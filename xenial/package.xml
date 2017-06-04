@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="2">
+  <name>fastrtps</name>
+  <version>:{version}</version>
+  <description>Implementation of RTPS standard.</description>
+  <maintainer email="stevenragnarok@osrfoundation.org">Steven! Ragnarök</maintainer>
+  <license>Apache License 2.0</license>
+
+  <depend>asio-dev</depend>
+  <depend>tinxml2-dev</depend>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>
+
