@@ -8,6 +8,7 @@
   <license>Apache License 2.0</license>
 
   <depend>asio-dev</depend>
+  <depend>fastcdr</depend>
   <depend>tinxml2-dev</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
