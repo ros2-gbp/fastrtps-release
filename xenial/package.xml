@@ -9,7 +9,7 @@
 
   <depend>asio</depend>
   <depend>fastcdr</depend>
-  <depend>tinxml2</depend>
+  <depend>tinyxml2</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
