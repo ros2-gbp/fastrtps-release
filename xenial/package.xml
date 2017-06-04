@@ -7,9 +7,9 @@
   <maintainer email="stevenragnarok@osrfoundation.org">Steven! Ragnarök</maintainer>
   <license>Apache License 2.0</license>
 
-  <depend>asio-dev</depend>
+  <depend>asiov</depend>
   <depend>fastcdr</depend>
-  <depend>tinxml2-dev</depend>
+  <depend>tinxml2v</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
