@@ -16,7 +16,7 @@ tracks:
     last_version: 1.4.0
     name: upstream
     patches: xenial
-    release_inc: '0'
+    release_inc: '1'
     release_repo_url: git@github.com:nuclearsandwich/fastrtps-release
     release_tag: master
     ros_distro: r2b2
