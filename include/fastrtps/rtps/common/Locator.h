@@ -132,7 +132,7 @@ class RTPS_DllAPI Locator_t
             return addr;
         }
 
-        bool set_IP6_address(uint16_t group0, uint16_t group1, uint16_t group2, uint16_t group3, 
+        bool set_IP6_address(uint16_t group0, uint16_t group1, uint16_t group2, uint16_t group3,
                 uint16_t group4, uint16_t group5, uint16_t group6, uint16_t group7)
         {
             address[0]  = (octet) (group0 >> 8);
@@ -343,7 +343,7 @@ class LocatorList_t
 
         RTPS_DllAPI void erase(const Locator_t& loc)
         {
-            m_locators.erase(std::remove(m_locators.begin(), m_locators.end(), loc), m_locators.end());
+            std::remove(m_locators.begin(), m_locators.end(), loc);
         }
 
         RTPS_DllAPI bool contains(const Locator_t& loc)

@@ -91,7 +91,6 @@ set(${PROJECT_NAME}_source_files
     rtps/builtin/discovery/endpoint/EDP.cpp
     rtps/builtin/discovery/endpoint/EDPSimple.cpp
     rtps/builtin/discovery/endpoint/EDPSimpleListeners.cpp
-    rtps/builtin/discovery/endpoint/EDPStaticXML.cpp
     rtps/builtin/discovery/endpoint/EDPStatic.cpp
     rtps/builtin/liveliness/WLP.cpp
     rtps/builtin/liveliness/WLPListener.cpp
@@ -105,6 +104,10 @@ set(${PROJECT_NAME}_source_files
     rtps/exceptions/Exception.cpp
     rtps/attributes/PropertyPolicy.cpp
     rtps/common/Token.cpp
+    xmlparser/XMLParserCommon.cpp
+    xmlparser/XMLProfileElementParser.cpp
+    xmlparser/XMLEndpointParser.cpp
+    xmlparser/XMLProfileParser.cpp
     )
 
 # Add sources to Makefile.am
@@ -404,10 +407,23 @@ if(MSVC OR MSVC_IDE)
             PATTERN "*.pdb"
             )
 
-        if(EPROSIMA_INSTALLER_MINION AND EPROSIMA_INSTALLER_OPENSSL_ROOT)
-            install(FILES ${EPROSIMA_INSTALLER_OPENSSL_ROOT}/bin/libeay32.dll
-                ${EPROSIMA_INSTALLER_OPENSSL_ROOT}/bin/ssleay32.dll
+        if(NOT (("${MSVC_ARCH}" STREQUAL "i86Win32VS2013") OR ("${MSVC_ARCH}" STREQUAL "x64Win64VS2013")))
+            install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_static.dir/Debug/${PROJECT_NAME}_static.pdb
+                DESTINATION ${LIB_INSTALL_DIR}${DIR_EXTENSION}
+                COMPONENT libraries_${MSVC_ARCH}
+                CONFIGURATIONS Debug
+                )
+        endif()
+
+        if(EPROSIMA_INSTALLER_MINION)
+            install(FILES ${OPENSSL_ROOT_DIR}/lib/libeay32.dll
                 DESTINATION ${BIN_INSTALL_DIR}${DIR_EXTENSION}
+                COMPONENT libraries_${MSVC_ARCH}
+                )
+
+            install(FILES ${OPENSSL_ROOT_DIR}/lib/VC/static/libeay32MD.lib
+                ${OPENSSL_ROOT_DIR}/lib/VC/static/libeay32MDd.lib
+                DESTINATION ${LIB_INSTALL_DIR}${DIR_EXTENSION}
                 COMPONENT libraries_${MSVC_ARCH}
                 )
         endif()

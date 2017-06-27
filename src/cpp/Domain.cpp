@@ -30,12 +30,16 @@
 
 #include <fastrtps/log/Log.h>
 
+#include <fastrtps/xmlparser/XMLProfileParser.h>
+
 using namespace eprosima::fastrtps::rtps;
+using namespace eprosima::fastrtps::xmlparser;
 
 namespace eprosima {
 namespace fastrtps {
 
 std::vector<Domain::t_p_Participant> Domain::m_participants;
+bool Domain::default_xml_profiles_loaded = false;
 
 
 Domain::Domain()
@@ -109,10 +113,25 @@ bool Domain::removeSubscriber(Subscriber* sub)
     return false;
 }
 
+Participant* Domain::createParticipant(const std::string &participant_profile, ParticipantListener* listen)
+{
+    if (false == default_xml_profiles_loaded)
+    {
+        XMLProfileParser::loadDefaultXMLFile();
+        default_xml_profiles_loaded = true;
+    }
+
+    ParticipantAttributes participant_att;
+    if ( XMLP_ret::XML_ERROR == XMLProfileParser::fillParticipantAttributes(participant_profile, participant_att))
+    {
+        logError(PARTICIPANT, "Problem loading profile '" << participant_profile << "'");
+        return nullptr;
+    }
+    return createParticipant(participant_att, listen);
+}
 
 Participant* Domain::createParticipant(ParticipantAttributes& att,ParticipantListener* listen)
 {
-
     Participant* pubsubpar = new Participant();
     ParticipantImpl* pspartimpl = new ParticipantImpl(att,pubsubpar,listen);
     RTPSParticipant* part = RTPSDomain::createParticipant(att.rtps,&pspartimpl->m_rtps_listener);
@@ -133,8 +152,18 @@ Participant* Domain::createParticipant(ParticipantAttributes& att,ParticipantLis
     return pubsubpar;
 }
 
-Publisher* Domain::createPublisher(Participant* part,PublisherAttributes& att,
-        PublisherListener* listen )
+Publisher* Domain::createPublisher(Participant *part, const std::string &publisher_profile, PublisherListener *listen)
+{
+    PublisherAttributes publisher_att;
+    if ( XMLP_ret::XML_ERROR == XMLProfileParser::fillPublishertAttributes(publisher_profile, publisher_att))
+    {
+        logError(PUBLISHER, "Problem loading profile '" << publisher_profile << "'");
+        return nullptr;
+    }
+    return createPublisher(part, publisher_att, listen);
+}
+
+Publisher* Domain::createPublisher(Participant *part, PublisherAttributes &att, PublisherListener *listen)
 {
     for (auto it = m_participants.begin(); it != m_participants.end(); ++it)
     {
@@ -147,8 +176,18 @@ Publisher* Domain::createPublisher(Participant* part,PublisherAttributes& att,
     return nullptr;
 }
 
-Subscriber* Domain::createSubscriber(Participant* part,SubscriberAttributes& att,
-        SubscriberListener* listen )
+Subscriber* Domain::createSubscriber(Participant *part, const std::string &subscriber_profile, SubscriberListener *listen)
+{
+    SubscriberAttributes subscriber_att;
+    if ( XMLP_ret::XML_ERROR == XMLProfileParser::fillSubscribertAttributes(subscriber_profile, subscriber_att))
+    {
+        logError(PUBLISHER, "Problem loading profile '" << subscriber_profile << "'");
+        return nullptr;
+    }
+    return createSubscriber(part, subscriber_att, listen);
+}
+
+Subscriber* Domain::createSubscriber(Participant *part, SubscriberAttributes &att, SubscriberListener *listen)
 {
     for (auto it = m_participants.begin(); it != m_participants.end(); ++it)
     {
@@ -196,6 +235,22 @@ bool Domain::unregisterType(Participant* part, const char* typeName)
         {
             return part->mp_impl->unregisterType(typeName);
         }
+    }
+    return true;
+}
+
+bool Domain::loadXMLProfilesFile(const std::string &xml_profile_file)
+{
+    if (false == default_xml_profiles_loaded)
+    {
+        XMLProfileParser::loadDefaultXMLFile();
+        default_xml_profiles_loaded = true;
+    }
+
+    if ( XMLP_ret::XML_ERROR == XMLProfileParser::loadXMLFile(xml_profile_file))
+    {
+        logError(DOMAIN, "Problem loading XML file '" << xml_profile_file << "'");
+        return false;
     }
     return true;
 }

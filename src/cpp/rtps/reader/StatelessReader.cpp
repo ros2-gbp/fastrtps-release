@@ -117,7 +117,7 @@ bool StatelessReader::change_received(CacheChange_t* change, std::unique_lock<st
     return false;
 }
 
-bool StatelessReader::nextUntakenCache(CacheChange_t** change,WriterProxy** /*wpout*/)
+bool StatelessReader::nextUntakenCache(CacheChange_t** change, WriterProxy** /*wpout*/)
 {
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
     return mp_history->get_min_change(change);
@@ -168,7 +168,7 @@ bool StatelessReader::processDataMsg(CacheChange_t *change)
 
         CacheChange_t* change_to_add;
         if(reserveCache(&change_to_add, change->serializedPayload.length)) //Reserve a new cache from the corresponding cache pool
-        { 
+        {
 #if HAVE_SECURITY
             if(is_payload_protected())
             {
@@ -234,11 +234,12 @@ bool StatelessReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t
             // If CacheChange_t is completed, it will be returned;
             CacheChange_t* change_completed = fragmentedChangePitStop_->process(incomingChange, sampleSize, fragmentStartingNum);
 
+            // Try to remove previous CacheChange_t from PitStop.
+            fragmentedChangePitStop_->try_to_remove_until(incomingChange->sequenceNumber, incomingChange->writerGUID);
+
             // If the change was completed, process it.
             if(change_completed != nullptr)
             {
-                // Try to remove previous CacheChange_t from PitStop.
-                fragmentedChangePitStop_->try_to_remove_until(change_completed->sequenceNumber, change_completed->writerGUID);
 
                 CacheChange_t* change_to_add = nullptr;
 
