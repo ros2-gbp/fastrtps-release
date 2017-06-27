@@ -15,11 +15,11 @@ tracks:
     devel_branch: null
     last_version: 1.4.0
     name: upstream
-    patches: xenial
+    patches: r2b2
     release_inc: '1'
     release_repo_url: git@github.com:nuclearsandwich/fastrtps-release
     release_tag: master
     ros_distro: r2b2
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-RTPS.git
-    version: 1.4.0
+    version: :{ask}
