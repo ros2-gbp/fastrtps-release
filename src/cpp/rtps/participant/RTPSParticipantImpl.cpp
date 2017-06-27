@@ -332,7 +332,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(const RTPSParticipantAttributes& PParam
     mp_builtinProtocols = new BuiltinProtocols();
     if(!mp_builtinProtocols->initBuiltinProtocols(this,m_att.builtin))
     {
-        logWarning(RTPS_PARTICIPANT, "The builtin protocols were not corecctly initialized");
+        logError(RTPS_PARTICIPANT, "The builtin protocols were not correctly initialized");
     }
     //eClock::my_sleep(300);
 
@@ -854,9 +854,8 @@ void RTPSParticipantImpl::createReceiverResources(LocatorList_t& Locator_list, b
             //Push the new items into the ReceiverResource buffer
             m_receiverResourcelist.push_back(ReceiverControlBlock(std::move(*it_buffer)));
             //Create and init the MessageReceiver
-            //TODO(Ricardo) listenSocketBufferSize is too much size. Review
-            m_receiverResourcelist.back().mp_receiver = new MessageReceiver(this, m_att.listenSocketBufferSize);
-            m_receiverResourcelist.back().mp_receiver->init(m_att.listenSocketBufferSize);
+            m_receiverResourcelist.back().mp_receiver = new MessageReceiver(this, m_network_Factory.get_max_message_size_between_transports());
+            m_receiverResourcelist.back().mp_receiver->init(m_network_Factory.get_max_message_size_between_transports());
 
             //Init the thread
             m_receiverResourcelist.back().m_thread = new std::thread(&RTPSParticipantImpl::performListenOperation,this, &(m_receiverResourcelist.back()),(*it_loc));

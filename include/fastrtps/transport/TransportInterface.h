@@ -102,6 +102,10 @@ public:
                         const Locator_t& localLocator, Locator_t& remoteLocator) = 0;
 
    virtual LocatorList_t NormalizeLocator(const Locator_t& locator) = 0;
+
+   virtual LocatorList_t ShrinkLocatorLists(const std::vector<LocatorList_t>& locatorLists) = 0;
+
+   virtual bool is_local_locator(const Locator_t& locator) const = 0;
 };
 
 /**
@@ -111,6 +115,9 @@ public:
 struct TransportDescriptorInterface
 {
     TransportDescriptorInterface(uint32_t maximumMessageSize) : maxMessageSize(maximumMessageSize) {}
+
+    TransportDescriptorInterface(const TransportDescriptorInterface& t) : maxMessageSize(t.maxMessageSize) {}
+
     virtual ~TransportDescriptorInterface(){}
 
     uint32_t maxMessageSize;
