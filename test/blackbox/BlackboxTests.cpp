@@ -17,6 +17,8 @@
 #include "types/Data64kbType.h"
 #include "types/Data1mbType.h"
 
+#include <thread>
+
 /****** Auxiliary print functions  ******/
 template<class Type>
 void default_receive_print(const Type&)
@@ -88,6 +90,7 @@ void default_send_print(const Data1mb& data)
 #include "ReqRepAsReliableHelloWorldReplier.hpp"
 #include "PubSubReader.hpp"
 #include "PubSubWriter.hpp"
+#include "PubSubWriterReader.hpp"
 
 #include <fastrtps/rtps/RTPSDomain.h>
 #include <fastrtps/rtps/flowcontrol/ThroughputControllerDescriptor.h>
@@ -95,6 +98,8 @@ void default_send_print(const Data1mb& data)
 #include <fastrtps/transport/test_UDPv4Transport.h>
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
 #include <fastrtps/rtps/common/Locator.h>
+#include <fastrtps/xmlparser/XMLProfileParser.h>
+
 
 #include <thread>
 #include <memory>
@@ -1813,6 +1818,41 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_ok)
     reader.block_for_all();
 }
 
+// Used to detect Github issue #106
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_ok_same_participant)
+{
+    PubSubWriterReader<HelloWorldType> wreader(TEST_TOPIC_NAME);
+
+    PropertyPolicy property_policy;
+
+    property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
+                    "builtin.PKI-DH"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+                    "file://" + std::string(certs_path) + "/mainpubcert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+                    "file://" + std::string(certs_path) + "/mainpubkey.pem"));
+
+    wreader.property_policy(property_policy).init();
+
+    ASSERT_TRUE(wreader.isInitialized());
+
+    // Wait for discovery.
+    wreader.waitDiscovery();
+
+    auto data = default_helloworld_data_generator();
+
+    wreader.startReception(data);
+
+    // Send data
+    wreader.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    wreader.block_for_all();
+}
+
 BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_fail)
 {
     {
@@ -1987,6 +2027,45 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_rtps_ok)
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
     reader.block_for_all();
+}
+
+// Used to detect Github issue #106
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_rtps_ok_same_participant)
+{
+    PubSubWriterReader<HelloWorldType> wreader(TEST_TOPIC_NAME);
+
+    PropertyPolicy pub_property_policy, sub_property_policy,
+                   property_policy;
+
+    property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
+                    "builtin.PKI-DH"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+                    "file://" + std::string(certs_path) + "/mainpubcert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+                    "file://" + std::string(certs_path) + "/mainpubkey.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.crypto.plugin",
+                    "builtin.AES-GCM-GMAC"));
+    property_policy.properties().emplace_back("rtps.participant.rtps_protection_kind", "ENCRYPT");
+
+    wreader.property_policy(property_policy).init();
+
+    ASSERT_TRUE(wreader.isInitialized());
+
+    // Wait for discovery.
+    wreader.waitDiscovery();
+
+    auto data = default_helloworld_data_generator();
+
+    wreader.startReception(data);
+
+    // Send data
+    wreader.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    wreader.block_for_all();
 }
 
 BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_rtps_large_string)
@@ -2183,6 +2262,48 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_submessage_ok)
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
     reader.block_for_all();
+}
+
+// Used to detect Github issue #106
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_submessage_ok_same_participant)
+{
+    PubSubWriterReader<HelloWorldType> wreader(TEST_TOPIC_NAME);
+
+    PropertyPolicy pub_property_policy, sub_property_policy,
+                   property_policy;
+
+    property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
+                    "builtin.PKI-DH"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+                    "file://" + std::string(certs_path) + "/mainpubcert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+                    "file://" + std::string(certs_path) + "/mainpubkey.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.crypto.plugin",
+                    "builtin.AES-GCM-GMAC"));
+    pub_property_policy.properties().emplace_back("rtps.endpoint.submessage_protection_kind", "ENCRYPT");
+    sub_property_policy.properties().emplace_back("rtps.endpoint.submessage_protection_kind", "ENCRYPT");
+
+    wreader.property_policy(property_policy).
+        pub_property_policy(pub_property_policy).
+        sub_property_policy(sub_property_policy).init();
+
+    ASSERT_TRUE(wreader.isInitialized());
+
+    // Wait for discovery.
+    wreader.waitDiscovery();
+
+    auto data = default_helloworld_data_generator();
+
+    wreader.startReception(data);
+
+    // Send data
+    wreader.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    wreader.block_for_all();
 }
 
 BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_submessage_large_string)
@@ -2385,6 +2506,48 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_payload_ok)
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
     reader.block_for_all();
+}
+
+// Used to detect Github issue #106
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_payload_ok_same_participant)
+{
+    PubSubWriterReader<HelloWorldType> wreader(TEST_TOPIC_NAME);
+
+    PropertyPolicy pub_property_policy, sub_property_policy,
+                   property_policy;
+
+    property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
+                    "builtin.PKI-DH"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+                    "file://" + std::string(certs_path) + "/mainpubcert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+                    "file://" + std::string(certs_path) + "/mainpubkey.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.crypto.plugin",
+                    "builtin.AES-GCM-GMAC"));
+    pub_property_policy.properties().emplace_back("rtps.endpoint.payload_protection_kind", "ENCRYPT");
+    sub_property_policy.properties().emplace_back("rtps.endpoint.payload_protection_kind", "ENCRYPT");
+
+    wreader.property_policy(property_policy).
+        pub_property_policy(pub_property_policy).
+        sub_property_policy(sub_property_policy).init();
+
+    ASSERT_TRUE(wreader.isInitialized());
+
+    // Wait for discovery.
+    wreader.waitDiscovery();
+
+    auto data = default_helloworld_data_generator();
+
+    wreader.startReception(data);
+
+    // Send data
+    wreader.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    wreader.block_for_all();
 }
 
 BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_payload_large_string)
@@ -2741,6 +2904,53 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_all_data300kb)
 }
 
 #endif
+
+template<typename T>
+void send_async_data(PubSubWriter<T>& writer, std::list<typename T::type> data_to_send)
+{
+    // Send data
+    writer.send(data_to_send);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data_to_send.empty());
+}
+
+BLACKBOXTEST(BlackBox, PubSubAsReliableMultithreadKeepLast1)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    reader.history_depth(1).
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.history_depth(1).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Because its volatile the durability
+    // Wait for discovery.
+    writer.waitDiscovery();
+    reader.waitDiscovery();
+
+    auto data = default_helloworld_data_generator(300);
+
+    reader.startReception(data);
+
+    std::thread thr1(&send_async_data<HelloWorldType>, std::ref(writer),
+            std::list<HelloWorld>(data.begin(), std::next(data.begin(), 100)));
+    std::thread thr2(&send_async_data<HelloWorldType>, std::ref(writer),
+            std::list<HelloWorld>(std::next(data.begin(), 100), std::next(data.begin(), 200)));
+    std::thread thr3(&send_async_data<HelloWorldType>, std::ref(writer),
+            std::list<HelloWorld>(std::next(data.begin(), 200), data.end()));
+
+    thr1.join();
+    thr2.join();
+    thr3.join();
+
+    // Block reader until reception finished or timeout.
+    reader.block_for_at_least(105);
+}
 
 int main(int argc, char **argv)
 {

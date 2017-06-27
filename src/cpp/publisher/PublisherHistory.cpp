@@ -34,9 +34,19 @@ extern ::rtps::WriteParams WRITE_PARAM_DEFAULT;
 namespace eprosima {
 namespace fastrtps {
 
-PublisherHistory::PublisherHistory(PublisherImpl* pimpl,uint32_t payloadMaxSize,HistoryQosPolicy& history,
-        ResourceLimitsQosPolicy& resource,MemoryManagementPolicy_t mempolicy):
-    WriterHistory(HistoryAttributes(mempolicy, payloadMaxSize, resource.allocated_samples, resource.max_samples + 1)),
+PublisherHistory::PublisherHistory(PublisherImpl* pimpl, uint32_t payloadMaxSize, HistoryQosPolicy& history,
+        ResourceLimitsQosPolicy& resource, MemoryManagementPolicy_t mempolicy):
+    WriterHistory(HistoryAttributes(mempolicy, payloadMaxSize,
+                history.kind == KEEP_ALL_HISTORY_QOS ?
+                        resource.allocated_samples :
+                        pimpl->getAttributes().topic.getTopicKind() == NO_KEY ?
+                            std::min(resource.allocated_samples, history.depth) :
+                            std::min(resource.allocated_samples, history.depth * resource.max_instances),
+                history.kind == KEEP_ALL_HISTORY_QOS ?
+                        resource.max_samples :
+                        pimpl->getAttributes().topic.getTopicKind() == NO_KEY ?
+                            history.depth :
+                            history.depth * resource.max_instances)),
     m_historyQos(history),
     m_resourceLimitsQos(resource),
     mp_pubImpl(pimpl)
@@ -60,11 +70,23 @@ bool PublisherHistory::add_pub_change(CacheChange_t* change, WriteParams &wparam
     }
 
     std::lock_guard<std::recursive_mutex> guard(*this->mp_mutex);
-    if(m_isHistoryFull && !this->mp_pubImpl->clean_history(1))
+    if(m_isHistoryFull)
     {
-        logWarning(RTPS_HISTORY,"Attempting to add Data to Full WriterCache: "<<this->mp_pubImpl->getGuid().entityId);
-        return false;
+        bool ret = false;
+
+        if(m_historyQos.kind == KEEP_ALL_HISTORY_QOS)
+            ret = this->mp_pubImpl->clean_history(1);
+        else if(m_historyQos.kind == KEEP_LAST_HISTORY_QOS)
+            ret = this->remove_min_change();
+
+        if(!ret)
+        {
+            logWarning(RTPS_HISTORY,"Attempting to add Data to Full WriterCache: "<<this->mp_pubImpl->getGuid().entityId);
+            return false;
+        }
     }
+
+    assert(!m_isHistoryFull);
 
     bool returnedValue = false;
 
@@ -72,21 +94,7 @@ bool PublisherHistory::add_pub_change(CacheChange_t* change, WriteParams &wparam
     if(mp_pubImpl->getAttributes().topic.getTopicKind() == NO_KEY)
     {
         if(this->add_change(change))
-        {
-            if(m_historyQos.kind == KEEP_ALL_HISTORY_QOS)
-            {
-                if((int32_t)m_changes.size()>=m_resourceLimitsQos.max_samples)
-                    m_isHistoryFull = true;
-            }
-            else
-            {
-                //KEEP_LAST_HISTORY_QoS
-                if((int32_t)m_changes.size()>=m_historyQos.depth)
-                    m_isHistoryFull = true;
-            }
-
             returnedValue = true;
-        }
     }
     //HISTORY WITH KEY
     else if(mp_pubImpl->getAttributes().topic.getTopicKind() == WITH_KEY)
@@ -124,22 +132,10 @@ bool PublisherHistory::add_pub_change(CacheChange_t* change, WriteParams &wparam
             {
                 if(this->add_change(change))
                 {
-
                     logInfo(RTPS_HISTORY,this->mp_pubImpl->getGuid().entityId <<" Change "
                             << change->sequenceNumber << " added with key: "<<change->instanceHandle
                             << " and "<<change->serializedPayload.length<< " bytes");
                     vit->second.push_back(change);
-                    if(m_historyQos.kind == KEEP_ALL_HISTORY_QOS)
-                    {
-                        if((int32_t)m_changes.size()==m_resourceLimitsQos.max_samples)
-                            m_isHistoryFull = true;
-                    }
-                    else
-                    {
-                        if((int32_t)m_changes.size()==m_historyQos.depth*m_resourceLimitsQos.max_instances)
-                            m_isHistoryFull = true;
-                    }
-
                     returnedValue =  true;
                 }
             }
