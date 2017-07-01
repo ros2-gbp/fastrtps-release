@@ -12,13 +12,13 @@ tracks:
       -i :{release_inc} --os-name debian --os-not-required
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc}
-    devel_branch: null
+    devel_branch: master
     last_version: 1.5.0
     name: upstream
     patches: r2b2
     release_inc: '0'
-    release_repo_url: git@github.com:nuclearsandwich/fastrtps-release
-    release_tag: master
+    release_repo_url: git@github.com:ros2-gbp/fastrtps-release
+    release_tag: b96e02861239a1ca3d1cb91a4760bba4c1df3498
     ros_distro: r2b2
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-RTPS.git
