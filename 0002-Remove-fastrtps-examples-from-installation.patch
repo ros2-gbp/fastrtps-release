@@ -1,0 +1,21 @@
+From 1c12b1272d7835d6d5f4d84f4d80445277fb5c44 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?= <steven@nuclearsandwich.com>
+Date: Wed, 5 Jul 2017 14:31:29 -0400
+Subject: [PATCH 2/2] Remove fastrtps examples from installation.
+
+---
+ debian/rules.em | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/debian/rules.em b/debian/rules.em
+index 466d55e..303653b 100755
+--- a/debian/rules.em
++++ b/debian/rules.em
+@@ -61,3 +61,4 @@ override_dh_auto_install:
+ 	# set things like CMAKE_PREFIX_PATH, PKG_CONFIG_PATH, and PYTHONPATH.
+ 	if [ -f "@(InstallationPrefix)/setup.sh" ]; then . "@(InstallationPrefix)/setup.sh"; fi && \
+ 	dh_auto_install
++	rm -r $(CURDIR)/debian/@(Package)/@(InstallationPrefix)/examples
+-- 
+2.7.4
+
