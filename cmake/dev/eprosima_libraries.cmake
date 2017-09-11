@@ -59,6 +59,7 @@ macro(find_eprosima_package package)
                 ${BUILD_OPTION}
                 ${ANDROID_BUILD_OPTIONS}
                 "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+                "-DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}"
                 "-DMINION=ON"
                 "-DEPROSIMA_INSTALLER_MINION=${EPROSIMA_INSTALLER_MINION}"
                 "-DBIN_INSTALL_DIR:PATH=${BIN_INSTALL_DIR}"
@@ -172,7 +173,7 @@ macro(find_eprosima_thirdparty package thirdparty_name)
 endmacro()
 
 macro(install_eprosima_libraries)
-    if((MSVC OR MSVC_IDE) AND EPROSIMA_BUILD AND NOT MINION)
+    if((MSVC OR MSVC_IDE) AND THIRDPARTY AND NOT MINION)
         if(EPROSIMA_INSTALLER)
             # Install includes. Take from x64Win64VS2013
             install(DIRECTORY ${PROJECT_BINARY_DIR}/eprosima_installer/x64Win64VS2015/install/${INCLUDE_INSTALL_DIR}/
@@ -251,7 +252,7 @@ macro(install_eprosima_libraries)
                 OPTIONAL
                 )
         endif()
-    elseif(UNIX AND EPROSIMA_BUILD AND NOT MINION AND NOT EPROSIMA_INSTALLER)
+    elseif(UNIX AND THIRDPARTY AND NOT MINION AND NOT EPROSIMA_INSTALLER)
             # Install includes
             install(DIRECTORY ${PROJECT_BINARY_DIR}/external/install/${INCLUDE_INSTALL_DIR}/
                 DESTINATION ${INCLUDE_INSTALL_DIR}
