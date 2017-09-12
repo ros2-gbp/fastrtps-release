@@ -1,0 +1,39 @@
+From fb4dd908e08eb85c1614991fca2694a359c08201 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?= <steven@nuclearsandwich.com>
+Date: Tue, 12 Sep 2017 19:20:37 -0400
+Subject: [PATCH] Enable security support.
+
+---
+ debian/control.em | 2 +-
+ debian/rules.em   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/debian/control.em b/debian/control.em
+index 7cbf65a..4d6f671 100644
+--- a/debian/control.em
++++ b/debian/control.em
+@@ -2,7 +2,7 @@ Source: @(Package)
+ Section: misc
+ Priority: extra
+ Maintainer: @(Maintainer)
+-Build-Depends: debhelper (>= @(debhelper_version).0.0), @(', '.join(BuildDepends))
++Build-Depends: debhelper (>= @(debhelper_version).0.0), libssl-dev, @(', '.join(BuildDepends))
+ Homepage: @(Homepage)
+ Standards-Version: 3.9.2
+ 
+diff --git a/debian/rules.em b/debian/rules.em
+index aa010fa..a56087e 100755
+--- a/debian/rules.em
++++ b/debian/rules.em
+@@ -26,7 +26,7 @@ override_dh_auto_configure:
+ 	# in the install tree that was dropped by catkin, and source it.  It will
+ 	# set things like CMAKE_PREFIX_PATH, PKG_CONFIG_PATH, and PYTHONPATH.
+ 	if [ -f "@(InstallationPrefix)/setup.sh" ]; then . "@(InstallationPrefix)/setup.sh"; fi && \
+-	dh_auto_configure -- -DCMAKE_INSTALL_PREFIX="@(InstallationPrefix)"
++	dh_auto_configure -- -DCMAKE_INSTALL_PREFIX="@(InstallationPrefix)" -DSECURITY=ON
+ 
+ override_dh_auto_build:
+ 	# In case we're installing to a non-standard location, look for a setup.sh
+-- 
+2.7.4
+
