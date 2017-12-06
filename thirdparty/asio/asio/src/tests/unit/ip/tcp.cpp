@@ -2,7 +2,7 @@
 // tcp.cpp
 // ~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -303,6 +303,9 @@ void test()
 
     socket1.close();
     socket1.close(ec);
+
+    socket1.release();
+    socket1.release(ec);
 
     ip::tcp::socket::native_handle_type native_socket4
       = socket1.native_handle();
@@ -870,6 +873,9 @@ void test()
     acceptor1.close();
     acceptor1.close(ec);
 
+    acceptor1.release();
+    acceptor1.release(ec);
+
     ip::tcp::acceptor::native_handle_type native_acceptor4
       = acceptor1.native_handle();
     (void)native_acceptor4;
@@ -1304,19 +1310,19 @@ void test()
 
   ip::tcp::iostream ios1;
 
-#if defined(ASIO_HAS_MOVE)
+#if defined(ASIO_HAS_STD_IOSTREAM_MOVE)
   ip::tcp::iostream ios2(std::move(sock));
-#endif // defined(ASIO_HAS_MOVE)
+#endif // defined(ASIO_HAS_STD_IOSTREAM_MOVE)
 
   ip::tcp::iostream ios3("hostname", "service");
 
   // basic_socket_iostream operators.
 
-#if defined(ASIO_HAS_MOVE)
+#if defined(ASIO_HAS_STD_IOSTREAM_MOVE)
   ios1 = ip::tcp::iostream();
 
   ios2 = std::move(ios1);
-#endif // defined(ASIO_HAS_MOVE)
+#endif // defined(ASIO_HAS_STD_IOSTREAM_MOVE)
 
   // basic_socket_iostream members.
 

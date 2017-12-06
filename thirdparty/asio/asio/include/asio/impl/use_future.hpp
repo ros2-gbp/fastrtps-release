@@ -2,7 +2,7 @@
 // impl/use_future.hpp
 // ~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -174,7 +174,7 @@ class promise_invoker
 public:
   promise_invoker(const shared_ptr<std::promise<T> >& p,
       ASIO_MOVE_ARG(F) f)
-    : p_(p), f_(f)
+    : p_(p), f_(ASIO_MOVE_CAST(F)(f))
   {
   }
 
@@ -277,10 +277,8 @@ protected:
   template <typename Allocator>
   void create_promise(const Allocator& a)
   {
-    p_ = std::allocate_shared<std::promise<T>>(
-        typename Allocator::template rebind<char>::other(a),
-        std::allocator_arg,
-        typename Allocator::template rebind<char>::other(a));
+    ASIO_REBIND_ALLOC(Allocator, char) b(a);
+    p_ = std::allocate_shared<std::promise<T>>(b, std::allocator_arg, b);
   }
 
   shared_ptr<std::promise<T> > p_;

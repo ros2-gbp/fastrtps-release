@@ -313,6 +313,18 @@ class PubSubReader
             return *this;
         }
 
+        PubSubReader& disable_builtin_transport()
+        {
+            participant_attr_.rtps.useBuiltinTransports = false;
+            return *this;
+        }
+
+        PubSubReader& add_user_transport_to_pparams(std::shared_ptr<TransportDescriptorInterface> userTransportDescriptor)
+        {
+            participant_attr_.rtps.userTransports.push_back(userTransportDescriptor);
+            return *this;
+        }
+
         PubSubReader& resource_limits_allocated_samples(const int32_t initial)
         {
             subscriber_attr_.topic.resourceLimitsQos.allocated_samples = initial;
@@ -341,6 +353,18 @@ class PubSubReader
         PubSubReader& multicastLocatorList(LocatorList_t multicastLocators)
         {
             subscriber_attr_.multicastLocatorList = multicastLocators;
+            return *this;
+        }
+
+        PubSubReader& metatraffic_unicast_locator_list(LocatorList_t unicastLocators)
+        {
+            participant_attr_.rtps.builtin.metatrafficUnicastLocatorList = unicastLocators;
+            return *this;
+        }
+
+        PubSubReader& initial_peers(LocatorList_t initial_peers)
+        {
+            participant_attr_.rtps.builtin.initialPeersList = initial_peers;
             return *this;
         }
 
@@ -415,6 +439,13 @@ class PubSubReader
         PubSubReader& userData(std::vector<octet> user_data)
         {
             participant_attr_.rtps.userData = user_data;
+            return *this;
+        }
+
+        PubSubReader& lease_duration(Duration_t lease_duration, Duration_t announce_period)
+        {
+            participant_attr_.rtps.builtin.leaseDuration = lease_duration;
+            participant_attr_.rtps.builtin.leaseDuration_announcementperiod = announce_period;
             return *this;
         }
 

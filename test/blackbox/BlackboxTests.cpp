@@ -126,6 +126,16 @@ uint32_t global_port = 0;
 static const char* certs_path = nullptr;
 #endif
 
+uint32_t get_port()
+{
+    uint32_t port = GET_PID();
+
+    if(port + 7400 > port)
+        port += 7400;
+
+    return port;
+}
+
 class BlackboxEnvironment : public ::testing::Environment
 {
     public:
@@ -1758,6 +1768,100 @@ BLACKBOXTEST(BlackBox, EDPSlaveReaderAttachment)
     checker.block_until_discover_topic(checker.topic_name(), 1);
     checker.block_until_discover_partition("test", 0);
     checker.block_until_discover_partition("othertest", 0);
+}
+
+// Used to detect Github issue #155
+BLACKBOXTEST(BlackBox, EndpointRediscovery)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    auto testTransport = std::make_shared<test_UDPv4TransportDescriptor>();
+    reader.disable_builtin_transport();
+    reader.add_user_transport_to_pparams(testTransport);
+
+    reader.lease_duration({3, 0}, {1, 0}).reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    // To simulate lossy conditions, we are going to remove the default
+    // bultin transport, and instead use a lossy shim layer variant.
+    testTransport = std::make_shared<test_UDPv4TransportDescriptor>();
+    // We drop 20% of all data frags
+    writer.disable_builtin_transport();
+    writer.add_user_transport_to_pparams(testTransport);
+
+    writer.lease_duration({6, 0}, {2, 0}).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Because its volatile the durability
+    // Wait for discovery.
+    writer.waitDiscovery();
+    reader.waitDiscovery();
+
+    // Wait heartbeat period
+    std::this_thread::sleep_for(std::chrono::seconds(4));
+
+    test_UDPv4Transport::ShutdownAllNetwork = true;
+
+    writer.waitRemoval();
+
+    test_UDPv4Transport::ShutdownAllNetwork = false;
+
+    writer.waitDiscovery();
+}
+
+// Used to detect Github issue #154
+BLACKBOXTEST(BlackBox, LocalInitialPeers)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    uint32_t port = get_port();
+
+    Locator_t loc_initial_peer, loc_default_unicast;
+    LocatorList_t reader_initial_peers;
+    loc_initial_peer.set_IP4_address(127, 0, 0, 1);
+    loc_initial_peer.port = port;
+    reader_initial_peers.push_back(loc_initial_peer);
+    LocatorList_t reader_default_unicast_locator;
+    loc_default_unicast.port = port + 1;
+    reader_default_unicast_locator.push_back(loc_default_unicast);
+
+    reader.metatraffic_unicast_locator_list(reader_default_unicast_locator).
+        initial_peers(reader_initial_peers).
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    LocatorList_t writer_initial_peers;
+    loc_initial_peer.port = port + 1;
+    writer_initial_peers.push_back(loc_initial_peer);
+    LocatorList_t writer_default_unicast_locator;
+    loc_default_unicast.port = port;
+    writer_default_unicast_locator.push_back(loc_default_unicast);
+
+    writer.metatraffic_unicast_locator_list(writer_default_unicast_locator).
+        initial_peers(writer_initial_peers).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Because its volatile the durability
+    // Wait for discovery.
+    writer.waitDiscovery();
+    reader.waitDiscovery();
+
+    auto data = default_helloworld_data_generator();
+
+    reader.startReception(data);
+
+    // Send data
+    writer.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    reader.block_for_all();
 }
 
 #if HAVE_SECURITY

@@ -1241,7 +1241,9 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
         }
 
         // Search remote writer handle.
-        std::unique_lock<std::mutex> lock(mutex_);
+        mutex_.lock();
+        GUID_t writer_guid;
+        ReaderProxyData reader_data;
         auto wr_it = writer_handles_.find(message.destination_endpoint_key());
 
         if(wr_it != writer_handles_.end())
@@ -1252,10 +1254,15 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
             {
                 SecurityException exception;
 
-                if(!crypto_plugin_->cryptkeyexchange()->set_remote_datareader_crypto_tokens(*wr_it->second.writer_handle,
-                            *rd_it->second,
+                if(crypto_plugin_->cryptkeyexchange()->set_remote_datareader_crypto_tokens(*wr_it->second.writer_handle,
+                            *std::get<1>(rd_it->second),
                             message.message_data(),
                             exception))
+                {
+                    writer_guid = wr_it->first;
+                    reader_data = std::get<0>(rd_it->second);
+                }
+                else
                 {
                     logError(SECURITY, "Cannot set remote reader crypto tokens ("
                             << message.source_endpoint_key() << ") - (" << exception.what() << ")");
@@ -1268,6 +1275,14 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
         {
             logInfo(SECURITY, "Received Reader Cryptography message but not found local writer " <<
                     message.destination_endpoint_key());
+        }
+        mutex_.unlock();
+
+        // If writer was found and setting of crypto tokens works, then tell core to match writer and reader.
+        if(writer_guid != GUID_t::unknown())
+        {
+            participant_->pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(writer_guid,
+                    reader_data);
         }
     }
     else if(message.message_class_id().compare(GMCLASSID_SECURITY_WRITER_CRYPTO_TOKENS) == 0)
@@ -1294,7 +1309,9 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
         }
 
         // Search remote writer handle.
-        std::unique_lock<std::mutex> lock(mutex_);
+        mutex_.lock();
+        GUID_t reader_guid;
+        WriterProxyData writer_data;
         auto rd_it = reader_handles_.find(message.destination_endpoint_key());
 
         if(rd_it != reader_handles_.end())
@@ -1305,10 +1322,15 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
             {
                 SecurityException exception;
 
-                if(!crypto_plugin_->cryptkeyexchange()->set_remote_datawriter_crypto_tokens(*rd_it->second.reader_handle,
-                            *wr_it->second,
+                if(crypto_plugin_->cryptkeyexchange()->set_remote_datawriter_crypto_tokens(*rd_it->second.reader_handle,
+                            *std::get<1>(wr_it->second),
                             message.message_data(),
                             exception))
+                {
+                    reader_guid = rd_it->first;
+                    writer_data = std::get<0>(wr_it->second);
+                }
+                else
                 {
                     logError(SECURITY, "Cannot set remote writer crypto tokens ("
                             << message.source_endpoint_key() << ") - (" << exception.what() << ")");
@@ -1321,6 +1343,14 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
         {
             logInfo(SECURITY, "Received Writer Cryptography message but not found local reader " <<
                     message.destination_endpoint_key());
+        }
+        mutex_.unlock();
+
+        // If reader was found and setting of crypto tokens works, then tell core to match reader and writer.
+        if(reader_guid != GUID_t::unknown())
+        {
+            participant_->pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(reader_guid,
+                    writer_data);
         }
     }
     else
@@ -1811,6 +1841,9 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
 
             if(remote_reader_handle != nullptr && !remote_reader_handle->nil())
             {
+                GUID_t local_reader_guid;
+                WriterProxyData writer_data;
+
                 // Get local writer crypto tokens.
                 DatawriterCryptoTokenSeq local_writer_crypto_tokens;
                 if(crypto_plugin_->cryptkeyexchange()->create_local_datawriter_crypto_tokens(local_writer_crypto_tokens,
@@ -1819,7 +1852,8 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
                     if(remote_participant_key == participant_->getGuid())
                     {
                         logInfo(SECURITY, "Process successful discovering local reader " << remote_reader_data.guid());
-                        local_writer->second.associated_readers.emplace(remote_reader_data.guid(), remote_reader_handle);
+                        local_writer->second.associated_readers.emplace(remote_reader_data.guid(),
+                                std::make_tuple(remote_reader_data, remote_reader_handle));
 
                         // Search local reader.
                         auto local_reader = reader_handles_.find(remote_reader_data.guid());
@@ -1831,11 +1865,16 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
 
                             if(remote_writer!= local_reader->second.associated_writers.end())
                             {
-                                if(!crypto_plugin_->cryptkeyexchange()->set_remote_datawriter_crypto_tokens(
+                                if(crypto_plugin_->cryptkeyexchange()->set_remote_datawriter_crypto_tokens(
                                             *local_reader->second.reader_handle,
-                                            *remote_writer->second,
+                                            *std::get<1>(remote_writer->second),
                                             local_writer_crypto_tokens,
                                             exception))
+                                {
+                                    local_reader_guid = local_reader->first;
+                                    writer_data = std::get<0>(remote_writer->second);
+                                }
+                                else
                                 {
                                     logError(SECURITY, "Cannot set local reader crypto tokens ("
                                             << remote_reader_data.guid() << ") - (" << exception.what() << ")");
@@ -1895,7 +1934,8 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
                                 if(participant_volatile_message_secure_writer_history_->add_change(change))
                                 {
                                     logInfo(SECURITY, "Process successful discovering remote reader " << remote_reader_data.guid());
-                                    local_writer->second.associated_readers.emplace(remote_reader_data.guid(), remote_reader_handle);
+                                    local_writer->second.associated_readers.emplace(remote_reader_data.guid(),
+                                            std::make_tuple(remote_reader_data, remote_reader_handle));
                                     ret = true;
                                 }
                                 else
@@ -1923,20 +1963,40 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
 
                 // Check pending reader crypto messages.
                 auto pending = remote_reader_pending_messages_.find(remote_reader_data.guid());
+                bool pairing_cause_pending_message = false;
 
                 if(pending != remote_reader_pending_messages_.end())
                 {
-                    if(!crypto_plugin_->cryptkeyexchange()->set_remote_datareader_crypto_tokens(
+                    if(crypto_plugin_->cryptkeyexchange()->set_remote_datareader_crypto_tokens(
                                 *local_writer->second.writer_handle,
                                 *remote_reader_handle,
                                 pending->second,
                                 exception))
+                    {
+                        pairing_cause_pending_message = true;
+                    }
+                    else
                     {
                         logError(SECURITY, "Cannot set remote reader crypto tokens ("
                                 << remote_reader_data.guid() << ") - (" << exception.what() << ")");
                     }
 
                     remote_reader_pending_messages_.erase(pending);
+                }
+                lock.unlock();
+
+                // If reader was found and setting of crypto tokens works, then tell core to match reader and writer.
+                if(local_reader_guid != GUID_t::unknown())
+                {
+                    participant_->pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(
+                            local_reader_guid, writer_data);
+                }
+
+                // If writer was found and setting of crypto tokens works, then tell core to match writer and reader.
+                if(pairing_cause_pending_message)
+                {
+                    participant_->pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(
+                            writer_guid, remote_reader_data);
                 }
             }
             else
@@ -1980,7 +2040,7 @@ void SecurityManager::remove_reader(const GUID_t& writer_guid, const GUID_t& /*r
 
         if(rit != local_writer->second.associated_readers.end())
         {
-            crypto_plugin_->cryptokeyfactory()->unregister_datareader(rit->second, exception);
+            crypto_plugin_->cryptokeyfactory()->unregister_datareader(std::get<1>(rit->second), exception);
         }
         else
         {
@@ -2035,6 +2095,9 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
 
             if(remote_writer_handle != nullptr && !remote_writer_handle->nil())
             {
+                GUID_t local_writer_guid;
+                ReaderProxyData reader_data;
+
                 // Get local reader crypto tokens.
                 DatareaderCryptoTokenSeq local_reader_crypto_tokens;
                 if(crypto_plugin_->cryptkeyexchange()->create_local_datareader_crypto_tokens(local_reader_crypto_tokens,
@@ -2043,7 +2106,8 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
                     if(remote_participant_key == participant_->getGuid())
                     {
                         logInfo(SECURITY, "Process successful discovering local writer " << remote_writer_data.guid());
-                        local_reader->second.associated_writers.emplace(remote_writer_data.guid(), remote_writer_handle);
+                        local_reader->second.associated_writers.emplace(remote_writer_data.guid(),
+                                std::make_tuple(remote_writer_data, remote_writer_handle));
 
                         // Search local writer.
                         auto local_writer = writer_handles_.find(remote_writer_data.guid());
@@ -2055,11 +2119,16 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
 
                             if(remote_reader != local_writer->second.associated_readers.end())
                             {
-                                if(!crypto_plugin_->cryptkeyexchange()->set_remote_datareader_crypto_tokens(
+                                if(crypto_plugin_->cryptkeyexchange()->set_remote_datareader_crypto_tokens(
                                             *local_writer->second.writer_handle,
-                                            *remote_reader->second,
+                                            *std::get<1>(remote_reader->second),
                                             local_reader_crypto_tokens,
                                             exception))
+                                {
+                                    local_writer_guid = local_writer->first;
+                                    reader_data = std::get<0>(remote_reader->second);
+                                }
+                                else
                                 {
                                     logError(SECURITY, "Cannot set local writer crypto tokens ("
                                             << remote_writer_data.guid() << ") - (" << exception.what() << ")");
@@ -2119,7 +2188,8 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
                                 if(participant_volatile_message_secure_writer_history_->add_change(change))
                                 {
                                     logInfo(SECURITY, "Process successful discovering remote writer " << remote_writer_data.guid());
-                                    local_reader->second.associated_writers.emplace(remote_writer_data.guid(), remote_writer_handle);
+                                    local_reader->second.associated_writers.emplace(remote_writer_data.guid(),
+                                            std::make_tuple(remote_writer_data, remote_writer_handle));
                                     ret = true;
                                 }
                                 else
@@ -2148,20 +2218,40 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
 
                 // Check pending writer crypto messages.
                 auto pending = remote_writer_pending_messages_.find(remote_writer_data.guid());
+                bool pairing_cause_pending_message = false;
 
                 if(pending != remote_writer_pending_messages_.end())
                 {
-                    if(!crypto_plugin_->cryptkeyexchange()->set_remote_datawriter_crypto_tokens(
+                    if(crypto_plugin_->cryptkeyexchange()->set_remote_datawriter_crypto_tokens(
                                 *local_reader->second.reader_handle,
                                 *remote_writer_handle,
                                 pending->second,
                                 exception))
+                    {
+                        pairing_cause_pending_message = true;
+                    }
+                    else
                     {
                         logError(SECURITY, "Cannot set remote writer crypto tokens ("
                                 << remote_writer_data.guid() << ") - (" << exception.what() << ")");
                     }
 
                     remote_writer_pending_messages_.erase(pending);
+                }
+                lock.unlock();
+
+                // If writer was found and setting of crypto tokens works, then tell core to match writer and reader.
+                if(local_writer_guid != GUID_t::unknown())
+                {
+                    participant_->pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(
+                            local_writer_guid, reader_data);
+                }
+
+                // If reader was found and setting of crypto tokens works, then tell core to match reader and writer.
+                if(pairing_cause_pending_message)
+                {
+                    participant_->pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(
+                            reader_guid, remote_writer_data);
                 }
             }
             else
@@ -2205,7 +2295,7 @@ void SecurityManager::remove_writer(const GUID_t& reader_guid, const GUID_t& /*r
 
         if(wit != local_reader->second.associated_writers.end())
         {
-            crypto_plugin_->cryptokeyfactory()->unregister_datawriter(wit->second, exception);
+            crypto_plugin_->cryptokeyfactory()->unregister_datawriter(std::get<1>(wit->second), exception);
         }
         else
         {
@@ -2237,7 +2327,7 @@ bool SecurityManager::encode_writer_submessage(CDRMessage_t& message, const GUID
             const auto& rd_it_handle = wr_it->second.associated_readers.find(rd_it);
 
             if(rd_it_handle != wr_it->second.associated_readers.end())
-                receiving_datareader_crypto_list.push_back(rd_it_handle->second);
+                receiving_datareader_crypto_list.push_back(std::get<1>(rd_it_handle->second));
             else
             {
                 logError(SECURITY, "Cannot find remote reader " << rd_it);
@@ -2297,7 +2387,7 @@ bool SecurityManager::encode_reader_submessage(CDRMessage_t& message, const GUID
             const auto& wr_it_handle = rd_it->second.associated_writers.find(wr_it);
 
             if(wr_it_handle != rd_it->second.associated_writers.end())
-                receiving_datawriter_crypto_list.push_back(wr_it_handle->second);
+                receiving_datawriter_crypto_list.push_back(std::get<1>(wr_it_handle->second));
             else
             {
                 logError(SECURITY, "Cannot find remote writer " << wr_it);
@@ -2477,7 +2567,7 @@ bool SecurityManager::decode_serialized_payload(const SerializedPayload_t& secur
             SecurityException exception;
 
             if(crypto_plugin_->cryptotransform()->decode_serialized_payload(decode_payload,
-                        encode_payload, inline_qos, *rd_it->second.reader_handle, *wr_it_handle->second, exception))
+                        encode_payload, inline_qos, *rd_it->second.reader_handle, *std::get<1>(wr_it_handle->second), exception))
             {
                 if(decode_payload.size() <= payload.max_size) // TODO(Ricardo) Look if max_size can be 0.
                 {
@@ -2629,13 +2719,13 @@ bool SecurityManager::participant_authorized(const DiscoveredParticipantInfo::Au
 
     for(auto& remote_reader : temp_readers)
     {
-        participant_->pdpsimple()->getEDP()->pairingLaterReaderProxy(remote_reader.second, *participant_data,
+        participant_->pdpsimple()->getEDP()->pairing_reader_proxy_with_local_writer(remote_reader.second, *participant_data,
                 remote_reader.first);
     }
 
     for(auto& remote_writer : temp_writers)
     {
-        participant_->pdpsimple()->getEDP()->pairingLaterWriterProxy(remote_writer.second, *participant_data,
+        participant_->pdpsimple()->getEDP()->pairing_writer_proxy_with_local_reader(remote_writer.second, *participant_data,
                 remote_writer.first);
     }
 

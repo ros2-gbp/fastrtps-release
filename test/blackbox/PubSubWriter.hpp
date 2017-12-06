@@ -458,6 +458,18 @@ class PubSubWriter
         return *this;
     }
 
+    PubSubWriter& metatraffic_unicast_locator_list(LocatorList_t unicastLocators)
+    {
+        participant_attr_.rtps.builtin.metatrafficUnicastLocatorList = unicastLocators;
+        return *this;
+    }
+
+    PubSubWriter& initial_peers(LocatorList_t initial_peers)
+    {
+        participant_attr_.rtps.builtin.initialPeersList = initial_peers;
+        return *this;
+    }
+
     PubSubWriter& outLocatorList(LocatorList_t outLocators)
     {
         publisher_attr_.outLocatorList = outLocators;
@@ -528,6 +540,13 @@ class PubSubWriter
     PubSubWriter& attach_edp_listeners()
     {
         attachEDP_ = true;
+        return *this;
+    }
+
+    PubSubWriter& lease_duration(Duration_t lease_duration, Duration_t announce_period)
+    {
+        participant_attr_.rtps.builtin.leaseDuration = lease_duration;
+        participant_attr_.rtps.builtin.leaseDuration_announcementperiod = announce_period;
         return *this;
     }
 
