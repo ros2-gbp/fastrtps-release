@@ -11,7 +11,7 @@
   <depend>fastcdr</depend>
   <depend>tinyxml2</depend>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>cmake</buildtool_depend>
 
   <export>
     <build_type>cmake</build_type>
