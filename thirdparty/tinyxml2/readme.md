@@ -1,5 +1,8 @@
-TinyXML-2 [![TravisCI Status](https://travis-ci.org/leethomason/tinyxml2.svg?branch=master)](https://travis-ci.org/leethomason/tinyxml2) [![AppVeyor Status](https://ci.appveyor.com/api/projects/status/github/leethomason/tinyxml2?branch=master&svg=true)](https://ci.appveyor.com/project/leethomason/tinyxml2)
+TinyXML-2
 =========
+
+[![TravisCI Status](https://travis-ci.org/leethomason/tinyxml2.svg?branch=master)](https://travis-ci.org/leethomason/tinyxml2) [![AppVeyor Status](https://ci.appveyor.com/api/projects/status/github/leethomason/tinyxml2?branch=master&svg=true)](https://ci.appveyor.com/project/leethomason/tinyxml2)
+
 ![TinyXML-2 Logo](http://www.grinninglizard.com/tinyxml2/TinyXML2_small.png)
 
 TinyXML-2 is a simple, small, efficient, C++ XML parser that can be 
@@ -9,7 +12,7 @@ The master is hosted on github:
 https://github.com/leethomason/tinyxml2
 
 The online HTML version of these docs:
-http://grinninglizard.com/tinyxml2docs/index.html
+http://leethomason.github.io/tinyxml2/
 
 Examples are in the "related pages" tab of the HTML docs.
 
@@ -88,9 +91,8 @@ Advantages of TinyXML-2
 
 Advantages of TinyXML-1
 
-1.  Can report the location of parsing errors.
-2.  Support for some C++ STL conventions: streams and strings
-3.  Very mature and well debugged code base.
+1.  Support for some C++ STL conventions: streams and strings
+2.  Very mature and well debugged code base.
 
 Features
 --------
@@ -156,6 +158,15 @@ However, you may also use COLLAPSE_WHITESPACE, which will:
 
 Note that (currently) there is a performance impact for using COLLAPSE_WHITESPACE.
 It essentially causes the XML to be parsed twice.
+
+#### Error Reporting
+
+TinyXML-2 reports the line number of any errors in an XML document that
+cannot be parsed correctly. In addition, all nodes (elements, declarations,
+text, comments etc.) and attributes have a line number recorded as they are parsed.
+This allows an application that performs additional validation of the parsed
+XML document (e.g. application-implemented DTD validation) to report
+line number information in it's errors.
 
 ### Entities
 

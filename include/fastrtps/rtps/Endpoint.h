@@ -45,9 +45,13 @@ class ResourceEvent;
 class Endpoint
 {
     friend class RTPSParticipantImpl;
+
     protected:
+
     Endpoint(RTPSParticipantImpl* pimpl,GUID_t& guid,EndpointAttributes& att);
+
     virtual ~Endpoint();
+
     public:
 
     /**
@@ -88,7 +92,7 @@ class Endpoint
 
     private:
 
-    Endpoint& operator=(const Endpoint&)NON_COPYABLE_CXX11;
+    Endpoint& operator=(const Endpoint&) = delete;
 
 #if HAVE_SECURITY
     bool supports_rtps_protection_;

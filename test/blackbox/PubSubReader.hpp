@@ -54,9 +54,21 @@ class PubSubReader
 
                 ~ParticipantListener() {}
 
-                void onParticipantDiscovery(Participant*, ParticipantDiscoveryInfo info){
-                    if(reader_.onDiscovery_!=nullptr){
+                void onParticipantDiscovery(Participant*, ParticipantDiscoveryInfo info)
+                {
+                    if(reader_.onDiscovery_!=nullptr)
+                    {
                         reader_.discovery_result_ = reader_.onDiscovery_(info);
+
+                    }
+
+                    if(info.rtps.m_status == DISCOVERED_RTPSPARTICIPANT)
+                    {
+                        reader_.participant_matched();
+                    }
+                    else if(info.rtps.m_status == REMOVED_RTPSPARTICIPANT)
+                    {
+                        reader_.participant_unmatched();
                     }
                 }
 
@@ -72,7 +84,7 @@ class PubSubReader
 
             private:
 
-                ParticipantListener& operator=(const ParticipantListener&) NON_COPYABLE_CXX11;
+                ParticipantListener& operator=(const ParticipantListener&) = delete;
 
                 PubSubReader& reader_;
         } participant_listener_;
@@ -102,7 +114,7 @@ class PubSubReader
 
             private:
 
-                Listener& operator=(const Listener&) NON_COPYABLE_CXX11;
+                Listener& operator=(const Listener&) = delete;
 
                 PubSubReader& reader_;
         } listener_;
@@ -111,8 +123,9 @@ class PubSubReader
 
     public:
 
-        PubSubReader(const std::string& topic_name) : participant_listener_(*this), listener_(*this), participant_(nullptr), subscriber_(nullptr),
-        topic_name_(topic_name), initialized_(false), matched_(0), receiving_(false), current_received_count_(0),
+        PubSubReader(const std::string& topic_name) : participant_listener_(*this), listener_(*this),
+        participant_(nullptr), subscriber_(nullptr), topic_name_(topic_name), initialized_(false),
+        matched_(0), participant_matched_(0), receiving_(false), current_received_count_(0),
         number_samples_expected_(0), discovery_result_(false), onDiscovery_(nullptr)
 #if HAVE_SECURITY
         , authorized_(0), unauthorized_(0)
@@ -183,8 +196,9 @@ class PubSubReader
             total_msgs_ = msgs;
             number_samples_expected_ = total_msgs_.size();
             current_received_count_ = 0;
-            receiving_ = true;
             mutex_.unlock();
+
+            receiving_.store(true);
 
             bool ret = false;
             do
@@ -196,9 +210,7 @@ class PubSubReader
 
         void stopReception()
         {
-            mutex_.lock();
-            receiving_ = false;
-            mutex_.unlock();
+            receiving_.store(false);
         }
 
         void block_for_all()
@@ -241,23 +253,30 @@ class PubSubReader
 
             std::cout << "Reader is waiting discovery..." << std::endl;
 
-            if(matched_ == 0)
-                cvDiscovery_.wait(lock);
+            cvDiscovery_.wait(lock, [&](){return matched_ != 0;});
 
-            ASSERT_NE(matched_, 0u);
             std::cout << "Reader discovery finished..." << std::endl;
         }
 
-        void waitRemoval()
+        void wait_participant_undiscovery()
+        {
+            std::unique_lock<std::mutex> lock(mutexDiscovery_);
+
+            std::cout << "Reader is waiting undiscovery..." << std::endl;
+
+            cvDiscovery_.wait(lock, [&](){return participant_matched_ == 0;});
+
+            std::cout << "Reader undiscovery finished..." << std::endl;
+        }
+
+        void wait_writer_undiscovery()
         {
             std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
             std::cout << "Reader is waiting removal..." << std::endl;
 
-            if(matched_ != 0)
-                cvDiscovery_.wait(lock);
+            cvDiscovery_.wait(lock, [&](){return matched_ == 0;});
 
-            ASSERT_EQ(matched_, 0u);
             std::cout << "Reader removal finished..." << std::endl;
         }
 
@@ -464,9 +483,8 @@ class PubSubReader
         void receive_one(eprosima::fastrtps::Subscriber* subscriber, bool& returnedValue)
         {
             returnedValue = false;
-            std::unique_lock<std::mutex> lock(mutex_);
 
-            if(receiving_)
+            if(receiving_.load())
             {
                 type data;
                 SampleInfo_t info;
@@ -474,6 +492,8 @@ class PubSubReader
                 if(subscriber->takeNextData((void*)&data, &info))
                 {
                     returnedValue = true;
+
+                    std::unique_lock<std::mutex> lock(mutex_);
 
                     // Check order of changes.
                     ASSERT_LT(last_seq, info.sample_identity.sequence_number());
@@ -490,6 +510,20 @@ class PubSubReader
                     }
                 }
             }
+        }
+
+        void participant_matched()
+        {
+            std::unique_lock<std::mutex> lock(mutexDiscovery_);
+            ++participant_matched_;
+            cvDiscovery_.notify_one();
+        }
+
+        void participant_unmatched()
+        {
+            std::unique_lock<std::mutex> lock(mutexDiscovery_);
+            --participant_matched_;
+            cvDiscovery_.notify_one();
         }
 
         void matched()
@@ -524,7 +558,7 @@ class PubSubReader
         }
 #endif
 
-        PubSubReader& operator=(const PubSubReader&)NON_COPYABLE_CXX11;
+        PubSubReader& operator=(const PubSubReader&)= delete;
 
         eprosima::fastrtps::Participant *participant_;
         eprosima::fastrtps::ParticipantAttributes participant_attr_;
@@ -538,7 +572,8 @@ class PubSubReader
         std::mutex mutexDiscovery_;
         std::condition_variable cvDiscovery_;
         unsigned int matched_;
-        bool receiving_;
+        unsigned int participant_matched_;
+        std::atomic<bool> receiving_;
         type_support type_;
         SequenceNumber_t last_seq;
         size_t current_received_count_;

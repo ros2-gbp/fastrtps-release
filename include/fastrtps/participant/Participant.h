@@ -36,64 +36,67 @@ namespace fastrtps{
 class ParticipantImpl;
 class ParticipantAttributes;
 
-namespace rtps {
-class WriterProxyData;
-class ReaderProxyData;
+namespace rtps
+{
+    class WriterProxyData;
+    class ReaderProxyData;
 }
 
 /**
  * Class Participant used to group Publishers and Subscribers into a single working unit.
  * @ingroup FASTRTPS_MODULE
  */
-class RTPS_DllAPI Participant {
-	friend class Domain;
-	friend class ParticipantImpl;
-private:
+class RTPS_DllAPI Participant
+{
+    friend class Domain;
+    friend class ParticipantImpl;
 
-	Participant();
+    private:
 
-	virtual ~Participant();
+    Participant();
 
-	ParticipantImpl* mp_impl;
+    virtual ~Participant();
 
-public:
+    ParticipantImpl* mp_impl;
 
-	/**
-	*	Get the GUID_t of the associated RTPSParticipant.
-	* @return GUID_t
-	*/
-	const GUID_t& getGuid()const ;
+    public:
 
-	/**
-	* Get the ParticipantAttributes.
-	* @return ParticipantAttributes.
-	*/
-	const ParticipantAttributes& getAttributes();
+    /**
+     *	Get the GUID_t of the associated RTPSParticipant.
+     * @return GUID_t
+     */
+    const GUID_t& getGuid() const;
 
-	/**
-	* Called when using a StaticEndpointDiscovery mechanism different that the one
-	* included in FastRTPS, for example when communicating with other implementations.
-	* It indicates to the Participant that an Endpoint from the XML has been discovered and
-	* should be activated.
-	* @param partguid Participant GUID_t.
-	* @param userId User defined ID as shown in the XML file.
-	* @param kind EndpointKind (WRITER or READER)
-	* @return True if correctly found and activated.
-	*/
-	bool newRemoteEndpointDiscovered(const GUID_t& partguid, uint16_t userId,
-		EndpointKind_t kind);
+    /**
+     * Get the ParticipantAttributes.
+     * @return ParticipantAttributes.
+     */
+    const ParticipantAttributes& getAttributes() const;
 
-	/**
-	 * This method returns a pointer to the Endpoint Discovery Protocol Readers (when not in Static mode)
-	 * SimpleEDP creates two readers, one for Publishers and one for Subscribers, and they are both returned
-	 * as a std::pair of pointers. These readers in particular have modified listeners that allow a slave 
-	 * listener to attach its callbach to the original one, allowing for the addition of logging elements.
-	 * 
-	 * @return std::pair of pointers to the EDP Readers
-	 * */	
-	std::pair<StatefulReader*,StatefulReader*> getEDPReaders();
+    /**
+     * Called when using a StaticEndpointDiscovery mechanism different that the one
+     * included in FastRTPS, for example when communicating with other implementations.
+     * It indicates to the Participant that an Endpoint from the XML has been discovered and
+     * should be activated.
+     * @param partguid Participant GUID_t.
+     * @param userId User defined ID as shown in the XML file.
+     * @param kind EndpointKind (WRITER or READER)
+     * @return True if correctly found and activated.
+     */
+    bool newRemoteEndpointDiscovered(const GUID_t& partguid, uint16_t userId,
+            EndpointKind_t kind);
 
-	std::vector<std::string> getParticipantNames();
+    /**
+     * This method returns a pointer to the Endpoint Discovery Protocol Readers (when not in Static mode)
+     * SimpleEDP creates two readers, one for Publishers and one for Subscribers, and they are both returned
+     * as a std::pair of pointers. These readers in particular have modified listeners that allow a slave 
+     * listener to attach its callbach to the original one, allowing for the addition of logging elements.
+     * 
+     * @return std::pair of pointers to the EDP Readers
+     * */	
+    std::pair<StatefulReader*,StatefulReader*> getEDPReaders();
+
+    std::vector<std::string> getParticipantNames() const;
 
     bool get_remote_writer_info(const GUID_t& writerGuid, WriterProxyData& returnedInfo);
 

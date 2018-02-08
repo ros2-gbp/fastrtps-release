@@ -40,7 +40,7 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const CacheChange_t* const change_in)
+void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change_in)
 {
     CacheChange_t* change = (CacheChange_t*)change_in;
     //std::lock_guard<std::recursive_mutex> guard(*this->mp_SEDP->mp_PubReader.first->getMutex());
@@ -49,6 +49,13 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const C
     {
         logWarning(RTPS_EDP,"Received change with no Key");
     }
+
+    //Call the slave, if it exists
+    attached_listener_mutex.lock();
+    if(attached_listener != nullptr)
+        attached_listener->onNewCacheChangeAdded(this->mp_SEDP->mp_PubReader.first, change_in);
+    attached_listener_mutex.unlock();
+
     if(change->kind == ALIVE)
     {
         //LOAD INFORMATION IN TEMPORAL WRITER PROXY DATA
@@ -69,39 +76,23 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const C
                 mp_SEDP->mp_PubReader.second->remove_change(change);
                 return;
             }
+
             //LOOK IF IS AN UPDATED INFORMATION
-            WriterProxyData* wdata = nullptr;
-            ParticipantProxyData* pdata = nullptr;
-            if(this->mp_SEDP->mp_PDP->addWriterProxyData(&writerProxyData,true,&wdata,&pdata)) //ADDED NEW DATA
+            ParticipantProxyData pdata;
+            if(this->mp_SEDP->mp_PDP->addWriterProxyData(&writerProxyData, pdata)) //ADDED NEW DATA
             {
-                //CHECK the locators:
-                pdata->mp_mutex->lock();
-                if(wdata->unicastLocatorList().empty() && wdata->multicastLocatorList().empty())
-                {
-                    wdata->unicastLocatorList(pdata->m_defaultUnicastLocatorList);
-                    wdata->multicastLocatorList(pdata->m_defaultMulticastLocatorList);
-                }
-                wdata->isAlive(true);
-                pdata->mp_mutex->unlock();
-                mp_SEDP->pairing_writer_proxy_with_any_local_reader(pdata, wdata);
-            }
-            else if(pdata == nullptr) //RTPSParticipant NOT FOUND
-            {
-                logWarning(RTPS_EDP,"Received message from UNKNOWN RTPSParticipant, removing");
+                // At this point we can release reader lock, cause change is not used
+                reader->getMutex()->unlock();
+
+                mp_SEDP->pairing_writer_proxy_with_any_local_reader(&pdata, &writerProxyData);
+
+                // Take again the reader lock.
+                reader->getMutex()->lock();
             }
             else //NOT ADDED BECAUSE IT WAS ALREADY THERE
             {
-                pdata->mp_mutex->lock();
-                wdata->update(&writerProxyData);
-                pdata->mp_mutex->unlock();
-                mp_SEDP->pairing_writer_proxy_with_any_local_reader(pdata, wdata);
+                logWarning(RTPS_EDP,"Received message from UNKNOWN RTPSParticipant, removing");
             }
-
-            //Call the slave, if it exists
-            attached_listener_mutex.lock();
-            if(attached_listener != nullptr)
-                attached_listener->onNewCacheChangeAdded(this->mp_SEDP->mp_PubReader.first, change_in);
-            attached_listener_mutex.unlock();
         }
     }
     else
@@ -109,14 +100,8 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const C
         //REMOVE WRITER FROM OUR READERS:
         logInfo(RTPS_EDP,"Disposed Remote Writer, removing...");
 
-        //Call the slave, if it exists
-        attached_listener_mutex.lock();
-        if(attached_listener != nullptr)
-            attached_listener->onNewCacheChangeAdded(this->mp_SEDP->mp_PubReader.first, change_in);
-        attached_listener_mutex.unlock();
-
         GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
-        this->mp_SEDP->removeWriterProxy(auxGUID);
+        this->mp_SEDP->mp_PDP->removeWriterProxyData(auxGUID);
     }
 
     //Removing change from history
@@ -179,7 +164,7 @@ bool EDPSimpleSUBListener::computeKey(CacheChange_t* change)
     return compute_key(&aux_msg,change);
 }
 
-void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const CacheChange_t* const change_in)
+void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change_in)
 {
     CacheChange_t* change = (CacheChange_t*)change_in;
     //std::lock_guard<std::recursive_mutex> guard(*this->mp_SEDP->mp_SubReader.first->getMutex());
@@ -188,6 +173,13 @@ void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const C
     {
         logWarning(RTPS_EDP,"Received change with no Key");
     }
+
+    //Call the slave, if it exists
+    attached_listener_mutex.lock();
+    if(attached_listener != nullptr)
+        attached_listener->onNewCacheChangeAdded(this->mp_SEDP->mp_SubReader.first, change);
+    attached_listener_mutex.unlock();
+
     if(change->kind == ALIVE)
     {
         //LOAD INFORMATION IN TEMPORAL WRITER PROXY DATA
@@ -208,39 +200,23 @@ void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const C
                 mp_SEDP->mp_SubReader.second->remove_change(change);
                 return;
             }
+
             //LOOK IF IS AN UPDATED INFORMATION
-            ReaderProxyData* rdata = nullptr;
-            ParticipantProxyData* pdata = nullptr;
-            if(this->mp_SEDP->mp_PDP->addReaderProxyData(&readerProxyData,true,&rdata,&pdata)) //ADDED NEW DATA
+            ParticipantProxyData pdata;
+            if(this->mp_SEDP->mp_PDP->addReaderProxyData(&readerProxyData, pdata)) //ADDED NEW DATA
             {
-                pdata->mp_mutex->lock();
-                //CHECK the locators:
-                if(rdata->unicastLocatorList().empty() && rdata->multicastLocatorList().empty())
-                {
-                    rdata->unicastLocatorList(pdata->m_defaultUnicastLocatorList);
-                    rdata->multicastLocatorList(pdata->m_defaultMulticastLocatorList);
-                }
-                rdata->isAlive(true);
-                pdata->mp_mutex->unlock();
-                mp_SEDP->pairing_reader_proxy_with_any_local_writer(pdata, rdata);
+                // At this point we can release reader lock, cause change is not used
+                reader->getMutex()->unlock();
+
+                mp_SEDP->pairing_reader_proxy_with_any_local_writer(&pdata, &readerProxyData);
+
+                // Take again the reader lock.
+                reader->getMutex()->lock();
             }
-            else if(pdata == nullptr) //RTPSParticipant NOT FOUND
+            else
             {
                 logWarning(RTPS_EDP,"From UNKNOWN RTPSParticipant, removing");
             }
-            else //NOT ADDED BECAUSE IT WAS ALREADY THERE
-            {
-                pdata->mp_mutex->lock();
-                rdata->update(&readerProxyData);
-                pdata->mp_mutex->unlock();
-                mp_SEDP->pairing_reader_proxy_with_any_local_writer(pdata, rdata);
-            }
-
-            //Call the slave, if it exists
-            attached_listener_mutex.lock();
-            if(attached_listener != nullptr)
-                attached_listener->onNewCacheChangeAdded(this->mp_SEDP->mp_SubReader.first, change);
-            attached_listener_mutex.unlock();
         }
     }
     else
@@ -248,14 +224,8 @@ void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const C
         //REMOVE WRITER FROM OUR READERS:
         logInfo(RTPS_EDP,"Disposed Remote Reader, removing...");
 
-        //Call the slave, if it exists
-        attached_listener_mutex.lock();
-        if(attached_listener != nullptr)
-            attached_listener->onNewCacheChangeAdded(this->mp_SEDP->mp_SubReader.first, change);
-        attached_listener_mutex.unlock();
-
         GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
-        this->mp_SEDP->removeReaderProxy(auxGUID);
+        this->mp_SEDP->mp_PDP->removeReaderProxyData(auxGUID);
     }
 
     // Remove change from history.

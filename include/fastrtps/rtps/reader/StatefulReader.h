@@ -122,7 +122,7 @@ class StatefulReader:public RTPSReader
          * @param lock mutex protecting the StatefulReader.
          * @return True if added.
          */
-        bool change_received(CacheChange_t* a_change, WriterProxy* prox, std::unique_lock<std::recursive_mutex> &lock);
+        bool change_received(CacheChange_t* a_change, WriterProxy* prox);
 
         /**
          * Get the RTPS participant
@@ -180,7 +180,7 @@ class StatefulReader:public RTPSReader
 
     private:
 
-        bool acceptMsgFrom(GUID_t &entityGUID ,WriterProxy **wp, bool checkTrusted = true);
+        bool acceptMsgFrom(GUID_t &entityGUID ,WriterProxy **wp);
 
         /*!
          * @remarks Nn thread-safe.
