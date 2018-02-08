@@ -8,6 +8,10 @@
   <license>Apache License 2.0</license>
 
   <build_depend>asio</build_depend>
+  
+  <build_export_depend>libssl-dev</build_export_depend>
+  
+  <exec_depend>libssl-dev</exec_depend>
 
   <depend>fastcdr</depend>
   <depend>tinyxml2</depend>
