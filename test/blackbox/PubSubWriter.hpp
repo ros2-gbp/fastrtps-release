@@ -49,6 +49,24 @@ class PubSubWriter
 
             ~ParticipantListener() {}
 
+            void onParticipantDiscovery(Participant*, ParticipantDiscoveryInfo info)
+            {
+                if(writer_.onDiscovery_!=nullptr)
+                {
+                    writer_.discovery_result_ = writer_.onDiscovery_(info);
+
+                }
+
+                if(info.rtps.m_status == DISCOVERED_RTPSPARTICIPANT)
+                {
+                    writer_.participant_matched();
+                }
+                else if(info.rtps.m_status == REMOVED_RTPSPARTICIPANT)
+                {
+                    writer_.participant_unmatched();
+                }
+            }
+
 #if HAVE_SECURITY
             void onParticipantAuthentication(Participant*, const ParticipantAuthenticationInfo& info)
             {
@@ -61,7 +79,7 @@ class PubSubWriter
 
         private:
 
-            ParticipantListener& operator=(const ParticipantListener&) NON_COPYABLE_CXX11;
+            ParticipantListener& operator=(const ParticipantListener&) = delete;
 
             PubSubWriter& writer_;
     } participant_listener_;
@@ -84,7 +102,7 @@ class PubSubWriter
 
         private:
 
-            Listener& operator=(const Listener&) NON_COPYABLE_CXX11;
+            Listener& operator=(const Listener&) = delete;
 
             PubSubWriter &writer_;
 
@@ -124,13 +142,21 @@ class PubSubWriter
                     iHandle2GUID(readerGuid, change_in->instanceHandle);
 
                     if(writer_.participant_->get_remote_reader_info(readerGuid, readerInfo))
+                    {
+                        std::cout << "Undiscovered reader of topic " << readerInfo.topicName() << std::endl;
                         writer_.remove_reader_info(readerInfo);
+                    }
+                    else
+                    {
+                        std::cout << "Error getting remote reader info for topic " << readerInfo.topicName()
+                            << std::endl;
+                    }
                 }
             }
 
         private:
 
-            EDPTakeReaderInfo& operator=(const EDPTakeReaderInfo&) NON_COPYABLE_CXX11;
+            EDPTakeReaderInfo& operator=(const EDPTakeReaderInfo&) = delete;
 
             PubSubWriter &writer_;
     };
@@ -161,6 +187,10 @@ class PubSubWriter
                         std::cout << "Discovered writer of topic " << writerInfo.topicName() << std::endl;
                         writer_.add_writer_info(writerInfo);
                     }
+                    else
+                    {
+                        std::cout << "Error reading cdr message for topic " << writerInfo.topicName() << std::endl;
+                    }
                 }
                 else
                 {
@@ -169,13 +199,21 @@ class PubSubWriter
                     iHandle2GUID(writerGuid, change_in->instanceHandle);
 
                     if(writer_.participant_->get_remote_writer_info(writerGuid, writerInfo))
+                    {
+                        std::cout << "Undiscovered writer of topic " << writerInfo.topicName() << std::endl;
                         writer_.remove_writer_info(writerInfo);
+                    }
+                    else
+                    {
+                        std::cout << "Error getting remote writer info for topic " << writerInfo.topicName()
+                            << std::endl;
+                    }
                 }
             }
 
         private:
 
-            EDPTakeWriterInfo& operator=(const EDPTakeWriterInfo&) NON_COPYABLE_CXX11;
+            EDPTakeWriterInfo& operator=(const EDPTakeWriterInfo&) = delete;
 
             PubSubWriter &writer_;
     };
@@ -185,9 +223,10 @@ class PubSubWriter
     typedef TypeSupport type_support;
     typedef typename type_support::type type;
 
-    PubSubWriter(const std::string &topic_name) : participant_listener_(*this), listener_(*this), participant_(nullptr),
-    publisher_(nullptr), initialized_(false), matched_(0),
-    attachEDP_(false), edpReaderListener_(*this), edpWriterListener_(*this)
+    PubSubWriter(const std::string &topic_name) : participant_listener_(*this), listener_(*this),
+    participant_(nullptr), publisher_(nullptr), initialized_(false), matched_(0),
+    participant_matched_(0), attachEDP_(false), edpReaderListener_(*this), edpWriterListener_(*this),
+    discovery_result_(false), onDiscovery_(nullptr)
 #if HAVE_SECURITY
     , authorized_(0), unauthorized_(0)
 #endif
@@ -283,29 +322,41 @@ class PubSubWriter
         }
     }
 
+    bool send_sample(type& msg)
+    {
+        return publisher_->write((void*)&msg);
+    }
+
     void waitDiscovery()
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
         std::cout << "Writer is waiting discovery..." << std::endl;
 
-        if(matched_ == 0)
-            cv_.wait(lock);
+        cv_.wait(lock, [&](){return matched_ != 0;});
 
-        ASSERT_NE(matched_, 0u);
         std::cout << "Writer discovery finished..." << std::endl;
     }
 
-    void waitRemoval()
+    void wait_participant_undiscovery()
+    {
+        std::unique_lock<std::mutex> lock(mutexDiscovery_);
+
+        std::cout << "Writer is waiting undiscovery..." << std::endl;
+
+        cv_.wait(lock, [&](){return participant_matched_ == 0;});
+
+        std::cout << "Writer undiscovery finished..." << std::endl;
+    }
+
+    void wait_reader_undiscovery()
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
         std::cout << "Writer is waiting removal..." << std::endl;
 
-        if(matched_ != 0)
-            cv_.wait(lock);
+        cv_.wait(lock, [&](){return matched_ == 0;});
 
-        ASSERT_EQ(matched_, 0u);
         std::cout << "Writer removal finished..." << std::endl;
     }
 
@@ -375,6 +426,12 @@ class PubSubWriter
     PubSubWriter& reliability(const eprosima::fastrtps::ReliabilityQosPolicyKind kind)
     {
         publisher_attr_.qos.m_reliability.kind = kind;
+        return *this;
+    }
+
+    PubSubWriter& max_blocking_time(const Duration_t time)
+    {
+        publisher_attr_.qos.m_reliability.max_blocking_time = time;
         return *this;
     }
 
@@ -554,6 +611,20 @@ class PubSubWriter
 
     private:
 
+    void participant_matched()
+    {
+        std::unique_lock<std::mutex> lock(mutexDiscovery_);
+        ++participant_matched_;
+        cv_.notify_one();
+    }
+
+    void participant_unmatched()
+    {
+        std::unique_lock<std::mutex> lock(mutexDiscovery_);
+        --participant_matched_;
+        cv_.notify_one();
+    }
+
     void matched()
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
@@ -682,7 +753,7 @@ class PubSubWriter
         cvEntitiesInfoList_.notify_all();
     }
 
-    PubSubWriter& operator=(const PubSubWriter&)NON_COPYABLE_CXX11;
+    PubSubWriter& operator=(const PubSubWriter&)= delete;
 
     eprosima::fastrtps::Participant *participant_;
     eprosima::fastrtps::ParticipantAttributes participant_attr_;
@@ -693,6 +764,7 @@ class PubSubWriter
     std::mutex mutexDiscovery_;
     std::condition_variable cv_;
     unsigned int matched_;
+    unsigned int participant_matched_;
     type_support type_;
     bool attachEDP_;
     EDPTakeReaderInfo edpReaderListener_;
@@ -703,6 +775,10 @@ class PubSubWriter
     std::map<GUID_t, ReaderProxyData> mapReaderInfoList_;
     std::map<std::string,  int> mapTopicCountList_;
     std::map<std::string,  int> mapPartitionCountList_;
+    bool discovery_result_;
+
+    std::function<bool(const ParticipantDiscoveryInfo& info)> onDiscovery_;
+
 #if HAVE_SECURITY
     std::mutex mutexAuthentication_;
     std::condition_variable cvAuthentication_;

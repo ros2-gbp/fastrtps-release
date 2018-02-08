@@ -28,6 +28,7 @@
 #include <fastrtps/rtps/common/SerializedPayload.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
+#include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
 
 #include <map>
 #include <mutex>
@@ -46,7 +47,6 @@ class StatefulWriter;
 class StatefulReader;
 class WriterHistory;
 class ReaderHistory;
-class ParticipantProxyData;
 
 namespace security {
 
@@ -67,13 +67,17 @@ class SecurityManager
 
         void destroy();
 
-        bool discovered_participant(ParticipantProxyData* participant_data);
+        bool discovered_participant(const ParticipantProxyData& participant_data);
 
-        void remove_participant(ParticipantProxyData* participant_data);
+        void remove_participant(const ParticipantProxyData& participant_data);
 
         bool register_local_writer(const GUID_t& writer_guid, const PropertySeq& writer_properties);
 
+        bool unregister_local_writer(const GUID_t& writer_guid);
+
         bool register_local_reader(const GUID_t& reader_guid, const PropertySeq& reader_properties);
+
+        bool unregister_local_reader(const GUID_t& reader_guid);
 
         bool discovered_reader(const GUID_t& writer_guid, const GUID_t& remote_participant,
                 ReaderProxyData& remote_reader_data);
@@ -181,16 +185,14 @@ class SecurityManager
 
                 typedef std::unique_ptr<AuthenticationInfo, EmptyDelete> AuthUniquePtr;
 
-                DiscoveredParticipantInfo(ParticipantProxyData* participant_data, AuthenticationStatus auth_status) :
+                DiscoveredParticipantInfo(AuthenticationStatus auth_status) :
                     auth_(auth_status), auth_ptr_(&auth_),
                     shared_secret_handle_(nullptr),
-                    participant_data_(participant_data),
                     participant_crypto_(nullptr) {}
 
                 DiscoveredParticipantInfo(DiscoveredParticipantInfo&& info) :
                     auth_(std::move(info.auth_)),  auth_ptr_(&auth_),
                     shared_secret_handle_(std::move(info.shared_secret_handle_)),
-                    participant_data_(info.participant_data_),
                     participant_crypto_(info.participant_crypto_) {}
 
                 AuthUniquePtr get_auth() { return std::move(auth_ptr_); }
@@ -199,11 +201,6 @@ class SecurityManager
                 {
                     assert(auth.get() == &auth_);
                     auth_ptr_ = std::move(auth); 
-                }
-
-                ParticipantProxyData* get_participant_data()
-                {
-                    return participant_data_;
                 }
 
                 void set_shared_secret(SharedSecretHandle* shared_secret)
@@ -236,8 +233,6 @@ class SecurityManager
 
                 SharedSecretHandle* shared_secret_handle_;
 
-                ParticipantProxyData* participant_data_;
-
                 ParticipantCryptoHandle* participant_crypto_;
 
         };
@@ -253,7 +248,7 @@ class SecurityManager
 
             private:
 
-                ParticipantStatelessMessageListener& operator=(const ParticipantStatelessMessageListener&) NON_COPYABLE_CXX11;
+                ParticipantStatelessMessageListener& operator=(const ParticipantStatelessMessageListener&) = delete;
 
                 SecurityManager &manager_;
         } participant_stateless_message_listener_;
@@ -269,7 +264,7 @@ class SecurityManager
 
             private:
 
-                ParticipantVolatileMessageListener& operator=(const ParticipantVolatileMessageListener&) NON_COPYABLE_CXX11;
+                ParticipantVolatileMessageListener& operator=(const ParticipantVolatileMessageListener&) = delete;
 
                 SecurityManager &manager_;
         } participant_volatile_message_secure_listener_;
@@ -293,20 +288,19 @@ class SecurityManager
         bool create_participant_volatile_message_secure_reader();
         void delete_participant_volatile_message_secure_reader();
 
-        void match_builtin_endpoints(ParticipantProxyData* participant_data);
+        void match_builtin_endpoints(const ParticipantProxyData& participant_data);
 
-        void unmatch_builtin_endpoints(ParticipantProxyData* participant_data);
+        void unmatch_builtin_endpoints(const ParticipantProxyData& participant_data);
 
-        ParticipantCryptoHandle* register_and_match_crypto_endpoint(ParticipantProxyData* participant_data, IdentityHandle& remote_participant_identity,
+        ParticipantCryptoHandle* register_and_match_crypto_endpoint(const GUID_t& remote_participant_guid, IdentityHandle& remote_participant_identity,
                 SharedSecretHandle& shared_secret);
 
         void process_participant_stateless_message(const CacheChange_t* const change);
 
         void process_participant_volatile_message_secure(const CacheChange_t* const change);
 
-        bool on_process_handshake(const GUID_t& remote_participant_key,
+        bool on_process_handshake(const GUID_t& remote_participant_guid,
                 DiscoveredParticipantInfo::AuthUniquePtr& remote_participant_info,
-                ParticipantProxyData* participant_data,
                 MessageIdentity&& message_identity,
                 HandshakeMessageToken&& message);
 
@@ -325,8 +319,9 @@ class SecurityManager
                 const GUID_t& destination_endpoint_key, const GUID_t& source_endpoint_key,
                 ParticipantCryptoTokenSeq& crypto_tokens);
 
-        bool participant_authorized(const DiscoveredParticipantInfo::AuthUniquePtr& remote_participant_info,
-                SharedSecretHandle* shared_secret_handle, ParticipantProxyData* data);
+        bool participant_authorized(const GUID_t& remote_participant_guid,
+                const DiscoveredParticipantInfo::AuthUniquePtr& remote_participant_info,
+                SharedSecretHandle* shared_secret_handle);
 
         RTPSParticipantImpl* participant_;
         StatelessWriter* participant_stateless_message_writer_;

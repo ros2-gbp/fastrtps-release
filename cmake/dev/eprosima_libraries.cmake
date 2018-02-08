@@ -70,8 +70,10 @@ macro(find_eprosima_package package)
                     ${ANDROID_BUILD_OPTIONS}
                     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
                     "-DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}"
+                    "-DCMAKE_EXE_LINKER_FLAGS=\"${CMAKE_EXE_LINKER_FLAGS}\""
                     "-DMINION=ON"
                     "-DEPROSIMA_INSTALLER_MINION=${EPROSIMA_INSTALLER_MINION}"
+                    "-DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
                     "-DBIN_INSTALL_DIR:PATH=${BIN_INSTALL_DIR}"
                     "-DINCLUDE_INSTALL_DIR:PATH=${INCLUDE_INSTALL_DIR}"
                     "-DLIB_INSTALL_DIR:PATH=${LIB_INSTALL_DIR}"
@@ -89,7 +91,7 @@ macro(find_eprosima_package package)
                     "set(SOURCE_DIR_ \"${PROJECT_SOURCE_DIR}/thirdparty/${package}\")\n"
                     "set(GENERATOR_ -G \"${CMAKE_GENERATOR}\")\n"
                     "set(CMAKE_INSTALL_PREFIX_ \"-DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX_}\")\n"
-                    "set(CMAKE_PREFIX_PATH_ -DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH_}\")\n"
+                    "set(CMAKE_PREFIX_PATH_ \"-DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH_}\")\n"
                     "set(CMAKE_C_COMPILER_ \"-DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}\")\n"
                     "set(CMAKE_CXX_COMPILER_ \"-DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}\")\n"
                     "set(EPROSIMA_PACKAGE_EXTERNAL_DIR_ \"-DEPROSIMA_PACKAGE_EXTERNAL_DIR:PATH=${EPROSIMA_PACKAGE_EXTERNAL_DIR}\")\n"
@@ -195,14 +197,14 @@ endmacro()
 macro(install_eprosima_libraries)
     if((MSVC OR MSVC_IDE) AND THIRDPARTY AND NOT MINION)
         if(EPROSIMA_INSTALLER)
-            # Install includes. Take from x64Win64VS2013
+            # Install includes. Take from x64Win64VS2015
             install(DIRECTORY ${PROJECT_BINARY_DIR}/eprosima_installer/x64Win64VS2015/install/${INCLUDE_INSTALL_DIR}/
                 DESTINATION ${INCLUDE_INSTALL_DIR}
                 COMPONENT headers
                 OPTIONAL
                 )
 
-            # Install licenses. Take from x64Win64VS2013
+            # Install licenses. Take from x64Win64VS2015
             install(DIRECTORY ${PROJECT_BINARY_DIR}/eprosima_installer/x64Win64VS2015/install/licenses/
                 DESTINATION ${LICENSE_INSTALL_DIR}
                 COMPONENT licenses
@@ -252,6 +254,8 @@ macro(install_eprosima_libraries)
                 FILES_MATCHING
                 PATTERN "*d.*"
                 PATTERN "*d-*.*"
+                PATTERN "*.cmake"
+                PATTERN "*-${BUILD_TYPE_INSTALLATION}.cmake" EXCLUDE
                 )
 
             install(DIRECTORY ${PROJECT_BINARY_DIR}/external/install/${LIB_INSTALL_DIR}/
@@ -263,6 +267,7 @@ macro(install_eprosima_libraries)
                 PATTERN "*"
                 PATTERN "*d.*" EXCLUDE
                 PATTERN "*d-*.*" EXCLUDE
+                PATTERN "*-debug.cmake" EXCLUDE
                 )
 
             # Install licenses
