@@ -62,12 +62,12 @@ class EDP
          * @param attributes DiscoveryAttributes structure.
          * @return True if correct.
          */
-        virtual bool initEDP(BuiltinAttributes& attributes)=0;
+        virtual bool initEDP(BuiltinAttributes& attributes) = 0;
         /**
          * Abstract method that assigns remote endpoints when a new RTPSParticipantProxyData is discovered.
          * @param pdata Discovered ParticipantProxyData
          */
-        virtual void assignRemoteEndpoints(ParticipantProxyData* pdata)=0;
+        virtual void assignRemoteEndpoints(const ParticipantProxyData& pdata) = 0;
         /**
          * Remove remote endpoints from the endpoint discovery protocol
          * @param pdata Pointer to the ParticipantProxyData to remove
@@ -79,26 +79,26 @@ class EDP
          * @param R Pointer to the Reader to remove.
          * @return True if correctly removed.
          */
-        virtual bool removeLocalReader(RTPSReader* R)=0;
+        virtual bool removeLocalReader(RTPSReader* R) = 0;
         /**
          * Abstract method that removes a local Writer from the discovery method
          * @param W Pointer to the Writer to remove.
          * @return True if correctly removed.
          */
-        virtual bool removeLocalWriter(RTPSWriter*W)=0;
+        virtual bool removeLocalWriter(RTPSWriter*W) = 0;
 
         /**
          * After a new local ReaderProxyData has been created some processing is needed (depends on the implementation).
          * @param rdata Pointer to the ReaderProxyData object.
          * @return True if correct.
          */
-        virtual bool processLocalReaderProxyData(ReaderProxyData* rdata)= 0;
+        virtual bool processLocalReaderProxyData(ReaderProxyData* rdata) = 0;
         /**
          * After a new local WriterProxyData has been created some processing is needed (depends on the implementation).
          * @param wdata Pointer to the Writer ProxyData object.
          * @return True if correct.
          */
-        virtual bool processLocalWriterProxyData(WriterProxyData* wdata)= 0;
+        virtual bool processLocalWriterProxyData(WriterProxyData* wdata) = 0;
 
         /**
          * Create a new ReaderPD for a local Reader.
@@ -136,40 +136,29 @@ class EDP
          * @param rdata Pointer to the ReaderProxyData object.
          * @return True if the two can be matched.
          */
-        bool validMatching(WriterProxyData* wdata,ReaderProxyData* rdata);
+        bool validMatching(const WriterProxyData* wdata, const ReaderProxyData* rdata);
         /**
          * Check the validity of a matching between a RTPSReader and a WriterProxyData object.
          * @param rdata Pointer to the ReaderProxyData object.
          * @param wdata Pointer to the WriterProxyData object.
          * @return True if the two can be matched.
          */
-        bool validMatching(ReaderProxyData* rdata,WriterProxyData* wdata);
-        /**
-         * Remove a WriterProxyDataObject based on its GUID_t.
-         * @param writer Reference to the writer GUID.
-         * @return True if correct.
-         */
-        bool removeWriterProxy(const GUID_t& writer);
-        /**
-         * Remove a ReaderProxyDataObject based on its GUID_t.
-         * @param reader Reference to the reader GUID.
-         * @return True if correct.
-         */
-        bool removeReaderProxy(const GUID_t& reader);
+        bool validMatching(const ReaderProxyData* rdata, const WriterProxyData* wdata);
+
         /**
          * Unpair a WriterProxyData object from all local readers.
          * @param pdata Pointer to the participant proxy data.
          * @param wdata Pointer to the WriterProxyData object.
          * @return True if correct.
          */
-        bool unpairWriterProxy(ParticipantProxyData* pdata, WriterProxyData* wdata);
+        bool unpairWriterProxy(const GUID_t& participant_guid, const GUID_t& writer_guid);
         /**
          * Unpair a ReaderProxyData object from all local writers.
          * @param rdata Pointer to the ReaderProxyData object.
          * @param pdata Pointer to the participant proxy data.
          * @return True if correct.
          */
-        bool unpairReaderProxy(ParticipantProxyData* pdata, ReaderProxyData* rdata);
+        bool unpairReaderProxy(const GUID_t& participant_guid, const GUID_t& reader_guid);
 
         /**
          * Try to pair/unpair ReaderProxyData.
@@ -180,7 +169,7 @@ class EDP
         bool pairing_reader_proxy_with_any_local_writer(ParticipantProxyData* pdata, ReaderProxyData* rdata);
 
 #if HAVE_SECURITY
-        bool pairing_reader_proxy_with_local_writer(const GUID_t& local_writer, ParticipantProxyData& pdata,
+        bool pairing_reader_proxy_with_local_writer(const GUID_t& local_writer, const GUID_t& remote_participant_guid,
                 ReaderProxyData& rdata);
 
         bool pairing_remote_reader_with_local_writer_after_crypto(const GUID_t& local_writer,
@@ -196,7 +185,7 @@ class EDP
         bool pairing_writer_proxy_with_any_local_reader(ParticipantProxyData* pdata, WriterProxyData* wdata);
 
 #if HAVE_SECURITY
-        bool pairing_writer_proxy_with_local_reader(const GUID_t& local_reader, ParticipantProxyData& pdata,
+        bool pairing_writer_proxy_with_local_reader(const GUID_t& local_reader, const GUID_t& remote_participant_guid,
                 WriterProxyData& wdata);
 
         bool pairing_remote_writer_with_local_reader_after_crypto(const GUID_t& local_reader,
@@ -215,13 +204,13 @@ class EDP
          * @param R Pointer to the Reader
          * @return True
          */
-        bool pairingReader(RTPSReader* R);
+        bool pairingReader(RTPSReader* R, const ParticipantProxyData& pdata, const ReaderProxyData& rdata);
         /**l
          * Try to pair/unpair a local Writer against all possible readerProxy Data.
          * @param W Pointer to the Writer
          * @return True
          */
-        bool pairingWriter(RTPSWriter* W);
+        bool pairingWriter(RTPSWriter* W, const ParticipantProxyData& pdata, const WriterProxyData& wdata);
 };
 
 }

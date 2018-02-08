@@ -47,7 +47,7 @@ class QosPolicy{
          * Whether it should always be sent.
          * @return True if it should always be sent.
          */
-        virtual bool sendAlways(){return m_sendAlways;}
+        virtual bool sendAlways() const {return m_sendAlways;}
     protected:
         bool m_sendAlways;
 
@@ -169,10 +169,12 @@ typedef enum ReliabilityQosPolicyKind:octet {
 class ReliabilityQosPolicy : private Parameter_t, public QosPolicy
 {
     public:
-        RTPS_DllAPI ReliabilityQosPolicy():	Parameter_t(PID_RELIABILITY,PARAMETER_KIND_LENGTH+PARAMETER_TIME_LENGTH),
+        RTPS_DllAPI ReliabilityQosPolicy() : Parameter_t(PID_RELIABILITY,PARAMETER_KIND_LENGTH+PARAMETER_TIME_LENGTH),
         QosPolicy(true), //indicate send always
-        kind(BEST_EFFORT_RELIABILITY_QOS){};
-        virtual RTPS_DllAPI ~ReliabilityQosPolicy(){};
+        kind(BEST_EFFORT_RELIABILITY_QOS),
+        // max_blocking_time = 100ms
+        max_blocking_time{0, 4294967100}  {}
+        virtual RTPS_DllAPI ~ReliabilityQosPolicy(){}
         ReliabilityQosPolicyKind kind;
         Duration_t max_blocking_time;
         /**
