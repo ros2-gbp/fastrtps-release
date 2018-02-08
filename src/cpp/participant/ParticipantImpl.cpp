@@ -176,9 +176,13 @@ Publisher* ParticipantImpl::createPublisher(PublisherAttributes& att,
     watt.mode = att.qos.m_publishMode.kind == eprosima::fastrtps::SYNCHRONOUS_PUBLISH_MODE ? SYNCHRONOUS_WRITER : ASYNCHRONOUS_WRITER;
     watt.endpoint.properties = att.properties;
     if(att.getEntityID()>0)
+    {
         watt.endpoint.setEntityID((uint8_t)att.getEntityID());
+    }
     if(att.getUserDefinedID()>0)
+    {
         watt.endpoint.setUserDefinedID((uint8_t)att.getUserDefinedID());
+    }
     watt.times = att.times;
 
     RTPSWriter* writer = RTPSDomain::createRTPSWriter(this->mp_rtpsParticipant,
@@ -210,7 +214,7 @@ std::pair<StatefulReader*,StatefulReader*> ParticipantImpl::getEDPReaders(){
     return mp_rtpsParticipant->getEDPReaders();
 }
 
-std::vector<std::string> ParticipantImpl::getParticipantNames(){
+std::vector<std::string> ParticipantImpl::getParticipantNames() const {
     return mp_rtpsParticipant->getParticipantNames();
 }
 

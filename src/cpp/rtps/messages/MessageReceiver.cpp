@@ -79,29 +79,37 @@ void MessageReceiver::init(uint32_t rec_buffer_size){
 
 MessageReceiver::~MessageReceiver()
 {
-    this->m_ParamList.deleteParams();
     logInfo(RTPS_MSG_IN,"");
+    assert(AssociatedWriters.size() == 0);
+    assert(AssociatedReaders.size() == 0);
 }
 
 void MessageReceiver::associateEndpoint(Endpoint *to_add){
     bool found = false;
     std::lock_guard<std::mutex> guard(mtx);
-    if(to_add->getAttributes()->endpointKind == WRITER){
-        for(auto it = AssociatedWriters.begin();it != AssociatedWriters.end(); ++it){
-            if( (*it) == (RTPSWriter*)to_add ){
+    if(to_add->getAttributes()->endpointKind == WRITER)
+    {
+        for(auto it = AssociatedWriters.begin(); it != AssociatedWriters.end(); ++it)
+        {
+            if( (*it) == (RTPSWriter*)to_add )
+            {
                 found = true;
                 break;
             }
         }
         if(!found) AssociatedWriters.push_back((RTPSWriter*)to_add);
-    }else{
-        for(auto it = AssociatedReaders.begin();it != AssociatedReaders.end(); ++it){
-            if( (*it) == (RTPSReader*)to_add ){
+    }
+    else
+    {
+        for(auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
+        {
+            if( (*it) == (RTPSReader*)to_add )
+            {
                 found = true;
                 break;
             }
         }
-        if(!found)	AssociatedReaders.push_back((RTPSReader*)to_add);
+        if(!found) AssociatedReaders.push_back((RTPSReader*)to_add);
     }
     return;
 }
@@ -359,9 +367,10 @@ void MessageReceiver::processCDRMsg(const GuidPrefix_t& RTPSParticipantguidprefi
         }
 
         if(!valid || last_submsg)
+        {
             break;
+        }
     }
-
 }
 
 bool MessageReceiver::checkRTPSHeader(CDRMessage_t*msg) //check and proccess the RTPS Header
@@ -417,9 +426,6 @@ bool MessageReceiver::readSubmessageHeader(CDRMessage_t* msg, SubmessageHeader_t
 bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh, bool* last)
 {
     std::lock_guard<std::mutex> guard(mtx);
-
-    // Reset param list
-    m_ParamList.deleteParams();
 
     //READ and PROCESS
     if(smh->submessageLength < RTPSMESSAGE_DATA_MIN_LENGTH)
@@ -513,7 +519,8 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
 
     if(inlineQosFlag)
     {
-        inlineQosSize = ParameterList::readParameterListfromCDRMsg(msg, &m_ParamList, &ch, false);
+        ParameterList_t parameter_list;
+        inlineQosSize = ParameterList::readParameterListfromCDRMsg(msg, &parameter_list, &ch, false);
 
         if(inlineQosSize <= 0)
         {
@@ -560,7 +567,8 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
                 return false;
             }
             //uint32_t param_size;
-            if(ParameterList::readParameterListfromCDRMsg(msg, &m_ParamList, &ch, false) <= 0)
+            ParameterList_t parameter_list;
+            if(ParameterList::readParameterListfromCDRMsg(msg, &parameter_list, &ch, false) <= 0)
             {
                 logInfo(RTPS_MSG_IN,IDSTRING"SubMessage Data ERROR, keyFlag ParameterList");
                 return false;
@@ -598,9 +606,6 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
 bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t* smh, bool* last)
 {
     std::lock_guard<std::mutex> guard(mtx);
-
-    // Reset param list
-    m_ParamList.deleteParams();
 
     //READ and PROCESS
     if (smh->submessageLength < RTPSMESSAGE_DATA_MIN_LENGTH)
@@ -665,7 +670,7 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
     //Get sequence number
     valid &= CDRMessage::readSequenceNumber(msg, &ch.sequenceNumber);
 
-    if (ch.sequenceNumber.to64long() <= 0 || (ch.sequenceNumber.high == -1 && ch.sequenceNumber.low == 0)) //message invalid //TODO make faster
+    if (ch.sequenceNumber <= SequenceNumber_t())
     {
         logWarning(RTPS_MSG_IN, IDSTRING"Invalid message received, bad sequence Number");
         return false;
@@ -706,7 +711,8 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
 
     if (inlineQosFlag)
     {
-        inlineQosSize = ParameterList::readParameterListfromCDRMsg(msg, &m_ParamList, &ch, false);
+        ParameterList_t parameter_list;
+        inlineQosSize = ParameterList::readParameterListfromCDRMsg(msg, &parameter_list, &ch, false);
 
         if (inlineQosSize <= 0)
         {
@@ -871,56 +877,12 @@ bool MessageReceiver::proc_Submsg_Acknack(CDRMessage_t* msg,SubmessageHeader_t* 
     for (std::vector<RTPSWriter*>::iterator it = AssociatedWriters.begin();
             it != AssociatedWriters.end(); ++it)
     {
-        //Look for the readerProxy the acknack is from
-        std::lock_guard<std::recursive_mutex> guardW(*(*it)->getMutex());
-
         if((*it)->getGuid() == writerGUID)
         {
             if((*it)->getAttributes()->reliabilityKind == RELIABLE)
             {
                 StatefulWriter* SF = (StatefulWriter*)(*it);
-
-                for(auto rit = SF->matchedReadersBegin();rit!=SF->matchedReadersEnd();++rit)
-                {
-                    std::lock_guard<std::recursive_mutex> guardReaderProxy(*(*rit)->mp_mutex);
-
-                    if((*rit)->m_att.guid == readerGUID )
-                    {
-                        if((*rit)->m_lastAcknackCount < Ackcount)
-                        {
-                            (*rit)->m_lastAcknackCount = Ackcount;
-                            bool maybe_all_acks = (*rit)->acked_changes_set(SNSet.base);
-                            std::vector<SequenceNumber_t> set_vec = SNSet.get_set();
-                            if ((*rit)->requested_changes_set(set_vec) && (*rit)->mp_nackResponse != nullptr)
-                            {
-                                (*rit)->mp_nackResponse->restart_timer();
-                            }
-                            else if (!finalFlag)
-                            {
-                                if(SNSet.base == SequenceNumber_t(0, 0) && SNSet.isSetEmpty())
-                                {
-                                    SF->send_heartbeat_to_nts(**rit, true);
-                                }
-
-                                SF->mp_periodicHB->restart_timer();
-                            }
-
-                            if(SF->getAttributes()->durabilityKind == VOLATILE)
-                            {
-                                // Clean history.
-                                // TODO Change mechanism
-                                SF->clean_history();
-                            }
-
-                            // Check if all CacheChange are acknowledge, because a user could be waiting
-                            // for this.
-                            if(maybe_all_acks)
-                                SF->check_for_all_acked();
-
-                        }
-                        break;
-                    }
-                }
+                SF->process_acknack(readerGUID, Ackcount, SNSet, finalFlag);
                 return true;
             }
             else
