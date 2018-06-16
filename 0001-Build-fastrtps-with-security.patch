@@ -1,0 +1,25 @@
+From a9490b7e99c0ac2c7ad146e79211c5c563a283dd Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?= <steven@nuclearsandwich.com>
+Date: Sat, 16 Jun 2018 12:59:20 -0700
+Subject: [PATCH] Build fastrtps with security.
+
+---
+ debian/rules.em | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/debian/rules.em b/debian/rules.em
+index aa010fa..a56087e 100755
+--- a/debian/rules.em
++++ b/debian/rules.em
+@@ -26,7 +26,7 @@ override_dh_auto_configure:
+ 	# in the install tree that was dropped by catkin, and source it.  It will
+ 	# set things like CMAKE_PREFIX_PATH, PKG_CONFIG_PATH, and PYTHONPATH.
+ 	if [ -f "@(InstallationPrefix)/setup.sh" ]; then . "@(InstallationPrefix)/setup.sh"; fi && \
+-	dh_auto_configure -- -DCMAKE_INSTALL_PREFIX="@(InstallationPrefix)"
++	dh_auto_configure -- -DCMAKE_INSTALL_PREFIX="@(InstallationPrefix)" -DSECURITY=ON
+ 
+ override_dh_auto_build:
+ 	# In case we're installing to a non-standard location, look for a setup.sh
+-- 
+2.7.4
+
