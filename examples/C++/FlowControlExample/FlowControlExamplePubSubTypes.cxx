@@ -25,6 +25,8 @@
 
 #include "FlowControlExamplePubSubTypes.h"
 
+using namespace eprosima::fastrtps::rtps;
+
 FlowControlExamplePubSubType::FlowControlExamplePubSubType() {
     setName("FlowControlExample");
     m_typeSize = (uint32_t)FlowControlExample::getMaxCdrSerializedSize() + 4 /*encapsulation*/;
@@ -80,7 +82,7 @@ bool FlowControlExamplePubSubType::deserialize(SerializedPayload_t* payload, voi
     return true;
 }
 
-std::function<uint32_t()> FlowControlExamplePubSubType::getSerializedSizeProvider(void* data)
+std::function<uint32_t()> FlowControlExamplePubSubType::getSerializedSizeProvider(void*)
 {
     return []() -> uint32_t { return 600000 + 1 + 4 /*encapsulation*/; };
 }

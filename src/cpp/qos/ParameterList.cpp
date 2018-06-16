@@ -20,9 +20,8 @@
 #include <fastrtps/qos/ParameterList.h>
 #include <fastrtps/qos/QosPolicies.h>
 
-
-namespace eprosima {
-namespace fastrtps {
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 #define IF_VALID_ADD {if(valid){plist->m_parameters.push_back((Parameter_t*)p);paramlist_byte_size += plength;}else{delete(p);return -1;}break;}
 
@@ -37,9 +36,13 @@ bool ParameterList::writeParameterListToCDRMsg(CDRMessage_t* msg, ParameterList_
         // Set encapsulation
         CDRMessage::addOctet(msg, 0);
         if(msg->msg_endian == BIGEND)
+        {
             CDRMessage::addOctet(msg, PL_CDR_BE);
+        }
         else
+        {
             CDRMessage::addOctet(msg, PL_CDR_LE);
+        }
         CDRMessage::addUInt16(msg, 0);
     }
 
@@ -78,13 +81,22 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
         octet encapsulation = 0;
         CDRMessage::readOctet(msg, &encapsulation);
         if(encapsulation == PL_CDR_BE)
+        {
             msg->msg_endian = BIGEND;
+        }
         else if(encapsulation == PL_CDR_LE)
+        {
             msg->msg_endian = LITTLEEND;
+        }
         else
+        {
             return -1;
+        }
         if(change != NULL)
+        {
             change->serializedPayload.encapsulation = (uint16_t)encapsulation;
+        }
+        // Skip encapsulation options
         msg->pos +=2;
     }
 
@@ -95,7 +107,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
         valid&=CDRMessage::readUInt16(msg,(uint16_t*)&pid);
         valid&=CDRMessage::readUInt16(msg,&plength);
         paramlist_byte_size +=4;
-        if(!valid || msg->pos > msg->length){
+        if(!valid || msg->pos > msg->length)
+        {
             return -1;
         }
         try
@@ -161,7 +174,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_EXPECTS_INLINE_QOS:
                     {
-                        if(plength != PARAMETER_BOOL_LENGTH){
+                        if(plength != PARAMETER_BOOL_LENGTH)
+                        {
                             return -1;
                         }
                         ParameterBool_t * p = new ParameterBool_t(PID_EXPECTS_INLINE_QOS,plength);
@@ -212,8 +226,10 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                 case PID_PARTICIPANT_GUID:
                 case PID_GROUP_GUID:
                 case PID_ENDPOINT_GUID:
+                case PID_PERSISTENCE_GUID:
                     {
-                        if(plength != PARAMETER_GUID_LENGTH){
+                        if(plength != PARAMETER_GUID_LENGTH)
+                        {
                             return -1;
                         }
                         ParameterGuid_t* p = new ParameterGuid_t(pid,plength);
@@ -235,15 +251,16 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                 case PID_TYPE_NAME:
                 case PID_ENTITY_NAME:
                     {
-                        if(plength > 256){
+                        if(plength > 256)
+                        {
                             return -1;
                         }
                         ParameterString_t* p = new ParameterString_t(pid,plength);
                         std::string aux;
                         valid &= CDRMessage::readString(msg,&aux);
                         p->setName(aux.c_str());
-                        //				cout << "READ: "<< p->m_string<<endl;
-                        //				cout << msg->pos << endl;
+                        //                cout << "READ: "<< p->m_string<<endl;
+                        //                cout << msg->pos << endl;
                         IF_VALID_ADD
                     }
                 case PID_PROPERTY_LIST:
@@ -253,7 +270,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                         ParameterPropertyList_t* p = new ParameterPropertyList_t(pid,plength);
                         uint32_t num_properties;
                         valid&=CDRMessage::readUInt32(msg,&num_properties);
-                        if(!valid){
+                        if(!valid)
+                        {
                             delete(p);
                             return -1;
                         }
@@ -266,7 +284,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                             pos_ref = msg->pos;
                             pair.first.clear();
                             valid &= CDRMessage::readString(msg,&pair.first);
-                            if(!valid){
+                            if(!valid)
+                            {
                                 delete(p);
                                 return -1;
                             }
@@ -274,14 +293,16 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                             pos_ref = msg->pos;
                             pair.second.clear();
                             valid &= CDRMessage::readString(msg,&pair.second);
-                            if(!valid){
+                            if(!valid)
+                            {
                                 delete(p);
                                 return -1;
                             }
                             length_diff += msg->pos - pos_ref;
                             p->properties.push_back(pair);
                         }
-                        if(plength != length_diff){
+                        if(plength != length_diff)
+                        {
                             delete(p);
                             return -1;
                         }
@@ -291,16 +312,26 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_STATUS_INFO:
                     {
-                        if(plength != 4){
+                        if(plength != 4)
+                        {
                             return -1;
                         }
                         octet status = msg->buffer[msg->pos+3];
-                        if(status == 1 && change != NULL)
-                            change->kind = NOT_ALIVE_DISPOSED;
-                        else if (status == 2 && change != NULL)
-                            change->kind = NOT_ALIVE_UNREGISTERED;
-                        else if (status == 3 && change != NULL)
-                            change->kind = NOT_ALIVE_DISPOSED_UNREGISTERED;
+                        if(change != NULL)
+                        {
+                            if(status == 1)
+                            {
+                                change->kind = NOT_ALIVE_DISPOSED;
+                            }
+                            else if (status == 2)
+                            {
+                                change->kind = NOT_ALIVE_UNREGISTERED;
+                            }
+                            else if (status == 3)
+                            {
+                                change->kind = NOT_ALIVE_DISPOSED_UNREGISTERED;
+                            }
+                        }
                         msg->pos+=plength;
                         paramlist_byte_size+=plength;
                         break;
@@ -312,7 +343,9 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                         p->length = 16;
                         valid&=CDRMessage::readData(msg,p->key.value,16);
                         if(change != NULL)
+                        {
                             change->instanceHandle = p->key;
+                        }
                         IF_VALID_ADD
                     }
                 case PID_SENTINEL:
@@ -322,7 +355,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_DURABILITY:
                     {
-                        if(plength != PARAMETER_KIND_LENGTH){
+                        if(plength != PARAMETER_KIND_LENGTH)
+                        {
                             return -1;
                         }
                         DurabilityQosPolicy* p = new DurabilityQosPolicy();
@@ -332,7 +366,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_DEADLINE:
                     {
-                        if(plength != PARAMETER_TIME_LENGTH){
+                        if(plength != PARAMETER_TIME_LENGTH)
+                        {
                             return -1;
                         }
                         DeadlineQosPolicy* p= new DeadlineQosPolicy();
@@ -342,7 +377,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_LATENCY_BUDGET:
                     {
-                        if(plength != PARAMETER_TIME_LENGTH){
+                        if(plength != PARAMETER_TIME_LENGTH)
+                        {
                             return -1;
                         }
                         LatencyBudgetQosPolicy* p = new LatencyBudgetQosPolicy();
@@ -352,7 +388,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_LIVELINESS:
                     {
-                        if(plength != PARAMETER_KIND_LENGTH+PARAMETER_TIME_LENGTH){
+                        if(plength != PARAMETER_KIND_LENGTH+PARAMETER_TIME_LENGTH)
+                        {
                             return -1;
                         }
                         LivelinessQosPolicy* p = new LivelinessQosPolicy();
@@ -364,7 +401,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_OWNERSHIP:
                     {
-                        if(plength != PARAMETER_KIND_LENGTH){
+                        if(plength != PARAMETER_KIND_LENGTH)
+                        {
                             return -1;
                         }
                         OwnershipQosPolicy* p = new OwnershipQosPolicy();
@@ -374,7 +412,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_RELIABILITY:
                     {
-                        if(plength != PARAMETER_KIND_LENGTH+PARAMETER_TIME_LENGTH){
+                        if(plength != PARAMETER_KIND_LENGTH+PARAMETER_TIME_LENGTH)
+                        {
                             return -1;
                         }
                         ReliabilityQosPolicy* p = new ReliabilityQosPolicy();
@@ -386,7 +425,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_DESTINATION_ORDER:
                     {
-                        if(plength != PARAMETER_KIND_LENGTH){
+                        if(plength != PARAMETER_KIND_LENGTH)
+                        {
                             return -1;
                         }
                         DestinationOrderQosPolicy* p = new DestinationOrderQosPolicy();
@@ -402,7 +442,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                         p->length = plength;
                         uint32_t vec_size = 0;
                         valid&=CDRMessage::readUInt32(msg,&vec_size);
-                        if(!valid || msg->pos+vec_size > msg->length){
+                        if(!valid || msg->pos+vec_size > msg->length)
+                        {
                             delete(p);
                             return -1;
                         }
@@ -414,7 +455,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                         {
                             msg->pos += (plength - 4 - vec_size);
                             length_diff += msg->pos - pos_ref;
-                            if(plength != length_diff){
+                            if(plength != length_diff)
+                            {
                                 delete(p);
                                 return -1;
                             }
@@ -430,7 +472,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_TIME_BASED_FILTER:
                     {
-                        if(plength != PARAMETER_TIME_LENGTH){
+                        if(plength != PARAMETER_TIME_LENGTH)
+                        {
                             return -1;
                         }
                         TimeBasedFilterQosPolicy* p = new TimeBasedFilterQosPolicy();
@@ -440,7 +483,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_PRESENTATION:
                     {
-                        if(plength != PARAMETER_PRESENTATION_LENGTH){
+                        if(plength != PARAMETER_PRESENTATION_LENGTH)
+                        {
                             return -1;
                         }
                         PresentationQosPolicy* p = new PresentationQosPolicy();
@@ -483,7 +527,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                         pos_ref = msg->pos;
                         valid &= CDRMessage::readOctetVector(msg,&p->value);
                         length_diff += msg->pos - pos_ref;
-                        if(plength != length_diff){
+                        if(plength != length_diff)
+                        {
                             delete(p);
                             return -1;
                         }
@@ -498,7 +543,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                         pos_ref = msg->pos;
                         valid &= CDRMessage::readOctetVector(msg,&p->value);
                         length_diff += msg->pos - pos_ref;
-                        if(plength != length_diff){
+                        if(plength != length_diff)
+                        {
                             delete(p);
                             return -1;
                         }
@@ -506,7 +552,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_HISTORY:
                     {
-                        if(plength != PARAMETER_KIND_LENGTH+4){
+                        if(plength != PARAMETER_KIND_LENGTH+4)
+                        {
                             return -1;
                         }
                         HistoryQosPolicy* p = new HistoryQosPolicy();
@@ -516,7 +563,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_DURABILITY_SERVICE:
                     {
-                        if(plength != PARAMETER_TIME_LENGTH+PARAMETER_KIND_LENGTH+16){
+                        if(plength != PARAMETER_TIME_LENGTH+PARAMETER_KIND_LENGTH+16)
+                        {
                             return -1;
                         }
                         DurabilityServiceQosPolicy * p = new DurabilityServiceQosPolicy();
@@ -531,7 +579,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_LIFESPAN:
                     {
-                        if(plength != PARAMETER_TIME_LENGTH){
+                        if(plength != PARAMETER_TIME_LENGTH)
+                        {
                             return -1;
                         }
                         LifespanQosPolicy * p = new LifespanQosPolicy();
@@ -541,7 +590,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_OWNERSHIP_STRENGTH:
                     {
-                        if(plength != 4){
+                        if(plength != 4)
+                        {
                             return -1;
                         }
                         OwnershipStrengthQosPolicy * p = new OwnershipStrengthQosPolicy();
@@ -550,7 +600,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_RESOURCE_LIMITS:
                     {
-                        if(plength != 12){
+                        if(plength != 12)
+                        {
                             return -1;
                         }
                         ResourceLimitsQosPolicy* p = new ResourceLimitsQosPolicy();
@@ -561,7 +612,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_TRANSPORT_PRIORITY:
                     {
-                        if(plength != 4){
+                        if(plength != 4)
+                        {
                             return -1;
                         }
                         TransportPriorityQosPolicy * p = new TransportPriorityQosPolicy();
@@ -570,7 +622,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_PARTICIPANT_MANUAL_LIVELINESS_COUNT:
                     {
-                        if(plength != 4){
+                        if(plength != 4)
+                        {
                             return -1;
                         }
                         ParameterCount_t*p = new ParameterCount_t(PID_PARTICIPANT_MANUAL_LIVELINESS_COUNT,plength);
@@ -580,7 +633,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                 case PID_PARTICIPANT_BUILTIN_ENDPOINTS:
                 case PID_BUILTIN_ENDPOINT_SET:
                     {
-                        if(plength != 4){
+                        if(plength != 4)
+                        {
                             return -1;
                         }
                         ParameterBuiltinEndpointSet_t * p = new ParameterBuiltinEndpointSet_t(pid,plength);
@@ -589,7 +643,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_PARTICIPANT_LEASE_DURATION:
                     {
-                        if(plength != PARAMETER_TIME_LENGTH){
+                        if(plength != PARAMETER_TIME_LENGTH)
+                        {
                             return -1;
                         }
                         ParameterTime_t* p = new ParameterTime_t(PID_PARTICIPANT_LEASE_DURATION,plength);
@@ -599,7 +654,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_CONTENT_FILTER_PROPERTY:
                     {
-                        if (plength > msg->length-msg->pos){
+                        if (plength > msg->length-msg->pos)
+                        {
                             return -1;
                         }
                         msg->pos += plength;
@@ -609,7 +665,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                 case PID_PARTICIPANT_ENTITYID:
                 case PID_GROUP_ENTITYID:
                     {
-                        if(plength != 4){
+                        if(plength != 4)
+                        {
                             return -1;
                         }
                         ParameterEntityId_t * p = new ParameterEntityId_t(pid,plength);
@@ -618,7 +675,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_TYPE_MAX_SIZE_SERIALIZED:
                     {
-                        if(plength != 4){
+                        if(plength != 4)
+                        {
                             return -1;
                         }
                         ParameterCount_t * p = new ParameterCount_t(pid,plength);
@@ -627,7 +685,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                     }
                 case PID_RELATED_SAMPLE_IDENTITY:
                     {
-                        if(plength == 24){
+                        if(plength == 24)
+                        {
                             ParameterSampleIdentity_t *p = new ParameterSampleIdentity_t(pid, plength);
                             valid &= CDRMessage::readData(msg, p->sample_id.writer_guid().guidPrefix.value, GuidPrefix_t::size);
                             valid &= CDRMessage::readData(msg, p->sample_id.writer_guid().entityId.value, EntityId_t::size);
@@ -635,13 +694,17 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                             valid &= CDRMessage::readUInt32(msg, &p->sample_id.sequence_number().low);
 
                             if(change != NULL)
+                            {
                                 change->write_params.sample_identity(p->sample_id);
+                            }
                             IF_VALID_ADD
                         }
-                        else if(plength > msg->length-msg->pos || plength > 24){
+                        else if(plength > msg->length-msg->pos || plength > 24)
+                        {
                             return -1;
                         }
-                        else{
+                        else
+                        {
                             msg->pos +=plength;
                             paramlist_byte_size +=plength;
                             break;
@@ -657,7 +720,8 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                 case PID_PAD:
                 default:
                     {
-                        if (plength > msg->length-msg->pos){
+                        if (plength > msg->length-msg->pos)
+                        {
                             return -1;
                         }
                         msg->pos +=plength;
@@ -675,5 +739,66 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
     return paramlist_byte_size;
 }
 
-} /* namespace pubsub */
-} /* namespace eprosima */
+bool ParameterList::readInstanceHandleFromCDRMsg(CacheChange_t* change, const uint16_t search_pid)
+{
+    // Only process data when change does not already have a handle
+    if (change->instanceHandle.isDefined())
+    {
+        return true;
+    }
+
+    // Use a temporary wraping message
+    CDRMessage_t msg(0);
+    msg.wraps = true;
+    msg.buffer = change->serializedPayload.data;
+    msg.length = change->serializedPayload.length;
+
+    // Read encapsulation
+    msg.pos += 1;
+    octet encapsulation = 0;
+    CDRMessage::readOctet(&msg, &encapsulation);
+    if (encapsulation == PL_CDR_BE)
+    {
+        msg.msg_endian = BIGEND;
+    }
+    else if (encapsulation == PL_CDR_LE)
+    {
+        msg.msg_endian = LITTLEEND;
+    }
+    else
+    {
+        return false;
+    }
+    if (change != NULL)
+    {
+        change->serializedPayload.encapsulation = (uint16_t)encapsulation;
+    }
+    // Skip encapsulation options
+    msg.pos += 2;
+
+    bool valid = false;
+    uint16_t pid;
+    uint16_t plength;
+    while (msg.pos < msg.length)
+    {
+        valid = true;
+        valid &= CDRMessage::readUInt16(&msg, (uint16_t*)&pid);
+        valid &= CDRMessage::readUInt16(&msg, &plength);
+        if ( (pid == PID_SENTINEL) || !valid)
+        {
+            break;
+        }
+        if (pid == PID_KEY_HASH)
+        {
+            valid &= CDRMessage::readData(&msg, change->instanceHandle.value, 16);
+            return valid;
+        }
+        if (pid == search_pid)
+        {
+            valid &= CDRMessage::readData(&msg, change->instanceHandle.value, 16);
+            return valid;
+        }
+        msg.pos += plength;
+    }
+    return false;
+}

@@ -28,6 +28,8 @@
 
 #include "FlowControlExampleSubscriber.h"
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 FlowControlExampleSubscriber::FlowControlExampleSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr) {}
 
@@ -61,7 +63,7 @@ bool FlowControlExampleSubscriber::init()
     return true;
 }
 
-void FlowControlExampleSubscriber::SubListener::onSubscriptionMatched(Subscriber* sub,MatchingInfo& info)
+void FlowControlExampleSubscriber::SubListener::onSubscriptionMatched(Subscriber*, MatchingInfo& info)
 {
     if (info.status == MATCHED_MATCHING)
     {

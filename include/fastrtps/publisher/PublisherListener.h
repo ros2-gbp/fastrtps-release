@@ -22,7 +22,7 @@
 #include "../rtps/common/Types.h"
 #include "../rtps/common/MatchingInfo.h"
 
-using namespace eprosima::fastrtps::rtps;
+
 
 namespace eprosima {
 namespace fastrtps {
@@ -44,7 +44,7 @@ public:
 	 * @param pub Pointer to the associated Publisher
 	 * @param info Information regarding the matched subscriber
 	 */
-	virtual void onPublicationMatched(Publisher* pub, MatchingInfo& info){(void)pub; (void)info;};
+	virtual void onPublicationMatched(Publisher* pub, rtps::MatchingInfo& info){(void)pub; (void)info;};
 };
 
 } /* namespace rtps */

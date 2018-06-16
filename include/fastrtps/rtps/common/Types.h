@@ -53,8 +53,10 @@ typedef enum ReliabilityKind_t{
 //!@ingroup COMMON_MODULE
 typedef enum DurabilityKind_t
 {
-    VOLATILE,
-    TRANSIENT_LOCAL
+    VOLATILE,        //!< Volatile Durability
+    TRANSIENT_LOCAL, //!< Transient Local Durability
+    TRANSIENT,       //!< Transient Durability.
+    PERSISTENT       //!< NOT IMPLEMENTED.
 }DurabilityKind_t;
 
 //!Endpoint kind
@@ -76,9 +78,6 @@ const Endianness_t DEFAULT_ENDIAN = BIGEND;
 #else
 const Endianness_t DEFAULT_ENDIAN = LITTLEEND;
 #endif
-
-#define EPROSIMA_BIG_ENDIAN 0
-
 
 typedef unsigned char octet;
 //typedef unsigned int uint;

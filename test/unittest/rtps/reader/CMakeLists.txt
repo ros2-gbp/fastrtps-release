@@ -13,7 +13,7 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    include(${PROJECT_SOURCE_DIR}/cmake/dev/gtest.cmake)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
     check_gtest()
     check_gmock()
 
@@ -31,7 +31,6 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         endif()
 
         add_executable(WriterProxyTests ${WRITERPROXYTESTS_SOURCE})
-        add_gtest(WriterProxyTests ${WRITERPROXYTESTS_SOURCE})
         target_compile_definitions(WriterProxyTests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(WriterProxyTests PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
@@ -41,9 +40,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/HeartbeatResponseDelay
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/WriterProxyLiveliness
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/InitialAckNack
-            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME})
+            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
         target_link_libraries(WriterProxyTests
             ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
-            ${CMAKE_THREAD_LIBS_INIT})
+            ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+        add_gtest(WriterProxyTests SOURCES ${WRITERPROXYTESTS_SOURCE})
     endif()
 endif()

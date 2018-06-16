@@ -13,7 +13,7 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    include(${PROJECT_SOURCE_DIR}/cmake/dev/gtest.cmake)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
     check_gtest()
     check_gmock()
 
@@ -42,8 +42,6 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
 
         add_executable(SecurityAuthentication ${SOURCES_SECURITY_TEST_SOURCE}
             ${CMAKE_CURRENT_SOURCE_DIR}/SecurityAuthenticationTests.cpp)
-        add_gtest(SecurityAuthentication 
-            ${CMAKE_CURRENT_SOURCE_DIR}/SecurityAuthenticationTests.cpp)
         target_compile_definitions(SecurityAuthentication PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(SecurityAuthentication PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
@@ -63,9 +61,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReaderProxyData
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/WriterProxyData
-            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}
+            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
         target_link_libraries(SecurityAuthentication ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES})
+        add_gtest(SecurityAuthentication
+            SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/SecurityAuthenticationTests.cpp)
     endif()
 endif()

@@ -28,7 +28,25 @@ using namespace eprosima::fastrtps::rtps;
 const uint32_t ReceiveBufferCapacity = 65536;
 #endif
 
-static uint32_t g_default_port = 7400;
+#if defined(_WIN32)
+#define GET_PID _getpid
+#else
+#define GET_PID getpid
+#endif
+
+static uint16_t g_default_port = 0;
+
+uint16_t get_port()
+{
+    uint16_t port = static_cast<uint16_t>(GET_PID());
+
+    if(4000 > port)
+    {
+        port += 4000;
+    }
+
+    return port;
+}
 
 class UDPv4Tests: public ::testing::Test
 {
@@ -164,10 +182,7 @@ TEST_F(UDPv4Tests, send_to_loopback)
 
     auto sendThreadFunction = [&]()
     {
-        Locator_t destinationLocator;
-        destinationLocator.port = g_default_port;
-        destinationLocator.kind = LOCATOR_KIND_UDPv4;
-        EXPECT_TRUE(transportUnderTest.Send(message, 5, outputChannelLocator, multicastLocator));
+        ASSERT_TRUE(transportUnderTest.Send(message, 5, outputChannelLocator, multicastLocator));
     };
 
     auto receiveThreadFunction = [&]()
@@ -460,9 +475,7 @@ void UDPv4Tests::HELPER_SetDescriptorDefaults()
 int main(int argc, char **argv)
 {
     Log::SetVerbosity(Log::Info);
-
-    if(const char* env_p = std::getenv("PORT_RANDOM_NUMBER"))
-        g_default_port = std::stoi(env_p);
+    g_default_port = get_port();
 
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

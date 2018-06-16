@@ -25,7 +25,6 @@
 #include "../participant/RTPSParticipantImpl.h"
 #include "FragmentedChangePitStop.h"
 
-
 #include <mutex>
 #include <thread>
 
@@ -59,6 +58,7 @@ bool StatelessReader::matched_writer_add(const RemoteWriterAttributes& wdata)
     }
     logInfo(RTPS_READER,"Writer " << wdata.guid << " added to "<<m_guid.entityId);
     m_matched_writers.push_back(wdata);
+    add_persistence_guid(wdata);
     m_acceptMessagesFromUnkownWriters = false;
     return true;
 }
@@ -71,7 +71,7 @@ bool StatelessReader::matched_writer_remove(const RemoteWriterAttributes& wdata)
         {
             logInfo(RTPS_READER,"Writer " <<wdata.guid<< " removed from "<<m_guid.entityId);
             m_matched_writers.erase(it);
-            m_historyRecord.erase(wdata.guid);
+            remove_persistence_guid(wdata);
             return true;
         }
     }
@@ -99,8 +99,7 @@ bool StatelessReader::change_received(CacheChange_t* change)
     {
         if(mp_history->received_change(change, 0))
         {
-            m_historyRecord[change->writerGUID] = change->sequenceNumber;
-
+            update_last_notified(change->writerGUID, change->sequenceNumber);
             if(getListener() != nullptr)
             {
                 getListener()->onNewCacheChangeAdded((RTPSReader*)this,change);
@@ -163,10 +162,11 @@ bool StatelessReader::processDataMsg(CacheChange_t *change)
         logInfo(RTPS_MSG_IN,IDSTRING"Trying to add change " << change->sequenceNumber <<" TO reader: "<< getGuid().entityId);
 
         CacheChange_t* change_to_add;
+
         if(reserveCache(&change_to_add, change->serializedPayload.length)) //Reserve a new cache from the corresponding cache pool
         {
 #if HAVE_SECURITY
-            if(is_payload_protected())
+            if(getAttributes()->security_attributes().is_payload_protected)
             {
                 change_to_add->copy_not_memcpy(change);
                 if(!getRTPSParticipant()->security_manager().decode_serialized_payload(change->serializedPayload,
@@ -229,7 +229,7 @@ bool StatelessReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t
             CacheChange_t* change_to_add = incomingChange;
 
 #if HAVE_SECURITY
-            if(is_payload_protected())
+            if(getAttributes()->security_attributes().is_payload_protected)
             {
                 if(reserveCache(&change_to_add, incomingChange->serializedPayload.length)) //Reserve a new cache from the corresponding cache pool
                 {
@@ -250,7 +250,7 @@ bool StatelessReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t
             CacheChange_t* change_completed = fragmentedChangePitStop_->process(change_to_add, sampleSize, fragmentStartingNum);
 
 #if HAVE_SECURITY
-            if(is_payload_protected())
+            if(getAttributes()->security_attributes().is_payload_protected)
                 releaseCache(change_to_add);
 #endif
 
@@ -316,6 +316,5 @@ bool StatelessReader::acceptMsgFrom(GUID_t& writerId)
 
 bool StatelessReader::thereIsUpperRecordOf(GUID_t& guid, SequenceNumber_t& seq)
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    return m_historyRecord.find(guid) != m_historyRecord.end() && m_historyRecord[guid] >= seq;
+    return get_last_notified(guid) >= seq;
 }

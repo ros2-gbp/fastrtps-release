@@ -29,7 +29,7 @@
 #include "../qos/WriterQos.h"
 #include "../rtps/attributes/PropertyPolicy.h"
 
-using namespace eprosima::fastrtps::rtps;
+
 
 namespace eprosima {
 namespace fastrtps{
@@ -39,13 +39,15 @@ namespace fastrtps{
  * Class PublisherAttributes, used by the user to define the attributes of a Publisher.
  * @ingroup FASTRTPS_ATTRIBUTES_MODULE
  */
-class PublisherAttributes {
-
+class PublisherAttributes
+{
     public:
-        PublisherAttributes(){
+
+        PublisherAttributes()
+        {
             m_userDefinedID = -1;
             m_entityID = -1;
-            historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
+            historyMemoryPolicy = rtps::PREALLOCATED_MEMORY_MODE;
         };
         virtual ~PublisherAttributes(){};
         //!Topic Attributes for the Publisher
@@ -53,18 +55,18 @@ class PublisherAttributes {
         //!QOS for the Publisher
         WriterQos qos;
         //!Writer Attributes
-        WriterTimes times;
+        rtps::WriterTimes times;
         //!Unicast locator list
-        LocatorList_t unicastLocatorList;
+        rtps::LocatorList_t unicastLocatorList;
         //!Multicast locator list
-        LocatorList_t multicastLocatorList;
+        rtps::LocatorList_t multicastLocatorList;
         //!Output locator list
-        LocatorList_t outLocatorList;
+        rtps::LocatorList_t outLocatorList;
         //!Throughput controller
-        ThroughputControllerDescriptor throughputController;
+        rtps::ThroughputControllerDescriptor throughputController;
         //!Underlying History memory policy
-        MemoryManagementPolicy_t historyMemoryPolicy;
-        PropertyPolicy properties;
+        rtps::MemoryManagementPolicy_t historyMemoryPolicy;
+        rtps::PropertyPolicy properties;
 
         /**
          * Get the user defined ID

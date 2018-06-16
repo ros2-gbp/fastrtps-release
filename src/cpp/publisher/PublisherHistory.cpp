@@ -29,10 +29,10 @@
 
 #include <mutex>
 
-extern ::rtps::WriteParams WRITE_PARAM_DEFAULT;
+extern eprosima::fastrtps::rtps::WriteParams WRITE_PARAM_DEFAULT;
 
-namespace eprosima {
-namespace fastrtps {
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 PublisherHistory::PublisherHistory(PublisherImpl* pimpl, uint32_t payloadMaxSize, HistoryQosPolicy& history,
         ResourceLimitsQosPolicy& resource, MemoryManagementPolicy_t mempolicy):
@@ -91,7 +91,9 @@ bool PublisherHistory::add_pub_change(CacheChange_t* change, WriteParams &wparam
     if(mp_pubImpl->getAttributes().topic.getTopicKind() == NO_KEY)
     {
         if(this->add_change(change))
+        {
             returnedValue = true;
+        }
     }
     //HISTORY WITH KEY
     else if(mp_pubImpl->getAttributes().topic.getTopicKind() == WITH_KEY)
@@ -108,7 +110,9 @@ bool PublisherHistory::add_pub_change(CacheChange_t* change, WriteParams &wparam
                     add = true;
                 }
                 else
+                {
                     logWarning(RTPS_HISTORY,"Change not added due to maximum number of samples per instance"<<endl;);
+                }
             }
             else if (m_historyQos.kind == KEEP_LAST_HISTORY_QOS)
             {
@@ -282,7 +286,3 @@ bool PublisherHistory::remove_change_g(CacheChange_t* a_change)
 {
     return remove_change_pub(a_change);
 }
-
-
-} /* namespace pubsub */
-} /* namespace eprosima */

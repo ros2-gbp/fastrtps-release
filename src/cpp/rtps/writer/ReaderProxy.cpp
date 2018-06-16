@@ -23,7 +23,6 @@
 #include <fastrtps/utils/TimeConversion.h>
 #include <fastrtps/rtps/writer/timedevent/NackResponseDelay.h>
 #include <fastrtps/rtps/writer/timedevent/NackSupressionDuration.h>
-#include <fastrtps/rtps/writer/timedevent/InitialHeartbeat.h>
 #include <fastrtps/log/Log.h>
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
 #include <fastrtps/rtps/history/WriterHistory.h>
@@ -37,14 +36,13 @@ using namespace eprosima::fastrtps::rtps;
 
 ReaderProxy::ReaderProxy(const RemoteReaderAttributes& rdata,const WriterTimes& times,StatefulWriter* SW) :
     m_att(rdata), mp_SFW(SW),
-    mp_nackResponse(nullptr), mp_nackSupression(nullptr), mp_initialHeartbeat(nullptr), m_lastAcknackCount(0),
+    mp_nackResponse(nullptr), mp_nackSupression(nullptr), m_lastAcknackCount(0),
     mp_mutex(new std::recursive_mutex()), lastNackfragCount_(0)
 {
     if(rdata.endpoint.reliabilityKind == RELIABLE)
     {
         mp_nackResponse = new NackResponseDelay(this,TimeConv::Time_t2MilliSecondsDouble(times.nackResponseDelay));
         mp_nackSupression = new NackSupressionDuration(this,TimeConv::Time_t2MilliSecondsDouble(times.nackSupressionDuration));
-        mp_initialHeartbeat = new InitialHeartbeat(this, TimeConv::Time_t2MilliSecondsDouble(times.initialHeartbeatDelay));
     }
 
     logInfo(RTPS_WRITER,"Reader Proxy created");
@@ -69,12 +67,6 @@ void ReaderProxy::destroy_timers()
     {
         delete(mp_nackSupression);
         mp_nackSupression = nullptr;
-    }
-
-    if(mp_initialHeartbeat != nullptr)
-    {
-        delete(mp_initialHeartbeat);
-        mp_initialHeartbeat = nullptr;
     }
 }
 
@@ -172,7 +164,7 @@ bool ReaderProxy::requested_changes_set(std::vector<SequenceNumber_t>& seqNumSet
     {
         auto chit = m_changesForReader.find(ChangeForReader_t(*sit));
 
-        if(chit != m_changesForReader.end() && chit->isValid())
+        if(chit != m_changesForReader.end())
         {
             ChangeForReader_t newch(*chit);
             newch.setStatus(REQUESTED);
@@ -189,6 +181,11 @@ bool ReaderProxy::requested_changes_set(std::vector<SequenceNumber_t>& seqNumSet
     if(isSomeoneWasSetRequested)
     {
         logInfo(RTPS_WRITER,"Requested Changes: " << seqNumSet);
+    }
+    else if(!seqNumSet.empty())
+    {
+        logWarning(RTPS_WRITER,"Requested Changes: " << seqNumSet
+                   << " not found (low mark: " << changesFromRLowMark_ << ")");
     }
 
     return isSomeoneWasSetRequested;

@@ -144,6 +144,10 @@ inline std::ostream& operator<<(std::ostream& output,const GuidPrefix_t& guiP){
 #define ENTITYID_SPDP_BUILTIN_RTPSParticipant_READER  0x000100c7
 #define ENTITYID_P2P_BUILTIN_RTPSParticipant_MESSAGE_WRITER  0x000200C2
 #define ENTITYID_P2P_BUILTIN_RTPSParticipant_MESSAGE_READER  0x000200C7
+#define ENTITYID_SEDP_BUILTIN_PUBLICATIONS_SECURE_WRITER  0xff0003c2
+#define ENTITYID_SEDP_BUILTIN_PUBLICATIONS_SECURE_READER  0xff0003c7
+#define ENTITYID_SEDP_BUILTIN_SUBSCRIPTIONS_SECURE_WRITER 0xff0004c2
+#define ENTITYID_SEDP_BUILTIN_SUBSCRIPTIONS_SECURE_READER  0xff0004c7
 #define ENTITYID_P2P_BUILTIN_PARTICIPANT_STATELESS_WRITER  0x000201C3
 #define ENTITYID_P2P_BUILTIN_PARTICIPANT_STATELESS_READER  0x000201C4
 #define ENTITYID_P2P_BUILTIN_PARTICIPANT_VOLATILE_MESSAGE_SECURE_WRITER  0xff0202C3
@@ -167,7 +171,9 @@ inline std::ostream& operator<<(std::ostream& output,const GuidPrefix_t& guiP){
 	{
 		uint32_t* aux = (uint32_t*)(value);
 		*aux = id;
-		reverse();
+#if !__BIG_ENDIAN__
+        reverse();
+#endif
 	}
 
     /*!
@@ -211,7 +217,8 @@ inline std::ostream& operator<<(std::ostream& output,const GuidPrefix_t& guiP){
 		return *this;
 		//return id;
 	}
-	//! 
+#if !__BIG_ENDIAN__
+    //! 
 	void reverse(){
 		octet oaux;
 		oaux = value[3];
@@ -221,6 +228,7 @@ inline std::ostream& operator<<(std::ostream& output,const GuidPrefix_t& guiP){
 		value[2] = value[1];
 		value[1] = oaux;
 	}
+#endif
 
     static EntityId_t unknown()
     {
@@ -306,6 +314,11 @@ const EntityId_t c_EntityId_RTPSParticipant = ENTITYID_RTPSParticipant;
 
 const EntityId_t c_EntityId_WriterLiveliness = ENTITYID_P2P_BUILTIN_RTPSParticipant_MESSAGE_WRITER;
 const EntityId_t c_EntityId_ReaderLiveliness = ENTITYID_P2P_BUILTIN_RTPSParticipant_MESSAGE_READER;
+
+const EntityId_t sedp_builtin_publications_secure_writer = ENTITYID_SEDP_BUILTIN_PUBLICATIONS_SECURE_WRITER;
+const EntityId_t sedp_builtin_publications_secure_reader = ENTITYID_SEDP_BUILTIN_PUBLICATIONS_SECURE_READER;
+const EntityId_t sedp_builtin_subscriptions_secure_writer = ENTITYID_SEDP_BUILTIN_SUBSCRIPTIONS_SECURE_WRITER;
+const EntityId_t sedp_builtin_subscriptions_secure_reader = ENTITYID_SEDP_BUILTIN_SUBSCRIPTIONS_SECURE_READER;
 
 const EntityId_t participant_stateless_message_writer_entity_id = ENTITYID_P2P_BUILTIN_PARTICIPANT_STATELESS_WRITER;
 const EntityId_t participant_stateless_message_reader_entity_id = ENTITYID_P2P_BUILTIN_PARTICIPANT_STATELESS_READER;

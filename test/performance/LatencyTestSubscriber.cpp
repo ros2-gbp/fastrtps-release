@@ -27,8 +27,9 @@ using namespace eprosima::fastrtps::rtps;
 
 
 uint32_t datassub[] = {12,28,60,124,252,508,1020,2044,4092,8188,16380};
+uint32_t datassub_large[] = {63996, 131068};
 
-std::vector<uint32_t> data_size_sub (datassub, datassub + sizeof(datassub) / sizeof(uint32_t) );
+std::vector<uint32_t> data_size_sub;
 
 LatencyTestSubscriber::LatencyTestSubscriber():
     mp_participant(nullptr),
@@ -62,8 +63,17 @@ LatencyTestSubscriber::~LatencyTestSubscriber()
     Domain::removeParticipant(mp_participant);
 }
 
-bool LatencyTestSubscriber::init(bool echo, int nsam, bool reliable, uint32_t pid, bool hostname)
+bool LatencyTestSubscriber::init(bool echo, int nsam, bool reliable, uint32_t pid, bool hostname,
+        const PropertyPolicy& part_property_policy, const PropertyPolicy& property_policy, bool large_data)
 {
+    if(!large_data)
+    {
+         data_size_sub.assign(datassub, datassub + sizeof(datassub) / sizeof(uint32_t) );
+    }
+    else
+    {
+        data_size_sub.assign(datassub_large, datassub_large + sizeof(datassub_large) / sizeof(uint32_t) );
+    }
     m_echo = echo;
     n_samples = nsam;
     ParticipantAttributes PParam;
@@ -77,6 +87,7 @@ bool LatencyTestSubscriber::init(bool echo, int nsam, bool reliable, uint32_t pi
     PParam.rtps.sendSocketBufferSize = 65536;
     PParam.rtps.listenSocketBufferSize = 2*65536;
     PParam.rtps.setName("Participant_sub");
+    PParam.rtps.properties = part_property_policy;
     mp_participant = Domain::createParticipant(PParam);
     if(mp_participant == nullptr)
         return false;
@@ -106,6 +117,12 @@ bool LatencyTestSubscriber::init(bool echo, int nsam, bool reliable, uint32_t pi
     Locator_t loc;
     loc.port = 15002;
     PubDataparam.unicastLocatorList.push_back(loc);
+    PubDataparam.properties = property_policy;
+    if(large_data)
+    {
+        PubDataparam.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        PubDataparam.qos.m_publishMode.kind = eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE;
+    }
     mp_datapub = Domain::createPublisher(mp_participant,PubDataparam,(PublisherListener*)&this->m_datapublistener);
     if(mp_datapub == nullptr)
         return false;
@@ -126,8 +143,13 @@ bool LatencyTestSubscriber::init(bool echo, int nsam, bool reliable, uint32_t pi
         SubDataparam.qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
     loc.port = 15003;
     SubDataparam.unicastLocatorList.push_back(loc);
+    SubDataparam.properties = property_policy;
     //loc.set_IP4_address(239,255,0,2);
     //SubDataparam.multicastLocatorList.push_back(loc);
+    if(large_data)
+    {
+        SubDataparam.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+    }
     mp_datasub = Domain::createSubscriber(mp_participant,SubDataparam,&this->m_datasublistener);
     if(mp_datasub == nullptr)
         return false;
@@ -315,7 +337,7 @@ void LatencyTestSubscriber::run()
 bool LatencyTestSubscriber::test(uint32_t datasize)
 {
     cout << "Preparing test with data size: " << datasize+4<<endl;
-    mp_latency = new LatencyType((uint16_t)datasize);
+    mp_latency = new LatencyType(datasize);
 
     std::unique_lock<std::mutex> lock(mutex_);
     if(comm_count_ == 0) comm_cond_.wait(lock);
@@ -330,7 +352,7 @@ bool LatencyTestSubscriber::test(uint32_t datasize)
     mp_commandpub->write(&command);
 
     lock.lock();
-    if(data_count_ == 0) data_cond_.wait(lock);
+    data_cond_.wait(lock, [&]() { return data_count_ > 0;});
     --data_count_;
     lock.unlock();
 

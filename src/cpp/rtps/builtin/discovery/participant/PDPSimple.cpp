@@ -81,8 +81,12 @@ PDPSimple::~PDPSimple()
     if(mp_resendParticipantTimer != nullptr)
         delete(mp_resendParticipantTimer);
 
+    mp_RTPSParticipant->disableReader(mp_SPDPReader);
+
     if(mp_EDP!=nullptr)
+    {
         delete(mp_EDP);
+    }
 
     mp_RTPSParticipant->deleteUserEndpoint(mp_SPDPWriter);
     mp_RTPSParticipant->deleteUserEndpoint(mp_SPDPReader);
@@ -106,11 +110,13 @@ void PDPSimple::initializeParticipantProxyData(ParticipantProxyData* participant
 
     participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_ANNOUNCER;
     participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_DETECTOR;
+
     if(mp_RTPSParticipant->getAttributes().builtin.use_WriterLivelinessProtocol)
     {
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_WRITER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_READER;
     }
+
     if(mp_RTPSParticipant->getAttributes().builtin.use_SIMPLE_EndpointDiscoveryProtocol)
     {
         if(mp_RTPSParticipant->getAttributes().builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader)
@@ -118,11 +124,26 @@ void PDPSimple::initializeParticipantProxyData(ParticipantProxyData* participant
             participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_ANNOUNCER;
             participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_DETECTOR;
         }
+
         if(mp_RTPSParticipant->getAttributes().builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter)
         {
             participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_DETECTOR;
             participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_ANNOUNCER;
         }
+
+#if HAVE_SECURITY
+        if(mp_RTPSParticipant->getAttributes().builtin.m_simpleEDP.enable_builtin_secure_publications_writer_and_subscriptions_reader)
+        {
+            participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_SECURE_ANNOUNCER;
+            participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_SECURE_DETECTOR;
+        }
+
+        if(mp_RTPSParticipant->getAttributes().builtin.m_simpleEDP.enable_builtin_secure_subscriptions_writer_and_publications_reader)
+        {
+            participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_SECURE_ANNOUNCER;
+            participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_SECURE_DETECTOR;
+        }
+#endif
     }
 
 #if HAVE_SECURITY
@@ -155,6 +176,13 @@ void PDPSimple::initializeParticipantProxyData(ParticipantProxyData* participant
     {
         participant_data->identity_token_ = std::move(*identity_token);
         mp_RTPSParticipant->security_manager().return_identity_token(identity_token);
+    }
+
+    PermissionsToken* permissions_token = nullptr;
+    if(mp_RTPSParticipant->security_manager().get_permissions_token(&permissions_token) && permissions_token != nullptr)
+    {
+        participant_data->permissions_token_ = std::move(*permissions_token);
+        mp_RTPSParticipant->security_manager().return_permissions_token(permissions_token);
     }
 #endif
 }
@@ -242,7 +270,7 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
                 aux_msg.buffer = change->serializedPayload.data;
                 aux_msg.max_size = change->serializedPayload.max_size;
 
-#if EPROSIMA_BIG_ENDIAN
+#if __BIG_ENDIAN__
                 change->serializedPayload.encapsulation = (uint16_t)PL_CDR_BE;
                 aux_msg.msg_endian = BIGEND;
 #else
@@ -286,7 +314,7 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
             aux_msg.buffer = change->serializedPayload.data;
             aux_msg.max_size = change->serializedPayload.max_size;
 
-#if EPROSIMA_BIG_ENDIAN
+#if __BIG_ENDIAN__
             change->serializedPayload.encapsulation = (uint16_t)PL_CDR_BE;
             aux_msg.msg_endian = BIGEND;
 #else
@@ -575,9 +603,10 @@ void PDPSimple::assignRemoteEndpoints(ParticipantProxyData* pdata)
     auxendp &=DISC_BUILTIN_ENDPOINT_PARTICIPANT_ANNOUNCER;
     if(auxendp!=0)
     {
-        RemoteWriterAttributes watt;
+        RemoteWriterAttributes watt(pdata->m_VendorId);
         watt.guid.guidPrefix = pdata->m_guid.guidPrefix;
         watt.guid.entityId = c_EntityId_SPDPWriter;
+        watt.endpoint.persistence_guid = watt.guid;
         watt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
         watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
         watt.endpoint.reliabilityKind = BEST_EFFORT;
@@ -588,7 +617,7 @@ void PDPSimple::assignRemoteEndpoints(ParticipantProxyData* pdata)
     auxendp &=DISC_BUILTIN_ENDPOINT_PARTICIPANT_DETECTOR;
     if(auxendp!=0)
     {
-        RemoteReaderAttributes ratt;
+        RemoteReaderAttributes ratt(pdata->m_VendorId);
         ratt.expectsInlineQos = false;
         ratt.guid.guidPrefix = pdata->m_guid.guidPrefix;
         ratt.guid.entityId = c_EntityId_SPDPReader;
@@ -606,30 +635,6 @@ void PDPSimple::assignRemoteEndpoints(ParticipantProxyData* pdata)
     //Inform EDP of new RTPSParticipant data:
     notifyAboveRemoteEndpoints(*pdata);
 #endif
-}
-
-void PDPSimple::notifyAboveRemoteEndpoints(const GUID_t& participant_guid)
-{
-    ParticipantProxyData participant_data;
-    bool found_participant = false;
-
-    this->mp_mutex->lock();
-    for(std::vector<ParticipantProxyData*>::iterator pit = m_participantProxies.begin();
-            pit != m_participantProxies.end(); ++pit)
-    {
-        if((*pit)->m_guid == participant_guid)
-        {
-            participant_data.copy(**pit);
-            found_participant = true;
-            break;
-        }
-    }
-    this->mp_mutex->unlock();
-
-    if(found_participant)
-    {
-        notifyAboveRemoteEndpoints(participant_data);
-    }
 }
 
 void PDPSimple::notifyAboveRemoteEndpoints(const ParticipantProxyData& pdata)
@@ -653,6 +658,7 @@ void PDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
         RemoteWriterAttributes watt;
         watt.guid.guidPrefix = pdata->m_guid.guidPrefix;
         watt.guid.entityId = c_EntityId_SPDPWriter;
+        watt.endpoint.persistence_guid = watt.guid;
         watt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
         watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
         watt.endpoint.reliabilityKind = BEST_EFFORT;
@@ -710,14 +716,14 @@ bool PDPSimple::removeRemoteParticipant(GUID_t& partGUID)
             }
         }
 
-#if HAVE_SECURITY
-        mp_builtin->mp_participantImpl->security_manager().remove_participant(*pdata);
-#endif
-
         if(mp_builtin->mp_WLP != nullptr)
             this->mp_builtin->mp_WLP->removeRemoteEndpoints(pdata);
         this->mp_EDP->removeRemoteEndpoints(pdata);
         this->removeRemoteEndpoints(pdata);
+
+#if HAVE_SECURITY
+        mp_builtin->mp_participantImpl->security_manager().remove_participant(*pdata);
+#endif
 
         this->mp_SPDPReaderHistory->getMutex()->lock();
         for(std::vector<CacheChange_t*>::iterator it=this->mp_SPDPReaderHistory->changesBegin();

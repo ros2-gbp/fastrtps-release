@@ -20,6 +20,9 @@
 #include "EprosimaClientTest.h"
 #include "fastrtps/utils/TimeConversion.h"
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
+using namespace clientserver;
 
 EprosimaClientTest::EprosimaClientTest():m_overhead(0) {
     // TODO Auto-generated constructor stub

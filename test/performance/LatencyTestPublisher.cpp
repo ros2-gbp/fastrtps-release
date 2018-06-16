@@ -31,9 +31,10 @@ using namespace eprosima;
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-uint32_t dataspub[] = {12,28,60,124,252,508,1020,2044,4092,8188,16380};
+uint32_t dataspub[] = {12, 28, 60, 124, 252, 508, 1020, 2044, 4092, 8188, 16380};
+uint32_t dataspub_large[] = {63996, 131068};
 
-std::vector<uint32_t> data_size_pub (dataspub, dataspub + sizeof(dataspub) / sizeof(uint32_t) );
+std::vector<uint32_t> data_size_pub;
 
 
 LatencyTestPublisher::LatencyTestPublisher():
@@ -69,12 +70,22 @@ LatencyTestPublisher::~LatencyTestPublisher()
 }
 
 
-bool LatencyTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pid, bool hostname, bool export_csv)
+bool LatencyTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pid, bool hostname, bool export_csv,
+        const PropertyPolicy& part_property_policy, const PropertyPolicy& property_policy, bool large_data)
 {
     n_samples = n_sam;
     n_subscribers = n_sub;
     n_export_csv = export_csv;
     reliable_ = reliable;
+
+    if(!large_data)
+    {
+        data_size_pub.assign(dataspub, dataspub + sizeof(dataspub) / sizeof(uint32_t) );
+    }
+    else
+    {
+        data_size_pub.assign(dataspub_large, dataspub_large + sizeof(dataspub_large) / sizeof(uint32_t) );
+    }
 
     //////////////////////////////
     /*
@@ -85,7 +96,8 @@ bool LatencyTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pi
        strftime(date_buffer, 9, "%Y%m%d", now);
        strftime(time_buffer, 7, "%H%M%S", now);
        */
-    for (std::vector<uint32_t>::iterator it = data_size_pub.begin(); it != data_size_pub.end(); ++it) {
+    for (std::vector<uint32_t>::iterator it = data_size_pub.begin(); it != data_size_pub.end(); ++it)
+    {
         output_file_minimum << "\"" << n_samples << " samples of " << *it + 4 << " bytes (us)\"";
         output_file_average << "\"" << n_samples << " samples of " << *it + 4 << " bytes (us)\"";
         if (it != data_size_pub.end() - 1)
@@ -96,7 +108,9 @@ bool LatencyTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pi
 
         std::string str_reliable = "besteffort";
         if(reliable_)
+        {
             str_reliable = "reliable";
+        }
 
         switch (*it + 4)
         {
@@ -144,6 +158,14 @@ bool LatencyTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pi
                 output_file_16384 << "\"Minimum of " << n_samples << " samples (" << str_reliable << ")\",";
                 output_file_16384 << "\"Average of " << n_samples << " samples (" << str_reliable << ")\"" << std::endl;
                 break;
+            case 64000:
+                output_file_64000 << "\"Minimum of " << n_samples << " samples (" << str_reliable << ")\",";
+                output_file_64000 << "\"Average of " << n_samples << " samples (" << str_reliable << ")\"" << std::endl;
+                break;
+            case 131072:
+                output_file_131072 << "\"Minimum of " << n_samples << " samples (" << str_reliable << ")\",";
+                output_file_131072 << "\"Average of " << n_samples << " samples (" << str_reliable << ")\"" << std::endl;
+                break;
             default:
                 break;
         }
@@ -160,6 +182,7 @@ bool LatencyTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pi
     PParam.rtps.builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter = true;
     PParam.rtps.builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader = true;
     PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PParam.rtps.properties = part_property_policy;
 
     PParam.rtps.sendSocketBufferSize = 65536;
     PParam.rtps.listenSocketBufferSize = 2*65536;
@@ -198,6 +221,12 @@ bool LatencyTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pi
     Locator_t loc;
     loc.port = 15000;
     PubDataparam.unicastLocatorList.push_back(loc);
+    PubDataparam.properties = property_policy;
+    if(large_data)
+    {
+        PubDataparam.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        PubDataparam.qos.m_publishMode.kind = eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE;
+    }
     mp_datapub = Domain::createPublisher(mp_participant,PubDataparam,(PublisherListener*)&this->m_datapublistener);
     if(mp_datapub == nullptr)
         return false;
@@ -217,6 +246,11 @@ bool LatencyTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pi
         SubDataparam.qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
     loc.port = 15001;
     SubDataparam.unicastLocatorList.push_back(loc);
+    SubDataparam.properties = property_policy;
+    if(large_data)
+    {
+        SubDataparam.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+    }
 
 
 
@@ -496,8 +530,8 @@ bool LatencyTestPublisher::test(uint32_t datasize)
     //cout << "Beginning test of size: "<<datasize+4 <<endl;
     m_status = 0;
     n_received = 0;
-    mp_latency_in = new LatencyType((uint16_t)datasize);
-    mp_latency_out = new LatencyType((uint16_t)datasize);
+    mp_latency_in = new LatencyType(datasize);
+    mp_latency_out = new LatencyType(datasize);
     times_.clear();
     TestCommandType command;
     command.m_command = READY;
@@ -520,11 +554,12 @@ bool LatencyTestPublisher::test(uint32_t datasize)
         mp_datapub->write((void*)mp_latency_out);
 
         lock.lock();
-        if(data_count_ == 0)
-            data_cond_.wait_for(lock, std::chrono::seconds(1));
+        data_cond_.wait_for(lock, std::chrono::seconds(1), [&]() { return data_count_ > 0; });
 
-        if(data_count_ != 0)
+        if(data_count_ > 0)
+        {
             --data_count_;
+        }
         lock.unlock();
     }
 
@@ -540,7 +575,7 @@ bool LatencyTestPublisher::test(uint32_t datasize)
     size_t removed=0;
     mp_datapub->removeAllChange(&removed);
     //cout << "   REMOVED: "<< removed<<endl;
-    analizeTimes(datasize);
+    analyzeTimes(datasize);
     printStat(m_stats.back());
 
     delete(mp_latency_in);
@@ -549,7 +584,7 @@ bool LatencyTestPublisher::test(uint32_t datasize)
     return true;
 }
 
-void LatencyTestPublisher::analizeTimes(uint32_t datasize)
+void LatencyTestPublisher::analyzeTimes(uint32_t datasize)
 {
     TimeStats TS;
     TS.nbytes = datasize+4;
@@ -636,6 +671,12 @@ void LatencyTestPublisher::printStat(TimeStats& TS)
             break;
         case 16384:
             output_file_16384 << "\"" << TS.m_min.count() << "\",\"" << TS.mean << "\"" << std::endl;
+            break;
+        case 64000:
+            output_file_64000 << "\"" << TS.m_min.count() << "\",\"" << TS.mean << "\"" << std::endl;
+            break;
+        case 131072:
+            output_file_131072 << "\"" << TS.m_min.count() << "\",\"" << TS.mean << "\"" << std::endl;
             break;
         default:
             break;

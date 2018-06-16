@@ -43,6 +43,7 @@
 #include <fastrtps/rtps/network/ReceiverResource.h>
 #include <fastrtps/rtps/network/SenderResource.h>
 #include <fastrtps/rtps/messages/MessageReceiver.h>
+#include <fastrtps/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 
 #if HAVE_SECURITY
 #include "../security/SecurityManager.h"
@@ -76,6 +77,7 @@ class ReaderListener;
 class StatefulReader;
 class PDPSimple;
 class FlowController;
+class IPersistenceService;
 
 /*
    Receiver Control block is a struct we use to encapsulate the resources that take part in message reception.
@@ -213,9 +215,11 @@ class RTPSParticipantImpl
         uint32_t calculateMaxDataSize(uint32_t length);
 
 #if HAVE_SECURITY
-        ::security::SecurityManager& security_manager() { return m_security_manager; }
+        security::SecurityManager& security_manager() { return m_security_manager; }
 
-        bool is_rtps_protected() const { return is_rtps_protected_; }
+        const security::ParticipantSecurityAttributes& security_attributes() { return security_attributes_; }
+
+        bool is_security_initialized() const { return m_security_manager_initialized; }
 #endif
 
         PDPSimple* pdpsimple();
@@ -258,7 +262,9 @@ class RTPSParticipantImpl
 
 #if HAVE_SECURITY
         // Security manager
-        ::security::SecurityManager m_security_manager;
+        security::SecurityManager m_security_manager;
+        // Security manager initialization result
+        bool m_security_manager_initialized;
 #endif
 
         //! Encapsulates all associated resources on a Receiving element.
@@ -334,8 +340,14 @@ class RTPSParticipantImpl
         std::vector<std::unique_ptr<FlowController> > m_controllers;
 
 #if HAVE_SECURITY
-        bool is_rtps_protected_;
+        security::ParticipantSecurityAttributes security_attributes_;
 #endif
+
+        /**
+         * Get persistence service from factory, using endpoint attributes (or participant 
+         * attributes if endpoint does not define a persistence service config)
+         */
+        IPersistenceService* get_persistence_service(const EndpointAttributes& param);
 
     public:
 
@@ -367,6 +379,8 @@ class RTPSParticipantImpl
                 const EntityId_t& entityId = c_EntityId_Unknown,bool isBuiltin = false, bool enable = true);
 
         bool enableReader(RTPSReader *reader);
+
+        void disableReader(RTPSReader *reader);
 
         /**
          * Register a Writer in the BuiltinProtocols.

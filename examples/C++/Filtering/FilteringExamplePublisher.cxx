@@ -23,8 +23,8 @@
 
 #include "FilteringExamplePublisher.h"
 
-
-
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 FilteringExamplePublisher::FilteringExamplePublisher() : mp_participant(nullptr), mp_fast_publisher(nullptr), mp_slow_publisher(nullptr) {}
 
@@ -74,7 +74,7 @@ bool FilteringExamplePublisher::init()
 
 }
 
-void FilteringExamplePublisher::PubListener::onPublicationMatched(Publisher* pub,MatchingInfo& info)
+void FilteringExamplePublisher::PubListener::onPublicationMatched(Publisher*, MatchingInfo& info)
 {
     if (info.status == MATCHED_MATCHING)
     {

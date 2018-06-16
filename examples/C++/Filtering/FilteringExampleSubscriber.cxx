@@ -21,6 +21,8 @@
 
 #include "FilteringExampleSubscriber.h"
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 FilteringExampleSubscriber::FilteringExampleSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr) {}
 
@@ -63,7 +65,7 @@ bool FilteringExampleSubscriber::init(int type)
     return true;
 }
 
-void FilteringExampleSubscriber::SubListener::onSubscriptionMatched(Subscriber* sub,MatchingInfo& info)
+void FilteringExampleSubscriber::SubListener::onSubscriptionMatched(Subscriber*, MatchingInfo& info)
 {
     if (info.status == MATCHED_MATCHING)
     {

@@ -23,10 +23,6 @@
 #include "fastrtps/TopicDataType.h"
 #include "fastrtps/rtps/common/all_common.h"
 
-using namespace eprosima;
-using namespace fastrtps;
-using namespace rtps;
-
 namespace clientserver{
 
 class Operation
@@ -38,7 +34,7 @@ public:
 		MULTIPLICATION,
 		DIVISION,
 	};
-	GUID_t m_guid;
+	eprosima::fastrtps::rtps::GUID_t m_guid;
 	uint32_t m_operationId;
 	OPERATIONTYPE m_operationType;
 	int32_t m_num1;
@@ -48,7 +44,7 @@ public:
 	~Operation(){}
 };
 
-class OperationDataType:public TopicDataType
+class OperationDataType:public eprosima::fastrtps::TopicDataType
 {
 public:
 	OperationDataType()
@@ -58,8 +54,8 @@ public:
 		m_isGetKeyDefined = false;
 };
 	~OperationDataType(){};
-	bool serialize(void*data,SerializedPayload_t* payload);
-	bool deserialize(SerializedPayload_t* payload,void * data);
+	bool serialize(void*data, eprosima::fastrtps::rtps::SerializedPayload_t* payload);
+	bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t* payload,void * data);
     std::function<uint32_t()> getSerializedSizeProvider(void* data);
 	void* createData();
 	void deleteData(void* data);
@@ -75,7 +71,7 @@ public:
 		ERROR_RESULT,
 		SERVER_NOT_READY
 	};
-	GUID_t m_guid;
+	eprosima::fastrtps::rtps::GUID_t m_guid;
 	uint32_t m_operationId;
 	RESULTTYPE m_resultType;
 	int32_t m_result;
@@ -84,7 +80,7 @@ public:
 };
 
 
-class ResultDataType:public TopicDataType
+class ResultDataType:public eprosima::fastrtps::TopicDataType
 {
 public:
 	ResultDataType()
@@ -94,8 +90,8 @@ public:
 		m_isGetKeyDefined = false;
 };
 	~ResultDataType(){};
-	bool serialize(void*data,SerializedPayload_t* payload);
-	bool deserialize(SerializedPayload_t* payload,void * data);
+	bool serialize(void*data, eprosima::fastrtps::rtps::SerializedPayload_t* payload);
+	bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t* payload,void * data);
     std::function<uint32_t()> getSerializedSizeProvider(void* data);
 	void* createData();
 	void deleteData(void* data);

@@ -68,7 +68,7 @@ class RTPSWithRegistrationReader
 
                 void onReaderMatched(eprosima::fastrtps::rtps::RTPSReader* /*reader*/, eprosima::fastrtps::rtps::MatchingInfo& info)
                 {
-                    if (info.status == MATCHED_MATCHING)
+                    if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                         reader_.matched();
                 }
 
@@ -98,7 +98,7 @@ class RTPSWithRegistrationReader
         virtual ~RTPSWithRegistrationReader()
         {
             if(participant_ != nullptr)
-                RTPSDomain::removeRTPSParticipant(participant_);
+                eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(participant_);
             if(history_ != nullptr)
                 delete(history_);
         }
@@ -109,7 +109,7 @@ class RTPSWithRegistrationReader
             pattr.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
             pattr.builtin.use_WriterLivelinessProtocol = true;
             pattr.builtin.domainId = (uint32_t)GET_PID() % 230;
-            participant_ = RTPSDomain::createParticipant(pattr);
+            participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant(pattr);
             ASSERT_NE(participant_, nullptr);
 
             //Create readerhistory
@@ -141,6 +141,11 @@ class RTPSWithRegistrationReader
                 delete(history_);
                 history_ = nullptr;
             }
+
+            reader_ = nullptr;
+            receiving_ = false;
+            initialized_ = false;
+            matched_ = 0;
         }
 
         void expected_data(const std::list<type>& msgs)
@@ -153,6 +158,11 @@ class RTPSWithRegistrationReader
         {
             std::unique_lock<std::mutex> lock(mutex_);
             total_msgs_ = std::move(msgs);
+        }
+
+        const std::list<type>& not_received_data() const
+        {
+            return total_msgs_;
         }
 
         void startReception(size_t number_samples_expected = 0)
@@ -181,23 +191,50 @@ class RTPSWithRegistrationReader
             mutex_.unlock();
         }
 
-        std::list<type> block(const std::chrono::seconds &max_wait)
+        void block(std::function<bool()> checker)
         {
             std::unique_lock<std::mutex> lock(mutex_);
-            if(current_received_count_ != number_samples_expected_)
-                cv_.wait_for(lock, max_wait);
-
-            return total_msgs_;
+            cv_.wait(lock, checker);
         }
+
+        void block_for_all()
+        {
+            block([this]() -> bool {
+                    return number_samples_expected_ == current_received_count_;
+                    });
+        }
+
+        size_t block_for_at_least(size_t at_least)
+        {
+            block([this, at_least]() -> bool {
+                    return current_received_count_ >= at_least;
+                    });
+            return current_received_count_;
+        }
+
+        void block_until_seq_number_greater_or_equal(const eprosima::fastrtps::rtps::SequenceNumber_t& min_seq)
+        {
+            block([this, min_seq]() -> bool {
+                return last_seq_ >= min_seq;
+            });
+        }
+
 
         void waitDiscovery()
         {
             std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
-            if(matched_ == 0)
-                cvDiscovery_.wait_for(lock, std::chrono::seconds(10));
+            if (matched_ == 0)
+            {
+                cvDiscovery_.wait(lock, [this]() -> bool {
+                    return matched_ != 0;
+                });
+            }
+        }
 
-            ASSERT_NE(matched_, 0u);
+        void check_seq_number_greater_or_equal(const eprosima::fastrtps::rtps::SequenceNumber_t& min_seq)
+        {
+            ASSERT_GE(last_seq_, min_seq);
         }
 
         void matched()
@@ -214,12 +251,12 @@ class RTPSWithRegistrationReader
 
         /*** Function to change QoS ***/
         RTPSWithRegistrationReader& memoryMode(const eprosima::fastrtps::rtps::MemoryManagementPolicy_t memoryPolicy)
-	{
-		hattr_.memoryPolicy=memoryPolicy;
-		return *this;
-	}
+        {
+            hattr_.memoryPolicy=memoryPolicy;
+            return *this;
+        }
 
-	RTPSWithRegistrationReader& reliability(const eprosima::fastrtps::rtps::ReliabilityKind_t kind)
+        RTPSWithRegistrationReader& reliability(const eprosima::fastrtps::rtps::ReliabilityKind_t kind)
         {
             reader_attr_.endpoint.reliabilityKind = kind;
 
@@ -231,14 +268,41 @@ class RTPSWithRegistrationReader
             return *this;
         }
 
+        RTPSWithRegistrationReader& durability(const eprosima::fastrtps::rtps::DurabilityKind_t kind)
+        {
+            reader_attr_.endpoint.durabilityKind = kind;
+            reader_qos_.m_durability.durabilityKind(kind);
+
+            return *this;
+        }
+
         RTPSWithRegistrationReader& add_to_multicast_locator_list(const std::string& ip, uint32_t port)
         {
-            Locator_t loc;
+            eprosima::fastrtps::rtps::Locator_t loc;
             loc.set_IP4_address(ip);
             loc.port = port;
             reader_attr_.endpoint.multicastLocatorList.push_back(loc);
 
             return *this;
+        }
+
+        RTPSWithRegistrationReader& add_property(const std::string& prop, const std::string& value)
+        {
+            reader_attr_.endpoint.properties.properties().emplace_back(prop, value);
+
+            return *this;
+        }
+
+        RTPSWithRegistrationReader& make_persistent(const std::string& filename, const eprosima::fastrtps::rtps::GuidPrefix_t& guidPrefix)
+        {
+            reader_attr_.endpoint.persistence_guid.guidPrefix = guidPrefix;
+            reader_attr_.endpoint.persistence_guid.entityId = 0x55555555;
+
+            std::cout << "Initializing persistent READER " << reader_attr_.endpoint.persistence_guid << " with file " << filename << std::endl;
+
+            return durability(eprosima::fastrtps::rtps::DurabilityKind_t::PERSISTENT)
+                .add_property("dds.persistence.plugin", "builtin.SQLITE3")
+                .add_property("dds.persistence.sqlite3.filename", filename);
         }
 
     private:
@@ -263,14 +327,13 @@ class RTPSWithRegistrationReader
                 ASSERT_NE(it, total_msgs_.end());
                 total_msgs_.erase(it);
                 ++current_received_count_;
-
-                if(current_received_count_ == number_samples_expected_)
-                    cv_.notify_one();
+                default_receive_print<type>(data);
+                cv_.notify_one();
 
                 eprosima::fastrtps::rtps::ReaderHistory *history = reader->getHistory();
                 ASSERT_NE(history, nullptr);
 
-                history->remove_change((CacheChange_t*)change);
+                history->remove_change((eprosima::fastrtps::rtps::CacheChange_t*)change);
             }
         }
 
@@ -282,7 +345,7 @@ class RTPSWithRegistrationReader
         eprosima::fastrtps::TopicAttributes topic_attr_;
         eprosima::fastrtps::ReaderQos reader_qos_;
         eprosima::fastrtps::rtps::ReaderHistory* history_;
-	eprosima::fastrtps::rtps::HistoryAttributes hattr_;
+        eprosima::fastrtps::rtps::HistoryAttributes hattr_;
         bool initialized_;
         std::list<type> total_msgs_;
         std::mutex mutex_;
@@ -291,7 +354,7 @@ class RTPSWithRegistrationReader
         std::condition_variable cvDiscovery_;
         bool receiving_;
         unsigned int matched_;
-        SequenceNumber_t last_seq_;
+        eprosima::fastrtps::rtps::SequenceNumber_t last_seq_;
         size_t current_received_count_;
         size_t number_samples_expected_;
         type_support type_;

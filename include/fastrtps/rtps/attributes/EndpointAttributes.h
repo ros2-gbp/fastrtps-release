@@ -22,6 +22,7 @@
 #include "../common/Types.h"
 #include "../common/Locator.h"
 #include "PropertyPolicy.h"
+#include "../security/accesscontrol/EndpointSecurityAttributes.h"
 
 namespace eprosima {
 namespace fastrtps{
@@ -38,6 +39,7 @@ class EndpointAttributes
             topicKind(NO_KEY),
             reliabilityKind(BEST_EFFORT),
             durabilityKind(VOLATILE),
+            persistence_guid(),
             m_userDefinedID(-1),
             m_entityID(-1)
         {
@@ -56,6 +58,9 @@ class EndpointAttributes
 
         //!Durability kind, default value VOLATILE
         DurabilityKind_t durabilityKind;
+
+        //!GUID used for persistence
+        GUID_t persistence_guid;
 
         //!Unicast locator list
         LocatorList_t unicastLocatorList;
@@ -91,6 +96,12 @@ class EndpointAttributes
          */
         inline void setEntityID(uint8_t id){m_entityID = id;};
 
+#if HAVE_SECURITY
+        const security::EndpointSecurityAttributes& security_attributes() const { return security_attributes_; }
+
+        security::EndpointSecurityAttributes& security_attributes() { return security_attributes_; }
+#endif
+
     private:
 
         //!User Defined ID, used for StaticEndpointDiscovery, default value -1.
@@ -98,6 +109,10 @@ class EndpointAttributes
 
         //!Entity ID, if the user want to specify the EntityID of the enpoint, default value -1.
         int16_t m_entityID;
+
+#if HAVE_SECURITY
+        security::EndpointSecurityAttributes security_attributes_;
+#endif
 };
 }
 } /* namespace rtps */

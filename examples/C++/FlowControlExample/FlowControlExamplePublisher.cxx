@@ -32,8 +32,8 @@
 
 #include "FlowControlExamplePublisher.h"
 
-
-
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 FlowControlExamplePublisher::FlowControlExamplePublisher() : mp_participant(nullptr),
                                                              mp_fast_publisher(nullptr),
@@ -88,7 +88,7 @@ bool FlowControlExamplePublisher::init()
     return true;
 }
 
-void FlowControlExamplePublisher::PubListener::onPublicationMatched(Publisher* pub,MatchingInfo& info)
+void FlowControlExamplePublisher::PubListener::onPublicationMatched(Publisher*, MatchingInfo& info)
 {
     if (info.status == MATCHED_MATCHING)
     {

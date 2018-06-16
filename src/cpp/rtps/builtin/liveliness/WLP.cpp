@@ -162,9 +162,10 @@ bool WLP::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     if((auxendp!=0 || partdet!=0) && this->mp_builtinReader!=nullptr)
     {
         logInfo(RTPS_LIVELINESS,"Adding remote writer to my local Builtin Reader");
-        RemoteWriterAttributes watt;
+        RemoteWriterAttributes watt(pdata.m_VendorId);
         watt.guid.guidPrefix = pdata.m_guid.guidPrefix;
         watt.guid.entityId = c_EntityId_WriterLiveliness;
+        watt.endpoint.persistence_guid = watt.guid;
         watt.endpoint.unicastLocatorList = pdata.m_metatrafficUnicastLocatorList;
         watt.endpoint.multicastLocatorList = pdata.m_metatrafficMulticastLocatorList;
         watt.endpoint.topicKind = WITH_KEY;
@@ -179,7 +180,7 @@ bool WLP::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     if((auxendp!=0 || partdet!=0) && this->mp_builtinWriter!=nullptr)
     {
         logInfo(RTPS_LIVELINESS,"Adding remote reader to my local Builtin Writer");
-        RemoteReaderAttributes ratt;
+        RemoteReaderAttributes ratt(pdata.m_VendorId);
         ratt.expectsInlineQos = false;
         ratt.guid.guidPrefix = pdata.m_guid.guidPrefix;
         ratt.guid.entityId = c_EntityId_ReaderLiveliness;
@@ -211,6 +212,7 @@ void WLP::removeRemoteEndpoints(ParticipantProxyData* pdata)
         RemoteWriterAttributes watt;
         watt.guid.guidPrefix = pdata->m_guid.guidPrefix;
         watt.guid.entityId = c_EntityId_WriterLiveliness;
+        watt.endpoint.persistence_guid = watt.guid;
         watt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
         watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
         watt.endpoint.topicKind = WITH_KEY;

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    include(${PROJECT_SOURCE_DIR}/cmake/dev/gtest.cmake)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
     check_gtest()
 
     if(GTEST_FOUND)
@@ -56,56 +56,44 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
 
         include_directories(mock/)
 
-        string(RANDOM LENGTH 4 ALPHABET 0123456789 PORT_RANDOM_NUMBER)
-        math(EXPR PORT_RANDOM_NUMBER "${PORT_RANDOM_NUMBER} + 0") # Remove extra leading 0s.
-        if(PORT_RANDOM_NUMBER LESS 1025)
-            math(EXPR PORT_RANDOM_NUMBER "${PORT_RANDOM_NUMBER} + 1024") # Remove extra leading 0s.
-        endif()
-
         add_executable(UDPv4Tests ${UDPV4TESTS_SOURCE})
-        add_gtest(UDPv4Tests ${UDPV4TESTS_SOURCE}
-            ENVIRONMENT "PORT_RANDOM_NUMBER=${PORT_RANDOM_NUMBER}"
-            )
         target_compile_definitions(UDPv4Tests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(UDPv4Tests PRIVATE ${GTEST_INCLUDE_DIRS}
-            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME})
+            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
         target_link_libraries(UDPv4Tests ${GTEST_LIBRARIES} ${MOCKS} )
         if(MSVC OR MSVC_IDE)
             target_link_libraries(UDPv4Tests ${PRIVACY}
                 iphlpapi Shlwapi
                 )
         endif()
+        add_gtest(UDPv4Tests SOURCES ${UDPV4TESTS_SOURCE})
 
         option(DISABLE_UDPV6_TESTS "Disable UDPv6 tests because fails in some systems" OFF)
 
         if(NOT DISABLE_UDPV6_TESTS)
             add_executable(UDPv6Tests ${UDPV6TESTS_SOURCE})
-            add_gtest(UDPv6Tests ${UDPV6TESTS_SOURCE}
-                ENVIRONMENT "PORT_RANDOM_NUMBER=${PORT_RANDOM_NUMBER}"
-                )
             target_compile_definitions(UDPv6Tests PRIVATE FASTRTPS_NO_LIB)
             target_include_directories(UDPv6Tests PRIVATE ${GTEST_INCLUDE_DIRS}
-                ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME})
+                ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
             target_link_libraries(UDPv6Tests ${GTEST_LIBRARIES} ${MOCKS} )
             if(MSVC OR MSVC_IDE)
                 target_link_libraries(UDPv6Tests ${PRIVACY}
                     iphlpapi Shlwapi
                     )
             endif()
+            add_gtest(UDPv6Tests SOURCES ${UDPV6TESTS_SOURCE})
         endif()
 
         add_executable(test_UDPv4Tests ${TEST_UDPV4TESTS_SOURCE})
-        add_gtest(test_UDPv4Tests ${TEST_UDPV4TESTS_SOURCE}
-            ENVIRONMENT "PORT_RANDOM_NUMBER=${PORT_RANDOM_NUMBER}"
-            )
         target_compile_definitions(test_UDPv4Tests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(test_UDPv4Tests PRIVATE ${GTEST_INCLUDE_DIRS}
-            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME})
+            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
         target_link_libraries(test_UDPv4Tests ${GTEST_LIBRARIES} ${MOCKS} )
         if(MSVC OR MSVC_IDE)
             target_link_libraries(test_UDPv4Tests ${PRIVACY}
                 iphlpapi Shlwapi
                 )
         endif()
+        add_gtest(test_UDPv4Tests SOURCES ${TEST_UDPV4TESTS_SOURCE})
     endif()
 endif()

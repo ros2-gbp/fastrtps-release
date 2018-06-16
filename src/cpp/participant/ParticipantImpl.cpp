@@ -42,11 +42,8 @@
 
 #include <fastrtps/log/Log.h>
 
+using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
-
-namespace eprosima {
-namespace fastrtps {
-
 
 ParticipantImpl::ParticipantImpl(ParticipantAttributes& patt,Participant* pspart,ParticipantListener* listen):
     m_att(patt),
@@ -166,7 +163,7 @@ Publisher* ParticipantImpl::createPublisher(PublisherAttributes& att,
 
     WriterAttributes watt;
     watt.throughputController = att.throughputController;
-    watt.endpoint.durabilityKind = att.qos.m_durability.kind == VOLATILE_DURABILITY_QOS ? VOLATILE : TRANSIENT_LOCAL;
+    watt.endpoint.durabilityKind = att.qos.m_durability.durabilityKind();
     watt.endpoint.endpointKind = WRITER;
     watt.endpoint.multicastLocatorList = att.multicastLocatorList;
     watt.endpoint.reliabilityKind = att.qos.m_reliability.kind == RELIABLE_RELIABILITY_QOS ? RELIABLE : BEST_EFFORT;
@@ -184,6 +181,24 @@ Publisher* ParticipantImpl::createPublisher(PublisherAttributes& att,
         watt.endpoint.setUserDefinedID((uint8_t)att.getUserDefinedID());
     }
     watt.times = att.times;
+
+    // TODO(Ricardo) Remove in future
+    // Insert topic_name and partitions
+    Property property;
+    property.name("topic_name");
+    property.value(att.topic.getTopicName());
+    watt.endpoint.properties.properties().push_back(std::move(property));
+    if(att.qos.m_partition.getNames().size() > 0)
+    {
+        property.name("partitions");
+        std::string partitions;
+        for(auto partition : att.qos.m_partition.getNames())
+        {
+            partitions += partition + ";";
+        }
+        property.value(std::move(partitions));
+        watt.endpoint.properties.properties().push_back(std::move(property));
+    }
 
     RTPSWriter* writer = RTPSDomain::createRTPSWriter(this->mp_rtpsParticipant,
             watt,
@@ -268,7 +283,7 @@ Subscriber* ParticipantImpl::createSubscriber(SubscriberAttributes& att,
     subimpl->mp_rtpsParticipant = this->mp_rtpsParticipant;
 
     ReaderAttributes ratt;
-    ratt.endpoint.durabilityKind = att.qos.m_durability.kind == VOLATILE_DURABILITY_QOS ? VOLATILE : TRANSIENT_LOCAL;
+    ratt.endpoint.durabilityKind = att.qos.m_durability.durabilityKind();
     ratt.endpoint.endpointKind = READER;
     ratt.endpoint.multicastLocatorList = att.multicastLocatorList;
     ratt.endpoint.reliabilityKind = att.qos.m_reliability.kind == RELIABLE_RELIABILITY_QOS ? RELIABLE : BEST_EFFORT;
@@ -282,6 +297,24 @@ Subscriber* ParticipantImpl::createSubscriber(SubscriberAttributes& att,
     if(att.getUserDefinedID()>0)
         ratt.endpoint.setUserDefinedID((uint8_t)att.getUserDefinedID());
     ratt.times = att.times;
+
+    // TODO(Ricardo) Remove in future
+    // Insert topic_name and partitions
+    Property property;
+    property.name("topic_name");
+    property.value(att.topic.getTopicName());
+    ratt.endpoint.properties.properties().push_back(std::move(property));
+    if(att.qos.m_partition.getNames().size() > 0)
+    {
+        property.name("partitions");
+        std::string partitions;
+        for(auto partition : att.qos.m_partition.getNames())
+        {
+            partitions += partition + ";";
+        }
+        property.value(std::move(partitions));
+        ratt.endpoint.properties.properties().push_back(std::move(property));
+    }
 
     RTPSReader* reader = RTPSDomain::createRTPSReader(this->mp_rtpsParticipant,
             ratt,
@@ -432,6 +465,3 @@ bool ParticipantImpl::get_remote_reader_info(const GUID_t& readerGuid, ReaderPro
 {
     return mp_rtpsParticipant->get_remote_reader_info(readerGuid, returnedInfo);
 }
-
-} /* namespace pubsub */
-} /* namespace eprosima */

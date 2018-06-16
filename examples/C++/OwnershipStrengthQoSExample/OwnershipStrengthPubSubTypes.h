@@ -25,7 +25,7 @@
 
 #include <fastrtps/TopicDataType.h>
 
-using namespace eprosima::fastrtps;
+
 
 #include "OwnershipStrength.h"
 
@@ -33,16 +33,16 @@ using namespace eprosima::fastrtps;
  * @brief This class represents the TopicDataType of the type ExampleMessage defined by the user in the IDL file.
  * @ingroup OWNERSHIPSTRENGTH
  */
-class ExampleMessagePubSubType : public TopicDataType {
+class ExampleMessagePubSubType : public eprosima::fastrtps::TopicDataType {
 public:
         typedef ExampleMessage type;
 
 	ExampleMessagePubSubType();
 	virtual ~ExampleMessagePubSubType();
-	bool serialize(void *data, SerializedPayload_t *payload);
-	bool deserialize(SerializedPayload_t *payload, void *data);
+	bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload);
+	bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data);
         std::function<uint32_t()> getSerializedSizeProvider(void* data);
-	bool getKey(void *data, InstanceHandle_t *ihandle);
+	bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle);
 	void* createData();
 	void deleteData(void * data);
 	MD5 m_md5;

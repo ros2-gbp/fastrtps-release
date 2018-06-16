@@ -21,7 +21,7 @@
 #define TESTWRITERSOCKET_H_
 
 #include "fastrtps/rtps/rtps_fwd.h"
-using namespace eprosima::fastrtps::rtps;
+
 
 #include <string>
 #include <cstdio>
@@ -31,9 +31,9 @@ class TestWriterSocket {
 public:
 	TestWriterSocket();
 	virtual ~TestWriterSocket();
-	RTPSParticipant* mp_participant;
-	RTPSWriter* mp_writer;
-	WriterHistory* mp_history;
+	eprosima::fastrtps::rtps::RTPSParticipant* mp_participant;
+	eprosima::fastrtps::rtps::RTPSWriter* mp_writer;
+	eprosima::fastrtps::rtps::WriterHistory* mp_history;
 	bool init(std::string ip,uint32_t port);
 	void run(uint16_t nmsgs);
 };

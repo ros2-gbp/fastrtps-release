@@ -31,8 +31,8 @@
 
 #include "XMLProfilesExamplePublisher.h"
 
-
-
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 XMLProfilesExamplePublisher::XMLProfilesExamplePublisher() : mp_participant(nullptr), mp_publisher(nullptr) {}
 
@@ -59,7 +59,7 @@ bool XMLProfilesExamplePublisher::init()
 	return true;
 }
 
-void XMLProfilesExamplePublisher::PubListener::onPublicationMatched(Publisher* pub,MatchingInfo& info)
+void XMLProfilesExamplePublisher::PubListener::onPublicationMatched(Publisher*, MatchingInfo& info)
 {
 	if (info.status == MATCHED_MATCHING)
 	{

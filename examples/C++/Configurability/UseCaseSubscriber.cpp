@@ -22,6 +22,9 @@
 
 #include "samplePubSubTypes.h"
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
+
 //Enums and configuration structure
 enum Reliability_type { Best_Effort, Reliable };
 enum Durability_type { Transient_Local, Volatile };
@@ -137,7 +140,7 @@ int main(){
             std::cout << "Please input a valid argument" << std::endl;
             continue;
         }
-        user_configuration.depth = choice;
+        user_configuration.depth = (uint8_t)choice;
         validinput=true;
     }
     std::cout << "---------------------------------------------------" << std::endl;
@@ -154,7 +157,7 @@ int main(){
             continue;
         }
         if(choice > 0){
-        user_configuration.depth = choice;
+        user_configuration.depth = (uint8_t)choice;
         }else{
         user_configuration.depth = 1;
         std::cout << "Defaulting to 1 instance..." << std::endl;
@@ -175,7 +178,7 @@ int main(){
             std::cout << "Please input a valid argument" << std::endl;
             continue;
         }
-        user_configuration.max_samples_per_key = choice;
+        user_configuration.max_samples_per_key = (uint16_t)choice;
         validinput=true;
     }
 
@@ -214,7 +217,7 @@ int main(){
             std::cout << "Please input a valid argument" << std::endl;
             continue;
         }
-        user_configuration.history_size = choice;
+        user_configuration.history_size = (uint16_t)choice;
         validinput=true;
     }
 

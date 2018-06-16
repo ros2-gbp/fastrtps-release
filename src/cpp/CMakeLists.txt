@@ -34,7 +34,6 @@ set(${PROJECT_NAME}_source_files
     rtps/writer/ReaderProxy.cpp
     rtps/writer/StatelessWriter.cpp
     rtps/writer/ReaderLocator.cpp
-    rtps/writer/timedevent/InitialHeartbeat.cpp
     rtps/writer/timedevent/PeriodicHeartbeat.cpp
     rtps/writer/timedevent/NackResponseDelay.cpp
     rtps/writer/timedevent/NackSupressionDuration.cpp
@@ -109,6 +108,14 @@ set(${PROJECT_NAME}_source_files
     xmlparser/XMLEndpointParser.cpp
     xmlparser/XMLParser.cpp
     xmlparser/XMLProfileManager.cpp
+    rtps/writer/PersistentWriter.cpp
+    rtps/writer/StatelessPersistentWriter.cpp
+    rtps/writer/StatefulPersistentWriter.cpp
+    rtps/reader/StatelessPersistentReader.cpp
+    rtps/reader/StatefulPersistentReader.cpp
+    rtps/persistence/PersistenceFactory.cpp
+    rtps/persistence/SQLite3PersistenceService.cpp
+    rtps/persistence/sqlite3.c
     )
 
 # Add sources to Makefile.am
@@ -124,14 +131,18 @@ set(${PROJECT_NAME}_security_source_files
     rtps/security/timedevent/HandshakeMessageTokenResent.cpp
     security/OpenSSLInit.cpp
     security/authentication/PKIDH.cpp
+    security/accesscontrol/Permissions.cpp
     security/cryptography/AESGCMGMAC.cpp
     security/cryptography/AESGCMGMAC_KeyExchange.cpp
     security/cryptography/AESGCMGMAC_KeyFactory.cpp
     security/cryptography/AESGCMGMAC_Transform.cpp
     security/cryptography/AESGCMGMAC_Types.cpp
     security/authentication/PKIIdentityHandle.cpp
-    security/access/mockAccessHandle.cpp
     security/authentication/PKIHandshakeHandle.cpp
+    security/accesscontrol/AccessPermissionsHandle.cpp
+    security/accesscontrol/CommonParser.cpp
+    security/accesscontrol/GovernanceParser.cpp
+    security/accesscontrol/PermissionsParser.cpp
     )
 
 # Add sources to Makefile.am
@@ -172,12 +183,6 @@ if(ANDROID)
         ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
         )
 endif()
-
-# Set version
-set(${PROJECT_NAME_UPPER}_VERSION_MAJOR ${PROJECT_MAJOR_VERSION})
-set(${PROJECT_NAME_UPPER}_VERSION_MINOR ${PROJECT_MINOR_VERSION})
-set(${PROJECT_NAME_UPPER}_VERSION_MICRO ${PROJECT_MICRO_VERSION})
-set(${PROJECT_NAME_UPPER}_VERSION_STR ${PROJECT_VERSION})
 
 configure_file(${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/config.h.in
     ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}/config.h)
@@ -244,9 +249,9 @@ if(MSVC OR MSVC_IDE)
         # Rename the library to have a "lib" before.
         set_target_properties(${PROJECT_NAME}_static PROPERTIES OUTPUT_NAME lib${PROJECT_NAME})
 
-        set_target_properties(${PROJECT_NAME} ${PROJECT_NAME}_static PROPERTIES RELEASE_POSTFIX -${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION})
-        set_target_properties(${PROJECT_NAME} ${PROJECT_NAME}_static PROPERTIES RELWITHDEBINFO_POSTFIX -${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION})
-        set_target_properties(${PROJECT_NAME} ${PROJECT_NAME}_static PROPERTIES DEBUG_POSTFIX d-${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION})
+        set_target_properties(${PROJECT_NAME} ${PROJECT_NAME}_static PROPERTIES RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+        set_target_properties(${PROJECT_NAME} ${PROJECT_NAME}_static PROPERTIES RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+        set_target_properties(${PROJECT_NAME} ${PROJECT_NAME}_static PROPERTIES DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "WindowsStore")
             set_target_properties(${PROJECT_NAME} ${PROJECT_NAME}_static PROPERTIES VS_WINRT_COMPONENT "true")
@@ -257,14 +262,14 @@ if(MSVC OR MSVC_IDE)
 
         # Define public headers
         target_include_directories(${PROJECT_NAME} PUBLIC
-            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}>
+            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/cpp>
             $<INSTALL_INTERFACE:include>
             )
 
         # Define public headers for static library
         target_include_directories(${PROJECT_NAME}_static PUBLIC
-            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}>
+            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/cpp>
             $<INSTALL_INTERFACE:include>
             )
@@ -276,11 +281,13 @@ if(MSVC OR MSVC_IDE)
         endif()
 
         # Link library to external win32 libraries.
-        target_link_libraries(${PROJECT_NAME} ${PRIVACY}
-            ${CMAKE_THREAD_LIBS_INIT}
+        target_link_libraries(${PROJECT_NAME} ${PRIVACY} fastcdr
+            ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS}
             iphlpapi Shlwapi kernel32 user32.dll
             ${EXTRA_LIBRARIES}
             )
+
+        target_link_libraries(${PROJECT_NAME}_static ${PRIVACY} fastcdr)
 
         if(TINYXML2_LIBRARY)
             target_link_libraries(${PROJECT_NAME} ${PRIVACY}
@@ -295,18 +302,18 @@ else()
     #Create library
     add_library(${PROJECT_NAME} ${${PROJECT_NAME}_source_files})
     set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
-    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_MAJOR_VERSION})
+    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 
     # Define public headers
     target_include_directories(${PROJECT_NAME} PUBLIC
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/cpp>
         $<INSTALL_INTERFACE:include>
         )
 
     # Link library to external libraries.
-    target_link_libraries(${PROJECT_NAME}
-        ${CMAKE_THREAD_LIBS_INIT}
+    target_link_libraries(${PROJECT_NAME} fastcdr
+        ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS}
         ${EXTRA_LIBRARIES}
         )
 

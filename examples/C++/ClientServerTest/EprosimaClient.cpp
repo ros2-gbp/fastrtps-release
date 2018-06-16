@@ -21,6 +21,10 @@
 
 #include "fastrtps/fastrtps_all.h"
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
+using namespace clientserver;
+
 EprosimaClient::EprosimaClient():
 mp_operation_pub(nullptr),
 mp_result_sub(nullptr),
@@ -135,7 +139,7 @@ void EprosimaClient::resetResult()
 	m_result.m_result = 0;
 }
 
-void EprosimaClient::OperationListener::onPublicationMatched(Publisher* pub,MatchingInfo& info)
+void EprosimaClient::OperationListener::onPublicationMatched(Publisher*, MatchingInfo& info)
 {
 	if(info.status == MATCHED_MATCHING)
 	{
@@ -146,7 +150,7 @@ void EprosimaClient::OperationListener::onPublicationMatched(Publisher* pub,Matc
 	mp_up->isReady();
 }
 
-void EprosimaClient::ResultListener::onSubscriptionMatched(Subscriber* sub,MatchingInfo& info)
+void EprosimaClient::ResultListener::onSubscriptionMatched(Subscriber*, MatchingInfo& info)
 {
 	if(info.status == MATCHED_MATCHING)
 	{
@@ -157,7 +161,7 @@ void EprosimaClient::ResultListener::onSubscriptionMatched(Subscriber* sub,Match
 	mp_up->isReady();
 }
 
-void EprosimaClient::ResultListener::onNewDataMessage(Subscriber* sub)
+void EprosimaClient::ResultListener::onNewDataMessage(Subscriber*)
 {
 }
 

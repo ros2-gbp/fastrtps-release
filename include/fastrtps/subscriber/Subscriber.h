@@ -23,7 +23,7 @@
 #include "../rtps/common/Guid.h"
 #include "../attributes/SubscriberAttributes.h"
 
-using namespace eprosima::fastrtps::rtps;
+
 
 namespace eprosima {
 namespace fastrtps {
@@ -52,7 +52,7 @@ class RTPS_DllAPI Subscriber
      * Get the associated GUID
      * @return Associated GUID
      */
-    const GUID_t& getGuid();
+    const rtps::GUID_t& getGuid();
 
     /**
      * Method to block the current thread until an unread message is available

@@ -25,6 +25,8 @@
 #include <fastrtps/Domain.h>
 #include <fastrtps/utils/eClock.h>
 
+using namespace eprosima::fastrtps::rtps;
+using namespace eprosima::fastrtps;
 
 HelloWorldPublisher::HelloWorldPublisher():mp_participant(nullptr),
 mp_publisher(nullptr)
@@ -48,9 +50,16 @@ bool HelloWorldPublisher::init()
             "file://certs/mainpubcert.pem");
     participant_property_policy.properties().emplace_back("dds.sec.auth.builtin.PKI-DH.private_key",
             "file://certs/mainpubkey.pem");
+    participant_property_policy.properties().emplace_back(Property("dds.sec.access.plugin",
+                    "builtin.Access-Permissions"));
+    participant_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.permissions_ca",
+                    "file://certs/maincacert.pem"));
+    participant_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.governance",
+                    "file://certs/governance.smime"));
+    participant_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.permissions",
+                    "file://certs/permissions.smime"));
     participant_property_policy.properties().emplace_back("dds.sec.crypto.plugin",
             "builtin.AES-GCM-GMAC");
-    participant_property_policy.properties().emplace_back("rtps.participant.rtps_protection_kind", "ENCRYPT");
     PParam.rtps.properties = participant_property_policy;
 
     mp_participant = Domain::createParticipant(PParam);
@@ -73,12 +82,6 @@ bool HelloWorldPublisher::init()
     Wparam.times.heartbeatPeriod.seconds = 2;
     Wparam.times.heartbeatPeriod.fraction = 200*1000*1000;
     Wparam.qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
-
-    PropertyPolicy publisher_property_policy;
-    publisher_property_policy.properties().emplace_back("rtps.endpoint.submessage_protection_kind", "ENCRYPT");
-    publisher_property_policy.properties().emplace_back("rtps.endpoint.payload_protection_kind", "ENCRYPT");
-
-    Wparam.properties = publisher_property_policy;
 
     mp_publisher = Domain::createPublisher(mp_participant,Wparam,(PublisherListener*)&m_listener);
     if(mp_publisher == nullptr)

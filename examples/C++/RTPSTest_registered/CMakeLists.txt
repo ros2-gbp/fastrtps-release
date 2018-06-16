@@ -13,11 +13,21 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 2.8.12)
-project("RTPSTest_registered")
+
+if(NOT CMAKE_VERSION VERSION_LESS 3.0)
+    cmake_policy(SET CMP0048 NEW)
+endif()
+
+project(RTPSTest_registered)
 
 # Find requirements
-find_package(fastcdr REQUIRED)
-find_package(fastrtps REQUIRED)
+if(NOT fastcdr_FOUND)
+    find_package(fastcdr REQUIRED)
+endif()
+
+if(NOT fastrtps_FOUND)
+    find_package(fastrtps REQUIRED)
+endif()
 
 # Set C++11
 include(CheckCXXCompilerFlag)
@@ -37,5 +47,5 @@ file(GLOB RTPSTESTREGISTERED_SOURCES "*.cpp")
 add_executable(RTPSTest_registered ${RTPSTESTREGISTERED_SOURCES})
 target_link_libraries(RTPSTest_registered fastrtps fastcdr)
 install(TARGETS RTPSTest_registered
-	RUNTIME DESTINATION examples/C++/RTPSTest_registered/${BIN_INSTALL_DIR}
+    RUNTIME DESTINATION examples/C++/RTPSTest_registered/${BIN_INSTALL_DIR}
     )

@@ -28,6 +28,8 @@
 
 #include "XMLProfilesExampleSubscriber.h"
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 XMLProfilesExampleSubscriber::XMLProfilesExampleSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr) {}
 
@@ -53,7 +55,7 @@ bool XMLProfilesExampleSubscriber::init()
 	return true;
 }
 
-void XMLProfilesExampleSubscriber::SubListener::onSubscriptionMatched(Subscriber* sub,MatchingInfo& info)
+void XMLProfilesExampleSubscriber::SubListener::onSubscriptionMatched(Subscriber*, MatchingInfo& info)
 {
 	if (info.status == MATCHED_MATCHING)
 	{

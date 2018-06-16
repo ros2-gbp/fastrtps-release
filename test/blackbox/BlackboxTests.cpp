@@ -107,32 +107,42 @@ void default_send_print(const Data1mb& data)
 #include <string>
 #include <gtest/gtest.h>
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
+
 #if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
 #define MEMORY_MODE_STRING ReallocMem
+#define MEMORY_MODE_BYTE 1
 #elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
 #define MEMORY_MODE_STRING DynMem
+#define MEMORY_MODE_BYTE 2
 #else
 #define MEMORY_MODE_STRING PreallocMem
+#define MEMORY_MODE_BYTE 3
 #endif
 
 #define PASTER(x, y) x ## _ ## y
 #define EVALUATOR(x, y) PASTER(x, y)
 #define BLACKBOXTEST(test_case_name, test_name) TEST(EVALUATOR(test_case_name, MEMORY_MODE_STRING), test_name)
+#define BLACKBOXTEST_F(test_case_name, test_name) TEST_F(EVALUATOR(test_case_name, MEMORY_MODE_STRING), test_name)
 #define TEST_TOPIC_NAME std::string(test_info_->test_case_name() + std::string("_") + test_info_->name())
 
-uint32_t global_port = 0;
+uint16_t global_port = 0;
 
 #if HAVE_SECURITY
 static const char* certs_path = nullptr;
 #endif
 
-uint32_t get_port()
+uint16_t get_port()
 {
-    uint32_t port = GET_PID();
+    uint16_t port = static_cast<uint16_t>(GET_PID());
 
-    if(port + 7400 > port)
-        port += 7400;
+    if(5000 > port)
+    {
+        port += 5000;
+    }
 
+    std::cout << "Generating port " << port << std::endl;
     return port;
 }
 
@@ -142,10 +152,7 @@ class BlackboxEnvironment : public ::testing::Environment
 
         void SetUp()
         {
-            global_port = GET_PID();
-
-            if(global_port + 7400 > global_port)
-                global_port += 7400;
+            global_port = get_port();
             //Log::SetVerbosity(Log::Info);
             //Log::SetCategoryFilter(std::regex("(SECURITY)"));
         }
@@ -295,6 +302,95 @@ void print_non_received_messages(const std::list<T>& data, const std::function<v
 }
 /***** End auxiliary lambda function *****/
 
+class EVALUATOR(BlackBoxPersistence, MEMORY_MODE_STRING) : public ::testing::Test
+{
+public:
+    const std::string& db_file_name() const { return db_file_name_; }
+    const eprosima::fastrtps::rtps::GuidPrefix_t& guid_prefix() const { return guid_prefix_; }
+    std::list<HelloWorld> not_received_data;
+
+    void run_one_send_recv_test(RTPSWithRegistrationReader<HelloWorldType>& reader, RTPSWithRegistrationWriter<HelloWorldType>& writer, uint32_t seq_check = 0, bool reliable = false)
+    {
+        // Wait for discovery.
+        writer.waitDiscovery();
+        reader.waitDiscovery();
+
+        auto data = default_helloworld_data_generator();
+        not_received_data.insert(not_received_data.end(), data.begin(), data.end());
+
+        reader.expected_data(not_received_data);
+        reader.startReception();
+
+        // Send data
+        writer.send(data);
+        // In this test all data should be sent.
+        ASSERT_TRUE(data.empty());
+
+        // Block reader until reception finished or timeout.
+        if (seq_check > 0)
+        {
+            reader.block_until_seq_number_greater_or_equal({ 0,seq_check });
+        }
+        else
+        {
+            if (reliable)
+            {
+                reader.block_for_all();
+            }
+            else
+            {
+                reader.block_for_at_least(2);
+            }
+        }
+
+        reader.destroy();
+        writer.destroy();
+
+        data = reader.not_received_data();
+        print_non_received_messages(data, default_helloworld_print);
+        not_received_data = data;
+    }
+
+protected:
+    std::string db_file_name_;
+    eprosima::fastrtps::rtps::GuidPrefix_t guid_prefix_;
+
+    virtual void SetUp()
+    {
+        // Get info about current test
+        auto info = ::testing::UnitTest::GetInstance()->current_test_info();
+
+        // Create DB file name from test name and PID
+        std::ostringstream ss;
+        ss << info->test_case_name() << "_" << info->name() << "_" << GET_PID() << ".db";
+        db_file_name_ = ss.str();
+
+        // Fill guid prefix
+        int32_t* p_value = (int32_t*)guid_prefix_.value;
+        *p_value++ = info->line();
+        *p_value = GET_PID();
+        guid_prefix_.value[8] = HAVE_SECURITY;
+        guid_prefix_.value[9] = MEMORY_MODE_BYTE;
+        eprosima::fastrtps::rtps::LocatorList_t loc;
+        eprosima::fastrtps::rtps::IPFinder::getIP4Address(&loc);
+        if (loc.size()>0)
+        {
+            guid_prefix_.value[10] = loc.begin()->address[14];
+            guid_prefix_.value[11] = loc.begin()->address[15];
+        }
+        else
+        {
+            guid_prefix_.value[10] = 127;
+            guid_prefix_.value[11] = 1;
+        }
+    }
+
+    virtual void TearDown()
+    {
+        std::remove(db_file_name_.c_str());
+    }
+};
+
 BLACKBOXTEST(BlackBox, RTPSAsNonReliableSocket)
 {
     RTPSAsSocketReader<HelloWorldType> reader(TEST_TOPIC_NAME);
@@ -311,7 +407,6 @@ BLACKBOXTEST(BlackBox, RTPSAsNonReliableSocket)
     ASSERT_TRUE(writer.isInitialized());
 
     auto data = default_helloworld_data_generator();
-    size_t data_length = data.size();
 
     reader.expected_data(data);
     reader.startReception();
@@ -320,10 +415,7 @@ BLACKBOXTEST(BlackBox, RTPSAsNonReliableSocket)
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(1));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_LE(data.size(), data_length - 2);
+    reader.block_for_at_least(2);
 }
 
 BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocket)
@@ -343,7 +435,6 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocket)
     ASSERT_TRUE(writer.isInitialized());
 
     auto data = default_helloworld_data_generator();
-    size_t data_length = data.size();
 
     reader.expected_data(data);
     reader.startReception();
@@ -352,10 +443,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocket)
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(1));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_LE(data.size(), data_length - 2);
+    reader.block_for_at_least(2);
 }
 
 BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocketWithWriterSpecificFlowControl)
@@ -378,7 +466,6 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocketWithWriterSpecificFlowControl
     ASSERT_TRUE(writer.isInitialized());
 
     auto data = default_helloworld_data_generator();
-    size_t data_length = data.size();
 
     reader.expected_data(data);
     reader.startReception();
@@ -387,10 +474,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocketWithWriterSpecificFlowControl
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(1));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_LE(data.size(), data_length - 2);
+    reader.block_for_at_least(2);
 }
 
 BLACKBOXTEST(BlackBox, RTPSAsReliableSocket)
@@ -419,10 +503,7 @@ BLACKBOXTEST(BlackBox, RTPSAsReliableSocket)
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(2));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_EQ(data.size(), 0);
+    reader.block_for_all();
 }
 
 BLACKBOXTEST(BlackBox, AsyncRTPSAsReliableSocket)
@@ -452,10 +533,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsReliableSocket)
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(2));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_EQ(data.size(), 0);
+    reader.block_for_all();
 }
 
 BLACKBOXTEST(BlackBox, RTPSAsNonReliableWithRegistration)
@@ -477,7 +555,6 @@ BLACKBOXTEST(BlackBox, RTPSAsNonReliableWithRegistration)
     reader.waitDiscovery();
 
     auto data = default_helloworld_data_generator();
-    size_t data_length = data.size();
 
     reader.expected_data(data);
     reader.startReception();
@@ -486,10 +563,7 @@ BLACKBOXTEST(BlackBox, RTPSAsNonReliableWithRegistration)
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(1));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_LE(data.size(), data_length - 2);
+    reader.block_for_at_least(2);
 }
 
 BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableWithRegistration)
@@ -512,7 +586,6 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableWithRegistration)
     reader.waitDiscovery();
 
     auto data = default_helloworld_data_generator();
-    size_t data_length = data.size();
 
     reader.expected_data(data);
     reader.startReception();
@@ -521,10 +594,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableWithRegistration)
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(1));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_LE(data.size(), data_length - 2);
+    reader.block_for_at_least(2);
 }
 
 BLACKBOXTEST(BlackBox, RTPSAsReliableWithRegistration)
@@ -556,10 +626,7 @@ BLACKBOXTEST(BlackBox, RTPSAsReliableWithRegistration)
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(2));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_EQ(data.size(), 0);
+    reader.block_for_all();
 }
 
 BLACKBOXTEST(BlackBox, AsyncRTPSAsReliableWithRegistration)
@@ -591,10 +658,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsReliableWithRegistration)
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
-    data = reader.block(std::chrono::seconds(2));
-
-    print_non_received_messages(data, default_helloworld_print);
-    ASSERT_EQ(data.size(), 0);
+    reader.block_for_all();
 }
 
 BLACKBOXTEST(BlackBox, PubSubAsNonReliableHelloworld)
@@ -1069,7 +1133,6 @@ BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData300kbInLossyConditions)
     ASSERT_EQ(test_UDPv4Transport::DropLog.size(), testTransport->dropLogLength);
 }
 
-
 BLACKBOXTEST(BlackBox, AsyncFragmentSizeTest)
 {
     // ThroghputController size large than maxMessageSize.
@@ -1213,6 +1276,137 @@ BLACKBOXTEST(BlackBox, UDPv4TransportWrongConfig)
 
         ASSERT_FALSE(writer.isInitialized());
     }
+}
+
+BLACKBOXTEST_F(BlackBoxPersistence, RTPSAsNonReliableWithPersistence)
+{
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string ip("239.255.1.4");
+
+    reader.make_persistent(db_file_name(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.make_persistent(db_file_name(), guid_prefix()).reliability(eprosima::fastrtps::rtps::ReliabilityKind_t::BEST_EFFORT).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Discover, send and receive
+    run_one_send_recv_test(reader, writer, 0, false);
+
+    // Stop and start reader and writer
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    
+    std::cout << "First round finished." << std::endl;
+
+    reader.init();
+    writer.init();
+
+    // Discover, send and receive
+    run_one_send_recv_test(reader, writer, 13, false);
+    reader.destroy();
+    writer.destroy();
+
+    std::cout << "Second round finished." << std::endl;
+}
+
+BLACKBOXTEST_F(BlackBoxPersistence, AsyncRTPSAsNonReliableWithPersistence)
+{
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string ip("239.255.1.4");
+
+    reader.make_persistent(db_file_name(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.make_persistent(db_file_name(), guid_prefix()).reliability(eprosima::fastrtps::rtps::ReliabilityKind_t::BEST_EFFORT).
+        asynchronously(eprosima::fastrtps::rtps::RTPSWriterPublishMode::ASYNCHRONOUS_WRITER).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Discover, send and receive
+    run_one_send_recv_test(reader, writer, 0, false);
+
+    // Stop and start reader and writer
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    std::cout << "First round finished." << std::endl;
+
+    reader.init();
+    writer.init();
+
+    // Discover, send and receive
+    run_one_send_recv_test(reader, writer, 13, false);
+
+    std::cout << "Second round finished." << std::endl;
+}
+
+BLACKBOXTEST_F(BlackBoxPersistence, RTPSAsReliableWithPersistence)
+{
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string ip("239.255.1.4");
+
+    reader.make_persistent(db_file_name(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).
+        reliability(eprosima::fastrtps::rtps::ReliabilityKind_t::RELIABLE).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.make_persistent(db_file_name(), guid_prefix()).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Discover, send and receive
+    run_one_send_recv_test(reader, writer, 0, true);
+
+    // Stop and start reader and writer
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    std::cout << "First round finished." << std::endl;
+
+    reader.init();
+    writer.init();
+
+    // Discover, send and receive
+    run_one_send_recv_test(reader, writer, 20, true);
+
+    std::cout << "Second round finished." << std::endl;
+}
+
+BLACKBOXTEST_F(BlackBoxPersistence, AsyncRTPSAsReliableWithPersistence)
+{
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string ip("239.255.1.4");
+
+    reader.make_persistent(db_file_name(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).
+        reliability(eprosima::fastrtps::rtps::ReliabilityKind_t::RELIABLE).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.make_persistent(db_file_name(), guid_prefix()).asynchronously(eprosima::fastrtps::rtps::RTPSWriterPublishMode::ASYNCHRONOUS_WRITER).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Discover, send and receive
+    run_one_send_recv_test(reader, writer, 0, true);
+
+    // Stop and start reader and writer
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    std::cout << "First round finished." << std::endl;
+
+    reader.init();
+    writer.init();
+
+    // Discover, send and receive
+    run_one_send_recv_test(reader, writer, 20, true);
+    reader.destroy();
+    writer.destroy();
+
+    std::cout << "Second round finished." << std::endl;
 }
 
 // Test created to check bug #1568 (Github #34)
@@ -1783,45 +1977,17 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldUserData)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
-    std::vector<octet> received_user_data;
-    reader.setOnDiscoveryFunction([](const ParticipantDiscoveryInfo& info) -> bool{
-            std::cout << "Received USER_DATA from the writer: ";
-            for (auto i: info.rtps.m_userData) std::cout << i << ' ';
-            return info.rtps.m_userData == std::vector<octet>({'a','b','c','d'});
-        });
-
-    reader.history_depth(100).
-        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
     writer.history_depth(100).
         userData({'a','b','c','d'}).init();
 
     ASSERT_TRUE(writer.isInitialized());
 
-    reader.waitDiscovery();
-    writer.waitDiscovery();
-
-    ASSERT_TRUE(reader.getDiscoveryResult());
-}
-
-BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldParticipantDiscovery)
-{
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-
-    GUID_t participant_guid;
-    reader.setOnDiscoveryFunction([&participant_guid](const ParticipantDiscoveryInfo& info) -> bool{
-            if(info.rtps.m_status == DISCOVERED_RTPSPARTICIPANT)
+    reader.setOnDiscoveryFunction([&writer](const ParticipantDiscoveryInfo& info) -> bool{
+            if(info.rtps.m_guid == writer.participant_guid())
             {
-                std::cout << "Discovered participant " << info.rtps.m_guid << std::endl;
-                participant_guid = info.rtps.m_guid;
-            }
-            else if(info.rtps.m_status == REMOVED_RTPSPARTICIPANT)
-            {
-                std::cout << "Removed participant " << info.rtps.m_guid << std::endl;
-                return participant_guid == info.rtps.m_guid;
+                std::cout << "Received USER_DATA from the writer: ";
+                for (auto i: info.rtps.m_userData) std::cout << i << ' ';
+                return info.rtps.m_userData == std::vector<octet>({'a','b','c','d'});
             }
 
             return false;
@@ -1832,9 +1998,46 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldParticipantDiscovery)
 
     ASSERT_TRUE(reader.isInitialized());
 
+
+    reader.waitDiscovery();
+    writer.waitDiscovery();
+
+    reader.wait_discovery_result();
+}
+
+BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldParticipantDiscovery)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
     writer.history_depth(100).init();
 
     ASSERT_TRUE(writer.isInitialized());
+
+    int count = 0;
+    reader.setOnDiscoveryFunction([&writer, &count](const ParticipantDiscoveryInfo& info) -> bool{
+            if(info.rtps.m_guid == writer.participant_guid())
+            {
+                if(info.rtps.m_status == DISCOVERED_RTPSPARTICIPANT)
+                {
+                    std::cout << "Discovered participant " << info.rtps.m_guid << std::endl;
+                    ++count;
+                }
+                else if(info.rtps.m_status == REMOVED_RTPSPARTICIPANT ||
+                        info.rtps.m_status == DROPPED_RTPSPARTICIPANT)
+                {
+                    std::cout << "Removed participant " << info.rtps.m_guid << std::endl;
+                    return ++count == 2;
+                }
+            }
+
+            return false;
+        });
+
+    reader.history_depth(100).
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+
+    ASSERT_TRUE(reader.isInitialized());
 
     reader.waitDiscovery();
     writer.waitDiscovery();
@@ -1843,7 +2046,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldParticipantDiscovery)
 
     reader.wait_participant_undiscovery();
 
-    ASSERT_TRUE(reader.getDiscoveryResult());
+    reader.wait_discovery_result();
 }
 
 BLACKBOXTEST(BlackBox, EDPSlaveReaderAttachment)
@@ -1970,6 +2173,76 @@ BLACKBOXTEST(BlackBox, LocalInitialPeers)
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
     reader.block_for_all();
+}
+
+// Regression test of Refs #2535, github micro-RTPS #1
+BLACKBOXTEST(BlackBox, PubXmlLoadedPartition)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    reader.partition("A").init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    const std::string xml = R"(<profiles>
+  <publisher profile_name="partition_publisher_profile">
+    <topic>
+      <name>)" + writer.topic_name() + R"(</name>
+      <dataType>HelloWorldType</dataType>
+    </topic>
+    <qos>
+      <partition>
+        <names>
+          <name>A</name>
+        </names>
+      </partition>
+    </qos>
+    </publisher>
+</profiles>)";
+
+    writer.load_publisher_attr(xml).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    reader.waitDiscovery();
+    writer.waitDiscovery();
+}
+
+// Regression test of Refs #2786, github issue #194
+BLACKBOXTEST(BlackBox, RTPSAsReliableVolatileSocket)
+{
+    RTPSAsSocketReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSAsSocketWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string ip("239.255.1.4");
+
+    reader.reliability(eprosima::fastrtps::rtps::ReliabilityKind_t::RELIABLE).
+        add_to_multicast_locator_list(ip, global_port).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.reliability(eprosima::fastrtps::rtps::ReliabilityKind_t::RELIABLE).
+        durability(eprosima::fastrtps::rtps::DurabilityKind_t::VOLATILE).
+        add_to_multicast_locator_list(ip, global_port).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    auto data = default_helloworld_data_generator();
+
+    reader.expected_data(data);
+    reader.startReception();
+
+    // Send data
+    writer.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    reader.block_for_all();
+
+    // Wait for acks to be sent and check writer history is empty
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    ASSERT_TRUE(writer.is_history_empty());
 }
 
 #if HAVE_SECURITY
@@ -4010,34 +4283,6 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_user_data)
     PropertyPolicy pub_part_property_policy, sub_part_property_policy,
                    pub_property_policy, sub_property_policy;
 
-    sub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
-                    "builtin.PKI-DH"));
-    sub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
-                    "file://" + std::string(certs_path) + "/maincacert.pem"));
-    sub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
-                    "file://" + std::string(certs_path) + "/mainsubcert.pem"));
-    sub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
-                    "file://" + std::string(certs_path) + "/mainsubkey.pem"));
-    sub_part_property_policy.properties().emplace_back(Property("dds.sec.crypto.plugin",
-                    "builtin.AES-GCM-GMAC"));
-    sub_part_property_policy.properties().emplace_back("rtps.participant.rtps_protection_kind", "ENCRYPT");
-    sub_property_policy.properties().emplace_back("rtps.endpoint.submessage_protection_kind", "ENCRYPT");
-    sub_property_policy.properties().emplace_back("rtps.endpoint.payload_protection_kind", "ENCRYPT");
-
-    std::vector<octet> received_user_data;
-    reader.setOnDiscoveryFunction([](const ParticipantDiscoveryInfo& info) -> bool{
-            std::cout << "Received USER_DATA from the writer: ";
-            for (auto i: info.rtps.m_userData) std::cout << i << ' ';
-            return info.rtps.m_userData == std::vector<octet>({'a','b','c','d','e'});
-        });
-
-    reader.history_depth(100).
-        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-        property_policy(sub_part_property_policy).
-        entity_property_policy(sub_property_policy).init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
     pub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
                     "builtin.PKI-DH"));
     pub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
@@ -4059,6 +4304,38 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_user_data)
 
     ASSERT_TRUE(writer.isInitialized());
 
+    sub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
+                    "builtin.PKI-DH"));
+    sub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    sub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+                    "file://" + std::string(certs_path) + "/mainsubcert.pem"));
+    sub_part_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+                    "file://" + std::string(certs_path) + "/mainsubkey.pem"));
+    sub_part_property_policy.properties().emplace_back(Property("dds.sec.crypto.plugin",
+                    "builtin.AES-GCM-GMAC"));
+    sub_part_property_policy.properties().emplace_back("rtps.participant.rtps_protection_kind", "ENCRYPT");
+    sub_property_policy.properties().emplace_back("rtps.endpoint.submessage_protection_kind", "ENCRYPT");
+    sub_property_policy.properties().emplace_back("rtps.endpoint.payload_protection_kind", "ENCRYPT");
+
+    reader.setOnDiscoveryFunction([&writer](const ParticipantDiscoveryInfo& info) -> bool{
+            if(info.rtps.m_guid == writer.participant_guid())
+            {
+                std::cout << "Received USER_DATA from the writer: ";
+                for (auto i: info.rtps.m_userData) std::cout << i << ' ';
+                return info.rtps.m_userData == std::vector<octet>({'a','b','c','d','e'});
+            }
+
+            return false;
+        });
+
+    reader.history_depth(100).
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
+        property_policy(sub_part_property_policy).
+        entity_property_policy(sub_property_policy).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
     // Wait for authorization
     reader.waitAuthorized();
     writer.waitAuthorized();
@@ -4066,7 +4343,673 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_user_data)
     reader.waitDiscovery();
     writer.waitDiscovery();
 
-    ASSERT_TRUE(reader.getDiscoveryResult());
+    reader.wait_discovery_result();
+}
+
+static void BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(PubSubReader<HelloWorldType>& reader,
+        PubSubWriter<HelloWorldType>& writer, const std::string& governance_file)
+{
+    PropertyPolicy pub_property_policy, sub_property_policy;
+
+    sub_property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
+                    "builtin.PKI-DH"));
+    sub_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    sub_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+                    "file://" + std::string(certs_path) + "/mainsubcert.pem"));
+    sub_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+                    "file://" + std::string(certs_path) + "/mainsubkey.pem"));
+    sub_property_policy.properties().emplace_back(Property("dds.sec.crypto.plugin",
+                    "builtin.AES-GCM-GMAC"));
+    sub_property_policy.properties().emplace_back(Property("dds.sec.access.plugin",
+                    "builtin.Access-Permissions"));
+    sub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.permissions_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    sub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.governance",
+                    "file://" + std::string(certs_path) + "/" + governance_file));
+    sub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.permissions",
+                    "file://" + std::string(certs_path) + "/permissions.smime"));
+
+    reader.history_depth(10).
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
+        property_policy(sub_property_policy).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    pub_property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
+                    "builtin.PKI-DH"));
+    pub_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    pub_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+                    "file://" + std::string(certs_path) + "/mainpubcert.pem"));
+    pub_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+                    "file://" + std::string(certs_path) + "/mainpubkey.pem"));
+    pub_property_policy.properties().emplace_back(Property("dds.sec.crypto.plugin",
+                    "builtin.AES-GCM-GMAC"));
+    pub_property_policy.properties().emplace_back(Property("dds.sec.access.plugin",
+                    "builtin.Access-Permissions"));
+    pub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.permissions_ca",
+                    "file://" + std::string(certs_path) + "/maincacert.pem"));
+    pub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.governance",
+                    "file://" + std::string(certs_path) + "/" + governance_file));
+    pub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.permissions",
+                    "file://" + std::string(certs_path) + "/permissions.smime"));
+
+    writer.history_depth(10).
+        property_policy(pub_property_policy).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Wait for authorization
+    reader.waitAuthorized();
+    writer.waitAuthorized();
+
+    // Wait for discovery.
+    writer.waitDiscovery();
+    reader.waitDiscovery();
+
+    auto data = default_helloworld_data_generator();
+
+    reader.startReception(data);
+
+    // Send data
+    writer.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    reader.block_for_all();
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessEncrypt_validation_ok_enable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessEncrypt_validation_ok_disable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessEncrypt_validation_ok_disable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessEncrypt_validation_ok_enable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessEncrypt_validation_ok_enable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessEncrypt_validation_ok_disable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessEncrypt_validation_ok_disable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessEncrypt_validation_ok_enable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessNone_validation_ok_enable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessNone_validation_ok_disable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessNone_validation_ok_disable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessNone_validation_ok_enable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessNone_validation_ok_enable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessNone_validation_ok_disable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessNone_validation_ok_disable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryDisableAccessNone_validation_ok_enable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessEncrypt_validation_ok_enable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessEncrypt_validation_ok_disable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessEncrypt_validation_ok_disable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessEncrypt_validation_ok_enable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessEncrypt_validation_ok_enable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessEncrypt_validation_ok_disable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessEncrypt_validation_ok_disable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessEncrypt_validation_ok_enable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessNone_validation_ok_enable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessNone_validation_ok_disable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessNone_validation_ok_disable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessNone_validation_ok_enable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessNone_validation_ok_enable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessNone_validation_ok_disable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessNone_validation_ok_disable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsDisableDiscoveryEnableAccessNone_validation_ok_enable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_disable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessEncrypt_validation_ok_enable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessEncrypt_validation_ok_disable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessEncrypt_validation_ok_disable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessEncrypt_validation_ok_enable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessEncrypt_validation_ok_enable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessEncrypt_validation_ok_disable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessEncrypt_validation_ok_disable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessEncrypt_validation_ok_enable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessNone_validation_ok_enable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessNone_validation_ok_disable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessNone_validation_ok_disable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessNone_validation_ok_enable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessNone_validation_ok_enable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessNone_validation_ok_disable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessNone_validation_ok_disable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryDisableAccessNone_validation_ok_enable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_disable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessEncrypt_validation_ok_enable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessEncrypt_validation_ok_disable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessEncrypt_validation_ok_disable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessEncrypt_validation_ok_enable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessEncrypt_validation_ok_enable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessEncrypt_validation_ok_disable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessEncrypt_validation_ok_disable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessEncrypt_validation_ok_enable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_encrypt.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessNone_validation_ok_enable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessNone_validation_ok_disable_discovery_enable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessNone_validation_ok_disable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessNone_validation_ok_enable_discovery_disable_access_encrypt)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessNone_validation_ok_enable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessNone_validation_ok_disable_discovery_enable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessNone_validation_ok_disable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
+}
+
+
+BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnableDiscoveryEnableAccessNone_validation_ok_enable_discovery_disable_access_none)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string governance_file("governance_enable_discovery_enable_access_none.smime");
+
+    BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
 }
 
 #endif
@@ -4116,6 +5059,27 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableMultithreadKeepLast1)
 
     // Block reader until reception finished or timeout.
     reader.block_for_at_least(105);
+}
+
+// Test created to check bug #3020 (Github #238)
+BLACKBOXTEST(BlackBox, PubSubAsReliableVolatilePubRemoveWithoutSubs)
+{
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    writer.history_depth(10).
+        durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    auto data = default_helloworld_data_generator();
+
+    // Send data
+    writer.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+
+    size_t number_of_changes_removed = 0;
+    ASSERT_FALSE(writer.remove_all_changes(&number_of_changes_removed));
 }
 
 int main(int argc, char **argv)

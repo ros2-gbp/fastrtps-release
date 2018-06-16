@@ -18,18 +18,16 @@ main(ctx, definitions) ::= <<
 $fileHeader(ctx=ctx,  file=[ctx.filename, "PubSubTypes.h"], description=["This header file contains the declaration of the serialization functions."])$
 
 
-#ifndef _$ctx.fileNameUpper$_PUBSUBTYPES_H_
-#define _$ctx.fileNameUpper$_PUBSUBTYPES_H_
+#ifndef _$ctx.headerGuardName$_PUBSUBTYPES_H_
+#define _$ctx.headerGuardName$_PUBSUBTYPES_H_
 
 #include <fastrtps/TopicDataType.h>
-
-using namespace eprosima::fastrtps;
 
 #include "$ctx.filename$.h"
 
 $definitions; separator="\n"$
 
-#endif // _$ctx.filename; format="toUpper"$_PUBSUBTYPE_H_
+#endif // _$ctx.headerGuardName$_PUBSUBTYPES_H_
 >>
 
 // TODO name -> module
@@ -74,16 +72,16 @@ struct_type(ctx, parent, struct) ::= <<
  * @brief This class represents the TopicDataType of the type $struct.name$ defined by the user in the IDL file.
  * @ingroup $ctx.trimfilename$
  */
-class $if(parent.IsInterface)$$parent.name$_$endif$$struct.name$PubSubType : public TopicDataType {
+class $if(parent.IsInterface)$$parent.name$_$endif$$struct.name$PubSubType : public eprosima::fastrtps::TopicDataType {
 public:
         typedef $if(parent.IsInterface)$$parent.name$_$endif$$struct.name$ type;
 
 	$if(parent.IsInterface)$$parent.name$_$endif$$struct.name$PubSubType();
 	virtual ~$if(parent.IsInterface)$$parent.name$_$endif$$struct.name$PubSubType();
-	bool serialize(void *data, SerializedPayload_t *payload);
-	bool deserialize(SerializedPayload_t *payload, void *data);
+	bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload);
+	bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data);
         std::function<uint32_t()> getSerializedSizeProvider(void* data);
-	bool getKey(void *data, InstanceHandle_t *ihandle);
+	bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle);
 	void* createData();
 	void deleteData(void * data);
 	MD5 m_md5;

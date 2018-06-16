@@ -36,7 +36,7 @@ inline bool CDRMessage::initCDRMsg(CDRMessage_t*msg,uint32_t payload_size)
     }
     msg->pos = 0;
     msg->length = 0;
-#if EPROSIMA_BIG_ENDIAN
+#if __BIG_ENDIAN__
     msg->msg_endian = BIGEND;
 #else
     msg->msg_endian = LITTLEEND;
@@ -53,7 +53,7 @@ inline bool CDRMessage::wrapVector(CDRMessage_t* msg, std::vector<octet>& vector
     msg->buffer = vectorToWrap.data();
     msg->length = (uint32_t)vectorToWrap.size();
     msg->max_size = (uint32_t)vectorToWrap.capacity();
-#if EPROSIMA_BIG_ENDIAN
+#if __BIG_ENDIAN__
     msg->msg_endian = BIGEND;
 #else
     msg->msg_endian = LITTLEEND;
@@ -927,7 +927,7 @@ inline bool CDRMessage::readDataHolderSeq(CDRMessage_t* msg, DataHolderSeq& data
     return returnedValue;
 }
 
-inline bool CDRMessage::addMessageIdentity(CDRMessage_t* msg, const ::security::MessageIdentity& message_identity)
+inline bool CDRMessage::addMessageIdentity(CDRMessage_t* msg, const security::MessageIdentity& message_identity)
 {
     assert(msg);
 
@@ -941,7 +941,7 @@ inline bool CDRMessage::addMessageIdentity(CDRMessage_t* msg, const ::security::
     return true;
 }
 
-inline bool CDRMessage::readMessageIdentity(CDRMessage_t* msg, ::security::MessageIdentity& message_identity)
+inline bool CDRMessage::readMessageIdentity(CDRMessage_t* msg, security::MessageIdentity& message_identity)
 {
     assert(msg);
 
@@ -955,7 +955,7 @@ inline bool CDRMessage::readMessageIdentity(CDRMessage_t* msg, ::security::Messa
     return true;
 }
 
-inline bool CDRMessage::addParticipantGenericMessage(CDRMessage_t* msg, const ::security::ParticipantGenericMessage& message)
+inline bool CDRMessage::addParticipantGenericMessage(CDRMessage_t* msg, const security::ParticipantGenericMessage& message)
 {
     assert(msg);
 
@@ -983,7 +983,7 @@ inline bool CDRMessage::addParticipantGenericMessage(CDRMessage_t* msg, const ::
     return true;
 }
 
-inline bool CDRMessage::readParticipantGenericMessage(CDRMessage_t* msg, ::security::ParticipantGenericMessage& message)
+inline bool CDRMessage::readParticipantGenericMessage(CDRMessage_t* msg, security::ParticipantGenericMessage& message)
 {
     assert(msg);
 

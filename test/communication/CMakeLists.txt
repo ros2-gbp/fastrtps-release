@@ -15,6 +15,13 @@
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
     find_package(PythonInterp 3)
 
+    add_definitions(
+        -DBOOST_ASIO_STANDALONE
+        -DASIO_STANDALONE
+        )
+
+    include_directories(${ASIO_INCLUDE_DIR})
+
     ###############################################################################
     # Binaries
     ###############################################################################
@@ -27,14 +34,14 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         )
     add_executable(SimpleCommunicationPublisher ${PUBLISHER_SOURCE})
     target_include_directories(SimpleCommunicationPublisher PRIVATE ${PROJECT_SOURCE_DIR}/test/blackbox)
-    target_link_libraries(SimpleCommunicationPublisher fastrtps fastcdr)
+    target_link_libraries(SimpleCommunicationPublisher fastrtps fastcdr ${CMAKE_DL_LIBS})
 
     set(SUBSCRIBER_SOURCE ${COMMON_SOURCE}
         Subscriber.cpp
         )
     add_executable(SimpleCommunicationSubscriber ${SUBSCRIBER_SOURCE})
     target_include_directories(SimpleCommunicationSubscriber PRIVATE ${PROJECT_SOURCE_DIR}/test/blackbox)
-    target_link_libraries(SimpleCommunicationSubscriber fastrtps fastcdr)
+    target_link_libraries(SimpleCommunicationSubscriber fastrtps fastcdr ${CMAKE_DL_LIBS})
 
     if(PYTHONINTERP_FOUND)
         add_test(NAME SimpleCommunication

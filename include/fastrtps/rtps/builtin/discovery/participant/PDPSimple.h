@@ -27,7 +27,7 @@
 
 #include "../../../../qos/QosPolicies.h"
 
-using namespace eprosima::fastrtps;
+
 
 namespace eprosima {
 namespace fastrtps{
@@ -140,8 +140,6 @@ class PDPSimple
      * @param pdata Pointer to the RTPSParticipantProxyData object.
      */
     void assignRemoteEndpoints(ParticipantProxyData* pdata);
-
-    void notifyAboveRemoteEndpoints(const GUID_t& participant_guid);
 
     void notifyAboveRemoteEndpoints(const ParticipantProxyData& pdata);
 

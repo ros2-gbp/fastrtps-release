@@ -38,7 +38,7 @@ class ReaderTimes
         ReaderTimes()
         {
             initialAcknackDelay.fraction = 200*1000*1000;
-            heartbeatResponseDelay.fraction = 500*1000*1000;
+            heartbeatResponseDelay.fraction = 20*1000*1000;
         };
         virtual ~ReaderTimes(){};
         //!Initial AckNack delay. Default value ~45ms.
@@ -81,17 +81,22 @@ class  ReaderAttributes
 class  RemoteWriterAttributes
 {
     public:
-        RemoteWriterAttributes()
+        RemoteWriterAttributes() : livelinessLeaseDuration(c_TimeInfinite), ownershipStrength(0),
+        is_eprosima_endpoint(true)
         {
             endpoint.endpointKind = WRITER;
-            livelinessLeaseDuration = c_TimeInfinite;
-            ownershipStrength = 0;
-        };
+        }
+
+        RemoteWriterAttributes(const VendorId_t& vendor_id) : livelinessLeaseDuration(c_TimeInfinite), ownershipStrength(0),
+        is_eprosima_endpoint(vendor_id == c_VendorId_eProsima)
+        {
+            endpoint.endpointKind = WRITER;
+        }
 
         virtual ~RemoteWriterAttributes()
         {
 
-        };
+        }
 
         //!Attributes of the associated endpoint.
         EndpointAttributes endpoint;
@@ -104,6 +109,8 @@ class  RemoteWriterAttributes
 
         //!Ownership Strength of the associated writer.
         uint16_t ownershipStrength;
+
+        bool is_eprosima_endpoint;
 };
 }
 }

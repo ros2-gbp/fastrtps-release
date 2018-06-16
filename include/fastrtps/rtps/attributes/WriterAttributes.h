@@ -48,7 +48,7 @@ class  WriterTimes
         {
             initialHeartbeatDelay.fraction = 200*1000*1000;
             heartbeatPeriod.seconds = 3;
-            nackResponseDelay.fraction = 200*1000*1000;
+            nackResponseDelay.fraction = 20*1000*1000;
         };
         virtual ~WriterTimes(){};
 
@@ -104,7 +104,14 @@ class  RemoteReaderAttributes
 {
     public:
 
-        RemoteReaderAttributes() : expectsInlineQos(false)
+        RemoteReaderAttributes() : expectsInlineQos(false),
+        is_eprosima_endpoint(true)
+        {
+            endpoint.endpointKind = READER;
+        }
+
+        RemoteReaderAttributes(const VendorId_t& vendor_id) : expectsInlineQos(false),
+        is_eprosima_endpoint(vendor_id == c_VendorId_eProsima)
         {
             endpoint.endpointKind = READER;
         }
@@ -122,6 +129,8 @@ class  RemoteReaderAttributes
 
         //!Expects inline QOS.
         bool expectsInlineQos;
+
+        bool is_eprosima_endpoint;
 };
 }
 }

@@ -44,11 +44,9 @@ struct timezone
 
 #include "../rtps/common/Time_t.h"
 
-using namespace eprosima::fastrtps::rtps;
 
 namespace eprosima {
 namespace fastrtps{
-
 
 /**
  * Class eClock used to obtain the time and to sleep some processes.
@@ -69,7 +67,7 @@ public:
 	* @param now Pointer to a Time_t instance to fill with the current time
 	* @return true on success
 	*/
-	bool setTimeNow(Time_t* now);
+	bool setTimeNow(rtps::Time_t* now);
 	
 	/**
 	* Method to start measuring an interval in us.

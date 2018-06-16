@@ -38,6 +38,8 @@ class ParticipantProxyData
         LocatorList_t m_metatrafficUnicastLocatorList;
         LocatorList_t m_metatrafficMulticastLocatorList;
         IdentityToken identity_token_;
+        VendorId_t m_VendorId;
+        PermissionsToken permissions_token_;
 };
 
 } // namespace rtps
