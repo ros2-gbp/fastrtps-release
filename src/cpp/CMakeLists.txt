@@ -175,7 +175,7 @@ if(TINYXML2_SOURCE_DIR)
     list(APPEND ${PROJECT_NAME}_source_files
         ${TINYXML2_SOURCE_DIR}/tinyxml2.cpp
         )
-    set_sources(../../thirdparty/tinyxml2/tinyxml2.cpp)
+    set_sources(${TINYXML2_SOURCE_DIR}/tinyxml2.cpp)
 endif()
 
 if(ANDROID)
@@ -203,15 +203,14 @@ if(INTERNAL_DEBUG)
 endif()
 
 add_definitions(
-  -DBOOST_ASIO_STANDALONE
-  -DASIO_STANDALONE
-)
+    -DBOOST_ASIO_STANDALONE
+    -DASIO_STANDALONE
+    )
 
 if(ANDROID)
-  add_definitions(
-    -DASIO_DISABLE_MOVE
-    -DASIO_DISABLE_STD_STRING_VIEW
-  )
+    if(NOT HAVE_CXX14 AND NOT HAVE_CXX1Y)
+        add_definitions(-DASIO_DISABLE_STD_STRING_VIEW)
+    endif()
 endif()
 
 set(${PROJECT_NAME}_include_dirs
@@ -242,7 +241,7 @@ if(MSVC OR MSVC_IDE)
         generate_msvc_libraries(x64Win64VS2013)
         generate_msvc_libraries(i86Win32VS2015)
         generate_msvc_libraries(x64Win64VS2015)
-    else()
+    elseif(NOT EPROSIMA_INSTALLER)
         add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_source_files})
 
         add_library(${PROJECT_NAME}_static STATIC ${${PROJECT_NAME}_source_files})
@@ -388,12 +387,12 @@ endif()
 
 # Install libraries
 if(MSVC OR MSVC_IDE)
-    if(EPROSIMA_INSTALLER)
+    if(EPROSIMA_INSTALLER AND IS_TOP_LEVEL)
         install_msvc_libraries(i86Win32VS2013)
         install_msvc_libraries(x64Win64VS2013)
         install_msvc_libraries(i86Win32VS2015)
         install_msvc_libraries(x64Win64VS2015)
-    else()
+    elseif(NOT EPROSIMA_INSTALLER)
         set(DIR_EXTENSION "")
         if(EPROSIMA_INSTALLER_MINION)
             set(DIR_EXTENSION "/${MSVC_ARCH}")
