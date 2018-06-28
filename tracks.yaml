@@ -40,7 +40,7 @@ tracks:
     last_version: 1.6.0
     name: upstream
     patches: ros2
-    release_inc: '3'
+    release_inc: '4'
     release_repo_url: git@github.com:ros2-gbp/fastrtps-release
     release_tag: ea57f15aaf689144cb8e75aa8d23e7b6ed832b3a
     ros_distro: bouncy
