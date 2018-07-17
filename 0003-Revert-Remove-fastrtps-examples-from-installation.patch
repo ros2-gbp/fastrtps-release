@@ -1,0 +1,22 @@
+From 52377266f1566132c921590fd56e8ff769abbd11 Mon Sep 17 00:00:00 2001
+From: Mikael Arguedas <mikael@osrfoundation.org>
+Date: Mon, 16 Jul 2018 14:06:03 -0700
+Subject: [PATCH 3/4] Revert "Remove fastrtps examples from installation."
+
+This reverts commit 8bdf9bd41390ef70eaa6a1827e12cceabcfa0c3b.
+---
+ debian/rules.em | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/debian/rules.em b/debian/rules.em
+index d3e8f8f..a56087e 100755
+--- a/debian/rules.em
++++ b/debian/rules.em
+@@ -56,4 +56,3 @@ override_dh_auto_install:
+ 	# set things like CMAKE_PREFIX_PATH, PKG_CONFIG_PATH, and PYTHONPATH.
+ 	if [ -f "@(InstallationPrefix)/setup.sh" ]; then . "@(InstallationPrefix)/setup.sh"; fi && \
+ 	dh_auto_install
+-	rm -r $(CURDIR)/debian/@(Package)/@(InstallationPrefix)/examples
+-- 
+2.7.4
+
