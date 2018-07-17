@@ -42,7 +42,7 @@ tracks:
     patches: ros2
     release_inc: '4'
     release_repo_url: git@github.com:ros2-gbp/fastrtps-release
-    release_tag: ea57f15aaf689144cb8e75aa8d23e7b6ed832b3a
+    release_tag: 7a0b0fe7ca8d2c4ea41e36744c6024c263a6505a
     ros_distro: bouncy
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-RTPS.git
