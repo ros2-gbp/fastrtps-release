@@ -66,7 +66,7 @@ tracks:
     last_version: 1.6.0
     name: fastrtps
     patches: ros2
-    release_inc: '0'
+    release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
     release_tag: master
     ros_distro: crystal
