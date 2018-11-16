@@ -35,10 +35,6 @@
 using namespace eprosima::fastrtps;
 using namespace ::rtps;
 
-
-
-::rtps::WriteParams WRITE_PARAM_DEFAULT;
-
 PublisherImpl::PublisherImpl(ParticipantImpl* p,TopicDataType*pdatatype,
         PublisherAttributes& att,PublisherListener* listen ):
     mp_participant(p),
@@ -77,7 +73,7 @@ PublisherImpl::~PublisherImpl()
 
 bool PublisherImpl::create_new_change(ChangeKind_t changeKind, void* data)
 {
-    return create_new_change_with_params(changeKind, data, WRITE_PARAM_DEFAULT);
+    return create_new_change_with_params(changeKind, data, WriteParams::WRITE_PARAM_DEFAULT);
 }
 
 bool PublisherImpl::create_new_change_with_params(ChangeKind_t changeKind, void* data, WriteParams &wparams)
@@ -167,21 +163,10 @@ bool PublisherImpl::create_new_change_with_params(ChangeKind_t changeKind, void*
             ch->setFragmentSize((uint16_t)final_high_mark_for_frag);
         }
 
-        if(&wparams != &WRITE_PARAM_DEFAULT)
-        {
-            ch->write_params = wparams;
-        }
-
         if(!this->m_history.add_pub_change(ch, wparams, lock))
         {
             m_history.release_Cache(ch);
             return false;
-        }
-
-        if(m_att.qos.m_durability.kind == VOLATILE_DURABILITY_QOS &&
-                mp_writer->is_acked_by_all(ch))
-        {
-            m_history.remove_change_g(ch);
         }
 
         return true;
@@ -295,6 +280,14 @@ void PublisherImpl::PublisherWriterListener::onWriterMatched(RTPSWriter* /*write
 {
     if(mp_publisherImpl->mp_listener!=nullptr)
         mp_publisherImpl->mp_listener->onPublicationMatched(mp_publisherImpl->mp_userPublisher,info);
+}
+
+void PublisherImpl::PublisherWriterListener::onWriterChangeReceivedByAll(RTPSWriter* /*writer*/, CacheChange_t* ch)
+{
+    if (mp_publisherImpl->m_att.qos.m_durability.kind == VOLATILE_DURABILITY_QOS)
+    {
+        mp_publisherImpl->m_history.remove_change_g(ch);
+    }
 }
 
 bool PublisherImpl::try_remove_change(std::unique_lock<std::recursive_mutex>& lock)
