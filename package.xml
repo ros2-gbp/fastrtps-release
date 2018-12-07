@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="2">
   <name>fastrtps</name>
-  <version>1.6.0</version>
+  <version>1.7.0</version>
   <description>Implementation of RTPS standard.</description>
   <maintainer email="stevenragnarok@osrfoundation.org">Steven! Ragnarök</maintainer>
   <license>Apache License 2.0</license>

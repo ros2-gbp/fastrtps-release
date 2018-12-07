@@ -50,7 +50,7 @@ elseif(NOT EPROSIMA_INSTALLER)
     add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES})
     set_common_compile_options(${PROJECT_NAME})
     set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
-    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION})
+    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE ${PROJECT_NAME_UPPER}_SOURCE)
 
@@ -126,13 +126,15 @@ if(UNIX AND EPROSIMA_INSTALLER)
 endif()
 
 # Install libraries
-if(MSVC OR MSVC_IDE AND EPROSIMA_INSTALLER AND IS_TOP_LEVEL)
-    install_msvc_libraries(i86Win32VS2013)
-    install_msvc_libraries(x64Win64VS2013)
-    install_msvc_libraries(i86Win32VS2015)
-    install_msvc_libraries(x64Win64VS2015)
-    install_msvc_libraries(i86Win32VS2017)
-    install_msvc_libraries(x64Win64VS2017)
+if(MSVC OR MSVC_IDE AND EPROSIMA_INSTALLER)
+    if(IS_TOP_LEVEL)
+        install_msvc_libraries(i86Win32VS2013)
+        install_msvc_libraries(x64Win64VS2013)
+        install_msvc_libraries(i86Win32VS2015)
+        install_msvc_libraries(x64Win64VS2015)
+        install_msvc_libraries(i86Win32VS2017)
+        install_msvc_libraries(x64Win64VS2017)
+    endif()
 
     install(FILES ${PROJECT_SOURCE_DIR}/cmake/packaging/windows/${PROJECT_NAME}-config.cmake
         DESTINATION ${DATA_INSTALL_DIR}/${PROJECT_NAME}/cmake
