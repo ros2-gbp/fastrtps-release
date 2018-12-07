@@ -14,11 +14,9 @@
 
 package com.eprosima.idl.parser.typecode;
 
-import java.util.List;
-
+import com.eprosima.idl.util.Pair;
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.eprosima.idl.util.Pair;
 
 public class StringTypeCode extends TypeCode
 {
@@ -30,17 +28,42 @@ public class StringTypeCode extends TypeCode
 
     @Override
     public boolean isIsType_d(){return true;}
-    
+
+    @Override
+    public String getTypeIdentifier()
+    {
+        switch(getKind())
+        {
+            case Kind.KIND_STRING:
+                return "TI_STRING8_SMALL";
+            case Kind.KIND_WSTRING:
+                return "TI_STRING16_SMALL";
+            default:
+                return "TK_None";
+        }
+    }
+
+    @Override
+    public boolean isPlainType() { return true; }
+
+    @Override
+    public boolean isIsStringType() { return getKind() == Kind.KIND_STRING; }
+
+    @Override
+    public boolean isIsWStringType() { return getKind() == Kind.KIND_WSTRING; }
+
     @Override
     public String getCppTypename()
     {
         return getCppTypenameFromStringTemplate().toString();
     }
-    
+
     @Override
     public String getCTypename()
     {
-        return getCTypenameFromStringTemplate().toString();
+        StringTemplate st = getCTypenameFromStringTemplate();
+        st.setAttribute("maxsize", getMaxsize());
+        return st.toString();
     }
 
     @Override
@@ -48,19 +71,19 @@ public class StringTypeCode extends TypeCode
     {
         return getJavaTypenameFromStringTemplate().toString();
     }
-    
+
     @Override
     public String getIdlTypename()
     {
         return getIdlTypenameFromStringTemplate().toString();
     }
-    
+
     @Override
     public String getInitialValue()
-    {   
+    {
         return getInitialValueFromStringTemplate();
     }
-    
+
     public String getMaxsize()
     {
         if(m_maxsize == null)
@@ -68,11 +91,11 @@ public class StringTypeCode extends TypeCode
 
         return m_maxsize;
     }
-    
+
     public Pair<Integer, Integer> getMaxSerializedSize(int currentSize, int lastDataAligned)
     {
         int lcurrentSize = currentSize;
-        
+
         // Length
         if(4 <= lastDataAligned)
         {
@@ -83,7 +106,7 @@ public class StringTypeCode extends TypeCode
             int align = (4 - (lcurrentSize % 4)) & (4 - 1);
             lcurrentSize += 4 + align;
         }
-        
+
         if(m_maxsize == null)
         {
             return new Pair<Integer, Integer>(lcurrentSize + 255 + 1, 1);
@@ -93,7 +116,7 @@ public class StringTypeCode extends TypeCode
             return new Pair<Integer, Integer>(lcurrentSize + Integer.parseInt(m_maxsize) + 1, 1);
         }
     }
-    
+
     public int getMaxSerializedSizeWithoutAlignment(int currentSize)
     {
         if(m_maxsize == null)
@@ -105,6 +128,6 @@ public class StringTypeCode extends TypeCode
             return currentSize + 4 + Integer.parseInt(m_maxsize) + 1;
         }
     }
-    
+
     private String m_maxsize = null;
 }
