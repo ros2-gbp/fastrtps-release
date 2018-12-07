@@ -16,18 +16,29 @@ package com.eprosima.idl.parser.typecode;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.eprosima.idl.util.Pair;
 
 public class SequenceTypeCode extends ContainerTypeCode
 {
     public SequenceTypeCode(String maxsize)
     {
-        super(TypeCode.KIND_SEQUENCE);
+        super(Kind.KIND_SEQUENCE);
         m_maxsize = maxsize;
     }
 
     @Override
     public boolean isIsType_e(){return true;}
+
+    @Override
+    public String getTypeIdentifier()
+    {
+        return "TI_PLAIN_SEQUENCE_SMALL";
+    }
+
+    @Override
+    public boolean isPlainType() { return true; }
+
+    @Override
+    public boolean isIsSequenceType() { return true; }
 
     @Override
     public String getCppTypename()
@@ -37,14 +48,25 @@ public class SequenceTypeCode extends ContainerTypeCode
         st.setAttribute("maxsize", m_maxsize);
         return st.toString();
     }
-    
+
     @Override
     public String getCTypename()
     {
         StringTemplate st = getCTypenameFromStringTemplate();
         st.setAttribute("type", getContentTypeCode().getCTypename());
-        st.setAttribute("maxsize", m_maxsize);
+        st.setAttribute("maxsize", getMaxsize());
         return st.toString();
+    }
+
+    public String getCTypeDimensions()
+    {
+        String dimensions = "[" + getMaxsize()  + "]";
+        if(getContentTypeCode() instanceof StringTypeCode)
+        {
+            dimensions += "[" + ((StringTypeCode)getContentTypeCode()).getMaxsize() + "]";
+        }
+
+        return dimensions;
     }
 
     @Override
@@ -72,7 +94,7 @@ public class SequenceTypeCode extends ContainerTypeCode
 
         return m_maxsize;
     }
-    
+
     /*public Pair<Integer, Integer> getMaxSerializedSize(int currentSize, int lastDataAligned)
     {
         int lcontainTypeSize = getContentTypeCode().getSize();

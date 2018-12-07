@@ -14,21 +14,21 @@
 
 package com.eprosima.fastcdr.idl.generator;
 
-import com.eprosima.log.ColorMessage;
-import com.eprosima.idl.generator.manager.TemplateManager;
 import com.eprosima.idl.context.Context;
-import com.eprosima.idl.parser.typecode.TypeCode;
+import com.eprosima.idl.generator.manager.TemplateManager;
 import com.eprosima.idl.parser.tree.Definition;
 import com.eprosima.idl.parser.tree.Export;
-import com.eprosima.idl.parser.tree.Module;
 import com.eprosima.idl.parser.tree.Interface;
 import com.eprosima.idl.parser.tree.TypeDeclaration;
-
-import org.antlr.stringtemplate.*;
-
+import com.eprosima.idl.parser.typecode.Kind;
+import com.eprosima.log.ColorMessage;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Map;
-import java.io.*;
+import org.antlr.stringtemplate.StringTemplate;
+import org.antlr.stringtemplate.StringTemplateGroup;
+
+
 
 public class TypesGenerator
 {
@@ -47,7 +47,7 @@ public class TypesGenerator
     public boolean generate(Context context, String packagDir, String packag, String libraryName, Map<String, String> extensions)
     {
         ArrayList<Definition> definitions = context.getDefinitions();
-        
+
         boolean returnedValue = processDefinitions(context, definitions, packagDir, packag, extensions);
 
         if(returnedValue)
@@ -89,7 +89,7 @@ public class TypesGenerator
                             return false;
                         }
                     }
-                    
+
                     if(!processDefinitions(context, module.getDefinitions(), outputDir + File.separator,
                             packag + "." + module.getName(), extensions))
                         return false;
@@ -114,7 +114,7 @@ public class TypesGenerator
                         extensionst.setAttribute("interface", ifc);
                         ifcst.setAttribute("extension", extensionst.toString());
                     }
-                    
+
                     if(processExports(context, ifc.getExports(), ifcst, extensions))
                     {
                         // Save file.
@@ -204,7 +204,7 @@ public class TypesGenerator
         String extensionname = null;
         System.out.println("processTypesDeclaration " + typedecl.getName());
 
-        if(typedecl.getTypeCode().getKind() == TypeCode.KIND_STRUCT)
+        if(typedecl.getTypeCode().getKind() == Kind.KIND_STRUCT)
         {
             typest = stg_.getInstanceOf("struct_type");
             typest.setAttribute("struct", typedecl.getTypeCode());
@@ -213,10 +213,10 @@ public class TypesGenerator
             if(extensions != null && (extensionname =  extensions.get("struct_type")) != null)
             {
                 extensionst = stg_.getInstanceOf(extensionname);
-                extensionst.setAttribute("struct", typedecl.getTypeCode()); 
+                extensionst.setAttribute("struct", typedecl.getTypeCode());
             }
         }
-        else if(typedecl.getTypeCode().getKind() == TypeCode.KIND_UNION)
+        else if(typedecl.getTypeCode().getKind() == Kind.KIND_UNION)
         {
             typest = stg_.getInstanceOf("union_type");
             typest.setAttribute("union", typedecl.getTypeCode());
@@ -225,10 +225,10 @@ public class TypesGenerator
             if(extensions != null && (extensionname =  extensions.get("union_type")) != null)
             {
                 extensionst = stg_.getInstanceOf(extensionname);
-                extensionst.setAttribute("union", typedecl.getTypeCode()); 
+                extensionst.setAttribute("union", typedecl.getTypeCode());
             }
         }
-        else if(typedecl.getTypeCode().getKind() == TypeCode.KIND_ENUM)
+        else if(typedecl.getTypeCode().getKind() == Kind.KIND_ENUM)
         {
             typest = stg_.getInstanceOf("enum_type");
             typest.setAttribute("enum", typedecl.getTypeCode());
@@ -237,7 +237,19 @@ public class TypesGenerator
             if(extensions != null && (extensionname =  extensions.get("enum_type")) != null)
             {
                 extensionst = stg_.getInstanceOf(extensionname);
-                extensionst.setAttribute("enum", typedecl.getTypeCode()); 
+                extensionst.setAttribute("enum", typedecl.getTypeCode());
+            }
+        }
+        else if(typedecl.getTypeCode().getKind() == Kind.KIND_BITSET)
+        {
+            typest = stg_.getInstanceOf("bitset_type");
+            typest.setAttribute("bitset", typedecl.getTypeCode());
+
+            // Get extension
+            if(extensions != null && (extensionname =  extensions.get("bitset_type")) != null)
+            {
+                extensionst = stg_.getInstanceOf(extensionname);
+                extensionst.setAttribute("bitset", typedecl.getTypeCode());
             }
         }
 
@@ -246,8 +258,8 @@ public class TypesGenerator
             // Generate extension
             if(extensionst != null)
             {
-                extensionst.setAttribute("ctx", context); 
-                extensionst.setAttribute("parent", typedecl.getParent()); 
+                extensionst.setAttribute("ctx", context);
+                extensionst.setAttribute("parent", typedecl.getParent());
                 typest.setAttribute("extension", extensionst.toString());
             }
 
@@ -262,11 +274,11 @@ public class TypesGenerator
     private boolean writeFile(String file, StringTemplate template)
     {
         boolean returnedValue = false;
-        
+
         try
         {
             File handle = new File(file);
-            
+
             if(!handle.exists() || replace_)
             {
                 FileWriter fw = new FileWriter(file);
@@ -284,7 +296,7 @@ public class TypesGenerator
         catch(IOException e)
         {
             e.printStackTrace();
-        }   
+        }
 
         return returnedValue;
     }
