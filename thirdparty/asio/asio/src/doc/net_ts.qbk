@@ -1,5 +1,5 @@
 [/
- / Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+ / Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
  /
  / Distributed under the Boost Software License, Version 1.0. (See accompanying
  / file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -95,6 +95,13 @@ below shows the new Networking TS interfaces and the facilities they replace:
     [[link asio.reference.io_context.restart `io_context::restart`]]
     [[link asio.reference.io_context.reset `io_service::reset`]]
     []
+  ]
+  [
+    [[link asio.reference.io_context.io_context `io_context`] constructor
+    `concurrency_hint` parameter is type `int`]
+    [[link asio.reference.io_context.io_context `io_context`] constructor
+    `concurrency_hint` parameter is type `std::size_t`]
+    [The old constructor has not been retained as a deprecated overload.]
   ]
   [
     [[link asio.reference.execution_context `execution_context`], [link
