@@ -1,3 +1,26 @@
+## fastrtps (crystal) - 1.7.2-0
+
+The packages in the `fastrtps` repository were released into the `crystal` distro by running `/usr/bin/bloom-release -r crystal fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Wed, 27 Mar 2019 13:23:27 -0000`
+
+The `fastrtps` package was released.
+
+Version of package(s) in repository `fastrtps`:
+
+- upstream repository: https://github.com/eProsima/Fast-RTPS.git
+- release repository: https://github.com/ros2-gbp/fastrtps-release.git
+- rosdistro version: `1.7.0-0`
+- old version: `1.7.0-0`
+- new version: `1.7.2-0`
+
+Versions of tools used:
+
+- bloom version: `0.7.2`
+- catkin_pkg version: `0.4.10`
+- rosdep version: `0.15.0`
+- rosdistro version: `0.7.2`
+- vcstools version: `0.1.40`
+
+
 ## fastrtps (crystal) - 1.7.0-0
 
 The packages in the `fastrtps` repository were released into the `crystal` distro by running `/usr/bin/bloom-release -r crystal fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Fri, 07 Dec 2018 05:04:41 -0000`
