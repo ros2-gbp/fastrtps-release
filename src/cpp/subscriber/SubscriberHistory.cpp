@@ -36,15 +36,28 @@ inline bool sort_ReaderHistoryCache(CacheChange_t*c1,CacheChange_t*c2)
     return c1->sequenceNumber < c2->sequenceNumber;
 }
 
-SubscriberHistory::SubscriberHistory(SubscriberImpl* simpl,uint32_t payloadMaxSize,
-        HistoryQosPolicy& history,
-        ResourceLimitsQosPolicy& resource,MemoryManagementPolicy_t mempolicy):
-    ReaderHistory(HistoryAttributes(mempolicy, payloadMaxSize,resource.allocated_samples,resource.max_samples + 1)),
-    m_unreadCacheCount(0),
-    m_historyQos(history),
-    m_resourceLimitsQos(resource),
-    mp_subImpl(simpl),
-    mp_getKeyObject(nullptr)
+SubscriberHistory::SubscriberHistory(
+        SubscriberImpl* simpl,
+        uint32_t payloadMaxSize,
+        const HistoryQosPolicy& history,
+        const ResourceLimitsQosPolicy& resource,
+        MemoryManagementPolicy_t mempolicy)
+    : ReaderHistory(HistoryAttributes(mempolicy, payloadMaxSize,
+                history.kind == KEEP_ALL_HISTORY_QOS ?
+                        resource.allocated_samples :
+                        simpl->getAttributes().topic.getTopicKind() == NO_KEY ?
+                            std::min(resource.allocated_samples, history.depth) :
+                            std::min(resource.allocated_samples, history.depth * resource.max_instances),
+                history.kind == KEEP_ALL_HISTORY_QOS ?
+                        resource.max_samples :
+                        simpl->getAttributes().topic.getTopicKind() == NO_KEY ?
+                            history.depth :
+                            history.depth * resource.max_instances))
+    , m_unreadCacheCount(0)
+    , m_historyQos(history)
+    , m_resourceLimitsQos(resource)
+    , mp_subImpl(simpl)
+    , mp_getKeyObject(nullptr)
 {
     if (mp_subImpl->getType()->m_isGetKeyDefined)
     {
@@ -60,7 +73,9 @@ SubscriberHistory::~SubscriberHistory()
     }
 }
 
-bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_missing_changes_up_to)
+bool SubscriberHistory::received_change(
+        CacheChange_t* a_change,
+        size_t unknown_missing_changes_up_to)
 {
 
     if (mp_reader == nullptr || mp_mutex == nullptr)
