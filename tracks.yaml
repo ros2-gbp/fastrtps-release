@@ -94,7 +94,7 @@ tracks:
     release_tag: c776f0f0964e697f93b51590688569567a7056f3
     ros_distro: dashing
     vcs_type: git
-    vcs_uri: https://github.com/eProsima/Fast-RTPS.giit
+    vcs_uri: https://github.com/eProsima/Fast-RTPS.git
     version: 1.7.2
   r2b2:
     actions:
