@@ -91,7 +91,7 @@ tracks:
     last_version: 1.7.2
     name: fastrtps
     patches: dashing
-    release_inc: '1'
+    release_inc: '2'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
     release_tag: c776f0f0964e697f93b51590688569567a7056f3
     ros_distro: dashing
