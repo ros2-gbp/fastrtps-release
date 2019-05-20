@@ -77,7 +77,7 @@ tracks:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
       :{vcs_uri} --name :{name} --output-dir :{archive_dir_path}
-    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 1.7.2+osrf6@gc776f0f
+    - git-bloom-import-upstream :{archive_path} :{patches} --release-version :{version}
       --replace
     - git-bloom-generate -y rosrelease :{ros_distro} --source upstream -i :{release_inc}
     - git-bloom-generate -y rosdebian --prefix release/:{ros_distro} :{ros_distro}
@@ -93,11 +93,11 @@ tracks:
     patches: dashing
     release_inc: '2'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
-    release_tag: c776f0f0964e697f93b51590688569567a7056f3
+    release_tag: v:{version}
     ros_distro: dashing
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-RTPS.git
-    version: 1.7.2
+    version: :{ask}
   r2b2:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
