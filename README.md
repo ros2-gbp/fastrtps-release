@@ -1,3 +1,26 @@
+## fastrtps (dashing) - 1.8.0-1
+
+The packages in the `fastrtps` repository were released into the `dashing` distro by running `/usr/bin/bloom-release -r dashing fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Mon, 20 May 2019 22:09:30 -0000`
+
+The `fastrtps` package was released.
+
+Version of package(s) in repository `fastrtps`:
+
+- upstream repository: https://github.com/eProsima/Fast-RTPS.git
+- release repository: https://github.com/ros2-gbp/fastrtps-release.git
+- rosdistro version: `1.7.2-2`
+- old version: `1.7.2-2`
+- new version: `1.8.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.8.0`
+- catkin_pkg version: `0.4.11`
+- rosdep version: `0.15.1`
+- rosdistro version: `0.7.3`
+- vcstools version: `0.1.40`
+
+
 ## fastrtps (dashing) - 1.7.2-2
 
 The packages in the `fastrtps` repository were released into the `dashing` distro by running `/home/steven/osrf/bloom/myscripts/py3env/bin/bloom-release -r dashing fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Sat, 13 Apr 2019 19:44:15 -0000`
