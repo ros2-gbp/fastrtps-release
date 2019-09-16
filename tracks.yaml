@@ -98,6 +98,31 @@ tracks:
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-RTPS.git
     version: 1.8.0
+  eloquent:
+    actions:
+    - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
+      :{vcs_uri} --name :{name} --output-dir :{archive_dir_path}
+    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 1.8.0+osrf2@g6a6f79c
+      --replace
+    - git-bloom-generate -y rosrelease :{ros_distro} --source upstream -i :{release_inc}
+    - git-bloom-generate -y rosdebian --prefix release/:{ros_distro} :{ros_distro}
+      -i :{release_inc} --os-name ubuntu
+    - git-bloom-generate -y rosdebian --prefix release/:{ros_distro} :{ros_distro}
+      -i :{release_inc} --os-name debian --os-not-required
+    - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
+      :{release_inc}
+    devel_branch: master
+    last_release: 6a6f79c4256a00fc13834a2aaa3c60a0aaac5e76
+    last_version: 1.8.0
+    name: fastrtps
+    patches: dashing
+    release_inc: '2'
+    release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
+    release_tag: 6a6f79c4256a00fc13834a2aaa3c60a0aaac5e76
+    ros_distro: dashing
+    vcs_type: git
+    vcs_uri: https://github.com/eProsima/Fast-RTPS.git
+    version: 1.8.0
   r2b2:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
