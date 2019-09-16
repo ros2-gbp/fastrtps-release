@@ -17,16 +17,20 @@
  *
  */
 
-#ifndef READERATTRIBUTES_H_
-#define READERATTRIBUTES_H_
+#ifndef FASTRTPS_RTPS_ATTRIBUTES_READERATTRIBUTES_H_
+#define FASTRTPS_RTPS_ATTRIBUTES_READERATTRIBUTES_H_
 
 #include "../common/Time_t.h"
 #include "../common/Guid.h"
 #include "EndpointAttributes.h"
-namespace eprosima{
-namespace fastrtps{
-namespace rtps{
+#include "../../qos/QosPolicies.h"
+#include "../../utils/collections/ResourceLimitedContainerConfig.hpp"
 
+#include <functional>
+
+namespace eprosima {
+namespace fastrtps {
+namespace rtps {
 
 /**
  * Class ReaderTimes, defining the times associated with the Reliable Readers events.
@@ -59,12 +63,14 @@ public:
  * Class ReaderAttributes, to define the attributes of a RTPSReader.
  * @ingroup RTPS_ATTRIBUTES_MODULE
  */
-class  ReaderAttributes
+class ReaderAttributes
 {
     public:
 
         ReaderAttributes()
-            : expectsInlineQos(false)
+            : liveliness_kind_(AUTOMATIC_LIVELINESS_QOS)
+            , liveliness_lease_duration(c_TimeInfinite)
+            , expectsInlineQos(false)
             , disable_positive_acks(false)
         {
             endpoint.endpointKind = READER;
@@ -77,61 +83,27 @@ class  ReaderAttributes
         //!Attributes of the associated endpoint.
         EndpointAttributes endpoint;
 
-        //!Times associated with this reader.
+        //!Times associated with this reader (only for stateful readers)
         ReaderTimes times;
+
+        //! Liveliness kind
+        LivelinessQosPolicyKind liveliness_kind_;
+
+        //! Liveliness lease duration
+        Duration_t liveliness_lease_duration;
 
         //!Indicates if the reader expects Inline qos, default value 0.
         bool expectsInlineQos;
 
         //! Disable positive ACKs
         bool disable_positive_acks;
+
+        //! Define the allocation behaviour for matched-writer-dependent collections.
+        ResourceLimitedContainerConfig matched_writers_allocation;
 };
 
-/**
- * Class RemoteWriterAttributes, to define the attributes of a Remote Writer.
- * @ingroup RTPS_ATTRIBUTES_MODULE
- */
-class  RemoteWriterAttributes
-{
-    public:
-        RemoteWriterAttributes()
-            : livelinessLeaseDuration(c_TimeInfinite)
-            , ownershipStrength(0)
-            , is_eprosima_endpoint(true)
-        {
-            endpoint.endpointKind = WRITER;
-        }
+} /* namespace rtps */
+} /* namespace fastrtps */
+} /* namespace eprosima */
 
-        RemoteWriterAttributes(const VendorId_t& vendor_id)
-            : livelinessLeaseDuration(c_TimeInfinite)
-            , ownershipStrength(0)
-            , is_eprosima_endpoint(vendor_id == c_VendorId_eProsima)
-        {
-            endpoint.endpointKind = WRITER;
-        }
-
-        virtual ~RemoteWriterAttributes()
-        {
-
-        }
-
-        //!Attributes of the associated endpoint.
-        EndpointAttributes endpoint;
-
-        //!GUID_t of the writer, can be unknown if the reader is best effort.
-        GUID_t guid;
-
-        //!Liveliness lease duration, default value c_TimeInfinite.
-        Duration_t livelinessLeaseDuration;
-
-        //!Ownership Strength of the associated writer.
-        uint16_t ownershipStrength;
-
-        bool is_eprosima_endpoint;
-};
-}
-}
-}
-
-
-#endif /* WRITERATTRIBUTES_H_ */
+#endif /* FASTRTPS_RTPS_ATTRIBUTES_READERATTRIBUTES_H_ */

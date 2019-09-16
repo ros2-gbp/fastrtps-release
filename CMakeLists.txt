@@ -212,6 +212,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/common/eprosima_libraries.cmake)
 eprosima_find_package(fastcdr REQUIRED)
 eprosima_find_thirdparty(Asio asio)
 eprosima_find_thirdparty(TinyXML2 tinyxml2)
+find_package(foonathan_memory REQUIRED)
 
 if(ANDROID)
     eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
@@ -228,8 +229,12 @@ else()
     find_package(OpenSSL)
 endif()
 
+if(OPENSSL_FOUND)
+    message(STATUS "OpenSSL library ${OPENSSL_VERSION} found...")
+endif()
+
 option(NO_TLS "Disables TLS Support" OFF)
-if(OpenSSL_FOUND AND NOT NO_TLS)
+if(OPENSSL_FOUND AND NOT NO_TLS)
     set(TLS_FOUND 1)
 else()
     set(TLS_FOUND 0)
@@ -260,10 +265,18 @@ if(BUILD_JAVA)
         set(CMD_JAVA "assemble")
     endif()
 
-    gradle_build(${PROJECT_SOURCE_DIR}/${PROJECT_NAME}gen ${CMD_JAVA}
-        THIRDPARTY_DEPENDENCY idl
-        THIRDPARTY_DEPENDENCY fastcdr
-        )
+    include(${PROJECT_SOURCE_DIR}/cmake/common/GitUtils.cmake)
+
+    # Need to be downloaded at configuration time to be available at build time.
+    # Using ExternalProject fails because the source isn't yet downloaded when gradle is called.
+    git_clone(
+        PROJECT_NAME fastrtpsgen
+        GIT_URL https://github.com/eProsima/Fast-RTPS-Gen
+        DIRECTORY ${PROJECT_SOURCE_DIR})
+
+    file(RENAME ${PROJECT_SOURCE_DIR}/Fast-RTPS-Gen ${PROJECT_SOURCE_DIR}/fastrtpsgen)
+
+    gradle_build(${PROJECT_SOURCE_DIR}/${PROJECT_NAME}gen ${CMD_JAVA})
 endif()
 
 ###############################################################################

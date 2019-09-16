@@ -40,16 +40,9 @@ TCPReqRepHelloWorldReplier::TCPReqRepHelloWorldReplier(): request_listener_(*thi
     participant_(nullptr), request_subscriber_(nullptr), reply_publisher_(nullptr),
     initialized_(false), matched_(0)
 {
-#if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
-            sattr.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-            puattr.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-#elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
-            sattr.historyMemoryPolicy = DYNAMIC_RESERVE_MEMORY_MODE;
-            puattr.historyMemoryPolicy = DYNAMIC_RESERVE_MEMORY_MODE;
-#else
-            sattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
-            puattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
-#endif
+    // By default, memory mode is preallocated (the most restritive)
+    sattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
+    puattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
 }
 
 TCPReqRepHelloWorldReplier::~TCPReqRepHelloWorldReplier()
@@ -64,10 +57,10 @@ void TCPReqRepHelloWorldReplier::init(int participantId, int domainId, uint16_t 
     ParticipantAttributes pattr;
     pattr.rtps.builtin.domainId = domainId;
     pattr.rtps.participantID = participantId;
-    pattr.rtps.builtin.leaseDuration = c_TimeInfinite;
-    //pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(1, 0);
-    //pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(0, 2147483648);
-    pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(1, 0);
+    pattr.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    //pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(1, 0);
+    //pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(0, 2147483648);
+    pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(1, 0);
 
     // TCP CONNECTION PEER.
     //uint32_t kind = LOCATOR_KIND_TCPv4;

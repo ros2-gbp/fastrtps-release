@@ -21,12 +21,13 @@
 #define _RTPS_BUILTIN_DATA_PARTICIPANTPROXYDATA_H_
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-#include <mutex>
 #include "../../../qos/ParameterList.h"
 
+#include <fastrtps/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 #include "../../attributes/WriterAttributes.h"
 #include "../../attributes/ReaderAttributes.h"
 #include "../../common/Token.h"
+#include "../../common/RemoteLocators.hpp"
 
 #if HAVE_SECURITY
 #include "../../security/accesscontrol/ParticipantSecurityAttributes.h"
@@ -65,7 +66,7 @@ namespace rtps {
 
 struct CDRMessage_t;
 class PDPSimple;
-class RemoteParticipantLeaseDuration;
+class TimedEvent;
 class RTPSParticipantImpl;
 class ReaderProxyData;
 class WriterProxyData;
@@ -74,11 +75,11 @@ class WriterProxyData;
 * ParticipantProxyData class is used to store and convert the information Participants send to each other during the PDP phase.
 *@ingroup BUILTIN_MODULE
 */
-class ParticipantProxyData
+class ParticipantProxyData 
 {
     public:
 
-        ParticipantProxyData();
+        ParticipantProxyData(const RTPSParticipantAllocationAttributes& allocation);
 
         ParticipantProxyData(const ParticipantProxyData& pdata);
 
@@ -94,14 +95,10 @@ class ParticipantProxyData
         bool m_expectsInlineQos;
         //!Available builtin endpoints
         BuiltinEndpointSet_t m_availableBuiltinEndpoints;
-        //!Metatraffic unicast locator list
-        LocatorList_t m_metatrafficUnicastLocatorList;
-        //!Metatraffic multicast locator list
-        LocatorList_t m_metatrafficMulticastLocatorList;
-        //!Default unicast locator list
-        LocatorList_t m_defaultUnicastLocatorList;
-        //!Default multicast locator list
-        LocatorList_t m_defaultMulticastLocatorList;
+        //!Metatraffic locators
+        RemoteLocatorList metatraffic_locators;
+        //!Default locators
+        RemoteLocatorList default_locators;
         //!Manual liveliness count
         Count_t m_manualLivelinessCount;
         //!Participant name
@@ -127,11 +124,13 @@ class ParticipantProxyData
         //!
         std::vector<octet> m_userData;
         //!
-        RemoteParticipantLeaseDuration* mp_leaseDurationTimer;
+        TimedEvent* lease_duration_event;
         //!
-        std::vector<ReaderProxyData*> m_readers;
+        bool should_check_lease_duration;
         //!
-        std::vector<WriterProxyData*> m_writers;
+        ResourceLimitedVector<ReaderProxyData*> m_readers;
+        //!
+        ResourceLimitedVector<WriterProxyData*> m_writers;
 
         /**
          * Update the data.
@@ -152,14 +151,26 @@ class ParticipantProxyData
          */
         bool readFromCDRMessage(CDRMessage_t* msg, bool use_encapsulation=true);
 
-        //!Clear the data (restore to default state.)
+        //! Clear the data (restore to default state).
         void clear();
 
         /**
          * Copy the data from another object.
          * @param pdata Object to copy the data from
          */
-        void copy(ParticipantProxyData& pdata);
+        void copy(const ParticipantProxyData& pdata);
+
+        /**
+         * Set participant persistent GUID_t
+         * @param guid valid GUID_t
+         */
+        void set_persistence_guid(const GUID_t & guid);
+
+        /**
+         * Retrieve participant persistent GUID_t
+         * @return guid persistent GUID_t or c_Guid_Unknown
+         */
+        GUID_t get_persistence_guid() const;
 };
 
 } /* namespace rtps */

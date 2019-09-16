@@ -22,6 +22,9 @@
 #include <fastrtps/rtps/reader/ReaderListener.h>
 #include <fastrtps/log/Log.h>
 #include <fastrtps/rtps/common/CacheChange.h>
+#include <fastrtps/rtps/builtin/BuiltinProtocols.h>
+#include <fastrtps/rtps/builtin/liveliness/WLP.h>
+#include <fastrtps/rtps/writer/LivelinessManager.h>
 #include "../participant/RTPSParticipantImpl.h"
 #include "FragmentedChangePitStop.h"
 
@@ -30,75 +33,121 @@
 
 #include <cassert>
 
-#define IDSTRING "(ID:"<< std::this_thread::get_id() <<") "<<
+#define IDSTRING "(ID:" << std::this_thread::get_id() << ") " <<
 
 using namespace eprosima::fastrtps::rtps;
 
 
 StatelessReader::~StatelessReader()
 {
-    logInfo(RTPS_READER,"Removing reader "<<this->getGuid());
+    logInfo(RTPS_READER, "Removing reader " << this->getGuid());
 }
 
 StatelessReader::StatelessReader(
         RTPSParticipantImpl* pimpl,
-        GUID_t& guid,
-        ReaderAttributes& att,
+        const GUID_t& guid,
+        const ReaderAttributes& att,
         ReaderHistory* hist,
         ReaderListener* listen)
-    : RTPSReader(
-          pimpl,
-          guid,
-          att,
-          hist,
-          listen)
+    : RTPSReader(pimpl, guid, att, hist, listen)
+    , matched_writers_(att.matched_writers_allocation)
 {
 }
 
-bool StatelessReader::matched_writer_add(RemoteWriterAttributes& wdata)
+bool StatelessReader::matched_writer_add(
+        const WriterProxyData& wdata)
 {
-    std::lock_guard<std::recursive_timed_mutex> guard(mp_mutex);
-    for(auto it = m_matched_writers.begin();it!=m_matched_writers.end();++it)
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+    for (const RemoteWriterInfo_t& writer : matched_writers_)
     {
-        if((*it).guid == wdata.guid)
+        if (writer.guid == wdata.guid())
+        {
+            logWarning(RTPS_READER, "Attempting to add existing writer");
             return false;
-    }
-
-    getRTPSParticipant()->createSenderResources(wdata.endpoint.remoteLocatorList, false);
-
-    logInfo(RTPS_READER,"Writer " << wdata.guid << " added to "<<m_guid.entityId);
-    m_matched_writers.push_back(wdata);
-    add_persistence_guid(wdata);
-    m_acceptMessagesFromUnkownWriters = false;
-    return true;
-}
-bool StatelessReader::matched_writer_remove(const RemoteWriterAttributes& wdata)
-{
-    std::lock_guard<std::recursive_timed_mutex> guard(mp_mutex);
-    for(auto it = m_matched_writers.begin();it!=m_matched_writers.end();++it)
-    {
-        if((*it).guid == wdata.guid)
-        {
-            logInfo(RTPS_READER,"Writer " <<wdata.guid<< " removed from "<<m_guid.entityId);
-            m_matched_writers.erase(it);
-            remove_persistence_guid(wdata);
-            return true;
         }
     }
+
+    RemoteWriterInfo_t info;
+    info.guid = wdata.guid();
+    info.persistence_guid = wdata.persistence_guid();
+    info.has_manual_topic_liveliness = (MANUAL_BY_TOPIC_LIVELINESS_QOS == wdata.m_qos.m_liveliness.kind);
+    RemoteWriterInfo_t* att = matched_writers_.emplace_back(info);
+    if (att != nullptr)
+    {
+        add_persistence_guid(info.guid, info.persistence_guid);
+
+        m_acceptMessagesFromUnkownWriters = false;
+        logInfo(RTPS_READER, "Writer " << info.guid << " added to " << m_guid.entityId);
+
+        if (liveliness_lease_duration_ < c_TimeInfinite)
+        {
+            auto wlp = this->mp_RTPSParticipant->wlp();
+            if ( wlp != nullptr)
+            {
+                wlp->sub_liveliness_manager_->add_writer(
+                            wdata.guid(),
+                            liveliness_kind_,
+                            liveliness_lease_duration_);
+            }
+            else
+            {
+                logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
+            }
+        }
+        
+        return true;
+    }
+
+    logWarning(RTPS_READER, "No space to add writer " << wdata.guid() << " to reader " << m_guid.entityId);
     return false;
 }
 
-bool StatelessReader::matched_writer_is_matched(const RemoteWriterAttributes& wdata)
+bool StatelessReader::matched_writer_remove(const GUID_t& writer_guid)
 {
-    std::lock_guard<std::recursive_timed_mutex> guard(mp_mutex);
-    for(auto it = m_matched_writers.begin();it!=m_matched_writers.end();++it)
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+
+    ResourceLimitedVector<RemoteWriterInfo_t>::iterator it;
+    for (it = matched_writers_.begin(); it != matched_writers_.end(); ++it)
     {
-        if((*it).guid == wdata.guid)
+        if (it->guid == writer_guid)
         {
+            logInfo(RTPS_READER, "Writer " << writer_guid << " removed from " << m_guid.entityId);
+
+            if (liveliness_lease_duration_ < c_TimeInfinite)
+            {
+                auto wlp = this->mp_RTPSParticipant->wlp();
+                if ( wlp != nullptr)
+                {
+                    wlp->sub_liveliness_manager_->remove_writer(
+                                writer_guid,
+                                liveliness_kind_,
+                                liveliness_lease_duration_);
+                }
+                else
+                {
+                    logError(RTPS_LIVELINESS,
+                             "Finite liveliness lease duration but WLP not enabled, cannot remove writer");
+                }
+            }
+
+            remove_persistence_guid(it->guid, it->persistence_guid);
+            matched_writers_.erase(it);
+
             return true;
         }
     }
+
     return false;
+}
+
+bool StatelessReader::matched_writer_is_matched(const GUID_t& writer_guid)
+{
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+    return std::any_of(matched_writers_.begin(), matched_writers_.end(), 
+        [writer_guid](const RemoteWriterInfo_t& item)
+        {
+            return item.guid == writer_guid;
+        });
 }
 
 bool StatelessReader::change_received(CacheChange_t* change)
@@ -110,12 +159,15 @@ bool StatelessReader::change_received(CacheChange_t* change)
         if(mp_history->received_change(change, 0))
         {
             update_last_notified(change->writerGUID, change->sequenceNumber);
+            ++total_unread_;
+
             if(getListener() != nullptr)
             {
-                getListener()->onNewCacheChangeAdded((RTPSReader*)this,change);
+                getListener()->onNewCacheChangeAdded(this, change);
             }
 
-            mp_history->postSemaphore();
+            new_notification_cv_.notify_all();
+
             return true;
         }
     }
@@ -123,21 +175,38 @@ bool StatelessReader::change_received(CacheChange_t* change)
     return false;
 }
 
-bool StatelessReader::nextUntakenCache(CacheChange_t** change, WriterProxy** /*wpout*/)
+bool StatelessReader::nextUntakenCache(
+        CacheChange_t** change, 
+        WriterProxy** /*wpout*/)
 {
-    std::lock_guard<std::recursive_timed_mutex> guard(mp_mutex);
-    return mp_history->get_min_change(change);
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+    bool ret = mp_history->get_min_change(change);
+
+    if(ret)
+    {
+        if(!(*change)->isRead)
+        {
+            if (0 < total_unread_)
+            {
+                --total_unread_;
+            }
+        }
+
+        (*change)->isRead = true;
+    }
+
+    return ret;
 }
 
 
-bool StatelessReader::nextUnreadCache(CacheChange_t** change,WriterProxy** /*wpout*/)
+bool StatelessReader::nextUnreadCache(
+        CacheChange_t** change,
+        WriterProxy** /*wpout*/)
 {
-    std::lock_guard<std::recursive_timed_mutex> guard(mp_mutex);
-    //m_reader_cache.sortCacheChangesBySeqNum();
-
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
     bool found = false;
     std::vector<CacheChange_t*>::iterator it;
-    //TODO PROTEGER ACCESO A HISTORIA AQUI??? YO CREO QUE NO, YA ESTA EL READER PROTEGIDO
+
     for(it = mp_history->changesBegin();
             it!=mp_history->changesEnd();++it)
     {
@@ -147,20 +216,36 @@ bool StatelessReader::nextUnreadCache(CacheChange_t** change,WriterProxy** /*wpo
             break;
         }
     }
+
     if(found)
     {
         *change = *it;
+        if (0 < total_unread_)
+        {
+            --total_unread_;
+        }
+        (*change)->isRead = true;
+
         return true;
     }
-    logInfo(RTPS_READER,"No Unread elements left");
+
+    logInfo(RTPS_READER, "No Unread elements left");
     return false;
 }
 
 
 bool StatelessReader::change_removed_by_history(
-        CacheChange_t* /*ch*/,
+        CacheChange_t* ch,
         WriterProxy* /*prox*/)
 {
+    if(!ch->isRead)
+    {
+        if (0 < total_unread_)
+        {
+            --total_unread_;
+        }
+    }
+
     return true;
 }
 
@@ -168,15 +253,37 @@ bool StatelessReader::processDataMsg(CacheChange_t *change)
 {
     assert(change);
 
-    std::unique_lock<std::recursive_timed_mutex> lock(mp_mutex);
+    std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
 
     if(acceptMsgFrom(change->writerGUID))
     {
-        logInfo(RTPS_MSG_IN,IDSTRING"Trying to add change " << change->sequenceNumber <<" TO reader: "<< getGuid().entityId);
+        logInfo(RTPS_MSG_IN, IDSTRING "Trying to add change " << change->sequenceNumber << " TO reader: "
+            << getGuid().entityId);
+
+        if (liveliness_lease_duration_ < c_TimeInfinite)
+        {
+            if (liveliness_kind_ == MANUAL_BY_TOPIC_LIVELINESS_QOS ||
+                writer_has_manual_liveliness(change->writerGUID))
+            {
+                auto wlp = this->mp_RTPSParticipant->wlp();
+                if ( wlp != nullptr)
+                {
+                    wlp->sub_liveliness_manager_->assert_liveliness(
+                                change->writerGUID,
+                                liveliness_kind_,
+                                liveliness_lease_duration_);
+                }
+                else
+                {
+                    logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
+                }
+            }
+        }
 
         CacheChange_t* change_to_add;
 
-        if(reserveCache(&change_to_add, change->serializedPayload.length)) //Reserve a new cache from the corresponding cache pool
+        //Reserve a new cache from the corresponding cache pool
+        if(reserveCache(&change_to_add, change->serializedPayload.length))
         {
 #if HAVE_SECURITY
             if(getAttributes().security_attributes().is_payload_protected)
@@ -195,8 +302,9 @@ bool StatelessReader::processDataMsg(CacheChange_t *change)
 #endif
                 if (!change_to_add->copy(change))
                 {
-                    logWarning(RTPS_MSG_IN,IDSTRING"Problem copying CacheChange, received data is: " << change->serializedPayload.length
-                            << " bytes and max size in reader " << getGuid().entityId << " is " << change_to_add->serializedPayload.max_size);
+                    logWarning(RTPS_MSG_IN, IDSTRING "Problem copying CacheChange, received data is: " 
+                        << change->serializedPayload.length << " bytes and max size in reader " 
+                        << getGuid().entityId << " is " << change_to_add->serializedPayload.max_size);
                     releaseCache(change_to_add);
                     return false;
                 }
@@ -206,14 +314,13 @@ bool StatelessReader::processDataMsg(CacheChange_t *change)
         }
         else
         {
-            logError(RTPS_MSG_IN,IDSTRING"Problem reserving CacheChange in reader: " << getGuid().entityId);
+            logError(RTPS_MSG_IN, IDSTRING "Problem reserving CacheChange in reader: " << getGuid().entityId);
             return false;
         }
 
         if(!change_received(change_to_add))
         {
-            logInfo(RTPS_MSG_IN,IDSTRING"MessageReceiver not add change "
-                    <<change_to_add->sequenceNumber);
+            logInfo(RTPS_MSG_IN, IDSTRING "MessageReceiver not add change " << change_to_add->sequenceNumber);
             releaseCache(change_to_add);
 
             if(getGuid().entityId == c_EntityId_SPDPReader)
@@ -226,14 +333,37 @@ bool StatelessReader::processDataMsg(CacheChange_t *change)
     return true;
 }
 
-bool StatelessReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t sampleSize, uint32_t fragmentStartingNum)
+bool StatelessReader::processDataFragMsg(
+        CacheChange_t* incomingChange, 
+        uint32_t sampleSize, 
+        uint32_t fragmentStartingNum)
 {
     assert(incomingChange);
 
-    std::unique_lock<std::recursive_timed_mutex> lock(mp_mutex);
+    std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
 
     if (acceptMsgFrom(incomingChange->writerGUID))
     {
+        if (liveliness_lease_duration_ < c_TimeInfinite)
+        {
+            if (liveliness_kind_ == MANUAL_BY_TOPIC_LIVELINESS_QOS ||
+                writer_has_manual_liveliness(incomingChange->writerGUID))
+            {
+                auto wlp = this->mp_RTPSParticipant->wlp();
+                if ( wlp != nullptr)
+                {
+                    wlp->sub_liveliness_manager_->assert_liveliness(
+                                incomingChange->writerGUID,
+                                liveliness_kind_,
+                                liveliness_lease_duration_);
+                }
+                else
+                {
+                    logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
+                }
+            }
+        }
+
         // Check if CacheChange was received.
         if(!thereIsUpperRecordOf(incomingChange->writerGUID, incomingChange->sequenceNumber))
         {
@@ -294,10 +424,10 @@ bool StatelessReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t
 }
 
 bool StatelessReader::processHeartbeatMsg(
-        GUID_t& /*writerGUID*/,
+        const GUID_t& /*writerGUID*/,
         uint32_t /*hbCount*/,
-        SequenceNumber_t& /*firstSN*/,
-        SequenceNumber_t& /*lastSN*/,
+        const SequenceNumber_t& /*firstSN*/,
+        const SequenceNumber_t& /*lastSN*/,
         bool /*finalFlag*/,
         bool /*livelinessFlag*/)
 {
@@ -305,39 +435,46 @@ bool StatelessReader::processHeartbeatMsg(
 }
 
 bool StatelessReader::processGapMsg(
-        GUID_t& /*writerGUID*/,
-        SequenceNumber_t& /*gapStart*/,
-        SequenceNumberSet_t& /*gapList*/)
+        const GUID_t& /*writerGUID*/,
+        const SequenceNumber_t& /*gapStart*/,
+        const SequenceNumberSet_t& /*gapList*/)
 {
     return true;
 }
 
-bool StatelessReader::acceptMsgFrom(GUID_t& writerId)
+bool StatelessReader::acceptMsgFrom(const GUID_t& writerId)
 {
     if(this->m_acceptMessagesFromUnkownWriters)
     {
         return true;
     }
-    else
+    else if (writerId.entityId == this->m_trustedWriterEntityId)
     {
-        if(writerId.entityId == this->m_trustedWriterEntityId)
-        {
-            return true;
-        }
-
-        for(auto it = m_matched_writers.begin();it!=m_matched_writers.end();++it)
-        {
-            if((*it).guid == writerId)
-            {
-                return true;
-            }
-        }
+        return true;
     }
 
-    return false;
+    return std::any_of(matched_writers_.begin(), matched_writers_.end(), 
+        [& writerId](const RemoteWriterInfo_t& writer)
+        {
+            return writer.guid == writerId;
+        });
 }
 
-bool StatelessReader::thereIsUpperRecordOf(GUID_t& guid, SequenceNumber_t& seq)
+bool StatelessReader::thereIsUpperRecordOf(
+        const GUID_t& guid, 
+        const SequenceNumber_t& seq)
 {
     return get_last_notified(guid) >= seq;
+}
+
+bool StatelessReader::writer_has_manual_liveliness(const GUID_t& guid)
+{
+    for (const RemoteWriterInfo_t& writer : matched_writers_)
+    {
+        if (writer.guid == guid)
+        {
+            return writer.has_manual_topic_liveliness;
+        }
+    }
+    return false;
 }

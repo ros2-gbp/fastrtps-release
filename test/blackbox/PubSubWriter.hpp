@@ -53,7 +53,10 @@ class PubSubWriter
     {
         public:
 
-            ParticipantListener(PubSubWriter &writer) : writer_(writer) {}
+            ParticipantListener(
+                    PubSubWriter &writer)
+                : writer_(writer)
+            {}
 
             ~ParticipantListener() {}
 
@@ -63,7 +66,6 @@ class PubSubWriter
                 if(writer_.onDiscovery_!=nullptr)
                 {
                     writer_.discovery_result_ = writer_.onDiscovery_(info);
-
                 }
 
                 if(info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
@@ -91,11 +93,13 @@ class PubSubWriter
             }
 #endif
 
-            void onSubscriberDiscovery(eprosima::fastrtps::Participant*, eprosima::fastrtps::rtps::ReaderDiscoveryInfo&& info) override
+            void onSubscriberDiscovery(eprosima::fastrtps::Participant*,
+                                       eprosima::fastrtps::rtps::ReaderDiscoveryInfo&& info) override
             {
                 if(info.status == eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERED_READER)
                 {
                     writer_.add_reader_info(info.info);
+
                 }
                 else if(info.status == eprosima::fastrtps::rtps::ReaderDiscoveryInfo::CHANGED_QOS_READER)
                 {
@@ -107,7 +111,8 @@ class PubSubWriter
                 }
             }
 
-            void onPublisherDiscovery(eprosima::fastrtps::Participant*, eprosima::fastrtps::rtps::WriterDiscoveryInfo&& info) override
+            void onPublisherDiscovery(eprosima::fastrtps::Participant*,
+                                      eprosima::fastrtps::rtps::WriterDiscoveryInfo&& info) override
             {
                 if(info.status == eprosima::fastrtps::rtps::WriterDiscoveryInfo::DISCOVERED_WRITER)
                 {
@@ -128,16 +133,19 @@ class PubSubWriter
             ParticipantListener& operator=(const ParticipantListener&) = delete;
 
             PubSubWriter& writer_;
+
     } participant_listener_;
 
     class Listener : public eprosima::fastrtps::PublisherListener
     {
         public:
 
-            Listener(PubSubWriter &writer)
+            Listener(
+                    PubSubWriter &writer)
                 : writer_(writer)
                 , times_deadline_missed_(0)
-            {};
+                , times_liveliness_lost_(0)
+            {}
 
             ~Listener(){};
 
@@ -147,12 +155,12 @@ class PubSubWriter
             {
                 if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                 {
-                    std::cout << "Matched subscriber " << info.remoteEndpointGuid << std::endl;
+                    std::cout << "Publisher matched subscriber " << info.remoteEndpointGuid << std::endl;
                     writer_.matched();
                 }
                 else
                 {
-                    std::cout << "Unmatched subscriber " << info.remoteEndpointGuid << std::endl;
+                    std::cout << "Publisher unmatched subscriber " << info.remoteEndpointGuid << std::endl;
                     writer_.unmatched();
                 }
             }
@@ -165,9 +173,23 @@ class PubSubWriter
                 times_deadline_missed_ = status.total_count;
             }
 
+            void on_liveliness_lost(
+                    eprosima::fastrtps::Publisher* pub,
+                    const eprosima::fastrtps::LivelinessLostStatus& status) override
+            {
+                (void)pub;
+                times_liveliness_lost_ = status.total_count;
+                writer_.liveliness_lost();
+            }
+
             unsigned int missed_deadlines() const
             {
                 return times_deadline_missed_;
+            }
+
+            unsigned int times_liveliness_lost() const
+            {
+                return times_liveliness_lost_;
             }
 
         private:
@@ -176,7 +198,10 @@ class PubSubWriter
 
             PubSubWriter &writer_;
 
+            //! The number of times deadline was missed
             unsigned int times_deadline_missed_;
+            //! The number of times liveliness was lost
+            unsigned int times_liveliness_lost_;
 
     } listener_;
 
@@ -185,7 +210,8 @@ class PubSubWriter
     typedef TypeSupport type_support;
     typedef typename type_support::type type;
 
-    PubSubWriter(const std::string &topic_name)
+    PubSubWriter(
+            const std::string &topic_name)
         : participant_listener_(*this)
         , listener_(*this)
         , participant_(nullptr)
@@ -195,6 +221,7 @@ class PubSubWriter
         , participant_matched_(0)
         , discovery_result_(false)
         , onDiscovery_(nullptr)
+        , times_liveliness_lost_(0)
 #if HAVE_SECURITY
     , authorized_(0), unauthorized_(0)
 #endif
@@ -206,25 +233,27 @@ class PubSubWriter
         publisher_attr_.topic.topicName = t.str();
         topic_name_ = t.str();
 
-#if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
-        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-#elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
-        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::DYNAMIC_RESERVE_MEMORY_MODE;
-#else
+        // By default, memory mode is preallocated (the most restritive)
         publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
-#endif
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         publisher_attr_.times.heartbeatPeriod.seconds = 0;
         publisher_attr_.times.heartbeatPeriod.nanosec = 100000000;
         publisher_attr_.times.nackResponseDelay.seconds = 0;
         publisher_attr_.times.nackResponseDelay.nanosec = 100000000;
+
+        // Increase default max_blocking_time to 1 second, as our CI infrastructure shows some
+        // big CPU overhead sometimes
+        publisher_attr_.qos.m_reliability.max_blocking_time.seconds = 1;
+        publisher_attr_.qos.m_reliability.max_blocking_time.nanosec = 0;
     }
 
     ~PubSubWriter()
     {
         if(participant_ != nullptr)
+        {
             eprosima::fastrtps::Domain::removeParticipant(participant_);
+        }
     }
 
     void init()
@@ -294,6 +323,11 @@ class PubSubWriter
         return publisher_->write((void*)&msg);
     }
 
+    void assert_liveliness()
+    {
+        publisher_->assert_liveliness();
+    }
+
     void wait_discovery(std::chrono::seconds timeout = std::chrono::seconds::zero())
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
@@ -332,6 +366,19 @@ class PubSubWriter
         cv_.wait(lock, [&](){return matched_ == 0;});
 
         std::cout << "Writer removal finished..." << std::endl;
+    }
+
+    void wait_liveliness_lost(unsigned int times = 1)
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+        liveliness_cv_.wait(lock, [&](){ return times_liveliness_lost_ == times; });
+    }
+
+    void liveliness_lost()
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+        times_liveliness_lost_++;
+        liveliness_cv_.notify_one();
     }
 
 #if HAVE_SECURITY
@@ -398,6 +445,24 @@ class PubSubWriter
     PubSubWriter& deadline_period(const eprosima::fastrtps::Duration_t deadline_period)
     {
         publisher_attr_.qos.m_deadline.period = deadline_period;
+        return *this;
+    }
+
+    PubSubWriter& liveliness_kind(const eprosima::fastrtps::LivelinessQosPolicyKind kind)
+    {
+        publisher_attr_.qos.m_liveliness.kind = kind;
+        return *this;
+    }
+
+    PubSubWriter& liveliness_lease_duration(const eprosima::fastrtps::Duration_t lease_duration)
+    {
+        publisher_attr_.qos.m_liveliness.lease_duration = lease_duration;
+        return *this;
+    }
+
+    PubSubWriter& liveliness_announcement_period(const eprosima::fastrtps::Duration_t announcement_period)
+    {
+        publisher_attr_.qos.m_liveliness.announcement_period = announcement_period;
         return *this;
     }
 
@@ -588,9 +653,9 @@ class PubSubWriter
 
     PubSubWriter& static_discovery(const char* filename)
     {
-        participant_attr_.rtps.builtin.use_SIMPLE_EndpointDiscoveryProtocol = false;
-        participant_attr_.rtps.builtin.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_attr_.rtps.builtin.setStaticEndpointXMLFilename(filename);
+        participant_attr_.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
+        participant_attr_.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
+        participant_attr_.rtps.builtin.discovery_config.setStaticEndpointXMLFilename(filename);
         return *this;
     }
 
@@ -649,8 +714,8 @@ class PubSubWriter
 
     PubSubWriter& lease_duration(eprosima::fastrtps::Duration_t lease_duration, eprosima::fastrtps::Duration_t announce_period)
     {
-        participant_attr_.rtps.builtin.leaseDuration = lease_duration;
-        participant_attr_.rtps.builtin.leaseDuration_announcementperiod = announce_period;
+        participant_attr_.rtps.builtin.discovery_config.leaseDuration = lease_duration;
+        participant_attr_.rtps.builtin.discovery_config.leaseDuration_announcementperiod = announce_period;
         return *this;
     }
 
@@ -728,6 +793,11 @@ class PubSubWriter
     unsigned int missed_deadlines() const
     {
         return listener_.missed_deadlines();
+    }
+
+    unsigned int times_liveliness_lost() const
+    {
+        return listener_.times_liveliness_lost();
     }
 
     private:
@@ -992,6 +1062,13 @@ void change_reader_info(const eprosima::fastrtps::rtps::ReaderProxyData& reader_
     bool discovery_result_;
 
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
+
+    //! A mutex for liveliness
+    std::mutex liveliness_mutex_;
+    //! A condition variable for liveliness
+    std::condition_variable liveliness_cv_;
+    //! The number of times liveliness was lost
+    unsigned int times_liveliness_lost_;
 
 #if HAVE_SECURITY
     std::mutex mutexAuthentication_;

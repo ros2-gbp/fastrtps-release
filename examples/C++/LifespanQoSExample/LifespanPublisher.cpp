@@ -23,7 +23,6 @@
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/Domain.h>
-#include <fastrtps/utils/eClock.h>
 
 #include <thread>
 
@@ -43,7 +42,7 @@ bool LifespanPublisher::init(uint32_t lifespan_ms)
 
     ParticipantAttributes PParam;
     PParam.rtps.builtin.domainId = 0;
-    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_pub");
     participant_ = Domain::createParticipant(PParam);
     if( participant_ == nullptr )
@@ -106,12 +105,12 @@ void LifespanPublisher::run(uint32_t samples, uint32_t write_sleep_ms, uint32_t 
         {
             std::cout << "Message with index: " << hello_.index() << " SENT" << std::endl;
         }
-        eClock::my_sleep(write_sleep_ms);
+        std::this_thread::sleep_for(std::chrono::milliseconds(write_sleep_ms));
     }
 
     // Wait and try to clear history
     std::cout << std::endl << "Publisher waiting for " << sleep_ms << " milliseconds" << std::endl << std::endl;
-    eClock::my_sleep(sleep_ms);
+    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
 
     size_t removed = 0;
     publisher_->removeAllChange(&removed);

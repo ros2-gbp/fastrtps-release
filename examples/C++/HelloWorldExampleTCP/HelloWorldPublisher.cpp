@@ -24,7 +24,6 @@
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
 #include <fastrtps/Domain.h>
-#include <fastrtps/utils/eClock.h>
 #include <fastrtps/utils/IPLocator.h>
 
 #include <thread>
@@ -50,8 +49,8 @@ bool HelloWorldPublisher::init(
     ParticipantAttributes pparam;
 
     pparam.rtps.builtin.domainId = 0;
-    pparam.rtps.builtin.leaseDuration = c_TimeInfinite;
-    pparam.rtps.builtin.leaseDuration_announcementperiod = Duration_t(5, 0);
+    pparam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    pparam.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(5, 0);
     pparam.rtps.setName("Participant_pub");
 
     pparam.rtps.useBuiltinTransports = false;
@@ -157,7 +156,7 @@ void HelloWorldPublisher::runThread(
                 std::cout << "[RTCP] Message: " << hello_.message() << " with index: "
                     << hello_.index() << " SENT" << std::endl;
             }
-            eClock::my_sleep(sleep_ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
         }
     }
     else
@@ -173,7 +172,7 @@ void HelloWorldPublisher::runThread(
                 std::cout << "[RTCP] Message: " << hello_.message() << " with index: "
                     << hello_.index() << " SENT" << std::endl;
             }
-            eClock::my_sleep(sleep_ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
         }
     }
 }

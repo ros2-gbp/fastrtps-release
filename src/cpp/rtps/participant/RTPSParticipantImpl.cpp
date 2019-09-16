@@ -22,9 +22,6 @@
 #include "../flowcontrol/ThroughputController.h"
 #include "../persistence/PersistenceService.h"
 
-#include <fastrtps/rtps/resources/ResourceEvent.h>
-#include <fastrtps/rtps/resources/AsyncWriterThread.h>
-
 #include <fastrtps/rtps/messages/MessageReceiver.h>
 
 #include <fastrtps/rtps/writer/StatelessWriter.h>
@@ -39,6 +36,7 @@
 
 #include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
+#include <fastrtps/transport/TCPv4TransportDescriptor.h>
 
 #include <fastrtps/rtps/RTPSDomain.h>
 
@@ -48,9 +46,9 @@
 #include <fastrtps/rtps/builtin/liveliness/WLP.h>
 
 #include <fastrtps/utils/IPFinder.h>
-#include <fastrtps/utils/eClock.h>
 
 #include <fastrtps/utils/Semaphore.h>
+#include <fastrtps/utils/System.h>
 
 #include <mutex>
 #include <algorithm>
@@ -79,11 +77,15 @@ Locator_t& RTPSParticipantImpl::applyLocatorAdaptRule(Locator_t& loc)
     return loc;
 }
 
-RTPSParticipantImpl::RTPSParticipantImpl(const RTPSParticipantAttributes& PParam, const GuidPrefix_t& guidP,
-        RTPSParticipant* par, RTPSParticipantListener* plisten)
+RTPSParticipantImpl::RTPSParticipantImpl(
+        const RTPSParticipantAttributes& PParam,
+        const GuidPrefix_t& guidP,
+        const GuidPrefix_t& persistence_guid,
+        RTPSParticipant* par,
+        RTPSParticipantListener* plisten)
     : m_att(PParam)
-    , m_guid(guidP ,c_EntityId_RTPSParticipant)
-    , mp_event_thr(nullptr)
+    , m_guid(guidP, c_EntityId_RTPSParticipant)
+    , m_persistence_guid(persistence_guid, c_EntityId_RTPSParticipant)
     , mp_builtinProtocols(nullptr)
     , mp_ResourceSemaphore(new Semaphore(0))
     , IdCounter(0)
@@ -103,6 +105,26 @@ RTPSParticipantImpl::RTPSParticipantImpl(const RTPSParticipantAttributes& PParam
         m_network_Factory.RegisterTransport(&descriptor);
     }
 
+    // Workaround TCP discovery issues when register
+    switch (PParam.builtin.discovery_config.discoveryProtocol)
+    {
+    case DiscoveryProtocol::CLIENT:
+    case DiscoveryProtocol::SERVER:
+    case DiscoveryProtocol::BACKUP:
+        // Verify if listening ports are provided
+        for (auto& transportDescriptor : PParam.userTransports)
+        {
+            TCPTransportDescriptor * pT = dynamic_cast<TCPTransportDescriptor *>(transportDescriptor.get());
+            if (pT && pT->listening_ports.empty())
+            {
+                logError(RTPS_PARTICIPANT, "Participant " << m_att.getName() << " with GUID " << m_guid
+                    << " tries to use discovery server over TCP without providing a proper listening port");
+            }
+        }
+    default:
+        break;
+    }
+
     // User defined transports
     for (const auto& transportDescriptor : PParam.userTransports)
     {
@@ -110,8 +132,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(const RTPSParticipantAttributes& PParam
     }
 
     mp_userParticipant->mp_impl = this;
-    mp_event_thr = new ResourceEvent();
-    mp_event_thr->init_thread(this);
+    mp_event_thr.init_thread();
 
     // Throughput controller, if the descriptor has valid values
     if (PParam.throughputController.bytesPerPeriod != UINT32_MAX && PParam.throughputController.periodMillisecs != 0)
@@ -120,15 +141,16 @@ RTPSParticipantImpl::RTPSParticipantImpl(const RTPSParticipantAttributes& PParam
         m_controllers.push_back(std::move(controller));
     }
 
-    /// Creation of metatraffic locator and receiver resources
-    uint32_t metatraffic_multicast_port = m_att.port.getMulticastPort(m_att.builtin.domainId);
-    uint32_t metatraffic_unicast_port = m_att.port.getUnicastPort(m_att.builtin.domainId, m_att.participantID);
-
     /* If metatrafficMulticastLocatorList is empty, add mandatory default Locators
        Else -> Take them */
 
+    // Creation of metatraffic locator and receiver resources
+    uint32_t metatraffic_multicast_port = m_att.port.getMulticastPort(m_att.builtin.domainId);
+    uint32_t metatraffic_unicast_port = m_att.port.getUnicastPort(m_att.builtin.domainId,
+        static_cast<uint32_t>(m_att.participantID));
+
     /* INSERT DEFAULT MANDATORY MULTICAST LOCATORS HERE */
-    if(m_att.builtin.metatrafficMulticastLocatorList.empty() && m_att.builtin.metatrafficUnicastLocatorList.empty())
+    if (m_att.builtin.metatrafficMulticastLocatorList.empty() && m_att.builtin.metatrafficUnicastLocatorList.empty())
     {
         m_network_Factory.getDefaultMetatrafficMulticastLocators(m_att.builtin.metatrafficMulticastLocatorList,
             metatraffic_multicast_port);
@@ -159,7 +181,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(const RTPSParticipantAttributes& PParam
     createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true);
 
     // Initial peers
-    if(m_att.builtin.initialPeersList.empty())
+    if (m_att.builtin.initialPeersList.empty())
     {
         m_att.builtin.initialPeersList = m_att.builtin.metatrafficMulticastLocatorList;
     }
@@ -169,8 +191,9 @@ RTPSParticipantImpl::RTPSParticipantImpl(const RTPSParticipantAttributes& PParam
         initial_peers.swap(m_att.builtin.initialPeersList);
 
         std::for_each(initial_peers.begin(), initial_peers.end(),
-            [&](Locator_t& locator) {
-                m_network_Factory.configureInitialPeerLocator(locator, m_att);
+            [&](Locator_t& locator)
+            {
+               m_network_Factory.configureInitialPeerLocator(locator, m_att);
             });
     }
 
@@ -223,11 +246,20 @@ RTPSParticipantImpl::RTPSParticipantImpl(const RTPSParticipantAttributes& PParam
 
     //START BUILTIN PROTOCOLS
     mp_builtinProtocols = new BuiltinProtocols();
-    if(!mp_builtinProtocols->initBuiltinProtocols(this,m_att.builtin))
+    if (!mp_builtinProtocols->initBuiltinProtocols(this, m_att.builtin))
     {
         logError(RTPS_PARTICIPANT, "The builtin protocols were not correctly initialized");
     }
-    logInfo(RTPS_PARTICIPANT,"RTPSParticipant \"" <<  m_att.getName() << "\" with guidPrefix: " <<m_guid.guidPrefix);
+    logInfo(RTPS_PARTICIPANT, "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix);
+}
+
+RTPSParticipantImpl::RTPSParticipantImpl(
+        const RTPSParticipantAttributes& PParam,
+        const GuidPrefix_t& guidP,
+        RTPSParticipant* par,
+        RTPSParticipantListener* plisten)
+    : RTPSParticipantImpl(PParam, guidP, c_GuidPrefix_Unknown, par, plisten)
+{
 }
 
 const std::vector<RTPSWriter*>& RTPSParticipantImpl::getAllWriters() const
@@ -249,16 +281,17 @@ RTPSParticipantImpl::~RTPSParticipantImpl()
     for(auto& block : m_receiverResourcelist)
     {
         block.Receiver->UnregisterReceiver(block.mp_receiver);
+        block.disable();
     }
 
     while(m_userReaderList.size() > 0)
     {
-        deleteUserEndpoint((Endpoint*)*m_userReaderList.begin());
+        deleteUserEndpoint(static_cast<Endpoint*>(*m_userReaderList.begin()));
     }
 
     while(m_userWriterList.size() > 0)
     {
-        deleteUserEndpoint((Endpoint*)*m_userWriterList.begin());
+        deleteUserEndpoint(static_cast<Endpoint*>(*m_userWriterList.begin()));
     }
 
     delete(this->mp_builtinProtocols);
@@ -278,7 +311,6 @@ RTPSParticipantImpl::~RTPSParticipantImpl()
     delete(this->mp_userParticipant);
     send_resource_list_.clear();
 
-    delete(this->mp_event_thr);
     delete(this->mp_mutex);
 }
 
@@ -298,7 +330,7 @@ bool RTPSParticipantImpl::createWriter(
     std::string type = (param.endpoint.reliabilityKind == RELIABLE) ? "RELIABLE" :"BEST_EFFORT";
     logInfo(RTPS_PARTICIPANT," of type " << type);
     EntityId_t entId;
-    if(entityId== c_EntityId_Unknown)
+    if(entityId == c_EntityId_Unknown)
     {
         if(param.endpoint.topicKind == NO_KEY)
         {
@@ -309,9 +341,9 @@ bool RTPSParticipantImpl::createWriter(
             entId.value[3] = 0x02;
         }
         uint32_t idnum;
-        if(param.endpoint.getEntityID()>0)
+        if(param.endpoint.getEntityID() > 0)
         {
-            idnum = param.endpoint.getEntityID();
+            idnum = static_cast<uint32_t>(param.endpoint.getEntityID());
         }
         else
         {
@@ -319,11 +351,11 @@ bool RTPSParticipantImpl::createWriter(
             idnum = IdCounter;
         }
 
-        octet* c = (octet*)&idnum;
+        octet* c = reinterpret_cast<octet*>(&idnum);
         entId.value[2] = c[0];
         entId.value[1] = c[1];
         entId.value[0] = c[2];
-        if(this->existsEntityId(entId,WRITER))
+        if(this->existsEntityId(entId, WRITER))
         {
             logError(RTPS_PARTICIPANT,"A writer with the same entityId already exists in this RTPSParticipant");
             return false;
@@ -356,6 +388,14 @@ bool RTPSParticipantImpl::createWriter(
         return false;
     }
 
+    // Update persistence guidPrefix
+    if (param.endpoint.persistence_guid == c_Guid_Unknown && m_persistence_guid != c_Guid_Unknown)
+    {
+        param.endpoint.persistence_guid = GUID_t(
+                                                m_persistence_guid.guidPrefix,
+                                                entityId);
+    }
+
     // Get persistence service
     IPersistenceService* persistence = nullptr;
     if (param.endpoint.durabilityKind >= TRANSIENT)
@@ -375,14 +415,14 @@ bool RTPSParticipantImpl::createWriter(
     if (param.endpoint.reliabilityKind == BEST_EFFORT)
     {
         SWriter = (persistence == nullptr) ?
-            (RTPSWriter*) new StatelessWriter(this, guid, param, hist, listen) :
-            (RTPSWriter*) new StatelessPersistentWriter(this, guid, param, hist, listen, persistence);
+            new StatelessWriter(this, guid, param, hist, listen) :
+            new StatelessPersistentWriter(this, guid, param, hist, listen, persistence);
     }
     else if (param.endpoint.reliabilityKind == RELIABLE)
     {
         SWriter = (persistence == nullptr) ?
-            (RTPSWriter*) new StatefulWriter(this, guid, param, hist, listen) :
-            (RTPSWriter*) new StatefulPersistentWriter(this, guid, param, hist, listen, persistence);
+            new StatefulWriter(this, guid, param, hist, listen) :
+            new StatefulPersistentWriter(this, guid, param, hist, listen, persistence);
     }
 
     if (SWriter == nullptr)
@@ -411,19 +451,15 @@ bool RTPSParticipantImpl::createWriter(
     }
 #endif
 
-    createSendResources((Endpoint *)SWriter);
+    createSendResources(SWriter);
     if (param.endpoint.reliabilityKind == RELIABLE)
     {
-        if (!createAndAssociateReceiverswithEndpoint((Endpoint *)SWriter))
+        if (!createAndAssociateReceiverswithEndpoint(SWriter))
         {
             delete(SWriter);
             return false;
         }
     }
-
-    // Asynchronous thread runs regardless of mode because of
-    // nack response duties.
-    AsyncWriterThread::addWriter(*SWriter);
 
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
     m_allWriterList.push_back(SWriter);
@@ -469,7 +505,7 @@ bool RTPSParticipantImpl::createReader(
         uint32_t idnum;
         if (param.endpoint.getEntityID() > 0)
         {
-            idnum = param.endpoint.getEntityID();
+            idnum = static_cast<uint32_t>(param.endpoint.getEntityID());
         }
         else
         {
@@ -477,7 +513,7 @@ bool RTPSParticipantImpl::createReader(
             idnum = IdCounter;
         }
 
-        octet* c = (octet*)&idnum;
+        octet* c = reinterpret_cast<octet*>(&idnum);
         entId.value[2] = c[0];
         entId.value[1] = c[1];
         entId.value[0] = c[2];
@@ -526,14 +562,14 @@ bool RTPSParticipantImpl::createReader(
     if (param.endpoint.reliabilityKind == BEST_EFFORT)
     {
         SReader = (persistence == nullptr) ?
-            (RTPSReader*) new StatelessReader(this, guid, param, hist, listen) :
-            (RTPSReader*) new StatelessPersistentReader(this, guid, param, hist, listen, persistence);
+            new StatelessReader(this, guid, param, hist, listen) :
+            new StatelessPersistentReader(this, guid, param, hist, listen, persistence);
     }
     else if (param.endpoint.reliabilityKind == RELIABLE)
     {
         SReader = (persistence == nullptr) ?
-            (RTPSReader*) new StatefulReader(this, guid, param, hist, listen) :
-            (RTPSReader*) new StatefulPersistentReader(this, guid, param, hist, listen, persistence);
+            new StatefulReader(this, guid, param, hist, listen) :
+            new StatefulPersistentReader(this, guid, param, hist, listen, persistence);
     }
 
     if (SReader == nullptr)
@@ -565,7 +601,7 @@ bool RTPSParticipantImpl::createReader(
 
     if (param.endpoint.reliabilityKind == RELIABLE)
     {
-        createSendResources((Endpoint *)SReader);
+        createSendResources(SReader);
     }
 
     if (isBuiltin)
@@ -575,7 +611,7 @@ bool RTPSParticipantImpl::createReader(
 
     if (enable)
     {
-        if (!createAndAssociateReceiverswithEndpoint((Endpoint *)SReader))
+        if (!createAndAssociateReceiverswithEndpoint(SReader))
         {
             delete(SReader);
             return false;
@@ -594,7 +630,7 @@ bool RTPSParticipantImpl::createReader(
 
 bool RTPSParticipantImpl::enableReader(RTPSReader *reader)
 {
-    if (!assignEndpointListenResources((Endpoint*)reader))
+    if (!assignEndpointListenResources(reader))
     {
         return false;
     }
@@ -718,9 +754,9 @@ bool RTPSParticipantImpl::assignEndpoint2LocatorList(Endpoint* endp, LocatorList
 {
     /* Note:
        The previous version of this function associated (or created) ListenResources and added the endpoint to them.
-       It then requested the list of Locators the Listener is listening to and appended to the LocatorList_t from the paremeters.
+       It then requested the list of Locators the Listener is listening to and appended to the LocatorList_t from the parameters.
 
-       This has been removed becuase it is considered redundant. For ReceiveResources that listen on multiple interfaces, only
+       This has been removed because it is considered redundant. For ReceiveResources that listen on multiple interfaces, only
        one of the supported Locators is needed to make the match, and the case of new ListenResources being created has been removed
        since its the NetworkFactory the one that takes care of Resource creation.
        */
@@ -794,7 +830,7 @@ void RTPSParticipantImpl::createReceiverResources(LocatorList_t& Locator_list, b
         {
             std::lock_guard<std::mutex> lock(m_receiverResourcelistMutex);
             //Push the new items into the ReceiverResource buffer
-            m_receiverResourcelist.push_back(ReceiverControlBlock(std::move(*it_buffer)));
+            m_receiverResourcelist.emplace_back(*it_buffer);
             //Create and init the MessageReceiver
             auto mr = new MessageReceiver(this, size);
             m_receiverResourcelist.back().mp_receiver = mr;
@@ -805,26 +841,21 @@ void RTPSParticipantImpl::createReceiverResources(LocatorList_t& Locator_list, b
     }
 }
 
-void RTPSParticipantImpl::createSenderResources(LocatorList_t& Locator_list, bool ApplyMutation)
+void RTPSParticipantImpl::createSenderResources(const LocatorList_t& locator_list)
 {
     std::unique_lock<std::timed_mutex> lock(m_send_resources_mutex_);
 
-    for (auto it_loc = Locator_list.begin(); it_loc != Locator_list.end(); ++it_loc)
+    for (auto it_loc = locator_list.begin(); it_loc != locator_list.end(); ++it_loc)
     {
-        //TODO With two transports mutation not work.
-        bool were_created = false;
-        uint32_t tries = 0;
-
-        do
-        {
-            if(tries > 0)
-            {
-                *it_loc = applyLocatorAdaptRule(*it_loc);
-            }
-            were_created = m_network_Factory.build_send_resources(send_resource_list_, *it_loc);
-            ++tries;
-        } while (!were_created && ApplyMutation && (tries <= m_att.builtin.mutation_tries));
+        m_network_Factory.build_send_resources(send_resource_list_, *it_loc);
     }
+}
+
+void RTPSParticipantImpl::createSenderResources(const Locator_t& locator)
+{
+    std::unique_lock<std::timed_mutex> lock(m_send_resources_mutex_);
+    
+    m_network_Factory.build_send_resources(send_resource_list_, locator);
 }
 
 bool RTPSParticipantImpl::deleteUserEndpoint(Endpoint* p_endpoint)
@@ -892,7 +923,7 @@ bool RTPSParticipantImpl::deleteUserEndpoint(Endpoint* p_endpoint)
         {
             if (found_in_users)
             {
-                mp_builtinProtocols->removeLocalWriter((RTPSWriter*)p_endpoint);
+                mp_builtinProtocols->removeLocalWriter(static_cast<RTPSWriter*>(p_endpoint));
             }
 
 #if HAVE_SECURITY
@@ -907,7 +938,7 @@ bool RTPSParticipantImpl::deleteUserEndpoint(Endpoint* p_endpoint)
         {
             if (found_in_users)
             {
-                mp_builtinProtocols->removeLocalReader((RTPSReader*)p_endpoint);
+                mp_builtinProtocols->removeLocalReader(static_cast<RTPSReader*>(p_endpoint));
             }
 
 #if HAVE_SECURITY
@@ -943,11 +974,6 @@ void RTPSParticipantImpl::normalize_endpoint_locators(EndpointAttributes& endpoi
     }
 }
 
-ResourceEvent& RTPSParticipantImpl::getEventResource()
-{
-    return *this->mp_event_thr;
-}
-
 std::vector<std::string> RTPSParticipantImpl::getParticipantNames() const
 {
     std::vector<std::string> participant_names;
@@ -961,7 +987,6 @@ std::vector<std::string> RTPSParticipantImpl::getParticipantNames() const
 
 bool RTPSParticipantImpl::sendSync(
         CDRMessage_t* msg,
-        Endpoint* /*pend*/,
         const Locator_t& destination_loc,
         std::chrono::steady_clock::time_point& max_blocking_time_point)
 {
@@ -974,7 +999,12 @@ bool RTPSParticipantImpl::sendSync(
 
         for (auto& send_resource : send_resource_list_)
         {
-            send_resource->send(msg->buffer, msg->length, destination_loc);
+            // Calculate next timeout.
+            std::chrono::microseconds timeout =
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                        max_blocking_time_point - std::chrono::steady_clock::now());
+
+            send_resource->send(msg->buffer, msg->length, destination_loc, timeout);
         }
     }
 
@@ -1009,12 +1039,19 @@ void RTPSParticipantImpl::loose_next_change()
 
 bool RTPSParticipantImpl::newRemoteEndpointDiscovered(const GUID_t& pguid, int16_t userDefinedId, EndpointKind_t kind)
 {
-    if (m_att.builtin.use_STATIC_EndpointDiscoveryProtocol == false)
+    if (m_att.builtin.discovery_config.discoveryProtocol != DiscoveryProtocol::SIMPLE ||
+        m_att.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol == false)
     {
-        logWarning(RTPS_PARTICIPANT, "Remote Endpoints can only be activated with static discovery protocol");
+        logWarning(RTPS_PARTICIPANT, "Remote Endpoints can only be activated with static discovery protocol over PDP simple protocol");
         return false;
     }
-    return mp_builtinProtocols->mp_PDP->newRemoteEndpointStaticallyDiscovered(pguid, userDefinedId, kind);
+
+    if (PDPSimple * pS = dynamic_cast<PDPSimple*>(mp_builtinProtocols->mp_PDP))
+    {
+        return pS->newRemoteEndpointStaticallyDiscovered(pguid, userDefinedId, kind);
+    }
+
+    return false;
 }
 
 void RTPSParticipantImpl::ResourceSemaphorePost()
@@ -1108,13 +1145,17 @@ bool RTPSParticipantImpl::pairing_remote_writer_with_local_reader_after_security
 
 PDPSimple* RTPSParticipantImpl::pdpsimple()
 {
-    return mp_builtinProtocols->mp_PDP;
+    return dynamic_cast<PDPSimple*>(mp_builtinProtocols->mp_PDP);
+}
+
+WLP* RTPSParticipantImpl::wlp()
+{
+    return mp_builtinProtocols->mp_WLP;
 }
 
 bool RTPSParticipantImpl::get_remote_writer_info(const GUID_t& writerGuid, WriterProxyData& returnedInfo)
 {
-    ParticipantProxyData pdata;
-    if (this->mp_builtinProtocols->mp_PDP->lookupWriterProxyData(writerGuid, returnedInfo, pdata))
+    if (this->mp_builtinProtocols->mp_PDP->lookupWriterProxyData(writerGuid, returnedInfo))
     {
         return true;
     }
@@ -1123,8 +1164,7 @@ bool RTPSParticipantImpl::get_remote_writer_info(const GUID_t& writerGuid, Write
 
 bool RTPSParticipantImpl::get_remote_reader_info(const GUID_t& readerGuid, ReaderProxyData& returnedInfo)
 {
-    ParticipantProxyData pdata;
-    if (this->mp_builtinProtocols->mp_PDP->lookupReaderProxyData(readerGuid, returnedInfo, pdata))
+    if (this->mp_builtinProtocols->mp_PDP->lookupReaderProxyData(readerGuid, returnedInfo))
     {
         return true;
     }

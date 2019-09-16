@@ -29,8 +29,10 @@
 #include <fastrtps/rtps/history/ReaderHistory.h>
 #include <fastrtps/rtps/reader/ReaderListener.h>
 #include <fastrtps/rtps/attributes/ReaderAttributes.h>
+#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/rtps/common/SequenceNumber.h>
 #include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/utils/TimedMutex.hpp>
 
 #include <fastcdr/FastBuffer.h>
 #include <fastcdr/Cdr.h>
@@ -93,13 +95,8 @@ class RTPSAsSocketReader
             mw << magicword << "_" << asio::ip::host_name() << "_" << GET_PID();
             magicword_ = mw.str();
 
-#if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
-            hattr_.memoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-#elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
-            hattr_.memoryPolicy = eprosima::fastrtps::rtps::DYNAMIC_RESERVE_MEMORY_MODE;
-#else
+            // By default, memory mode is preallocated (the most restritive)
             hattr_.memoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
-#endif
 
             // By default, heartbeat period delay is 100 milliseconds.
             reader_attr_.times.heartbeatResponseDelay.seconds = 0;
@@ -118,7 +115,7 @@ class RTPSAsSocketReader
         void init()
         {
             eprosima::fastrtps::rtps::RTPSParticipantAttributes pattr;
-            pattr.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = false;
+            pattr.builtin.discovery_config.discoveryProtocol = eprosima::fastrtps::rtps::DiscoveryProtocol::NONE;
             pattr.builtin.use_WriterLivelinessProtocol = false;
             pattr.builtin.domainId = (uint32_t)GET_PID() % 230;
             pattr.participantID = 1;
@@ -179,7 +176,7 @@ class RTPSAsSocketReader
             receiving_ = true;
             mutex_.unlock();
 
-            std::unique_lock<std::recursive_timed_mutex> lock(*history_->getMutex());
+            std::unique_lock<eprosima::fastrtps::RecursiveTimedMutex> lock(*history_->getMutex());
             while(history_->changesBegin() != history_->changesEnd())
             {
                 eprosima::fastrtps::rtps::CacheChange_t* change = *history_->changesBegin();
@@ -253,29 +250,33 @@ class RTPSAsSocketReader
                 //Add remote writer (in this case a reader in the same machine)
                 eprosima::fastrtps::rtps::GUID_t guid = participant_->getGuid();
 
-                eprosima::fastrtps::rtps::RemoteWriterAttributes wattr;
+                eprosima::fastrtps::rtps::WriterProxyData wattr(4u, 1u);
                 eprosima::fastrtps::rtps::Locator_t loc;
                 IPLocator::setIPv4(loc, ip_);
                 loc.port = static_cast<uint16_t>(port_);
-                wattr.endpoint.multicastLocatorList.push_back(loc);
-                wattr.endpoint.reliabilityKind = eprosima::fastrtps::rtps::RELIABLE;
-                wattr.guid.guidPrefix.value[0] = guid.guidPrefix.value[0];
-                wattr.guid.guidPrefix.value[1] = guid.guidPrefix.value[1];
-                wattr.guid.guidPrefix.value[2] = guid.guidPrefix.value[2];
-                wattr.guid.guidPrefix.value[3] = guid.guidPrefix.value[3];
-                wattr.guid.guidPrefix.value[4] = guid.guidPrefix.value[4];
-                wattr.guid.guidPrefix.value[5] = guid.guidPrefix.value[5];
-                wattr.guid.guidPrefix.value[6] = guid.guidPrefix.value[6];
-                wattr.guid.guidPrefix.value[7] = guid.guidPrefix.value[7];
-                wattr.guid.guidPrefix.value[8] = 2;
-                wattr.guid.guidPrefix.value[9] = 0;
-                wattr.guid.guidPrefix.value[10] = 0;
-                wattr.guid.guidPrefix.value[11] = 0;
-                wattr.guid.entityId.value[0] = 0;
-                wattr.guid.entityId.value[1] = 0;
-                wattr.guid.entityId.value[2] = 2;
-                wattr.guid.entityId.value[3] = 3;
+                wattr.add_multicast_locator(loc);
+                wattr.m_qos.m_reliability.kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
+                wattr.guid().guidPrefix.value[0] = guid.guidPrefix.value[0];
+                wattr.guid().guidPrefix.value[1] = guid.guidPrefix.value[1];
+                wattr.guid().guidPrefix.value[2] = guid.guidPrefix.value[2];
+                wattr.guid().guidPrefix.value[3] = guid.guidPrefix.value[3];
+                wattr.guid().guidPrefix.value[4] = guid.guidPrefix.value[4];
+                wattr.guid().guidPrefix.value[5] = guid.guidPrefix.value[5];
+                wattr.guid().guidPrefix.value[6] = guid.guidPrefix.value[6];
+                wattr.guid().guidPrefix.value[7] = guid.guidPrefix.value[7];
+                wattr.guid().guidPrefix.value[8] = 2;
+                wattr.guid().guidPrefix.value[9] = 0;
+                wattr.guid().guidPrefix.value[10] = 0;
+                wattr.guid().guidPrefix.value[11] = 0;
+                wattr.guid().entityId.value[0] = 0;
+                wattr.guid().entityId.value[1] = 0;
+                wattr.guid().entityId.value[2] = 2;
+                wattr.guid().entityId.value[3] = 3;
                 reader_->matched_writer_add(wattr);
+            }
+            else
+            {
+                reader_->enableMessagesFromUnkownWriters(true);
             }
         }
 

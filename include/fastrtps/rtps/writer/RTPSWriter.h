@@ -22,14 +22,19 @@
 #include "../Endpoint.h"
 #include "../messages/RTPSMessageGroup.h"
 #include "../attributes/WriterAttributes.h"
+#include "../../qos/LivelinessLostStatus.h"
 #include "../../utils/collections/ResourceLimitedVector.hpp"
+#include "../common/LocatorSelector.hpp"
+#include "../messages/RTPSMessageSenderInterface.hpp"
+
 #include <vector>
 #include <memory>
 #include <functional>
 #include <chrono>
+#include <mutex>
 
 namespace eprosima {
-namespace fastrtps{
+namespace fastrtps {
 namespace rtps {
 
 class WriterListener;
@@ -42,11 +47,13 @@ struct CacheChange_t;
  * Class RTPSWriter, manages the sending of data to the readers. Is always associated with a HistoryCache.
  * @ingroup WRITER_MODULE
  */
-class RTPSWriter : public Endpoint
+class RTPSWriter : public Endpoint, public RTPSMessageSenderInterface
 {
     friend class WriterHistory;
     friend class RTPSParticipantImpl;
     friend class RTPSMessageGroup;
+    friend class AsyncInterestTree;
+
 protected:
     RTPSWriter(
             RTPSParticipantImpl*,
@@ -75,29 +82,31 @@ public:
     }
 
 
-    RTPS_DllAPI CacheChange_t* new_change(const std::function<uint32_t()>& dataCdrSerializedSize,
-            ChangeKind_t changeKind, InstanceHandle_t handle = c_InstanceHandle_Unknown);
+    RTPS_DllAPI CacheChange_t* new_change(
+            const std::function<uint32_t()>& dataCdrSerializedSize,
+            ChangeKind_t changeKind,
+            InstanceHandle_t handle = c_InstanceHandle_Unknown);
 
     /**
      * Add a matched reader.
-     * @param ratt Pointer to the ReaderProxyData object added.
+     * @param data Pointer to the ReaderProxyData object added.
      * @return True if added.
      */
-    RTPS_DllAPI virtual bool matched_reader_add(RemoteReaderAttributes& ratt) = 0;
+    RTPS_DllAPI virtual bool matched_reader_add(const ReaderProxyData& data) = 0;
 
     /**
      * Remove a matched reader.
-     * @param ratt Pointer to the object to remove.
+     * @param reader_guid GUID of the reader to remove.
      * @return True if removed.
      */
-    RTPS_DllAPI virtual bool matched_reader_remove(const RemoteReaderAttributes& ratt) = 0;
+    RTPS_DllAPI virtual bool matched_reader_remove(const GUID_t& reader_guid) = 0;
 
     /**
-     * Tells us if a specific Reader is matched against this writer
-     * @param ratt Pointer to the ReaderProxyData object
+     * Tells us if a specific Reader is matched against this writer.
+     * @param reader_guid GUID of the reader to check.
      * @return True if it was matched.
      */
-    RTPS_DllAPI virtual bool matched_reader_is_matched(const RemoteReaderAttributes& ratt) = 0;
+    RTPS_DllAPI virtual bool matched_reader_is_matched(const GUID_t& reader_guid) = 0;
 
     /**
     * Check if a specific change has been acknowledged by all Readers.
@@ -155,19 +164,6 @@ public:
     RTPS_DllAPI inline WriterListener* getListener() { return mp_listener; }
 
     /**
-     * Get the asserted liveliness
-     * @return Asserted liveliness
-     */
-    RTPS_DllAPI inline bool getLivelinessAsserted() { return m_livelinessAsserted; }
-
-    /**
-     * Set the asserted liveliness
-     * @param l asserted liveliness
-     * @return asserted liveliness
-     */
-    RTPS_DllAPI inline void setLivelinessAsserted(bool l) { m_livelinessAsserted = l; }
-
-    /**
      * Get the publication mode
      * @return publication mode
      */
@@ -188,7 +184,7 @@ public:
      */
     virtual bool try_remove_change(
             std::chrono::steady_clock::time_point& max_blocking_time_point,
-            std::unique_lock<std::recursive_timed_mutex>& lock) = 0;
+            std::unique_lock<RecursiveTimedMutex>& lock) = 0;
 
     /*
      * Adds a flow controller that will apply to this writer exclusively.
@@ -265,14 +261,73 @@ public:
         return writer_guid == m_guid;
     }
 
+    /**
+     * @brief A method to retrieve the liveliness kind
+     * @return Liveliness kind
+     */
+    const LivelinessQosPolicyKind& get_liveliness_kind() const;
+
+    /**
+     * @brief A method to retrieve the liveliness lease duration
+     * @return Lease durtation
+     */
+    const Duration_t& get_liveliness_lease_duration() const;
+
+    /**
+     * @brief A method to return the liveliness announcement period
+     * @return The announcement period
+     */
+    const Duration_t& get_liveliness_announcement_period() const;
+
+    //! Liveliness lost status of this writer
+    LivelinessLostStatus liveliness_lost_status_;
+
+    /**
+     * Check if the destinations managed by this sender interface have changed.
+     *
+     * @return true if destinations have changed, false otherwise.
+     */
+    bool destinations_have_changed() const override;
+
+    /**
+     * Get a GUID prefix representing all destinations.
+     *
+     * @return When all the destinations share the same prefix (i.e. belong to the same participant)
+     * that prefix is returned. When there are no destinations, or they belong to different
+     * participants, c_GuidPrefix_Unknown is returned.
+     */
+    GuidPrefix_t destination_guid_prefix() const override;
+
+    /**
+     * Get the GUID prefix of all the destination participants.
+     *
+     * @return a const reference to a vector with the GUID prefix of all destination participants.
+     */
+    const std::vector<GuidPrefix_t>& remote_participants() const override;
+
+    /**
+     * Get the GUID of all destinations.
+     *
+     * @return a const reference to a vector with the GUID of all destinations.
+     */
+    const std::vector<GUID_t>& remote_guids() const override;
+
+    /**
+     * Send a message through this interface.
+     *
+     * @param message Pointer to the buffer with the message already serialized.
+     * @param max_blocking_time_point Future timepoint where blocking send should end.
+     */
+    bool send(
+            CDRMessage_t* message,
+            std::chrono::steady_clock::time_point& max_blocking_time_point) const override;
+
 protected:
 
     //!Is the data sent directly or announced by HB and THEN send to the ones who ask for it?.
     bool m_pushMode;
     //!Group created to send messages more efficiently
     RTPSMessageGroup_t m_cdrmessages;
-    //!INdicates if the liveliness has been asserted
-    bool m_livelinessAsserted;
     //!WriterHistory
     WriterHistory* mp_history;
     //!Listener
@@ -282,11 +337,16 @@ protected:
     //!Separate sending activated
     bool m_separateSendingEnabled;
 
-    LocatorList_t mAllShrinkedLocatorList;
+    LocatorSelector locator_selector_;
 
     ResourceLimitedVector<GUID_t> all_remote_readers_;
+    ResourceLimitedVector<GuidPrefix_t> all_remote_participants_;
 
-    void update_cached_info_nts(std::vector<LocatorList_t>& allLocatorLists);
+    void add_guid(const GUID_t& remote_guid);
+
+    void compute_selected_guids();
+
+    void update_cached_info_nts();
 
     /**
      * Initialize the header of hte CDRMessages.
@@ -300,7 +360,7 @@ protected:
      */
     virtual void unsent_change_added_to_history(
             CacheChange_t* change,
-            std::chrono::time_point<std::chrono::steady_clock> max_blocking_time) = 0;
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) = 0;
 
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
@@ -315,9 +375,18 @@ protected:
     bool encrypt_cachechange(CacheChange_t* change);
 #endif
 
+    //! The liveliness kind of this reader
+    LivelinessQosPolicyKind liveliness_kind_;
+    //! The liveliness lease duration of this reader
+    Duration_t liveliness_lease_duration_;
+    //! The liveliness announcement period
+    Duration_t liveliness_announcement_period_;
+
 private:
 
     RTPSWriter& operator=(const RTPSWriter&) = delete;
+
+    RTPSWriter* next_[2];
 };
 
 }

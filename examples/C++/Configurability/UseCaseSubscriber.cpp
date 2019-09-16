@@ -18,8 +18,6 @@
 #include <fastrtps/Domain.h>
 #include <fastrtps/subscriber/SampleInfo.h>
 
-#include <fastrtps/utils/eClock.h>
-
 #include "samplePubSubTypes.h"
 
 using namespace eprosima::fastrtps;
@@ -226,7 +224,7 @@ int main(){
     ParticipantAttributes PparamSub;
 
     PparamSub.rtps.builtin.domainId = 0;
-    PparamSub.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PparamSub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PparamSub.rtps.setName("SubscriberParticipant");
 
     Participant *SubParticipant = Domain::createParticipant(PparamSub);

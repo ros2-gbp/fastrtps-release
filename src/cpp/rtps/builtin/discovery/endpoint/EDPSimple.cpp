@@ -19,7 +19,7 @@
 
 #include <fastrtps/rtps/builtin/discovery/endpoint/EDPSimple.h>
 #include "EDPSimpleListeners.h"
-#include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
+#include <fastrtps/rtps/builtin/discovery/participant/PDP.h>
 #include "../../../participant/RTPSParticipantImpl.h"
 #include <fastrtps/rtps/writer/StatefulWriter.h>
 #include <fastrtps/rtps/reader/StatefulReader.h>
@@ -39,24 +39,30 @@
 #include <mutex>
 
 namespace eprosima {
-namespace fastrtps{
+namespace fastrtps {
 namespace rtps {
 
 // Default configuration values for EDP entities.
-const Duration_t edp_heartbeat_period{1, 0}; // 1 second
-const Duration_t edp_nack_response_delay{0, 93*1000*1000}; // 93 milliseconds
-const Duration_t edp_nack_supression_duration{0, 11*1000*1000}; // 11 milliseconds
-const Duration_t edp_heartbeat_response_delay{0, 11*1000*1000}; // 11 milliseconds
+static const Duration_t edp_heartbeat_period{1, 0}; // 1 second
+static const Duration_t edp_nack_response_delay{0, 100 * 1000 }; // 100 milliseconds
+static const Duration_t edp_nack_supression_duration{0, 10*1000}; // 10 milliseconds
+static const Duration_t edp_heartbeat_response_delay{0, 10*1000}; // 10 milliseconds
 
-const int32_t edp_initial_reserved_caches = 20;
+static const int32_t edp_initial_reserved_caches = 20;
 
 
 EDPSimple::EDPSimple(
-        PDPSimple* p,
+        PDP* p,
         RTPSParticipantImpl* part)
     : EDP(p,part)
     , publications_listener_(nullptr)
     , subscriptions_listener_(nullptr)
+    , temp_reader_proxy_data_(
+            part->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
+            part->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators)
+    , temp_writer_proxy_data_(
+        part->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
+        part->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators)
 {
 }
 
@@ -133,7 +139,7 @@ bool EDPSimple::initEDP(BuiltinAttributes& attributes)
     }
 
 #if HAVE_SECURITY
-    if(!create_sedp_secure_endpoints())
+    if(mp_RTPSParticipant->is_secure() && !create_sedp_secure_endpoints())
     {
         logError(RTPS_EDP,"Problem creation SimpleEDP endpoints");
         return false;
@@ -143,46 +149,131 @@ bool EDPSimple::initEDP(BuiltinAttributes& attributes)
     return true;
 }
 
+void EDPSimple::set_builtin_reader_history_attributes(HistoryAttributes& attributes)
+{
+    attributes.initialReservedCaches = edp_initial_reserved_caches;
+    attributes.payloadMaxSize = DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;
+    attributes.memoryPolicy = mp_PDP->builtin_attributes().readerHistoryMemoryPolicy;
+}
+
+void EDPSimple::set_builtin_writer_history_attributes(HistoryAttributes& attributes)
+{
+    attributes.initialReservedCaches = edp_initial_reserved_caches;
+    attributes.payloadMaxSize = DISCOVERY_PUBLICATION_DATA_MAX_SIZE;
+    attributes.memoryPolicy = mp_PDP->builtin_attributes().writerHistoryMemoryPolicy;
+}
+
+void EDPSimple::set_builtin_reader_attributes(ReaderAttributes& attributes)
+{
+    // Matched writers will depend on total number of participants
+    attributes.matched_writers_allocation =
+        mp_PDP->getRTPSParticipant()->getRTPSParticipantAttributes().allocation.participants;
+
+    // As participants allocation policy includes the local participant, one has to be substracted
+    if (attributes.matched_writers_allocation.initial > 1)
+    {
+        attributes.matched_writers_allocation.initial--;
+    }
+    if ((attributes.matched_writers_allocation.maximum > 1) &&
+        (attributes.matched_writers_allocation.maximum < std::numeric_limits<size_t>::max()))
+    {
+        attributes.matched_writers_allocation.maximum--;
+    }
+
+    // Locators are copied from the local participant metatraffic locators
+    attributes.endpoint.unicastLocatorList.clear();
+    for (const Locator_t& loc : this->mp_PDP->getLocalParticipantProxyData()->metatraffic_locators.unicast)
+    {
+        attributes.endpoint.unicastLocatorList.push_back(loc);
+    }
+    attributes.endpoint.multicastLocatorList.clear();
+    for (const Locator_t& loc : this->mp_PDP->getLocalParticipantProxyData()->metatraffic_locators.multicast)
+    {
+        attributes.endpoint.multicastLocatorList.push_back(loc);
+    }
+
+    // Timings are configured using EDP default values
+    attributes.times.heartbeatResponseDelay = edp_heartbeat_response_delay;
+
+    // EDP endpoints are always reliable, transsient local, keyed topics
+    attributes.endpoint.reliabilityKind = RELIABLE;
+    attributes.endpoint.durabilityKind = TRANSIENT_LOCAL;
+    attributes.endpoint.topicKind = WITH_KEY;
+
+    // Built-in EDP readers never expect inline qos
+    attributes.expectsInlineQos = false;
+}
+
+void EDPSimple::set_builtin_writer_attributes(WriterAttributes& attributes)
+{
+    // Matched readers will depend on total number of participants
+    attributes.matched_readers_allocation =
+        mp_PDP->getRTPSParticipant()->getRTPSParticipantAttributes().allocation.participants;
+
+    // As participants allocation policy includes the local participant, one has to be substracted
+    if (attributes.matched_readers_allocation.initial > 1)
+    {
+        attributes.matched_readers_allocation.initial--;
+    }
+    if ((attributes.matched_readers_allocation.maximum > 1) &&
+        (attributes.matched_readers_allocation.maximum < std::numeric_limits<size_t>::max()))
+    {
+        attributes.matched_readers_allocation.maximum--;
+    }
+
+    // Locators are copied from the local participant metatraffic locators
+    attributes.endpoint.unicastLocatorList.clear();
+    for (const Locator_t& loc : this->mp_PDP->getLocalParticipantProxyData()->metatraffic_locators.unicast)
+    {
+        attributes.endpoint.unicastLocatorList.push_back(loc);
+    }
+    attributes.endpoint.multicastLocatorList.clear();
+    for (const Locator_t& loc : this->mp_PDP->getLocalParticipantProxyData()->metatraffic_locators.multicast)
+    {
+        attributes.endpoint.multicastLocatorList.push_back(loc);
+    }
+
+    // Timings are configured using EDP default values
+    attributes.times.heartbeatPeriod = edp_heartbeat_period;
+    attributes.times.nackResponseDelay = edp_nack_response_delay;
+    attributes.times.nackSupressionDuration = edp_nack_supression_duration;
+
+    // EDP endpoints are always reliable, transsient local, keyed topics
+    attributes.endpoint.reliabilityKind = RELIABLE;
+    attributes.endpoint.durabilityKind = TRANSIENT_LOCAL;
+    attributes.endpoint.topicKind = WITH_KEY;
+
+    // Set as asynchronous if there is a throughput controller installed
+    if (mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+        mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
+    {
+        attributes.mode = ASYNCHRONOUS_WRITER;
+    }
+}
 
 bool EDPSimple::createSEDPEndpoints()
 {
     WriterAttributes watt;
     ReaderAttributes ratt;
-    HistoryAttributes hatt;
+    HistoryAttributes reader_history_att;
+    HistoryAttributes writer_history_att;
     bool created = true;
     RTPSReader* raux = nullptr;
     RTPSWriter* waux = nullptr;
 
+    set_builtin_reader_history_attributes(reader_history_att);
+    set_builtin_writer_history_attributes(writer_history_att);
+    set_builtin_reader_attributes(ratt);
+    set_builtin_writer_attributes(watt);
+
     publications_listener_ = new EDPSimplePUBListener(this);
     subscriptions_listener_ = new EDPSimpleSUBListener(this);
 
-    if(m_discovery.m_simpleEDP.use_PublicationWriterANDSubscriptionReader)
+    if(m_discovery.discovery_config.m_simpleEDP.use_PublicationWriterANDSubscriptionReader)
     {
-        hatt.initialReservedCaches = edp_initial_reserved_caches;
-        hatt.payloadMaxSize = DISCOVERY_PUBLICATION_DATA_MAX_SIZE;
-        hatt.memoryPolicy = mp_PDP->mp_builtin->m_att.writerHistoryMemoryPolicy;
-        publications_writer_.second = new WriterHistory(hatt);
-        //Wparam.pushMode = true;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.topicKind = WITH_KEY;
-        watt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        watt.times.heartbeatPeriod = edp_heartbeat_period;
-        watt.times.nackResponseDelay = edp_nack_response_delay;
-        watt.times.nackSupressionDuration = edp_nack_supression_duration;
-        if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-                mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-            watt.mode = ASYNCHRONOUS_WRITER;
-
-        created &=this->mp_RTPSParticipant->createWriter(
-                    &waux,
-                    watt,
-                    publications_writer_.second,
-                    publications_listener_,
-                    c_EntityId_SEDPPubWriter,
-                    true);
+        publications_writer_.second = new WriterHistory(writer_history_att);
+        created &=this->mp_RTPSParticipant->createWriter(&waux, watt, publications_writer_.second,
+                publications_listener_, c_EntityId_SEDPPubWriter, true);
 
         if(created)
         {
@@ -195,26 +286,9 @@ bool EDPSimple::createSEDPEndpoints()
             publications_writer_.second = nullptr;
         }
 
-        hatt.initialReservedCaches = edp_initial_reserved_caches;
-        hatt.payloadMaxSize = DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;
-        hatt.memoryPolicy = mp_PDP->mp_builtin->m_att.readerHistoryMemoryPolicy;
-        subscriptions_reader_.second = new ReaderHistory(hatt);
-        ratt.expectsInlineQos = false;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        ratt.endpoint.topicKind = WITH_KEY;
-        ratt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.times.heartbeatResponseDelay = edp_heartbeat_response_delay;
-
-        created &=this->mp_RTPSParticipant->createReader(
-                    &raux,
-                    ratt,
-                    subscriptions_reader_.second,
-                    subscriptions_listener_,
-                    c_EntityId_SEDPSubReader,
-                    true);
+        subscriptions_reader_.second = new ReaderHistory(reader_history_att);
+        created &=this->mp_RTPSParticipant->createReader(&raux, ratt, subscriptions_reader_.second,
+                subscriptions_listener_, c_EntityId_SEDPSubReader, true);
 
         if(created)
         {
@@ -227,21 +301,9 @@ bool EDPSimple::createSEDPEndpoints()
             subscriptions_reader_.second = nullptr;
         }
     }
-    if(m_discovery.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter)
+    if(m_discovery.discovery_config.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter)
     {
-        hatt.initialReservedCaches = edp_initial_reserved_caches;
-        hatt.payloadMaxSize = DISCOVERY_PUBLICATION_DATA_MAX_SIZE;
-        hatt.memoryPolicy = mp_PDP->mp_builtin->m_att.readerHistoryMemoryPolicy;
-        publications_reader_.second = new ReaderHistory(hatt);
-        ratt.expectsInlineQos = false;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        ratt.endpoint.topicKind = WITH_KEY;
-        ratt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.times.heartbeatResponseDelay = edp_heartbeat_response_delay;
-
+        publications_reader_.second = new ReaderHistory(reader_history_att);
         created &=this->mp_RTPSParticipant->createReader(&raux, ratt, publications_reader_.second,
                 publications_listener_, c_EntityId_SEDPPubReader, true);
 
@@ -257,24 +319,7 @@ bool EDPSimple::createSEDPEndpoints()
             publications_reader_.second = nullptr;
         }
 
-        hatt.initialReservedCaches = edp_initial_reserved_caches;
-        hatt.payloadMaxSize = DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;
-        hatt.memoryPolicy = mp_PDP->mp_builtin->m_att.writerHistoryMemoryPolicy;
-        subscriptions_writer_.second = new WriterHistory(hatt);
-        //Wparam.pushMode = true;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.topicKind = WITH_KEY;
-        watt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        watt.times.heartbeatPeriod= edp_heartbeat_period;
-        watt.times.nackResponseDelay = edp_nack_response_delay;
-        watt.times.nackSupressionDuration = edp_nack_supression_duration;
-        if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-                mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-            watt.mode = ASYNCHRONOUS_WRITER;
-
+        subscriptions_writer_.second = new WriterHistory(writer_history_att);
         created &=this->mp_RTPSParticipant->createWriter(&waux, watt, subscriptions_writer_.second,
                 subscriptions_listener_, c_EntityId_SEDPSubWriter, true);
 
@@ -299,44 +344,48 @@ bool EDPSimple::create_sedp_secure_endpoints()
 {
     WriterAttributes watt;
     ReaderAttributes ratt;
-    HistoryAttributes hatt;
+    HistoryAttributes reader_history_att;
+    HistoryAttributes writer_history_att;
     bool created = true;
     RTPSReader* raux = nullptr;
     RTPSWriter* waux = nullptr;
 
-    auto& part_attr = mp_RTPSParticipant->security_attributes();
-    security::PluginParticipantSecurityAttributes plugin_part_attr(part_attr.plugin_participant_attributes);
+    set_builtin_reader_history_attributes(reader_history_att);
+    set_builtin_writer_history_attributes(writer_history_att);
+    set_builtin_reader_attributes(ratt);
+    set_builtin_writer_attributes(watt);
 
-    if(m_discovery.m_simpleEDP.enable_builtin_secure_publications_writer_and_subscriptions_reader)
+    const security::ParticipantSecurityAttributes& part_attr = mp_RTPSParticipant->security_attributes();
+
+    ratt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
+    ratt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
+
+    watt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
+    watt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
+
+    if (part_attr.is_discovery_protected)
     {
-        hatt.initialReservedCaches = edp_initial_reserved_caches;
-        hatt.payloadMaxSize = DISCOVERY_PUBLICATION_DATA_MAX_SIZE;
-        hatt.memoryPolicy = mp_PDP->mp_builtin->m_att.writerHistoryMemoryPolicy;
-        publications_secure_writer_.second = new WriterHistory(hatt);
-        //Wparam.pushMode = true;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.topicKind = WITH_KEY;
-        watt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        watt.times.heartbeatPeriod = edp_heartbeat_period;
-        watt.times.nackResponseDelay = edp_nack_response_delay;
-        watt.times.nackSupressionDuration = edp_nack_supression_duration;
-        watt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
-        watt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
-        if (part_attr.is_discovery_protected)
+        security::PluginParticipantSecurityAttributes plugin_part_attr(part_attr.plugin_participant_attributes);
+
+        if (plugin_part_attr.is_discovery_encrypted)
         {
-            if (plugin_part_attr.is_discovery_encrypted)
-                watt.endpoint.security_attributes().plugin_endpoint_attributes |= PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
-            if (plugin_part_attr.is_discovery_origin_authenticated)
-                watt.endpoint.security_attributes().plugin_endpoint_attributes |= PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
+            ratt.endpoint.security_attributes().plugin_endpoint_attributes |= 
+                PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
+            watt.endpoint.security_attributes().plugin_endpoint_attributes |=
+                PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
         }
+        if (plugin_part_attr.is_discovery_origin_authenticated)
+        {
+            ratt.endpoint.security_attributes().plugin_endpoint_attributes |= 
+                PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
+            watt.endpoint.security_attributes().plugin_endpoint_attributes |=
+                PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
+        }
+    }
 
-        if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-                mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-            watt.mode = ASYNCHRONOUS_WRITER;
-
+    if(m_discovery.discovery_config.m_simpleEDP.enable_builtin_secure_publications_writer_and_subscriptions_reader)
+    {
+        publications_secure_writer_.second = new WriterHistory(writer_history_att);
         created &=this->mp_RTPSParticipant->createWriter(&waux, watt, publications_secure_writer_.second,
                 publications_listener_, sedp_builtin_publications_secure_writer, true);
 
@@ -350,28 +399,7 @@ bool EDPSimple::create_sedp_secure_endpoints()
             delete(publications_secure_writer_.second);
             publications_secure_writer_.second = nullptr;
         }
-        hatt.initialReservedCaches = edp_initial_reserved_caches;
-        hatt.payloadMaxSize = DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;
-        hatt.memoryPolicy = mp_PDP->mp_builtin->m_att.readerHistoryMemoryPolicy;
-        subscriptions_secure_reader_.second = new ReaderHistory(hatt);
-        ratt.expectsInlineQos = false;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        ratt.endpoint.topicKind = WITH_KEY;
-        ratt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.times.heartbeatResponseDelay = edp_heartbeat_response_delay;
-        ratt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
-        ratt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
-        if (part_attr.is_discovery_protected)
-        {
-            if (plugin_part_attr.is_discovery_encrypted)
-                ratt.endpoint.security_attributes().plugin_endpoint_attributes |= PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
-            if (plugin_part_attr.is_discovery_origin_authenticated)
-                ratt.endpoint.security_attributes().plugin_endpoint_attributes |= PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
-        }
-
+        subscriptions_secure_reader_.second = new ReaderHistory(reader_history_att);
         created &=this->mp_RTPSParticipant->createReader(&raux, ratt, subscriptions_secure_reader_.second,
                 subscriptions_listener_, sedp_builtin_subscriptions_secure_reader, true);
 
@@ -387,30 +415,9 @@ bool EDPSimple::create_sedp_secure_endpoints()
         }
     }
 
-    if(m_discovery.m_simpleEDP.enable_builtin_secure_subscriptions_writer_and_publications_reader)
+    if(m_discovery.discovery_config.m_simpleEDP.enable_builtin_secure_subscriptions_writer_and_publications_reader)
     {
-        hatt.initialReservedCaches = edp_initial_reserved_caches;
-        hatt.payloadMaxSize = DISCOVERY_PUBLICATION_DATA_MAX_SIZE;
-        hatt.memoryPolicy = mp_PDP->mp_builtin->m_att.readerHistoryMemoryPolicy;
-        publications_secure_reader_.second = new ReaderHistory(hatt);
-        ratt.expectsInlineQos = false;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        ratt.endpoint.topicKind = WITH_KEY;
-        ratt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.times.heartbeatResponseDelay = edp_heartbeat_response_delay;
-        ratt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
-        ratt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
-        if (part_attr.is_discovery_protected)
-        {
-            if (plugin_part_attr.is_discovery_encrypted)
-                ratt.endpoint.security_attributes().plugin_endpoint_attributes |= PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
-            if (plugin_part_attr.is_discovery_origin_authenticated)
-                ratt.endpoint.security_attributes().plugin_endpoint_attributes |= PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
-        }
-
+        publications_secure_reader_.second = new ReaderHistory(reader_history_att);
         created &=this->mp_RTPSParticipant->createReader(&raux, ratt, publications_secure_reader_.second,
                 publications_listener_, sedp_builtin_publications_secure_reader, true);
 
@@ -426,33 +433,7 @@ bool EDPSimple::create_sedp_secure_endpoints()
             publications_secure_reader_.second = nullptr;
         }
 
-        hatt.initialReservedCaches = edp_initial_reserved_caches;
-        hatt.payloadMaxSize = DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;
-        hatt.memoryPolicy = mp_PDP->mp_builtin->m_att.writerHistoryMemoryPolicy;
-        subscriptions_secure_writer_.second = new WriterHistory(hatt);
-        //Wparam.pushMode = true;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.topicKind = WITH_KEY;
-        watt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        watt.times.heartbeatPeriod = edp_heartbeat_period;
-        watt.times.nackResponseDelay = edp_nack_response_delay;
-        watt.times.nackSupressionDuration = edp_nack_supression_duration;
-        watt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
-        watt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
-        if (part_attr.is_discovery_protected)
-        {
-            if (plugin_part_attr.is_discovery_encrypted)
-                watt.endpoint.security_attributes().plugin_endpoint_attributes |= PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
-            if (plugin_part_attr.is_discovery_origin_authenticated)
-                watt.endpoint.security_attributes().plugin_endpoint_attributes |= PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
-        }
-        if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-                mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-            watt.mode = ASYNCHRONOUS_WRITER;
-
+        subscriptions_secure_writer_.second = new WriterHistory(writer_history_att);
         created &=this->mp_RTPSParticipant->createWriter(&waux, watt, subscriptions_secure_writer_.second,
             subscriptions_listener_, sedp_builtin_subscriptions_secure_writer, true);
 
@@ -509,7 +490,7 @@ bool EDPSimple::processLocalReaderProxyData(RTPSReader* local_reader, ReaderProx
             change->serializedPayload.length = (uint16_t)aux_msg.length;
 
             {
-                std::unique_lock<std::recursive_timed_mutex> lock(*writer->second->getMutex());
+                std::unique_lock<RecursiveTimedMutex> lock(*writer->second->getMutex());
                 for(auto ch = writer->second->changesBegin(); ch != writer->second->changesEnd(); ++ch)
                 {
                     if((*ch)->instanceHandle == change->instanceHandle)
@@ -530,6 +511,7 @@ bool EDPSimple::processLocalReaderProxyData(RTPSReader* local_reader, ReaderProx
 
     return true;
 }
+
 bool EDPSimple::processLocalWriterProxyData(RTPSWriter* local_writer, WriterProxyData* wdata)
 {
     logInfo(RTPS_EDP, wdata->guid().entityId);
@@ -564,7 +546,7 @@ bool EDPSimple::processLocalWriterProxyData(RTPSWriter* local_writer, WriterProx
             change->serializedPayload.length = (uint16_t)aux_msg.length;
 
             {
-                std::unique_lock<std::recursive_timed_mutex> lock(*writer->second->getMutex());
+                std::unique_lock<RecursiveTimedMutex> lock(*writer->second->getMutex());
                 for(auto ch = writer->second->changesBegin(); ch != writer->second->changesEnd(); ++ch)
                 {
                     if((*ch)->instanceHandle == change->instanceHandle)
@@ -606,7 +588,7 @@ bool EDPSimple::removeLocalWriter(RTPSWriter* W)
         if(change != nullptr)
         {
             {
-                std::lock_guard<std::recursive_timed_mutex> guard(*writer->second->getMutex());
+                std::lock_guard<RecursiveTimedMutex> guard(*writer->second->getMutex());
                 for(auto ch = writer->second->changesBegin(); ch != writer->second->changesEnd(); ++ch)
                 {
                     if((*ch)->instanceHandle == change->instanceHandle)
@@ -646,7 +628,7 @@ bool EDPSimple::removeLocalReader(RTPSReader* R)
         if(change != nullptr)
         {
             {
-                std::lock_guard<std::recursive_timed_mutex> guard(*writer->second->getMutex());
+                std::lock_guard<RecursiveTimedMutex> guard(*writer->second->getMutex());
                 for(auto ch = writer->second->changesBegin(); ch != writer->second->changesEnd(); ++ch)
                 {
                     if((*ch)->instanceHandle == change->instanceHandle)
@@ -663,29 +645,38 @@ bool EDPSimple::removeLocalReader(RTPSReader* R)
     return mp_PDP->removeReaderProxyData(R->getGuid());
 }
 
-
-
 void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
 {
     logInfo(RTPS_EDP,"New DPD received, adding remote endpoints to our SimpleEDP endpoints");
+    const NetworkFactory& network = mp_RTPSParticipant->network_factory();
     uint32_t endp = pdata.m_availableBuiltinEndpoints;
     uint32_t auxendp = endp;
     auxendp &=DISC_BUILTIN_ENDPOINT_PUBLICATION_ANNOUNCER;
+
+    std::lock_guard<std::mutex> data_guard(temp_data_lock_);
+
+    temp_reader_proxy_data_.clear();
+    temp_reader_proxy_data_.m_expectsInlineQos = false;
+    temp_reader_proxy_data_.guid().guidPrefix = pdata.m_guid.guidPrefix;
+    temp_reader_proxy_data_.set_remote_locators(pdata.metatraffic_locators, network, true);
+    temp_reader_proxy_data_.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+    temp_reader_proxy_data_.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+
+    temp_writer_proxy_data_.clear();
+    temp_writer_proxy_data_.guid().guidPrefix = pdata.m_guid.guidPrefix;
+    temp_writer_proxy_data_.persistence_guid(pdata.get_persistence_guid());
+    temp_writer_proxy_data_.set_remote_locators(pdata.metatraffic_locators, network, true);
+    temp_writer_proxy_data_.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+    temp_writer_proxy_data_.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+
     //FIXME: FIX TO NOT FAIL WITH BAD BUILTIN ENDPOINT SET
     //auxendp = 1;
     if(auxendp!=0 && publications_reader_.first!=nullptr) //Exist Pub Writer and i have pub reader
     {
         logInfo(RTPS_EDP,"Adding SEDP Pub Writer to my Pub Reader");
-        RemoteWriterAttributes watt(pdata.m_VendorId);
-        watt.guid.guidPrefix = pdata.m_guid.guidPrefix;
-        watt.guid.entityId = c_EntityId_SEDPPubWriter;
-        watt.endpoint.persistence_guid = watt.guid;
-        watt.endpoint.unicastLocatorList = pdata.m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = pdata.m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        publications_reader_.first->matched_writer_add(watt);
+        temp_writer_proxy_data_.guid().entityId = c_EntityId_SEDPPubWriter;
+        temp_writer_proxy_data_.set_persistence_entity_id(c_EntityId_SEDPPubWriter);
+        publications_reader_.first->matched_writer_add(temp_writer_proxy_data_);
     }
     auxendp = endp;
     auxendp &=DISC_BUILTIN_ENDPOINT_PUBLICATION_DETECTOR;
@@ -694,16 +685,8 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     if(auxendp!=0 && publications_writer_.first!=nullptr) //Exist Pub Detector
     {
         logInfo(RTPS_EDP,"Adding SEDP Pub Reader to my Pub Writer");
-        RemoteReaderAttributes ratt(pdata.m_VendorId);
-        ratt.expectsInlineQos = false;
-        ratt.guid.guidPrefix = pdata.m_guid.guidPrefix;
-        ratt.guid.entityId = c_EntityId_SEDPPubReader;
-        ratt.endpoint.unicastLocatorList = pdata.m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = pdata.m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        publications_writer_.first->matched_reader_add(ratt);
+        temp_reader_proxy_data_.guid().entityId = c_EntityId_SEDPPubReader;
+        publications_writer_.first->matched_reader_add(temp_reader_proxy_data_);
     }
     auxendp = endp;
     auxendp &= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_ANNOUNCER;
@@ -712,16 +695,9 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     if(auxendp!=0 && subscriptions_reader_.first!=nullptr) //Exist Pub Announcer
     {
         logInfo(RTPS_EDP,"Adding SEDP Sub Writer to my Sub Reader");
-        RemoteWriterAttributes watt(pdata.m_VendorId);
-        watt.guid.guidPrefix = pdata.m_guid.guidPrefix;
-        watt.guid.entityId = c_EntityId_SEDPSubWriter;
-        watt.endpoint.persistence_guid = watt.guid;
-        watt.endpoint.unicastLocatorList = pdata.m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = pdata.m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        subscriptions_reader_.first->matched_writer_add(watt);
+        temp_writer_proxy_data_.guid().entityId = c_EntityId_SEDPSubWriter;
+        temp_writer_proxy_data_.set_persistence_entity_id(c_EntityId_SEDPSubWriter);
+        subscriptions_reader_.first->matched_writer_add(temp_writer_proxy_data_);
     }
     auxendp = endp;
     auxendp &= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_DETECTOR;
@@ -730,16 +706,8 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     if(auxendp!=0 && subscriptions_writer_.first!=nullptr) //Exist Pub Announcer
     {
         logInfo(RTPS_EDP,"Adding SEDP Sub Reader to my Sub Writer");
-        RemoteReaderAttributes ratt(pdata.m_VendorId);
-        ratt.expectsInlineQos = false;
-        ratt.guid.guidPrefix = pdata.m_guid.guidPrefix;
-        ratt.guid.entityId = c_EntityId_SEDPSubReader;
-        ratt.endpoint.unicastLocatorList = pdata.m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = pdata.m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        subscriptions_writer_.first->matched_reader_add(ratt);
+        temp_reader_proxy_data_.guid().entityId = c_EntityId_SEDPSubReader;
+        subscriptions_writer_.first->matched_reader_add(temp_reader_proxy_data_);
     }
 
 #if HAVE_SECURITY
@@ -749,16 +717,11 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     //auxendp = 1;
     if(auxendp != 0 && publications_secure_reader_.first != nullptr)
     {
-        WriterProxyData watt;
-        watt.guid().guidPrefix = pdata.m_guid.guidPrefix;
-        watt.guid().entityId = sedp_builtin_publications_secure_writer;
-        watt.persistence_guid(watt.guid());
-        watt.unicastLocatorList(pdata.m_metatrafficUnicastLocatorList);
-        watt.multicastLocatorList(pdata.m_metatrafficMulticastLocatorList);
-        watt.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
-        watt.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+        temp_writer_proxy_data_.guid().entityId = sedp_builtin_publications_secure_writer;
+        temp_writer_proxy_data_.set_persistence_entity_id(sedp_builtin_publications_secure_writer);
+ 
         if(!mp_RTPSParticipant->security_manager().discovered_builtin_writer(
-                    publications_secure_reader_.first->getGuid(), pdata.m_guid, watt,
+                    publications_secure_reader_.first->getGuid(), pdata.m_guid, temp_writer_proxy_data_,
                     publications_secure_reader_.first->getAttributes().security_attributes()))
         {
             logError(RTPS_EDP, "Security manager returns an error for writer " <<
@@ -772,16 +735,9 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     //auxendp = 1;
     if(auxendp != 0 && publications_secure_writer_.first!=nullptr)
     {
-        ReaderProxyData ratt;
-        ratt.m_expectsInlineQos = false;
-        ratt.guid().guidPrefix = pdata.m_guid.guidPrefix;
-        ratt.guid().entityId = sedp_builtin_publications_secure_reader;
-        ratt.unicastLocatorList(pdata.m_metatrafficUnicastLocatorList);
-        ratt.multicastLocatorList(pdata.m_metatrafficMulticastLocatorList);
-        ratt.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
-        ratt.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+        temp_reader_proxy_data_.guid().entityId = sedp_builtin_publications_secure_reader;
         if(!mp_RTPSParticipant->security_manager().discovered_builtin_reader(
-                    publications_secure_writer_.first->getGuid(), pdata.m_guid, ratt,
+                    publications_secure_writer_.first->getGuid(), pdata.m_guid, temp_reader_proxy_data_,
                     publications_secure_writer_.first->getAttributes().security_attributes()))
         {
             logError(RTPS_EDP, "Security manager returns an error for writer " <<
@@ -795,16 +751,11 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     //auxendp = 1;
     if(auxendp != 0 && subscriptions_secure_reader_.first != nullptr)
     {
-        WriterProxyData watt;
-        watt.guid().guidPrefix = pdata.m_guid.guidPrefix;
-        watt.guid().entityId = sedp_builtin_subscriptions_secure_writer;
-        watt.persistence_guid(watt.guid());
-        watt.unicastLocatorList(pdata.m_metatrafficUnicastLocatorList);
-        watt.multicastLocatorList(pdata.m_metatrafficMulticastLocatorList);
-        watt.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
-        watt.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+        temp_writer_proxy_data_.guid().entityId = sedp_builtin_subscriptions_secure_writer;
+        temp_writer_proxy_data_.set_persistence_entity_id(sedp_builtin_subscriptions_secure_writer);
+
         if(!mp_RTPSParticipant->security_manager().discovered_builtin_writer(
-                    subscriptions_secure_reader_.first->getGuid(), pdata.m_guid, watt,
+                    subscriptions_secure_reader_.first->getGuid(), pdata.m_guid, temp_writer_proxy_data_,
                     subscriptions_secure_reader_.first->getAttributes().security_attributes()))
         {
             logError(RTPS_EDP, "Security manager returns an error for writer " <<
@@ -819,16 +770,9 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     if(auxendp != 0 && subscriptions_secure_writer_.first!=nullptr)
     {
         logInfo(RTPS_EDP,"Adding SEDP Sub Reader to my Sub Writer");
-        ReaderProxyData ratt;
-        ratt.m_expectsInlineQos = false;
-        ratt.guid().guidPrefix = pdata.m_guid.guidPrefix;
-        ratt.guid().entityId = sedp_builtin_subscriptions_secure_reader;
-        ratt.unicastLocatorList(pdata.m_metatrafficUnicastLocatorList);
-        ratt.multicastLocatorList(pdata.m_metatrafficMulticastLocatorList);
-        ratt.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
-        ratt.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+        temp_reader_proxy_data_.guid().entityId = sedp_builtin_subscriptions_secure_reader;
         if(!mp_RTPSParticipant->security_manager().discovered_builtin_reader(
-                    subscriptions_secure_writer_.first->getGuid(), pdata.m_guid, ratt,
+                    subscriptions_secure_writer_.first->getGuid(), pdata.m_guid, temp_reader_proxy_data_,
                     subscriptions_secure_writer_.first->getAttributes().security_attributes()))
         {
             logError(RTPS_EDP, "Security manager returns an error for writer " <<
@@ -838,10 +782,12 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
 #endif
 }
 
-
 void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
 {
     logInfo(RTPS_EDP,"For RTPSParticipant: "<<pdata->m_guid);
+
+    GUID_t tmp_guid;
+    tmp_guid.guidPrefix = pdata->m_guid.guidPrefix;
 
     uint32_t endp = pdata->m_availableBuiltinEndpoints;
     uint32_t auxendp = endp;
@@ -850,16 +796,8 @@ void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
     //auxendp = 1;
     if(auxendp!=0 && publications_reader_.first!=nullptr) //Exist Pub Writer and i have pub reader
     {
-        RemoteWriterAttributes watt;
-        watt.guid.guidPrefix = pdata->m_guid.guidPrefix;
-        watt.guid.entityId = c_EntityId_SEDPPubWriter;
-        watt.endpoint.persistence_guid = watt.guid;
-        watt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        publications_reader_.first->matched_writer_remove(watt);
+        tmp_guid.entityId = c_EntityId_SEDPPubWriter;
+        publications_reader_.first->matched_writer_remove(tmp_guid);
     }
     auxendp = endp;
     auxendp &=DISC_BUILTIN_ENDPOINT_PUBLICATION_DETECTOR;
@@ -867,16 +805,8 @@ void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
     //auxendp = 1;
     if(auxendp!=0 && publications_writer_.first!=nullptr) //Exist Pub Detector
     {
-        RemoteReaderAttributes ratt;
-        ratt.expectsInlineQos = false;
-        ratt.guid.guidPrefix = pdata->m_guid.guidPrefix;
-        ratt.guid.entityId = c_EntityId_SEDPPubReader;
-        ratt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        publications_writer_.first->matched_reader_remove(ratt);
+        tmp_guid.entityId = c_EntityId_SEDPPubReader;
+        publications_writer_.first->matched_reader_remove(tmp_guid);
     }
     auxendp = endp;
     auxendp &= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_ANNOUNCER;
@@ -885,16 +815,8 @@ void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
     if(auxendp!=0 && subscriptions_reader_.first!=nullptr) //Exist Pub Announcer
     {
         logInfo(RTPS_EDP,"Adding SEDP Sub Writer to my Sub Reader");
-        RemoteWriterAttributes watt;
-        watt.guid.guidPrefix = pdata->m_guid.guidPrefix;
-        watt.guid.entityId = c_EntityId_SEDPSubWriter;
-        watt.endpoint.persistence_guid = watt.guid;
-        watt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        subscriptions_reader_.first->matched_writer_remove(watt);
+        tmp_guid.entityId = c_EntityId_SEDPSubWriter;
+        subscriptions_reader_.first->matched_writer_remove(tmp_guid);
     }
     auxendp = endp;
     auxendp &= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_DETECTOR;
@@ -903,16 +825,8 @@ void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
     if(auxendp!=0 && subscriptions_writer_.first!=nullptr) //Exist Pub Announcer
     {
         logInfo(RTPS_EDP,"Adding SEDP Sub Reader to my Sub Writer");
-        RemoteReaderAttributes ratt;
-        ratt.expectsInlineQos = false;
-        ratt.guid.guidPrefix = pdata->m_guid.guidPrefix;
-        ratt.guid.entityId = c_EntityId_SEDPSubReader;
-        ratt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        subscriptions_writer_.first->matched_reader_remove(ratt);
+        tmp_guid.entityId = c_EntityId_SEDPSubReader;
+        subscriptions_writer_.first->matched_reader_remove(tmp_guid);
     }
 
 #if HAVE_SECURITY
@@ -922,19 +836,11 @@ void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
     //auxendp = 1;
     if(auxendp != 0 && publications_secure_reader_.first != nullptr)
     {
-        RemoteWriterAttributes watt;
-        watt.guid.guidPrefix = pdata->m_guid.guidPrefix;
-        watt.guid.entityId = sedp_builtin_publications_secure_writer;
-        watt.endpoint.persistence_guid = watt.guid;
-        watt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        if(publications_secure_reader_.first->matched_writer_remove(watt))
+        tmp_guid.entityId = sedp_builtin_publications_secure_writer;
+        if(publications_secure_reader_.first->matched_writer_remove(tmp_guid))
         {
             mp_RTPSParticipant->security_manager().remove_writer(
-                    publications_secure_reader_.first->getGuid(), pdata->m_guid, watt.guid);
+                    publications_secure_reader_.first->getGuid(), pdata->m_guid, tmp_guid);
         }
     }
 
@@ -944,18 +850,11 @@ void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
     //auxendp = 1;
     if(auxendp != 0 && publications_secure_writer_.first != nullptr)
     {
-        RemoteReaderAttributes ratt;
-        ratt.guid.guidPrefix = pdata->m_guid.guidPrefix;
-        ratt.guid.entityId = sedp_builtin_publications_secure_reader;
-        ratt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        if(publications_secure_writer_.first->matched_reader_remove(ratt))
+        tmp_guid.entityId = sedp_builtin_publications_secure_reader;
+        if(publications_secure_writer_.first->matched_reader_remove(tmp_guid))
         {
             mp_RTPSParticipant->security_manager().remove_reader(
-                    publications_secure_writer_.first->getGuid(), pdata->m_guid, ratt.guid);
+                    publications_secure_writer_.first->getGuid(), pdata->m_guid, tmp_guid);
         }
     }
 
@@ -966,19 +865,11 @@ void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
     if(auxendp != 0 && subscriptions_secure_reader_.first != nullptr)
     {
         logInfo(RTPS_EDP,"Adding SEDP Sub Writer to my Sub Reader");
-        RemoteWriterAttributes watt;
-        watt.guid.guidPrefix = pdata->m_guid.guidPrefix;
-        watt.guid.entityId = sedp_builtin_subscriptions_secure_writer;
-        watt.endpoint.persistence_guid = watt.guid;
-        watt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
-        //watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        watt.endpoint.reliabilityKind = RELIABLE;
-        watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        if(subscriptions_secure_reader_.first->matched_writer_remove(watt))
+        tmp_guid.entityId = sedp_builtin_subscriptions_secure_writer;
+        if(subscriptions_secure_reader_.first->matched_writer_remove(tmp_guid))
         {
             mp_RTPSParticipant->security_manager().remove_writer(
-                    subscriptions_secure_reader_.first->getGuid(), pdata->m_guid, watt.guid);
+                    subscriptions_secure_reader_.first->getGuid(), pdata->m_guid, tmp_guid);
         }
     }
     auxendp = endp;
@@ -988,21 +879,69 @@ void EDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
     if(auxendp != 0 && subscriptions_secure_writer_.first!=nullptr)
     {
         logInfo(RTPS_EDP,"Adding SEDP Sub Reader to my Sub Writer");
-        RemoteReaderAttributes ratt;
-        ratt.guid.guidPrefix = pdata->m_guid.guidPrefix;
-        ratt.guid.entityId = sedp_builtin_subscriptions_secure_reader;
-        ratt.endpoint.unicastLocatorList = pdata->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
-        //ratt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
-        ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        ratt.endpoint.reliabilityKind = RELIABLE;
-        if(subscriptions_secure_writer_.first->matched_reader_remove(ratt))
+        tmp_guid.entityId = sedp_builtin_subscriptions_secure_reader;
+        if(subscriptions_secure_writer_.first->matched_reader_remove(tmp_guid))
         {
             mp_RTPSParticipant->security_manager().remove_reader(
-                    subscriptions_secure_writer_.first->getGuid(), pdata->m_guid, ratt.guid);
+                    subscriptions_secure_writer_.first->getGuid(), pdata->m_guid, tmp_guid);
         }
     }
 #endif
+}
+
+bool EDPSimple::areRemoteEndpointsMatched(const ParticipantProxyData* pdata)
+{
+    uint32_t endp = pdata->m_availableBuiltinEndpoints;
+
+    uint32_t auxendp = endp;
+    auxendp &= DISC_BUILTIN_ENDPOINT_PUBLICATION_ANNOUNCER;
+    if (auxendp != 0 && publications_reader_.first != nullptr) //Exist Pub Writer and I have Pub Reader
+    {
+        GUID_t wguid;
+        wguid.guidPrefix = pdata->m_guid.guidPrefix;
+        wguid.entityId = c_EntityId_SEDPPubWriter;
+
+        if (!publications_reader_.first->matched_writer_is_matched(wguid))
+            return false;
+    }
+
+    auxendp = endp;
+    auxendp &= DISC_BUILTIN_ENDPOINT_PUBLICATION_DETECTOR;
+    if (auxendp != 0 && publications_writer_.first != nullptr) //Exist Pub Detector
+    {
+        GUID_t rguid;
+        rguid.guidPrefix = pdata->m_guid.guidPrefix;
+        rguid.entityId = c_EntityId_SEDPPubReader;
+
+        if (!publications_writer_.first->matched_reader_is_matched(rguid))
+            return false;
+    }
+
+    auxendp = endp;
+    auxendp &= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_ANNOUNCER;
+    if (auxendp != 0 && subscriptions_reader_.first != nullptr) //Exist Pub Announcer
+    {
+        GUID_t wguid;
+        wguid.guidPrefix = pdata->m_guid.guidPrefix;
+        wguid.entityId = c_EntityId_SEDPSubWriter;
+
+        if (!subscriptions_reader_.first->matched_writer_is_matched(wguid))
+            return false;
+    }
+
+    auxendp = endp;
+    auxendp &= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_DETECTOR;
+    if (auxendp != 0 && subscriptions_writer_.first != nullptr) //Exist Pub Announcer
+    {
+        GUID_t rguid;
+        rguid.guidPrefix = pdata->m_guid.guidPrefix;
+        rguid.entityId = c_EntityId_SEDPSubReader;
+
+        if (!subscriptions_writer_.first->matched_reader_is_matched(rguid))
+            return false;
+    }
+
+    return true;
 }
 
 #if HAVE_SECURITY
@@ -1013,14 +952,12 @@ bool EDPSimple::pairing_remote_writer_with_local_builtin_reader_after_security(c
 
     if(local_reader.entityId == sedp_builtin_publications_secure_reader)
     {
-        RemoteWriterAttributes attrs = remote_writer_data.toRemoteWriterAttributes();
-        publications_secure_reader_.first->matched_writer_add(attrs);
+        publications_secure_reader_.first->matched_writer_add(remote_writer_data);
         returned_value = true;
     }
     else if(local_reader.entityId == sedp_builtin_subscriptions_secure_reader)
     {
-        RemoteWriterAttributes attrs = remote_writer_data.toRemoteWriterAttributes();
-        subscriptions_secure_reader_.first->matched_writer_add(attrs);
+        subscriptions_secure_reader_.first->matched_writer_add(remote_writer_data);
         returned_value = true;
     }
 
@@ -1034,14 +971,12 @@ bool EDPSimple::pairing_remote_reader_with_local_builtin_writer_after_security(c
 
     if(local_writer.entityId == sedp_builtin_publications_secure_writer)
     {
-        RemoteReaderAttributes attrs = remote_reader_data.toRemoteReaderAttributes();
-        publications_secure_writer_.first->matched_reader_add(attrs);
+        publications_secure_writer_.first->matched_reader_add(remote_reader_data);
         returned_value = true;
     }
     else if(local_writer.entityId == sedp_builtin_subscriptions_secure_writer)
     {
-        RemoteReaderAttributes attrs = remote_reader_data.toRemoteReaderAttributes();
-        subscriptions_secure_writer_.first->matched_reader_add(attrs);
+        subscriptions_secure_writer_.first->matched_reader_add(remote_reader_data);
         returned_value = true;
     }
 

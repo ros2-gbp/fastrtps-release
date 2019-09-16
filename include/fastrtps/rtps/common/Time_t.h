@@ -23,14 +23,8 @@
 #include <cstdint>
 #include <iostream>
 
-namespace eprosima{
-namespace fastrtps{
-
-namespace rtps{
-// 1 fraction = 1/(2^32) seconds
-constexpr long double FRACTION_TO_NANO = 0.23283064365386962890625; // 1000000000 / 4294967296
-constexpr long double NANO_TO_FRACTION = 4.294967296; // 4294967296 / 1000000000
-} // namespace rtps
+namespace eprosima {
+namespace fastrtps {
 
 /**
  * Structure Time_t, used to describe times.
@@ -67,11 +61,19 @@ struct RTPS_DllAPI Time_t
      *  Returns stored time as nanoseconds (including seconds)
      */
     int64_t to_ns() const;
+
+    /**
+     * Fills a Time_t struct with a representation of the current time.
+     *
+     * @param ret Reference to the structure to be filled in.
+     */
+    static void now(
+            Time_t& ret);
 };
 
-typedef Time_t Duration_t;
+using Duration_t = Time_t;
 
-namespace rtps{
+namespace rtps {
 
 /**
  * Structure Time_t, used to describe times at RTPS protocol.
@@ -150,6 +152,14 @@ public:
     Duration_t to_duration_t() const;
 
     void from_duration_t(const Duration_t& duration);
+
+    /**
+     * Fills a Time_t struct with a representation of the current time.
+     *
+     * @param ret Reference to the structure to be filled in.
+     */
+    static void now(
+            Time_t& ret);
 
 private:
     //!Seconds

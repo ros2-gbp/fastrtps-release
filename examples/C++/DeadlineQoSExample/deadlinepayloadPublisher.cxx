@@ -18,9 +18,6 @@
 #include <fastrtps/attributes/PublisherAttributes.h>
 
 #include <fastrtps/Domain.h>
-
-#include <fastrtps/utils/eClock.h>
-
 #include "deadlinepayloadPublisher.h"
 
 using namespace eprosima::fastrtps;
@@ -44,7 +41,7 @@ bool deadlinepayloadPublisher::init(double deadline_period_ms)
 
     ParticipantAttributes PParam;
     PParam.rtps.builtin.domainId = 0;
-    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_publisher");  //You can put here the name you want
     mp_participant = Domain::createParticipant(PParam);	
     if(mp_participant == nullptr)
@@ -96,7 +93,7 @@ void deadlinepayloadPublisher::run(uint32_t sleep_ms, int samples)
 {
     while(m_listener.n_matched == 0)
     {
-        eClock::my_sleep(250); // Sleep 250 ms
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
 
     // Publication code
@@ -110,7 +107,7 @@ void deadlinepayloadPublisher::run(uint32_t sleep_ms, int samples)
     int sample = 0;
     while(true)
     {
-        eClock::my_sleep(sleep_ms);
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
 
         if (samples > 0)
         {

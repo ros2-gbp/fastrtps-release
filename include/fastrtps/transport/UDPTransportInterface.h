@@ -65,26 +65,26 @@ public:
            const Locator_t&) override;
 
    /**
-   * Blocking Receive from the specified channel.
-   * @param p_channel_resource Pointer to the channer resource that stores the socket.
-   * @param receive_buffer vector with enough capacity (not size) to accomodate a full receive buffer. That
-   * capacity must not be less than the receive_buffer_size supplied to this class during construction.
-   * @param receive_buffer_capacity Maximum size of the receive_buffer.
-   * @param[out] receive_buffer_size Size of the received buffer.
-   * @param[out] remote_locator Locator describing the remote restination we received a packet from.
-   */
-   bool Receive(UDPChannelResource* p_channel_resource, octet* receive_buffer,
-       uint32_t receive_buffer_capacity, uint32_t& receive_buffer_size, Locator_t& remote_locator);
-
-   //! Release the listening socket for the specified port.
-   bool ReleaseInputChannel(const Locator_t& locator, const asio::ip::address& interface_address);
-
-   /**
    * Converts a given remote locator (that is, a locator referring to a remote
    * destination) to the main local locator whose channel can write to that
    * destination. In this case it will return a 0.0.0.0 address on that port.
    */
    virtual Locator_t RemoteToMainLocal(const Locator_t&) const override;
+
+    /**
+     * Transforms a remote locator into a locator optimized for local communications.
+     *
+     * If the remote locator corresponds to one of the local interfaces, it is converted
+     * to the corresponding local address.
+     *
+     * @param [in]  remote_locator Locator to be converted.
+     * @param [out] result_locator Converted locator.
+     *
+     * @return false if the input locator is not supported/allowed by this transport, true otherwise.
+     */
+    virtual bool transform_remote_locator(
+            const Locator_t& remote_locator,
+            Locator_t& result_locator) const override;
 
    /**
    * Blocking Send through the specified channel. In both modes, using a localLocator of 0.0.0.0 will
@@ -95,15 +95,30 @@ public:
    * @param socket channel we're sending from.
    * @param remote_locator Locator describing the remote destination we're sending to.
    * @param only_multicast_purpose
+   * @param timeout Maximum time this function will block
    */
    virtual bool send(
            const octet* send_buffer,
            uint32_t send_buffer_size,
            eProsimaUDPSocket& socket,
            const Locator_t& remote_locator,
-           bool only_multicast_purpose);
+           bool only_multicast_purpose,
+           const std::chrono::microseconds& timeout);
 
-   virtual LocatorList_t ShrinkLocatorLists(const std::vector<LocatorList_t>& locatorLists) override;
+    /**
+     * Performs the locator selection algorithm for this transport.
+     *
+     * It basically consists of the following steps
+     *   - selector.transport_starts is called
+     *   - transport handles the selection state of each locator
+     *   - if a locator from an entry is selected, selector.select is called for that entry
+     *
+     * In the case of UDP, multicast locators are selected when present in more than one entry,
+     * otherwise unicast locators are selected.
+     *
+     * @param [in, out] selector Locator selector.
+     */
+    virtual void select_locators(LocatorSelector& selector) const override;
 
     virtual bool fillMetatrafficMulticastLocator(Locator_t &locator,
         uint32_t metatraffic_multicast_port) const override;
@@ -116,6 +131,8 @@ public:
     virtual bool fillUnicastLocator(Locator_t &locator, uint32_t well_known_port) const override;
 
 protected:
+
+    friend class UDPChannelResource;
 
     // For UDPv6, the notion of channel corresponds to a port + direction tuple.
     asio::io_service io_service_;
@@ -133,7 +150,7 @@ protected:
     virtual bool compare_locator_ip_and_port(const Locator_t& lh, const Locator_t& rh) const = 0;
 
     virtual void endpoint_to_locator(asio::ip::udp::endpoint& endpoint, Locator_t& locator) = 0;
-    virtual void fill_local_ip(Locator_t& loc) = 0;
+    virtual void fill_local_ip(Locator_t& loc) const = 0;
 
     virtual asio::ip::udp::endpoint GenerateAnyAddressEndpoint(uint16_t port) = 0;
     virtual asio::ip::udp::endpoint generate_endpoint(uint16_t port) = 0;
@@ -161,14 +178,6 @@ protected:
         bool is_multicast, uint32_t maxMsgSize, TransportReceiverInterface* receiver);
     virtual eProsimaUDPSocket OpenAndBindInputSocket(const std::string& sIp, uint16_t port, bool is_multicast) = 0;
     eProsimaUDPSocket OpenAndBindUnicastOutputSocket(const asio::ip::udp::endpoint& endpoint, uint16_t& port);
-
-    /**
-     * Function to be called from a new thread, which takes cares of performing a blocking receive
-     * operation on the ReceiveResource
-     * @param p_channel_resource - Associated ChannelResource
-     * @param input_locator - Locator that triggered the creation of the resource
-    */
-    void perform_listen_operation(UDPChannelResource* p_channel_resource, Locator_t input_locator);
 
     virtual void set_receive_buffer_size(uint32_t size) = 0;
     virtual void set_send_buffer_size(uint32_t size) = 0;

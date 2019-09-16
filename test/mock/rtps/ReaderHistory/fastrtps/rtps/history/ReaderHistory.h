@@ -20,6 +20,7 @@
 #define _RTPS_HISTORY_READERHISTORY_H_
 
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
+#include <fastrtps/utils/TimedMutex.hpp>
 
 #include <gmock/gmock.h>
 
@@ -27,8 +28,12 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+class RTPSReader;
+
 class ReaderHistory
 {
+    friend class RTPSReader;
+
     public:
 
         ReaderHistory(const HistoryAttributes& /*att*/){}
@@ -41,6 +46,11 @@ class ReaderHistory
             delete change;
             return ret;
         }
+
+    protected:
+
+        RTPSReader* mp_reader;
+        RecursiveTimedMutex* mp_mutex;
 };
 
 } // namespace rtps

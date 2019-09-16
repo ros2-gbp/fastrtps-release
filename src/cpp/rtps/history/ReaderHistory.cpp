@@ -33,14 +33,11 @@ namespace rtps {
 ReaderHistory::ReaderHistory(const HistoryAttributes& att)
     : History(att)
     , mp_reader(nullptr)
-    , mp_semaphore(new Semaphore(0))
 {
 }
 
 ReaderHistory::~ReaderHistory()
 {
-    // TODO Auto-generated destructor stub
-    delete(mp_semaphore);
 }
 
 bool ReaderHistory::received_change(CacheChange_t* change, size_t)
@@ -56,7 +53,7 @@ bool ReaderHistory::add_change(CacheChange_t* a_change)
         return false;
     }
 
-    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
+    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
     if(m_att.memoryPolicy == PREALLOCATED_MEMORY_MODE && a_change->serializedPayload.length > m_att.payloadMaxSize)
     {
         logError(RTPS_HISTORY,
@@ -86,7 +83,7 @@ bool ReaderHistory::remove_change(CacheChange_t* a_change)
         return false;
     }
 
-    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
+    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
     if(a_change == nullptr)
     {
         logError(RTPS_HISTORY,"Pointer is not valid")
@@ -122,21 +119,10 @@ bool ReaderHistory::remove_changes_with_guid(const GUID_t& a_guid)
     }
 
     {//Lock scope
-        std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
+        std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
         for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin(); chit!=m_changes.end();++chit)
         {
-            bool matches = true;
-            unsigned int size = a_guid.guidPrefix.size;
-            if( !std::equal( (*chit)->writerGUID.guidPrefix.value , (*chit)->writerGUID.guidPrefix.value + size -1, a_guid.guidPrefix.value ) )
-            {
-                matches = false;
-            }
-            size = a_guid.entityId.size;
-            if( !std::equal( (*chit)->writerGUID.entityId.value , (*chit)->writerGUID.entityId.value + size -1, a_guid.entityId.value ) )
-            {
-                matches = false;
-            }
-            if(matches)
+            if((*chit)->writerGUID == a_guid)
             {
                 changes_to_remove.push_back( (*chit) );
             }
@@ -176,16 +162,6 @@ void ReaderHistory::updateMaxMinSeqNum()
         mp_minSeqCacheChange = *(minmax.first);
         mp_maxSeqCacheChange = *(minmax.second);
     }
-}
-
-void ReaderHistory::postSemaphore()
-{
-    return mp_semaphore->post();
-}
-
-void ReaderHistory::waitSemaphore() //TODO CAMBIAR NOMBRE PARA que el usuario sepa que es para esperar a un cachechange nuevo
-{
-    return mp_semaphore->wait();
 }
 
 bool ReaderHistory::get_min_change_from(

@@ -30,7 +30,6 @@
 #include <fastrtps/publisher/PublisherHistory.h>
 
 #include <fastrtps/rtps/writer/WriterListener.h>
-#include <fastrtps/rtps/timedevent/TimedCallback.h>
 #include <fastrtps/qos/DeadlineMissedStatus.h>
 
 namespace eprosima {
@@ -39,6 +38,7 @@ namespace rtps
 {
 class RTPSWriter;
 class RTPSParticipant;
+class TimedEvent;
 }
 
 class TopicDataType;
@@ -135,6 +135,17 @@ class PublisherImpl
      */
     void get_offered_deadline_missed_status(OfferedDeadlineMissedStatus& status);
 
+    /**
+     * @brief Returns the liveliness lost status
+     * @param status Liveliness lost status
+     */
+    void get_liveliness_lost_status(LivelinessLostStatus& status);
+
+    /**
+     * @brief Asserts liveliness
+     */
+    void assert_liveliness();
+
     private:
     ParticipantImpl* mp_participant;
     //! Pointer to the associated Data Writer.
@@ -153,8 +164,16 @@ class PublisherImpl
         public:
             PublisherWriterListener(PublisherImpl* p):mp_publisherImpl(p){};
             virtual ~PublisherWriterListener(){};
-            void onWriterMatched(rtps::RTPSWriter* writer, rtps::MatchingInfo& info);
-            void onWriterChangeReceivedByAll(rtps::RTPSWriter* writer, rtps::CacheChange_t* change);
+            void onWriterMatched(
+                    rtps::RTPSWriter* writer,
+                    rtps::MatchingInfo& info) override;
+            void onWriterChangeReceivedByAll(
+                    rtps::RTPSWriter* writer,
+                    rtps::CacheChange_t* change) override;
+            void on_liveliness_lost(
+                    rtps::RTPSWriter* writer,
+                    const LivelinessLostStatus& status) override;
+
             PublisherImpl* mp_publisherImpl;
     }m_writerListener;
 
@@ -165,7 +184,7 @@ class PublisherImpl
     uint32_t high_mark_for_frag_;
 
     //! A timer used to check for deadlines
-    rtps::TimedCallback deadline_timer_;
+    rtps::TimedEvent* deadline_timer_;
     //! Deadline duration in microseconds
     std::chrono::duration<double, std::ratio<1,1000000>> deadline_duration_us_;
     //! The current timer owner, i.e. the instance which started the deadline timer
@@ -174,24 +193,26 @@ class PublisherImpl
     OfferedDeadlineMissedStatus deadline_missed_status_;
 
     //! A timed callback to remove expired samples for lifespan QoS
-    rtps::TimedCallback lifespan_timer_;
+    rtps::TimedEvent* lifespan_timer_;
     //! The lifespan duration, in microseconds
     std::chrono::duration<double, std::ratio<1, 1000000>> lifespan_duration_us_;
 
     /**
      * @brief A method called when an instance misses the deadline
      */
-    void deadline_missed();
+    bool deadline_missed();
 
     /**
      * @brief A method to reschedule the deadline timer
+     * @return true value when the event has to be rescheduled. false value if not.
      */
-    void deadline_timer_reschedule();
+    bool deadline_timer_reschedule();
 
     /**
      * @brief A method to remove expired samples, invoked when the lifespan timer expires
+     * @return true value when the event has to be rescheduled. false value if not.
      */
-    void lifespan_expired();
+    bool lifespan_expired();
 };
 
 

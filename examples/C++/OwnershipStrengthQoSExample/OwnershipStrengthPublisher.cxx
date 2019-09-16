@@ -24,7 +24,6 @@
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/Domain.h>
-#include <fastrtps/utils/eClock.h>
 #include <sstream>
 
 #include "OwnershipStrengthPublisher.h"
@@ -52,7 +51,7 @@ bool OwnershipStrengthPublisher::init()
 
     ParticipantAttributes PParam;
     PParam.rtps.builtin.domainId = 0;
-    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_publisher");
     mp_participant = Domain::createParticipant(PParam);
     if(mp_participant == nullptr)
@@ -93,7 +92,7 @@ void OwnershipStrengthPublisher::run()
 {
     while(m_listener.n_matched == 0)
     {
-        eClock::my_sleep(250); // Sleep 250 ms
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
 
     char ch = 'y';

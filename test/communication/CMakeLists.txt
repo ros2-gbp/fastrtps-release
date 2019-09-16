@@ -34,22 +34,26 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         )
     add_executable(SimpleCommunicationPublisher ${PUBLISHER_SOURCE})
     target_include_directories(SimpleCommunicationPublisher PRIVATE ${PROJECT_SOURCE_DIR}/test/blackbox)
-    target_link_libraries(SimpleCommunicationPublisher fastrtps fastcdr ${CMAKE_DL_LIBS})
+    target_link_libraries(SimpleCommunicationPublisher fastrtps fastcdr foonathan_memory ${CMAKE_DL_LIBS})
 
     set(SUBSCRIBER_SOURCE ${COMMON_SOURCE}
         Subscriber.cpp
         )
     add_executable(SimpleCommunicationSubscriber ${SUBSCRIBER_SOURCE})
     target_include_directories(SimpleCommunicationSubscriber PRIVATE ${PROJECT_SOURCE_DIR}/test/blackbox)
-    target_link_libraries(SimpleCommunicationSubscriber fastrtps fastcdr ${CMAKE_DL_LIBS})
+    target_link_libraries(SimpleCommunicationSubscriber fastrtps fastcdr foonathan_memory ${CMAKE_DL_LIBS})
 
     ###############################################################################
     # Necessary files
     ###############################################################################
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/simple_communication.py
         ${CMAKE_CURRENT_BINARY_DIR}/simple_communication.py COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/two_publishers_communication.py
+        ${CMAKE_CURRENT_BINARY_DIR}/two_publishers_communication.py COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/liveliness_assertion.py
         ${CMAKE_CURRENT_BINARY_DIR}/liveliness_assertion.py COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/automatic_liveliness_assertion.py
+        ${CMAKE_CURRENT_BINARY_DIR}/automatic_liveliness_assertion.py COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/simple_besteffort.xml
         ${CMAKE_CURRENT_BINARY_DIR}/simple_besteffort.xml COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/simple_reliable.xml
@@ -175,6 +179,57 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         if(WIN32)
             string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
             set_property(TEST LivelinessAssertion APPEND PROPERTY ENVIRONMENT
+                "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+        endif()
+        add_test(NAME AutomaticLivelinessAssertion
+            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/automatic_liveliness_assertion.py)
+
+        # Set test with label NoMemoryCheck
+        set_property(TEST AutomaticLivelinessAssertion PROPERTY LABELS "NoMemoryCheck")
+
+        set_property(TEST AutomaticLivelinessAssertion PROPERTY ENVIRONMENT
+            "SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:SimpleCommunicationPublisher>")
+        set_property(TEST AutomaticLivelinessAssertion APPEND PROPERTY ENVIRONMENT
+            "SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:SimpleCommunicationSubscriber>")
+        if(WIN32)
+            string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+            set_property(TEST AutomaticLivelinessAssertion APPEND PROPERTY ENVIRONMENT
+                "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+        endif()
+
+        add_test(NAME TwoPublishersCommunicationBestEffort
+            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/two_publishers_communication.py)
+
+        # Set test with label NoMemoryCheck
+        set_property(TEST TwoPublishersCommunicationBestEffort PROPERTY LABELS "NoMemoryCheck")
+
+        set_property(TEST TwoPublishersCommunicationBestEffort PROPERTY ENVIRONMENT
+            "SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:SimpleCommunicationPublisher>")
+        set_property(TEST TwoPublishersCommunicationBestEffort APPEND PROPERTY ENVIRONMENT
+            "SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:SimpleCommunicationSubscriber>")
+        set_property(TEST TwoPublishersCommunicationBestEffort APPEND PROPERTY ENVIRONMENT
+            "XML_FILE=simple_besteffort.xml")
+        if(WIN32)
+            string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+            set_property(TEST TwoPublishersCommunicationBestEffort APPEND PROPERTY ENVIRONMENT
+                "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+        endif()
+
+        add_test(NAME TwoPublishersCommunicationReliable
+            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/two_publishers_communication.py)
+
+        # Set test with label NoMemoryCheck
+        set_property(TEST TwoPublishersCommunicationReliable PROPERTY LABELS "NoMemoryCheck")
+
+        set_property(TEST TwoPublishersCommunicationReliable PROPERTY ENVIRONMENT
+            "SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:SimpleCommunicationPublisher>")
+        set_property(TEST TwoPublishersCommunicationReliable APPEND PROPERTY ENVIRONMENT
+            "SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:SimpleCommunicationSubscriber>")
+        set_property(TEST TwoPublishersCommunicationReliable APPEND PROPERTY ENVIRONMENT
+            "XML_FILE=simple_reliable.xml")
+        if(WIN32)
+            string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+            set_property(TEST TwoPublishersCommunicationReliable APPEND PROPERTY ENVIRONMENT
                 "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
         endif()
     endif()

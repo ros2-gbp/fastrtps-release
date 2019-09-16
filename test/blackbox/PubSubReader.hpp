@@ -58,7 +58,10 @@ private:
     {
     public:
 
-        ParticipantListener(PubSubReader &reader) : reader_(reader) {}
+        ParticipantListener(
+                PubSubReader &reader)
+            : reader_(reader)
+        {}
 
         ~ParticipantListener() {}
 
@@ -76,6 +79,7 @@ private:
             if(info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
             {
                 reader_.participant_matched();
+
             }
             else if(info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT ||
                     info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
@@ -111,7 +115,8 @@ private:
     {
     public:
 
-        Listener(PubSubReader &reader)
+        Listener(
+                PubSubReader &reader)
             : reader_(reader)
             , times_deadline_missed_(0)
         {}
@@ -132,16 +137,18 @@ private:
             }
         }
 
-        void onSubscriptionMatched(eprosima::fastrtps::Subscriber* /*sub*/, eprosima::fastrtps::rtps::MatchingInfo& info) override
+        void onSubscriptionMatched(
+                eprosima::fastrtps::Subscriber* /*sub*/,
+                eprosima::fastrtps::rtps::MatchingInfo& info) override
         {
             if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
             {
-                std::cout << "Matched publisher " << info.remoteEndpointGuid << std::endl;
+                std::cout << "Subscriber matched publisher " << info.remoteEndpointGuid << std::endl;
                 reader_.matched();
             }
             else
             {
-                std::cout << "Unmatched publisher " << info.remoteEndpointGuid << std::endl;
+                std::cout << "Subscriber unmatched publisher " << info.remoteEndpointGuid << std::endl;
                 reader_.unmatched();
             }
         }
@@ -155,6 +162,26 @@ private:
             times_deadline_missed_ = status.total_count;
         }
 
+        void on_liveliness_changed(
+                eprosima::fastrtps::Subscriber* sub,
+                const eprosima::fastrtps::LivelinessChangedStatus& status) override
+        {
+            (void)sub;
+
+            reader_.set_liveliness_changed_status(status);
+
+            if (status.alive_count_change == 1)
+            {
+                reader_.liveliness_recovered();
+
+            }
+            else if (status.not_alive_count_change == 1)
+            {
+                reader_.liveliness_lost();
+
+            }
+        }
+
         unsigned int missed_deadlines() const
         {
             return times_deadline_missed_;
@@ -166,6 +193,7 @@ private:
 
         PubSubReader& reader_;
 
+        //! Number of times deadline was missed
         unsigned int times_deadline_missed_;
 
     } listener_;
@@ -174,7 +202,9 @@ private:
 
 public:
 
-    PubSubReader(const std::string& topic_name)
+    PubSubReader(
+            const std::string& topic_name,
+            bool take = true)
         : participant_listener_(*this)
         , listener_(*this)
         , participant_(nullptr)
@@ -188,10 +218,15 @@ public:
         , number_samples_expected_(0)
         , discovery_result_(false)
         , onDiscovery_(nullptr)
+        , take_(take)
 #if HAVE_SECURITY
         , authorized_(0)
         , unauthorized_(0)
 #endif
+        , liveliness_mutex_()
+        , liveliness_cv_()
+        , times_liveliness_lost_(0)
+        , times_liveliness_recovered_(0)
         {
             subscriber_attr_.topic.topicDataType = type_.getName();
             // Generate topic name
@@ -199,13 +234,8 @@ public:
             t << topic_name_ << "_" << asio::ip::host_name() << "_" << GET_PID();
             subscriber_attr_.topic.topicName = t.str();
 
-#if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
-            subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-#elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
-            subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::DYNAMIC_RESERVE_MEMORY_MODE;
-#else
+            // By default, memory mode is preallocated (the most restritive)
             subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
-#endif
 
             // By default, heartbeat period delay is 100 milliseconds.
             subscriber_attr_.times.heartbeatResponseDelay.seconds = 0;
@@ -215,7 +245,9 @@ public:
     ~PubSubReader()
     {
         if(participant_ != nullptr)
+        {
             eprosima::fastrtps::Domain::removeParticipant(participant_);
+        }
     }
 
     void init()
@@ -354,6 +386,20 @@ public:
         std::cout << "Reader removal finished..." << std::endl;
     }
 
+    void wait_liveliness_recovered(unsigned int times = 1)
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+
+        liveliness_cv_.wait(lock, [&](){ return times_liveliness_recovered_ == times; });
+    }
+
+    void wait_liveliness_lost(unsigned int times = 1)
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+
+        liveliness_cv_.wait(lock, [&](){ return times_liveliness_lost_ == times; });
+    }
+
 #if HAVE_SECURITY
     void waitAuthorized()
     {
@@ -393,6 +439,27 @@ public:
     PubSubReader& deadline_period(const eprosima::fastrtps::Duration_t deadline_period)
     {
         subscriber_attr_.qos.m_deadline.period = deadline_period;
+        return *this;
+    }
+
+    bool update_deadline_period(const eprosima::fastrtps::Duration_t& deadline_period)
+    {
+        eprosima::fastrtps::SubscriberAttributes attr;
+        attr = subscriber_attr_;
+        attr.qos.m_deadline.period = deadline_period;
+
+        return subscriber_->updateAttributes(attr);
+    }
+
+    PubSubReader& liveliness_kind(const eprosima::fastrtps::LivelinessQosPolicyKind& kind)
+    {
+        subscriber_attr_.qos.m_liveliness.kind = kind;
+        return *this;
+    }
+
+    PubSubReader& liveliness_lease_duration(const eprosima::fastrtps::Duration_t lease_duration)
+    {
+        subscriber_attr_.qos.m_liveliness.lease_duration = lease_duration;
         return *this;
     }
 
@@ -456,6 +523,19 @@ public:
     PubSubReader& resource_limits_max_samples(const int32_t max)
     {
         subscriber_attr_.topic.resourceLimitsQos.max_samples = max;
+        return *this;
+    }
+
+    PubSubReader& matched_writers_allocation(size_t initial, size_t maximum)
+    {
+        subscriber_attr_.matched_publisher_allocation.initial = initial;
+        subscriber_attr_.matched_publisher_allocation.maximum = maximum;
+        return *this;
+    }
+
+    PubSubReader& expect_no_allocs()
+    {
+        // TODO(Mcc): Add no allocations check code when feature is completely ready
         return *this;
     }
 
@@ -544,9 +624,9 @@ public:
 
     PubSubReader& static_discovery(const char* filename)
     {
-        participant_attr_.rtps.builtin.use_SIMPLE_EndpointDiscoveryProtocol = false;
-        participant_attr_.rtps.builtin.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_attr_.rtps.builtin.setStaticEndpointXMLFilename(filename);
+        participant_attr_.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
+        participant_attr_.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
+        participant_attr_.rtps.builtin.discovery_config.setStaticEndpointXMLFilename(filename);
         return *this;
     }
 
@@ -608,8 +688,8 @@ public:
             eprosima::fastrtps::Duration_t lease_duration,
             eprosima::fastrtps::Duration_t announce_period)
     {
-        participant_attr_.rtps.builtin.leaseDuration = lease_duration;
-        participant_attr_.rtps.builtin.leaseDuration_announcementperiod = announce_period;
+        participant_attr_.rtps.builtin.discovery_config.leaseDuration = lease_duration;
+        participant_attr_.rtps.builtin.discovery_config.leaseDuration_announcementperiod = announce_period;
         return *this;
     }
 
@@ -700,6 +780,48 @@ public:
         return listener_.missed_deadlines();
     }
 
+    void liveliness_lost()
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+        times_liveliness_lost_++;
+        liveliness_cv_.notify_one();
+    }
+
+    void liveliness_recovered()
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+        times_liveliness_recovered_++;
+        liveliness_cv_.notify_one();
+    }
+
+    void set_liveliness_changed_status(const eprosima::fastrtps::LivelinessChangedStatus& status)
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+
+        liveliness_changed_status_ = status;
+    }
+
+    unsigned int times_liveliness_lost()
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+
+        return times_liveliness_lost_;
+    }
+
+    unsigned int times_liveliness_recovered()
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+
+        return times_liveliness_recovered_;
+    }
+
+    const eprosima::fastrtps::LivelinessChangedStatus& liveliness_changed_status()
+    {
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+
+        return liveliness_changed_status_;
+    }
+
     bool is_matched() const
     {
         return matched_ > 0;
@@ -720,7 +842,10 @@ private:
         type data;
         eprosima::fastrtps::SampleInfo_t info;
 
-        if(subscriber->takeNextData((void*)&data, &info))
+        bool success = take_ ?
+                    subscriber->takeNextData((void*)&data, &info) :
+                    subscriber->readNextData((void*)&data, &info);
+        if (success)
         {
             returnedValue = true;
 
@@ -813,12 +938,26 @@ private:
 
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
 
+    //! True to take data from history. False to read
+    bool take_;
+
 #if HAVE_SECURITY
     std::mutex mutexAuthentication_;
     std::condition_variable cvAuthentication_;
     unsigned int authorized_;
     unsigned int unauthorized_;
 #endif
+
+    //! A mutex for liveliness status
+    std::mutex liveliness_mutex_;
+    //! A condition variable to notify when liveliness was recovered
+    std::condition_variable liveliness_cv_;
+    //! Number of times liveliness was lost
+    unsigned int times_liveliness_lost_;
+    //! Number of times liveliness was recovered
+    unsigned int times_liveliness_recovered_;
+    //! The liveliness changed status
+    eprosima::fastrtps::LivelinessChangedStatus liveliness_changed_status_;
 };
 
 #endif // _TEST_BLACKBOX_PUBSUBREADER_HPP_

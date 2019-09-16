@@ -165,7 +165,7 @@ TEST_F(UDPv4Tests, send_and_receive_between_ports)
 
     auto sendThreadFunction = [&]()
     {
-        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, multicastLocator));
+        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, multicastLocator, std::chrono::microseconds(100)));
     };
 
     senderThread.reset(new std::thread(sendThreadFunction));
@@ -209,7 +209,7 @@ TEST_F(UDPv4Tests, send_to_loopback)
 
     auto sendThreadFunction = [&]()
     {
-        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, multicastLocator));
+        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, multicastLocator, std::chrono::microseconds(100)));
     };
 
     senderThread.reset(new std::thread(sendThreadFunction));
@@ -239,7 +239,7 @@ TEST_F(UDPv4Tests, send_is_rejected_if_buffer_size_is_bigger_to_size_specified_i
     // Then
     std::vector<octet> receiveBufferWrongSize(descriptor.sendBufferSize + 1);
     ASSERT_FALSE(send_resource_list.at(0)->send(receiveBufferWrongSize.data(), (uint32_t)receiveBufferWrongSize.size(),
-                destinationLocator));
+                destinationLocator, std::chrono::microseconds(100)));
 }
 
 TEST_F(UDPv4Tests, RemoteToMainLocal_simply_strips_out_address_leaving_IP_ANY)
@@ -297,7 +297,7 @@ TEST_F(UDPv4Tests, send_to_wrong_interface)
     //Sending through a different IP will NOT work, except 0.0.0.0
     IPLocator::setIPv4(outputChannelLocator, 111, 111, 111, 111);
     std::vector<octet> message = { 'H','e','l','l','o' };
-    ASSERT_FALSE(send_resource_list.at(0)->send(message.data(), (uint32_t)message.size(), Locator_t()));
+    ASSERT_FALSE(send_resource_list.at(0)->send(message.data(), (uint32_t)message.size(), Locator_t(), std::chrono::microseconds(100)));
 }
 
 TEST_F(UDPv4Tests, send_to_blocked_interface)
@@ -332,7 +332,6 @@ TEST_F(UDPv4Tests, send_to_allowed_interface)
 
         if (IsAddressDefined(locator))
         {
-            descriptor.interfaceWhiteList.emplace_back("127.0.0.1");
             descriptor.interfaceWhiteList.emplace_back(IPLocator::toIPv4string(locator));
             UDPv4Transport transportUnderTest(descriptor);
             transportUnderTest.init();
@@ -351,10 +350,9 @@ TEST_F(UDPv4Tests, send_to_allowed_interface)
             IPLocator::setIPv4(remoteMulticastLocator, 239, 255, 1, 4); // Loopback
 
             // Sending through a ALLOWED IP will work
-            IPLocator::setIPv4(outputChannelLocator, 127, 0, 0, 1);
             std::vector<octet> message = { 'H','e','l','l','o' };
             ASSERT_TRUE(send_resource_list.at(0)->send(message.data(), (uint32_t)message.size(),
-                        remoteMulticastLocator));
+                        remoteMulticastLocator, std::chrono::microseconds(100)));
         }
     }
 }
@@ -411,7 +409,7 @@ TEST_F(UDPv4Tests, send_and_receive_between_allowed_sockets_using_localhost)
 
     auto sendThreadFunction = [&]()
     {
-        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, unicastLocator));
+        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, unicastLocator, std::chrono::microseconds(100)));
     };
 
     senderThread.reset(new std::thread(sendThreadFunction));
@@ -462,7 +460,7 @@ TEST_F(UDPv4Tests, send_and_receive_between_allowed_sockets_using_unicast)
 
     auto sendThreadFunction = [&]()
     {
-        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, unicastLocator));
+        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, unicastLocator, std::chrono::microseconds(100)));
     };
 
     senderThread.reset(new std::thread(sendThreadFunction));
@@ -513,13 +511,42 @@ TEST_F(UDPv4Tests, send_and_receive_between_allowed_sockets_using_unicast_to_mul
 
     auto sendThreadFunction = [&]()
     {
-        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, unicastLocator));
+        EXPECT_TRUE(send_resource_list.at(0)->send(message, 5, unicastLocator, std::chrono::microseconds(100)));
     };
 
     senderThread.reset(new std::thread(sendThreadFunction));
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     senderThread->join();
     sem.wait();
+}
+
+TEST_F(UDPv4Tests, open_and_close_two_multicast_transports_with_whitelist)
+{
+    std::vector<IPFinder::info_IP> interfaces;
+    GetIP4s(interfaces);
+
+    if (interfaces.size() > 0)
+    {
+        descriptor.interfaceWhiteList.push_back(interfaces.at(0).name);
+
+        UDPv4Transport transport1(descriptor);
+        UDPv4Transport transport2(descriptor);
+        transport1.init();
+        transport2.init();
+
+        Locator_t multicastLocator;
+        multicastLocator.port = g_default_port;
+        multicastLocator.kind = LOCATOR_KIND_UDPv4;
+        IPLocator::setIPv4(multicastLocator, "239.255.1.4");
+
+        std::cout << "Opening input channels" << std::endl;
+        ASSERT_TRUE(transport1.OpenInputChannel(multicastLocator, nullptr, 65500));
+        ASSERT_TRUE(transport2.OpenInputChannel(multicastLocator, nullptr, 65500));
+        std::cout << "Closing input channel on transport 1" << std::endl;
+        ASSERT_TRUE(transport1.CloseInputChannel(multicastLocator));
+        std::cout << "Closing input channel on transport 2" << std::endl;
+        ASSERT_TRUE(transport2.CloseInputChannel(multicastLocator));
+    }
 }
 #endif
 
@@ -546,193 +573,6 @@ TEST_F(UDPv4Tests, open_a_blocked_socket)
             break;
         }
     }
-}
-
-TEST_F(UDPv4Tests, shrink_locator_lists)
-{
-    UDPv4Transport transportUnderTest(descriptor);
-    transportUnderTest.init();
-
-    LocatorList_t result, list1, list2, list3;
-    Locator_t locator, locResult1, locResult2, locResult3;
-    locator.kind = LOCATOR_KIND_UDPv4;
-    locator.port = g_default_port;
-    locResult1.kind = LOCATOR_KIND_UDPv4;
-    locResult1.port = g_default_port;
-    locResult2.kind = LOCATOR_KIND_UDPv4;
-    locResult2.port = g_default_port;
-    locResult3.kind = LOCATOR_KIND_UDPv4;
-    locResult3.port = g_default_port;
-
-    // Check shrink of only one locator list unicast.
-    IPLocator::setIPv4(locator, 192,168,1,4);
-    IPLocator::setIPv4(locResult1, 192,168,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,2,5);
-    IPLocator::setIPv4(locResult2, 192,168,2,5);
-    list1.push_back(locator);
-
-    result = transportUnderTest.ShrinkLocatorLists({list1});
-    ASSERT_EQ(result.size(), 2u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2);
-    list1.clear();
-
-    // Check shrink of only one locator list with multicast.
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list1.push_back(locator);
-
-    result = transportUnderTest.ShrinkLocatorLists({list1});
-    ASSERT_EQ(result.size(), 1u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locator);
-    list1.clear();
-
-    // Check shrink of only one locator list with multicast and unicast.
-    IPLocator::setIPv4(locator, 192,168,1,4);
-    IPLocator::setIPv4(locResult1, 192,168,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,2,5);
-    IPLocator::setIPv4(locResult2, 192,168,2,5);
-    list1.push_back(locator);
-
-    result = transportUnderTest.ShrinkLocatorLists({list1});
-    ASSERT_EQ(result.size(), 2u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2);
-    list1.clear();
-
-    // Three. Two use same multicast, the other unicast
-    IPLocator::setIPv4(locator, 192,168,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list2.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,2,4);
-    list2.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,3,4);
-    list3.push_back(locator);
-    IPLocator::setIPv4(locResult1, 239,255,1,4);
-    IPLocator::setIPv4(locResult2, 192,168,3,4);
-
-    result = transportUnderTest.ShrinkLocatorLists({list1, list2, list3});
-    ASSERT_EQ(result.size(), 2u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2);
-
-    result = transportUnderTest.ShrinkLocatorLists({list3, list1, list2});
-    ASSERT_EQ(result.size(), 2u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2);
-
-    result = transportUnderTest.ShrinkLocatorLists({list2, list3, list1});
-    ASSERT_EQ(result.size(), 2u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2);
-
-    list1.clear();
-    list2.clear();
-    list3.clear();
-
-    // Three. Two use same multicast, the other another multicast
-    IPLocator::setIPv4(locator, 192,168,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list2.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,2,4);
-    list2.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,3,4);
-    list3.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,2,4);
-    list3.push_back(locator);
-    IPLocator::setIPv4(locResult1, 239,255,1,4);
-    IPLocator::setIPv4(locResult2, 192,168,3,4);
-
-    result = transportUnderTest.ShrinkLocatorLists({list1, list2, list3});
-    ASSERT_EQ(result.size(), 2u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2);
-
-    result = transportUnderTest.ShrinkLocatorLists({list3, list1, list2});
-    ASSERT_EQ(result.size(), 2u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2);
-
-    result = transportUnderTest.ShrinkLocatorLists({list2, list3, list1});
-    ASSERT_EQ(result.size(), 2u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2);
-
-    list1.clear();
-    list2.clear();
-    list3.clear();
-
-    // Three. One uses multicast, the others unicast
-    IPLocator::setIPv4(locator, 192,168,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,2,4);
-    list2.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,3,4);
-    list3.push_back(locator);
-    IPLocator::setIPv4(locResult1, 192,168,1,4);
-    IPLocator::setIPv4(locResult2, 192,168,2,4);
-    IPLocator::setIPv4(locResult3, 192,168,3,4);
-
-    result = transportUnderTest.ShrinkLocatorLists({list1, list2, list3});
-    ASSERT_EQ(result.size(), 3u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2 || *it == locResult3);
-
-    result = transportUnderTest.ShrinkLocatorLists({list3, list1, list2});
-    ASSERT_EQ(result.size(), 3u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2 || *it == locResult3);
-
-    result = transportUnderTest.ShrinkLocatorLists({list2, list3, list1});
-    ASSERT_EQ(result.size(), 3u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1 || *it == locResult2 || *it == locResult3);
-
-    list1.clear();
-    list2.clear();
-    list3.clear();
-
-    // Three using same multicast
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list1.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list2.push_back(locator);
-    IPLocator::setIPv4(locator, 239,255,1,4);
-    list3.push_back(locator);
-    IPLocator::setIPv4(locator, 192,168,3,4);
-    list3.push_back(locator);
-    IPLocator::setIPv4(locResult1, 239,255,1,4);
-
-    result = transportUnderTest.ShrinkLocatorLists({list1, list2, list3});
-    ASSERT_EQ(result.size(), 1u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1);
-
-    result = transportUnderTest.ShrinkLocatorLists({list3, list1, list2});
-    ASSERT_EQ(result.size(), 1u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1);
-
-    result = transportUnderTest.ShrinkLocatorLists({list2, list3, list1});
-    ASSERT_EQ(result.size(), 1u);
-    for(auto it = result.begin(); it != result.end(); ++it)
-        ASSERT_TRUE(*it == locResult1);
-
-    list1.clear();
-    list2.clear();
-    list3.clear();
 }
 
 void UDPv4Tests::HELPER_SetDescriptorDefaults()
