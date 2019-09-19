@@ -1,3 +1,26 @@
+## fastrtps (eloquent) - 1.9.0-3
+
+The packages in the `fastrtps` repository were released into the `eloquent` distro by running `/home/steven/osrf/bloom/.direnv/python-3.7.4/bin/bloom-release -r eloquent fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Thu, 19 Sep 2019 17:41:27 -0000`
+
+The `fastrtps` package was released.
+
+Version of package(s) in repository `fastrtps`:
+
+- upstream repository: https://github.com/eProsima/Fast-RTPS.git
+- release repository: https://github.com/ros2-gbp/fastrtps-release.git
+- rosdistro version: `1.9.0-2`
+- old version: `1.9.0-2`
+- new version: `1.9.0-3`
+
+Versions of tools used:
+
+- bloom version: `0.8.0`
+- catkin_pkg version: `0.4.13`
+- rosdep version: `0.15.2`
+- rosdistro version: `0.7.4`
+- vcstools version: `0.1.42`
+
+
 ## fastrtps (dashing) - 1.8.0-1
 
 The packages in the `fastrtps` repository were released into the `dashing` distro by running `/usr/bin/bloom-release -r dashing fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Mon, 20 May 2019 22:09:30 -0000`
