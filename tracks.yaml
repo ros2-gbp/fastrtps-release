@@ -93,7 +93,7 @@ tracks:
     patches: dashing
     release_inc: '2'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
-    release_tag: 6a6f79c4256a00fc13834a2aaa3c60a0aaac5e76
+    release_tag: b5f3fdfd711192e3d5a4af2adf24ef079f9b0c3f
     ros_distro: dashing
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-RTPS.git
