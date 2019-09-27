@@ -77,7 +77,7 @@ tracks:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
       :{vcs_uri} --name :{name} --output-dir :{archive_dir_path}
-    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 1.8.0+osrf2@g6a6f79c
+    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 1.8.0+osrf3@gb5f3fdf
       --replace
     - git-bloom-generate -y rosrelease :{ros_distro} --source upstream -i :{release_inc}
     - git-bloom-generate -y rosdebian --prefix release/:{ros_distro} :{ros_distro}
@@ -91,7 +91,7 @@ tracks:
     last_version: 1.8.0
     name: fastrtps
     patches: dashing
-    release_inc: '2'
+    release_inc: '0'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
     release_tag: b5f3fdfd711192e3d5a4af2adf24ef079f9b0c3f
     ros_distro: dashing
