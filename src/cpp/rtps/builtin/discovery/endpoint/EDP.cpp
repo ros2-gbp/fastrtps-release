@@ -88,7 +88,6 @@ bool EDP::newLocalReaderProxyData(RTPSReader* reader, const TopicAttributes& att
         rpd.plugin_security_attributes_ = 0UL;
     }
 #endif
-    reader->m_acceptMessagesFromUnkownWriters = false;
 
     if (att.getTopicDiscoveryKind() != NO_CHECK)
     {
@@ -153,7 +152,6 @@ bool EDP::newLocalWriterProxyData(RTPSWriter* writer, const TopicAttributes& att
 {
     logInfo(RTPS_EDP,"Adding " << writer->getGuid().entityId << " in topic "<<att.topicName);
     WriterProxyData wpd;
-    wpd.isAlive(true);
     wpd.guid(writer->getGuid());
     wpd.key() = wpd.guid();
     wpd.multicastLocatorList(writer->getAttributes().multicastLocatorList);
@@ -283,7 +281,6 @@ bool EDP::updatedLocalWriter(RTPSWriter* writer, const TopicAttributes& att, con
 {
     ParticipantProxyData pdata;
     WriterProxyData wdata;
-    wdata.isAlive(true);
     wdata.guid(writer->getGuid());
     wdata.key() = wdata.guid();
     wdata.multicastLocatorList(writer->getAttributes().multicastLocatorList);
@@ -441,6 +438,18 @@ bool EDP::validMatching(const WriterProxyData* wdata, const ReaderProxyData* rda
         logWarning(RTPS_EDP, "Incompatible Disable Positive Acks QoS: writer is enabled but reader is not");
         return false;
     }
+    if (wdata->m_qos.m_liveliness.lease_duration > rdata->m_qos.m_liveliness.lease_duration)
+     {
+         logWarning(RTPS_EDP, "Incompatible liveliness lease durations: offered lease duration "
+                    << wdata->m_qos.m_liveliness.lease_duration << " must be <= requested lease duration "
+                    << rdata->m_qos.m_liveliness.lease_duration);
+         return false;
+     }
+    if (wdata->m_qos.m_liveliness.kind < rdata->m_qos.m_liveliness.kind)
+    {
+        logWarning(RTPS_EDP, "Incompatible liveliness kinds: offered kind is < requested kind");
+        return false;
+    }
 
 #if HAVE_SECURITY
     // TODO: Check EndpointSecurityInfo
@@ -520,11 +529,6 @@ bool EDP::validMatching(const ReaderProxyData* rdata, const WriterProxyData* wda
         logInfo(RTPS_EDP, "Matching failed on checkTypeIdentifier.");
         return false;
     }
-    if(!wdata->isAlive()) //Matching
-    {
-        logWarning(RTPS_EDP, "WriterProxyData " << wdata->guid() << " is NOT alive");
-        return false;
-    }
     if(rdata->m_qos.m_reliability.kind == RELIABLE_RELIABILITY_QOS
             && wdata->m_qos.m_reliability.kind == BEST_EFFORT_RELIABILITY_QOS) //Means our reader is reliable but hte writer is not
     {
@@ -554,7 +558,18 @@ bool EDP::validMatching(const ReaderProxyData* rdata, const WriterProxyData* wda
         logWarning(RTPS_EDP, "Incompatible Disable Positive Acks QoS: writer is enabled but reader is not");
         return false;
     }
-
+    if (wdata->m_qos.m_liveliness.lease_duration > rdata->m_qos.m_liveliness.lease_duration)
+    {
+        logWarning(RTPS_EDP, "Incompatible liveliness lease durations: offered lease duration "
+                   << wdata->m_qos.m_liveliness.lease_duration << " must be <= requested lease duration "
+                   << rdata->m_qos.m_liveliness.lease_duration);
+        return false;
+    }
+    if (wdata->m_qos.m_liveliness.kind < rdata->m_qos.m_liveliness.kind)
+    {
+        logWarning(RTPS_EDP, "Incompatible liveliness kinds: offered kind is < than requested kind");
+        return false;
+    }
 #if HAVE_SECURITY
     // TODO: Check EndpointSecurityInfo
 #endif
@@ -634,7 +649,7 @@ bool EDP::pairingReader(RTPSReader* R, const ParticipantProxyData& pdata, const 
             if(valid)
             {
 #if HAVE_SECURITY
-                if(!mp_RTPSParticipant->security_manager().discovered_writer(R->m_guid, (*pit)->m_guid,
+                if(!mp_RTPSParticipant->security_manager().discovered_writer(R->getGuid(), (*pit)->m_guid,
                             **wdatait, R->getAttributes().security_attributes()))
                 {
                     logError(RTPS_EDP, "Security manager returns an error for reader " << R->getGuid());
