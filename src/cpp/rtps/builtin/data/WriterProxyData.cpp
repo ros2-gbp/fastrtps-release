@@ -37,7 +37,6 @@ WriterProxyData::WriterProxyData()
     : m_userDefinedId(0)
 #endif
     , m_typeMaxSerialized(0)
-    , m_isAlive(true)
     , m_topicKind(NO_KEY)
     , m_topicDiscoveryKind(NO_CHECK)
     {
@@ -60,7 +59,6 @@ WriterProxyData::WriterProxyData(const WriterProxyData& writerInfo)
     , m_topicName(writerInfo.m_topicName)
     , m_userDefinedId(writerInfo.m_userDefinedId)
     , m_typeMaxSerialized(writerInfo.m_typeMaxSerialized)
-    , m_isAlive(writerInfo.m_isAlive)
     , m_topicKind(writerInfo.m_topicKind)
     , persistence_guid_(writerInfo.persistence_guid_)
     , m_topicDiscoveryKind(writerInfo.m_topicDiscoveryKind)
@@ -90,7 +88,6 @@ WriterProxyData& WriterProxyData::operator=(const WriterProxyData& writerInfo)
     m_topicName = writerInfo.m_topicName;
     m_userDefinedId = writerInfo.m_userDefinedId;
     m_typeMaxSerialized = writerInfo.m_typeMaxSerialized;
-    m_isAlive = writerInfo.m_isAlive;
     m_topicKind = writerInfo.m_topicKind;
     persistence_guid_ = writerInfo.persistence_guid_;
     m_qos.setQos(writerInfo.m_qos, true);
@@ -226,8 +223,6 @@ bool WriterProxyData::writeToCDRMessage(CDRMessage_t* msg, bool write_encapsulat
     }
     if(m_qos.m_groupData.sendAlways() ||  m_qos.m_groupData.hasChanged)
     {
-        GroupDataQosPolicy*p = new GroupDataQosPolicy();
-        *p = m_qos.m_groupData;
         if (!m_qos.m_groupData.addToCDRMessage(msg)) return false;
     }
 
@@ -484,6 +479,7 @@ bool WriterProxyData::readFromCDRMessage(CDRMessage_t* msg)
                 assert(p != nullptr);
                 security_attributes_ = p->security_attributes;
                 plugin_security_attributes_ = p->plugin_security_attributes;
+                break;
             }
 #endif
             default:
@@ -521,7 +517,6 @@ void WriterProxyData::clear()
     m_userDefinedId = 0;
     m_qos = WriterQos();
     m_typeMaxSerialized = 0;
-    m_isAlive = true;
     m_topicKind = NO_KEY;
     persistence_guid_ = c_Guid_Unknown;
 }
@@ -538,7 +533,6 @@ void WriterProxyData::copy(WriterProxyData* wdata)
     m_userDefinedId = wdata->m_userDefinedId;
     m_qos = wdata->m_qos;
     m_typeMaxSerialized = wdata->m_typeMaxSerialized;
-    m_isAlive = wdata->m_isAlive;
     m_topicKind = wdata->m_topicKind;
     persistence_guid_ = wdata->persistence_guid_;
     m_topicDiscoveryKind = wdata->m_topicDiscoveryKind;
@@ -555,8 +549,6 @@ void WriterProxyData::update(WriterProxyData* wdata)
     m_unicastLocatorList = wdata->m_unicastLocatorList;
     m_multicastLocatorList = wdata->m_multicastLocatorList;
     m_qos.setQos(wdata->m_qos,false);
-    m_isAlive = wdata->m_isAlive;
-
 }
 
 RemoteWriterAttributes WriterProxyData::toRemoteWriterAttributes() const
@@ -564,7 +556,8 @@ RemoteWriterAttributes WriterProxyData::toRemoteWriterAttributes() const
     RemoteWriterAttributes remoteAtt;
 
     remoteAtt.guid = m_guid;
-    remoteAtt.livelinessLeaseDuration = m_qos.m_liveliness.lease_duration;
+    remoteAtt.liveliness_kind = m_qos.m_liveliness.kind;
+    remoteAtt.liveliness_lease_duration = m_qos.m_liveliness.lease_duration;
     remoteAtt.ownershipStrength = (uint16_t)m_qos.m_ownershipStrength.value;
     remoteAtt.endpoint.durabilityKind = m_qos.m_durability.durabilityKind();
     remoteAtt.endpoint.endpointKind = WRITER;

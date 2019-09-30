@@ -78,6 +78,24 @@ public:
 };
 
 /**
+ * Struct InitialAnnouncementConfig defines the behavior of the RTPSParticipant initial announcements.
+ * @ingroup RTPS_ATTRIBUTES_MODULE
+ */
+struct InitialAnnouncementConfig
+{
+    /// Number of initial announcements with specific period (default 5)
+    uint32_t count = 5u;
+
+    /// Specific period for initial announcements (default 100ms)
+    Duration_t period = { 0, 100000000u };
+
+    bool operator==(const InitialAnnouncementConfig& b) const
+    {
+        return (count == b.count) && (period == b.period);
+    }
+};
+
+/**
  * Class BuiltinAttributes, to define the behavior of the RTPSParticipant builtin protocols.
  * @ingroup RTPS_ATTRIBUTES_MODULE
  */
@@ -89,38 +107,44 @@ class BuiltinAttributes
          * Publisher and Subscriber defined with the same topic name would NOT be linked. All matching must be done
          * manually through the addReaderLocator, addReaderProxy, addWriterProxy methods.
          */
-        bool use_SIMPLE_RTPSParticipantDiscoveryProtocol;
+        bool use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
 
         //!Indicates to use the WriterLiveliness protocol.
-        bool use_WriterLivelinessProtocol;
+        bool use_WriterLivelinessProtocol = true;
 
         /**
          * If set to true, SimpleEDP would be used.
          */
-        bool use_SIMPLE_EndpointDiscoveryProtocol;
+        bool use_SIMPLE_EndpointDiscoveryProtocol = true;
 
         /**
          * If set to true, StaticEDP based on an XML file would be implemented.
          * The XML filename must be provided.
          */
-        bool use_STATIC_EndpointDiscoveryProtocol;
+        bool use_STATIC_EndpointDiscoveryProtocol = false;
 
         /**
-         * DomainId to be used by the RTPSParticipant (80 by default).
+         * DomainId to be used by the RTPSParticipant (0 by default).
          */
-        uint32_t domainId;
+        uint32_t domainId = 0;
 
         /**
          * Lease Duration of the RTPSParticipant,
          * indicating how much time remote RTPSParticipants should consider this RTPSParticipant alive.
          */
-        Duration_t leaseDuration;
+        Duration_t leaseDuration = { 20, 0 };
 
         /**
          * The period for the RTPSParticipant to send its Discovery Message to all other discovered RTPSParticipants
          * as well as to all Multicast ports.
          */
-        Duration_t leaseDuration_announcementperiod;
+        Duration_t leaseDuration_announcementperiod = { 3, 0 };
+
+        //!Initial announcements configuration
+        InitialAnnouncementConfig initial_announcements;
+
+        //!Set to true to avoid multicast traffic on builtin endpoints
+        bool avoid_builtin_multicast = true;
 
         //!Attributes of the SimpleEDP protocol
         SimpleEDPAttributes m_simpleEDP;
@@ -135,48 +159,37 @@ class BuiltinAttributes
         LocatorList_t initialPeersList;
 
         //! Memory policy for builtin readers
-        MemoryManagementPolicy_t readerHistoryMemoryPolicy;
+        MemoryManagementPolicy_t readerHistoryMemoryPolicy = MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE;
 
         //! Memory policy for builtin writers
-        MemoryManagementPolicy_t writerHistoryMemoryPolicy;
+        MemoryManagementPolicy_t writerHistoryMemoryPolicy = MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE;
 
         //! Mutation tries if the port is being used.
-        uint32_t mutation_tries;
+        uint32_t mutation_tries = 100u;
 
-        BuiltinAttributes()
-        {
-            use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
-            use_SIMPLE_EndpointDiscoveryProtocol = true;
-            use_STATIC_EndpointDiscoveryProtocol = false;
-            m_staticEndpointXMLFilename = "";
-            domainId = 0;
-            leaseDuration.seconds = 130;
-            leaseDuration_announcementperiod.seconds = 40;
-            use_WriterLivelinessProtocol = true;
-            readerHistoryMemoryPolicy = MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE;
-            writerHistoryMemoryPolicy = MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE;
-            mutation_tries = 100u;
-        }
-        virtual ~BuiltinAttributes() {}
+        BuiltinAttributes() = default;
+
+        virtual ~BuiltinAttributes() = default;
 
         bool operator==(const BuiltinAttributes& b) const
         {
-            return (this->use_SIMPLE_RTPSParticipantDiscoveryProtocol ==
-                       b.use_SIMPLE_RTPSParticipantDiscoveryProtocol) &&
-                   (this->use_WriterLivelinessProtocol == b.use_WriterLivelinessProtocol) &&
-                   (this->use_SIMPLE_EndpointDiscoveryProtocol == b.use_SIMPLE_EndpointDiscoveryProtocol) &&
-                   (this->use_STATIC_EndpointDiscoveryProtocol == b.use_STATIC_EndpointDiscoveryProtocol) &&
-                   (this->domainId == b.domainId) &&
-                   (this->leaseDuration == b.leaseDuration) &&
-                   (this->leaseDuration_announcementperiod == b.leaseDuration_announcementperiod) &&
-                   (this->m_simpleEDP == b.m_simpleEDP) &&
-                   (this->metatrafficUnicastLocatorList == b.metatrafficUnicastLocatorList) &&
-                   (this->metatrafficMulticastLocatorList == b.metatrafficMulticastLocatorList) &&
-                   (this->initialPeersList == b.initialPeersList) &&
-                   (this->readerHistoryMemoryPolicy == b.readerHistoryMemoryPolicy) &&
-                   (this->writerHistoryMemoryPolicy == b.writerHistoryMemoryPolicy) &&
-                   (this->m_staticEndpointXMLFilename == b.m_staticEndpointXMLFilename) &&
-                   (this->mutation_tries == b.mutation_tries);
+            return (use_SIMPLE_RTPSParticipantDiscoveryProtocol == b.use_SIMPLE_RTPSParticipantDiscoveryProtocol) &&
+                   (use_WriterLivelinessProtocol == b.use_WriterLivelinessProtocol) &&
+                   (use_SIMPLE_EndpointDiscoveryProtocol == b.use_SIMPLE_EndpointDiscoveryProtocol) &&
+                   (use_STATIC_EndpointDiscoveryProtocol == b.use_STATIC_EndpointDiscoveryProtocol) &&
+                   (domainId == b.domainId) &&
+                   (leaseDuration == b.leaseDuration) &&
+                   (leaseDuration_announcementperiod == b.leaseDuration_announcementperiod) &&
+                   (initial_announcements == b.initial_announcements) &&
+                   (avoid_builtin_multicast == b.avoid_builtin_multicast) &&
+                   (m_simpleEDP == b.m_simpleEDP) &&
+                   (metatrafficUnicastLocatorList == b.metatrafficUnicastLocatorList) &&
+                   (metatrafficMulticastLocatorList == b.metatrafficMulticastLocatorList) &&
+                   (initialPeersList == b.initialPeersList) &&
+                   (readerHistoryMemoryPolicy == b.readerHistoryMemoryPolicy) &&
+                   (writerHistoryMemoryPolicy == b.writerHistoryMemoryPolicy) &&
+                   (m_staticEndpointXMLFilename == b.m_staticEndpointXMLFilename) &&
+                   (mutation_tries == b.mutation_tries);
         }
 
         /**
@@ -193,7 +206,8 @@ class BuiltinAttributes
 
     private:
         //! StaticEDP XML filename, only necessary if use_STATIC_EndpointDiscoveryProtocol=true
-        std::string m_staticEndpointXMLFilename;
+        std::string m_staticEndpointXMLFilename = "";
+
 };
 
 /**
