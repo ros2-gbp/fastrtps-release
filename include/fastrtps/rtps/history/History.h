@@ -20,6 +20,8 @@
 #ifndef HISTORY_H_
 #define HISTORY_H_
 
+#include <mutex>
+
 #include "../../fastrtps_dll.h"
 
 #include "CacheChangePool.h"
@@ -27,7 +29,6 @@
 #include "../common/SequenceNumber.h"
 #include "../common/Guid.h"
 #include "../attributes/HistoryAttributes.h"
-#include "../../utils/TimedMutex.hpp"
 
 #include <cassert>
 
@@ -57,13 +58,13 @@ class History
                 CacheChange_t** change,
                 const std::function<uint32_t()>& calculateSizeFunc)
         {
-            std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+            std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
             return m_changePool.reserve_Cache(change, calculateSizeFunc);
         }
 
         RTPS_DllAPI inline bool reserve_Cache(CacheChange_t** change, uint32_t dataSize)
         {
-            std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+            std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
             return m_changePool.reserve_Cache(change, dataSize);
         }
 
@@ -73,7 +74,7 @@ class History
          */
         RTPS_DllAPI inline void release_Cache(CacheChange_t* ch)
         {
-            std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+            std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
             return m_changePool.release_Cache(ch);
         }
 
@@ -89,7 +90,7 @@ class History
          */
         RTPS_DllAPI size_t getHistorySize() 
         { 
-            std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+            std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
             return m_changes.size();
         }
 
@@ -116,13 +117,11 @@ class History
          * @return Iterator to the beginning of the vector.
          */
         RTPS_DllAPI std::vector<CacheChange_t*>::iterator changesBegin(){ return m_changes.begin(); }
-        RTPS_DllAPI std::vector<CacheChange_t*>::reverse_iterator changesRbegin() { return m_changes.rbegin(); }
         /**
          * Get the end of the changes history iterator.
          * @return Iterator to the end of the vector.
          */
         RTPS_DllAPI std::vector<CacheChange_t*>::iterator changesEnd(){ return m_changes.end(); }
-        RTPS_DllAPI std::vector<CacheChange_t*>::reverse_iterator changesRend() { return m_changes.rend(); }
         /**
          * Get the minimum CacheChange_t.
          * @param min_change Pointer to pointer to the minimum change.
@@ -147,7 +146,7 @@ class History
          * Get the mutex
          * @return Mutex
          */
-        RTPS_DllAPI inline RecursiveTimedMutex* getMutex() { assert(mp_mutex != nullptr); return mp_mutex; }
+        RTPS_DllAPI inline std::recursive_timed_mutex* getMutex() { assert(mp_mutex != nullptr); return mp_mutex; }
 
         RTPS_DllAPI bool get_change(
                 const SequenceNumber_t& seq,
@@ -181,11 +180,11 @@ class History
         //!Pointer to the maximum sequeceNumber CacheChange.
         CacheChange_t* mp_maxSeqCacheChange;
 
-        //!Print the seqNum of the changes in the History (for debuggisi, mng purposes).
+        //!Print the seqNum of the changes in the History (for debugging purposes).
         void print_changes_seqNum2();
 
         //!Mutex for the History.
-        RecursiveTimedMutex* mp_mutex;
+        std::recursive_timed_mutex* mp_mutex;
 
 };
 

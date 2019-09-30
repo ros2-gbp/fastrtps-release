@@ -25,10 +25,6 @@ if(NOT fastcdr_FOUND)
     find_package(fastcdr REQUIRED)
 endif()
 
-if(NOT foonathan_memory_FOUND)
-    find_package(foonathan_memory REQUIRED)
-endif()
-
 if(NOT fastrtps_FOUND)
     find_package(fastrtps REQUIRED)
 endif()
@@ -71,7 +67,7 @@ add_definitions(
 include_directories(${ASIO_INCLUDE_DIR})
 
 add_executable(DeadlineQoSExample ${DEADLINEQOS_EXAMPLE_SOURCES})
-target_link_libraries(DeadlineQoSExample fastrtps fastcdr foonathan_memory)
+target_link_libraries(DeadlineQoSExample fastrtps fastcdr)
 if(UNIX)
   target_link_libraries(DeadlineQoSExample pthread)
 endif()

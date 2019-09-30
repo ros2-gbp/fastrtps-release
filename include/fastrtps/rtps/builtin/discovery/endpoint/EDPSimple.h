@@ -23,9 +23,6 @@
 
 #include "EDP.h"
 
-#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
-#include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
-
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
@@ -34,31 +31,30 @@ class StatefulReader;
 class StatefulWriter;
 class RTPSWriter;
 class RTPSReader;
+class EDPSimplePUBListener;
+class EDPSimpleSUBListener;
 class ReaderHistory;
 class WriterHistory;
-class HistoryAttributes;
-class ReaderAttributes;
-class WriterAttributes;
-class EDPListener;
+
 
 /**
  * Class EDPSimple, implements the Simple Endpoint Discovery Protocol defined in the RTPS specification.
  * Inherits from EDP class.
  *@ingroup DISCOVERY_MODULE
  */
-class EDPSimple : public EDP  
+class EDPSimple : public EDP
 {
     typedef std::pair<StatefulWriter*,WriterHistory*> t_p_StatefulWriter;
     typedef std::pair<StatefulReader*,ReaderHistory*> t_p_StatefulReader;
 
-public:
+    public:
 
     /**
      * Constructor.
-     * @param p Pointer to the PDP
+     * @param p Pointer to the PDPSimple
      * @param part Pointer to the RTPSParticipantImpl
      */
-    EDPSimple(PDP* p,RTPSParticipantImpl* part);
+    EDPSimple(PDPSimple* p,RTPSParticipantImpl* part);
     virtual ~EDPSimple();
     //!Discovery attributes.
     BuiltinAttributes m_discovery;
@@ -82,10 +78,10 @@ public:
 #endif
 
     //!Pointer to the listener associated with PubReader and PubWriter.
-    EDPListener* publications_listener_;
+    EDPSimplePUBListener* publications_listener_;
 
     //!Pointer to the listener associated with SubReader and SubWriter.
-    EDPListener* subscriptions_listener_;
+    EDPSimpleSUBListener* subscriptions_listener_;
 
     /**
      * Initialization method.
@@ -103,9 +99,6 @@ public:
      * @param pdata Pointer to the ParticipantProxyData to remove
      */
     void removeRemoteEndpoints(ParticipantProxyData* pdata) override;
-
-    //! Verify if the given participant EDP enpoints are matched with us
-    bool areRemoteEndpointsMatched(const ParticipantProxyData* pdata) override;
 
     /**
      * This method generates the corresponding change in the subscription writer and send it to all known remote endpoints.
@@ -134,43 +127,13 @@ public:
      */
     bool removeLocalWriter(RTPSWriter*W) override;
 
-protected:
-
-    /**
-     * Initialization of history attributes for EDP built-in readers
-     *
-     * @param [out] attributes History attributes to initialize
-     */
-    virtual void set_builtin_reader_history_attributes(HistoryAttributes& attributes);
-
-    /**
-     * Initialization of history attributes for EDP built-in writers
-     *
-     * @param [out] attributes History attributes to initialize
-     */
-    virtual void set_builtin_writer_history_attributes(HistoryAttributes& attributes);
-
-    /**
-     * Initialization of reader attributes for EDP built-in readers
-     *
-     * @param [out] attributes Reader attributes to initialize
-     */
-    virtual void set_builtin_reader_attributes(ReaderAttributes& attributes);
-
-    /**
-     * Initialization of writer attributes for EDP built-in writers
-     *
-     * @param [out] attributes Writer attributes to initialize
-     */
-    virtual void set_builtin_writer_attributes(WriterAttributes& attributes);
+    private:
 
     /**
      * Create local SEDP Endpoints based on the DiscoveryAttributes.
      * @return True if correct.
      */
-    virtual bool createSEDPEndpoints();
-
-private:
+    bool createSEDPEndpoints();
 
 #if HAVE_SECURITY
     bool create_sedp_secure_endpoints();
@@ -182,13 +145,10 @@ private:
                 const ReaderProxyData& remote_reader_data) override;
 #endif
 
-    std::mutex temp_data_lock_;
-    ReaderProxyData temp_reader_proxy_data_;
-    WriterProxyData temp_writer_proxy_data_;
 };
 
+}
 } /* namespace rtps */
-} /* namespace fastrtps */
 } /* namespace eprosima */
 
 #endif

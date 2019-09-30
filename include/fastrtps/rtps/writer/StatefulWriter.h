@@ -22,17 +22,18 @@
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "RTPSWriter.h"
+#include "timedevent/PeriodicHeartbeat.h"
 #include "../../utils/collections/ResourceLimitedVector.hpp"
 #include <condition_variable>
 #include <mutex>
-
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
 class ReaderProxy;
-class TimedEvent;
+class NackResponseDelay;
+class TimedCallback;
 
 /**
  * Class StatefulWriter, specialization of RTPSWriter that maintains information of each matched Reader.
@@ -58,16 +59,8 @@ protected:
             WriterListener* listen = nullptr);
 
 private:
-
     //!Timed Event to manage the periodic HB to the Reader.
-    TimedEvent* periodic_hb_event_;
-
-    //! Timed Event to manage the Acknack response delay.
-    TimedEvent* nack_response_event_;
-
-    //! A timed event to mark samples as acknowledget (used only if disable positive ACKs QoS is enabled)
-    TimedEvent* ack_event_;
-
+    PeriodicHeartbeat* mp_periodicHB;
     //!Count of the sent heartbeats.
     Count_t m_heartbeatCount;
     //!WriterTimes
@@ -90,6 +83,8 @@ private:
     bool all_acked_;
     std::condition_variable_any may_remove_change_cond_;
     unsigned int may_remove_change_;
+    //! Timed Event to manage the Acknack response delay.
+    NackResponseDelay* nack_response_event_;
 
 public:
 
@@ -100,7 +95,7 @@ public:
      */
     void unsent_change_added_to_history(
             CacheChange_t* p,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) override;
+            std::chrono::time_point<std::chrono::steady_clock> max_blocking_time) override;
 
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
@@ -122,30 +117,28 @@ public:
 
     /**
      * Add a matched reader.
-     * @param data Pointer to the ReaderProxyData object added.
+     * @param ratt Attributes of the reader to add.
      * @return True if added.
      */
-    bool matched_reader_add(const ReaderProxyData& data) override;
+    bool matched_reader_add(RemoteReaderAttributes& ratt) override;
 
     /**
      * Remove a matched reader.
-     * @param reader_guid GUID of the reader to remove.
+     * @param ratt Attributes of the reader to remove.
      * @return True if removed.
      */
-    bool matched_reader_remove(const GUID_t& reader_guid) override;
+    bool matched_reader_remove(const RemoteReaderAttributes& ratt) override;
 
     /**
      * Tells us if a specific Reader is matched against this writer
-     * @param reader_guid GUID of the reader to check.
+     * @param ratt Attributes of the reader to remove.
      * @return True if it was matched.
      */
-    bool matched_reader_is_matched(const GUID_t& reader_guid) override;
+    bool matched_reader_is_matched(const RemoteReaderAttributes& ratt) override;
 
     bool is_acked_by_all(const CacheChange_t* a_change) const override;
 
     bool wait_for_all_acked(const Duration_t& max_wait) override;
-
-    bool all_readers_updated();
 
     /**
      * Remove the change with the minimum SequenceNumber
@@ -153,7 +146,7 @@ public:
      */
     bool try_remove_change(
             std::chrono::steady_clock::time_point& max_blocking_time_point,
-            std::unique_lock<RecursiveTimedMutex>& lock) override;
+            std::unique_lock<std::recursive_timed_mutex>& lock) override;
 
     /**
      * Update the Attributes of the Writer.
@@ -192,7 +185,6 @@ public:
      */
     inline size_t getMatchedReadersSize() const
     {
-        std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
         return matched_readers_.size();
     }
 
@@ -274,15 +266,19 @@ public:
 
 private:
 
-    void update_reader_info(bool create_sender_resources);
+    void send_heartbeat_piggyback_nts_(
+            RTPSMessageGroup& message_group,
+            uint32_t& last_bytes_processed);
 
     void send_heartbeat_piggyback_nts_(
-            ReaderProxy* reader,
+            const std::vector<GUID_t>& remote_readers,
+            const LocatorList_t& locators,
             RTPSMessageGroup& message_group,
             uint32_t& last_bytes_processed);
 
     void send_heartbeat_nts_(
-            size_t number_of_readers,
+            const std::vector<GUID_t>& remote_readers,
+            const LocatorList_t& locators,
             RTPSMessageGroup& message_group,
             bool final,
             bool liveliness = false);
@@ -293,7 +289,7 @@ private:
      * @brief A method called when the ack timer expires
      * @details Only used if disable positive ACKs QoS is enabled
      */
-    bool ack_timer_expired();
+    void ack_timer_expired();
 
     //! True to disable piggyback heartbeats
     bool disable_heartbeat_piggyback_;
@@ -301,6 +297,8 @@ private:
     bool disable_positive_acks_;
     //! Keep duration for disable positive ACKs QoS, in microseconds
     std::chrono::duration<double, std::ratio<1, 1000000>> keep_duration_us_;
+    //! A timed event to mark samples as acknowledget (used only if disable positive ACKs QoS is enabled)
+    TimedCallback* ack_timer_;
     //! Last acknowledged cache change (only used if using disable positive ACKs QoS)
     SequenceNumber_t last_sequence_number_;
 

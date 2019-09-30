@@ -16,6 +16,7 @@
 #include <fastrtps/transport/TCPChannelResource.h>
 #include <fastrtps/transport/TCPTransportInterface.h>
 #include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/utils/eClock.h>
 
 #include <future>
 
@@ -80,10 +81,7 @@ void TCPChannelResourceBasic::connect(
 #endif
                         )
                 {
-                    if (!channel_weak_ptr.expired())
-                    {
-                        parent_->SocketConnected(channel_weak_ptr, ec);
-                    }
+                    parent_->SocketConnected(channel_weak_ptr, ec);
                 }
             );
         }
@@ -96,7 +94,7 @@ void TCPChannelResourceBasic::connect(
 
 void TCPChannelResourceBasic::disconnect()
 {
-    if (eConnecting < change_status(eConnectionStatus::eDisconnected) && alive())
+    if (eConnecting < change_status(eConnectionStatus::eDisconnected))
     {
         auto socket = socket_;
 

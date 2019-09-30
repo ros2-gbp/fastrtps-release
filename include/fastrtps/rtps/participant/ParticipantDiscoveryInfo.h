@@ -47,10 +47,7 @@ struct ParticipantDiscoveryInfo
         DROPPED_PARTICIPANT
     };
 
-    ParticipantDiscoveryInfo(const ParticipantProxyData& data)
-        : status(DISCOVERED_PARTICIPANT)
-        , info(data)
-    {}
+    ParticipantDiscoveryInfo(): status(DISCOVERED_PARTICIPANT) {}
 
     virtual ~ParticipantDiscoveryInfo() {}
 
@@ -58,7 +55,7 @@ struct ParticipantDiscoveryInfo
     DISCOVERY_STATUS status;
 
     //! Participant discovery info
-    const ParticipantProxyData& info;
+    ParticipantProxyData info;
 };
 
 #if HAVE_SECURITY

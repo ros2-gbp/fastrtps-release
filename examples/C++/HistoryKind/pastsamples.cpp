@@ -10,6 +10,8 @@
 #include <fastrtps/Domain.h>
 #include <fastrtps/subscriber/SampleInfo.h>
 
+#include <fastrtps/utils/eClock.h>
+
 #include "samplePubSubTypes.h"
 
 using namespace eprosima::fastrtps;
@@ -47,7 +49,7 @@ void pastsamples(){
 
     ParticipantAttributes PparamPub;
     PparamPub.rtps.builtin.domainId = 0;
-    PparamPub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PparamPub.rtps.builtin.leaseDuration = c_TimeInfinite;
     PparamPub.rtps.setName("PublisherParticipant");
 
     Participant *PubParticipant = Domain::createParticipant(PparamPub);
@@ -83,7 +85,7 @@ void pastsamples(){
 
     ParticipantAttributes PparamSub;
     PparamSub.rtps.builtin.domainId = 0;
-    PparamSub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PparamSub.rtps.builtin.leaseDuration = c_TimeInfinite;
     PparamSub.rtps.setName("SubscriberParticipant");
 
     Participant *SubParticipant = Domain::createParticipant(PparamSub);
@@ -145,7 +147,7 @@ void pastsamples(){
         myPub->write(&my_sample);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    eClock::my_sleep(1500);
 
     //Read the contents of both histories:
         std::cout << "The Keep All Subscriber holds: " << std::endl;

@@ -29,7 +29,7 @@
 #include <list>
 
 namespace eprosima {
-namespace fastrtps {
+namespace fastrtps{
 namespace rtps {
 
 
@@ -61,7 +61,7 @@ public:
      */
     void unsent_change_added_to_history(
             CacheChange_t* change,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) override;
+            std::chrono::time_point<std::chrono::steady_clock> max_blocking_time) override;
 
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
@@ -72,24 +72,24 @@ public:
 
     /**
      * Add a matched reader.
-     * @param data Pointer to the ReaderProxyData object added.
+     * @param reader_attributes Attributes of the reader to add.
      * @return True if added.
      */
-    bool matched_reader_add(const ReaderProxyData& data) override;
+    bool matched_reader_add(RemoteReaderAttributes& reader_attributes) override;
 
     /**
      * Remove a matched reader.
-     * @param reader_guid GUID of the reader to remove.
+     * @param reader_attributes Attributes of the reader to remove.
      * @return True if removed.
      */
-    bool matched_reader_remove(const GUID_t& reader_guid) override;
+    bool matched_reader_remove(const RemoteReaderAttributes& reader_attributes) override;
 
     /**
      * Tells us if a specific Reader is matched against this writer
-     * @param reader_guid GUID of the reader to check.
+     * @param reader_attributes Attributes of the reader to check.
      * @return True if it was matched.
      */
-    bool matched_reader_is_matched(const GUID_t& reader_guid) override;
+    bool matched_reader_is_matched(const RemoteReaderAttributes& reader_attributes) override;
 
     /**
      * Method to indicate that there are changes not sent in some of all ReaderProxy.
@@ -118,34 +118,24 @@ public:
 
     bool try_remove_change(
             std::chrono::steady_clock::time_point&,
-            std::unique_lock<RecursiveTimedMutex>&) override
+            std::unique_lock<std::recursive_timed_mutex>&) override
     {
         return remove_older_changes(1);
     }
 
     void add_flow_controller(std::unique_ptr<FlowController> controller) override;
 
-    /**
-     * Send a message through this interface.
-     *
-     * @param message Pointer to the buffer with the message already serialized.
-     * @param max_blocking_time_point Future timepoint where blocking send should end.
-     */
-    bool send(
-            CDRMessage_t* message,
-            std::chrono::steady_clock::time_point& max_blocking_time_point) const override;
-
 private:
 
-    void get_builtin_guid();
+    void get_builtin_guid(ResourceLimitedVector<GUID_t>& guid_vector);
 
     bool has_builtin_guid();
 
-    void update_reader_info(bool create_sender_resources);
+    void update_locators_nts();
 
     bool is_inline_qos_expected_ = false;
     LocatorList_t fixed_locators_;
-    ResourceLimitedVector<ReaderLocator> matched_readers_;
+    ResourceLimitedVector<RemoteReaderAttributes> matched_readers_;
     ResourceLimitedVector<ChangeForReader_t, std::true_type> unsent_changes_;
     std::vector<std::unique_ptr<FlowController> > flow_controllers_;
 };

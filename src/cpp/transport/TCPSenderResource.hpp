@@ -42,8 +42,7 @@ class TCPSenderResource : public SenderResource
             send_lambda_ = [this, &transport] (
                     const octet* data,
                     uint32_t dataSize,
-                    const Locator_t& destination,
-                    const std::chrono::microseconds&)-> bool
+                    const Locator_t& destination)-> bool
                 {
                     return transport.send(data, dataSize, channel_, destination);
                 };

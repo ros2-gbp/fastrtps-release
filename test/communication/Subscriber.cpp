@@ -27,6 +27,7 @@
 #include <fastrtps/subscriber/SubscriberListener.h>
 #include <fastrtps/Domain.h>
 #include <fastrtps/subscriber/SampleInfo.h>
+#include <fastrtps/utils/eClock.h>
 
 #include <types/HelloWorldType.h>
 
@@ -52,49 +53,25 @@ class ParListener : public ParticipantListener
          * @param p Pointer to the Participant
          * @param info DiscoveryInfo.
          */
-        void onParticipantDiscovery(
-                Participant* /*participant*/,
-                rtps::ParticipantDiscoveryInfo&& info) override
+        void onParticipantDiscovery(Participant*, rtps::ParticipantDiscoveryInfo&& info) override
         {
             if(info.status == rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
             {
-                std::cout << "Subscriber participant " << //participant->getGuid() <<
-                    " discovered participant " << info.info.m_guid << std::endl;
+                std::cout << "Subscriber discovered a participant" << std::endl;
             }
             else if(info.status == rtps::ParticipantDiscoveryInfo::CHANGED_QOS_PARTICIPANT)
             {
-                std::cout << "Subscriber participant " << //participant->getGuid() <<
-                    " detected changes on participant " << info.info.m_guid << std::endl;
+                std::cout << "Subscriber detected changes on a participant" << std::endl;
             }
             else if(info.status == rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT)
             {
-                std::cout << "Subscriber participant " << //participant->getGuid() <<
-                    " removed participant " << info.info.m_guid << std::endl;
+                std::cout << "Subscriber removed a participant" << std::endl;
             }
             else if(info.status == rtps::ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
             {
-                std::cout << "Subscriber participant " << //participant->getGuid() <<
-                    " dropped participant " << info.info.m_guid << std::endl;
+                std::cout << "Subscriber dropped a participant" << std::endl;
             }
         }
-
-#if HAVE_SECURITY
-        void onParticipantAuthentication(
-                Participant* /*participant*/,
-                rtps::ParticipantAuthenticationInfo&& info) override
-        {
-            if (rtps::ParticipantAuthenticationInfo::AUTHORIZED_PARTICIPANT == info.status)
-            {
-                std::cout << "Subscriber participant " << //participant->getGuid() <<
-                    " authorized participant " << info.guid << std::endl;
-            }
-            else
-            {
-                std::cout << "Subscriber participant " << //participant->getGuid() <<
-                    " unauthorized participant " << info.guid << std::endl;
-            }
-        }
-#endif
 };
 
 class SubListener : public SubscriberListener
@@ -110,11 +87,11 @@ class SubListener : public SubscriberListener
         {
             if(info.status == MATCHED_MATCHING)
             {
-                std::cout << "Subscriber matched with publisher " << info.remoteEndpointGuid << std::endl;
+                std::cout << "Publisher matched" << std::endl;
             }
             else
             {
-                std::cout << "Subscriber unmatched with publisher " << info.remoteEndpointGuid << std::endl;
+                std::cout << "Publisher unmatched" << std::endl;
             }
         }
 
@@ -273,7 +250,7 @@ int main(int argc, char** argv)
 
     while(notexit && run)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        eClock::my_sleep(250);
     }
 
     if (run)

@@ -21,9 +21,11 @@
 #define _RTPS_BUILTIN_DATA_WRITERPROXYDATA_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include "../../../qos/WriterQos.h"
 #include "../../../attributes/TopicAttributes.h"
 #include "../../../qos/ParameterList.h"
+#include "../../../qos/WriterQos.h"
+
+#include "../../attributes/ReaderAttributes.h"
 
 #include "../../../utils/fixed_size_string.hpp"
 
@@ -31,15 +33,11 @@
 #include "../../security/accesscontrol/EndpointSecurityAttributes.h"
 #endif
 
-#include "../../common/RemoteLocators.hpp"
-
 namespace eprosima {
-namespace fastrtps {
+namespace fastrtps{
 namespace rtps {
 
 struct CDRMessage_t;
-class NetworkFactory;
-class ParticipantProxyData;
 
 /**
  **@ingroup BUILTIN_MODULE
@@ -48,9 +46,7 @@ class WriterProxyData
 {
     public:
 
-        RTPS_DllAPI WriterProxyData(
-                const size_t max_unicast_locators,
-                const size_t max_multicast_locators);
+        RTPS_DllAPI WriterProxyData();
 
         virtual RTPS_DllAPI ~WriterProxyData();
 
@@ -68,7 +64,7 @@ class WriterProxyData
             m_guid = std::move(guid);
         }
 
-        RTPS_DllAPI const GUID_t& guid() const
+        RTPS_DllAPI GUID_t guid() const
         {
             return m_guid;
         }
@@ -98,43 +94,45 @@ class WriterProxyData
             return persistence_guid_;
         }
 
-        RTPS_DllAPI void set_persistence_entity_id(const EntityId_t & nid)
+        RTPS_DllAPI void unicastLocatorList(const LocatorList_t& unicastLocatorList)
         {
-            persistence_guid_.entityId = persistence_guid_.guidPrefix != c_GuidPrefix_Unknown ? nid : c_EntityId_Unknown;
+            m_unicastLocatorList = unicastLocatorList;
         }
 
-        RTPS_DllAPI bool has_locators() const
+        RTPS_DllAPI void unicastLocatorList(LocatorList_t&& unicastLocatorList)
         {
-            return !remote_locators_.unicast.empty() || !remote_locators_.multicast.empty();
+            m_unicastLocatorList = std::move(unicastLocatorList);
         }
 
-        RTPS_DllAPI const RemoteLocatorList& remote_locators() const
+        RTPS_DllAPI LocatorList_t unicastLocatorList() const
         {
-            return remote_locators_;
+            return m_unicastLocatorList;
         }
 
-        RTPS_DllAPI void add_unicast_locator(const Locator_t& locator);
+        RTPS_DllAPI LocatorList_t& unicastLocatorList()
+        {
+            return m_unicastLocatorList;
+        }
 
-        void set_announced_unicast_locators(
-                const LocatorList_t& locators);
+        RTPS_DllAPI void multicastLocatorList(const LocatorList_t& multicastLocatorList)
+        {
+            m_multicastLocatorList = multicastLocatorList;
+        }
 
-        void set_remote_unicast_locators(
-                const LocatorList_t& locators,
-                const NetworkFactory& network);
+        RTPS_DllAPI void multicastLocatorList(LocatorList_t&& multicastLocatorList)
+        {
+            m_multicastLocatorList = std::move(multicastLocatorList);
+        }
 
-        RTPS_DllAPI void add_multicast_locator(const Locator_t& locator);
+        RTPS_DllAPI LocatorList_t multicastLocatorList() const
+        {
+            return m_multicastLocatorList;
+        }
 
-        void set_multicast_locators(
-                const LocatorList_t& locators,
-                const NetworkFactory& network);
-
-        void set_locators(
-                const RemoteLocatorList& locators);
-
-        void set_remote_locators(
-                const RemoteLocatorList& remote_locators,
-                const NetworkFactory& network,
-                bool use_multicast_locators);
+        RTPS_DllAPI LocatorList_t& multicastLocatorList()
+        {
+            return m_multicastLocatorList;
+        }
 
         RTPS_DllAPI void key(const InstanceHandle_t& key)
         {
@@ -319,40 +317,31 @@ class WriterProxyData
 
         //!Clear the information and return the object to the default state.
         void clear();
-
-        /**
-         * Check if this object can be updated with the information on another object.
-         * @param wdata WriterProxyData object to be checked.
-         * @return true if this object can be updated with the information on wdata.
-         */
-        bool is_update_allowed(const WriterProxyData& wdata) const;
-
-        /**
-         * Update certain parameters from another object.
-         * @param wdata pointer to object with new information.
-         */
-        void update(WriterProxyData* wdata);
-
+        //!Update certain parameters from another object.
+        void update(WriterProxyData* rdata);
         //!Copy all information from another object.
-        void copy(WriterProxyData* wdata);
-
+        void copy(WriterProxyData* rdata);
         //!Write as a parameter list on a CDRMessage_t
-        bool writeToCDRMessage(
-                CDRMessage_t* msg,
-                bool write_encapsulation);
-
+        bool writeToCDRMessage(CDRMessage_t* msg, bool write_encapsulation);
         //!Read a parameter list from a CDRMessage_t.
-        RTPS_DllAPI bool readFromCDRMessage(
-                CDRMessage_t* msg,
-                const NetworkFactory& network);
+        RTPS_DllAPI bool readFromCDRMessage(CDRMessage_t* msg);
+
+        /**
+         * Convert the ProxyData information to RemoteWriterAttributes object.
+         * @return Reference to the RemoteWriterAttributes object.
+         */
+        RemoteWriterAttributes toRemoteWriterAttributes() const;
 
     private:
 
         //!GUID
         GUID_t m_guid;
 
-        //!Holds locator information
-        RemoteLocatorList remote_locators_;
+        //!Unicast locator list
+        LocatorList_t m_unicastLocatorList;
+
+        //!Multicast locator list
+        LocatorList_t m_multicastLocatorList;
 
         //!GUID_t of the Writer converted to InstanceHandle_t
         InstanceHandle_t m_key;
@@ -388,8 +377,8 @@ class WriterProxyData
         TypeObjectV1 m_type;
 };
 
+}
 } /* namespace rtps */
-} /* namespace fastrtps */
 } /* namespace eprosima */
 
 #endif

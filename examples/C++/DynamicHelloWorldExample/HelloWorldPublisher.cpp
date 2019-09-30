@@ -22,6 +22,7 @@
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 #include <fastrtps/types/DynamicTypeBuilderFactory.h>
 #include <fastrtps/types/DynamicDataFactory.h>
 #include <fastrtps/types/DynamicTypeBuilder.h>
@@ -140,7 +141,7 @@ void HelloWorldPublisher::runThread(uint32_t samples, uint32_t sleep)
             std::cout << "Message: " << message << " with index: " << index << " SENT" << std::endl;
             ++i;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
+        eClock::my_sleep(sleep);
     }
 }
 

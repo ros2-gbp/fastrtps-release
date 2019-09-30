@@ -30,9 +30,9 @@ const GUID_t& Subscriber::getGuid()
     return mp_impl->getGuid();
 }
 
-bool Subscriber::wait_for_unread_samples(const Duration_t& timeout)
+void Subscriber::waitForUnreadMessage()
 {
-    return mp_impl->wait_for_unread_samples(timeout);
+    return mp_impl->waitForUnreadMessage();
 }
 
 bool Subscriber::readNextData(void* data,SampleInfo_t* info)
@@ -59,9 +59,9 @@ bool Subscriber::isInCleanState() const
     return mp_impl->isInCleanState();
 }
 
-uint64_t Subscriber::get_unread_count() const
+uint64_t Subscriber::getUnreadCount() const
 {
-	return mp_impl->get_unread_count();
+	return mp_impl->getUnreadCount();
 }
 
 void Subscriber::get_requested_deadline_missed_status(RequestedDeadlineMissedStatus& status)

@@ -53,10 +53,7 @@ class PubSubWriter
     {
         public:
 
-            ParticipantListener(
-                    PubSubWriter &writer)
-                : writer_(writer)
-            {}
+            ParticipantListener(PubSubWriter &writer) : writer_(writer) {}
 
             ~ParticipantListener() {}
 
@@ -66,6 +63,7 @@ class PubSubWriter
                 if(writer_.onDiscovery_!=nullptr)
                 {
                     writer_.discovery_result_ = writer_.onDiscovery_(info);
+
                 }
 
                 if(info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
@@ -93,13 +91,11 @@ class PubSubWriter
             }
 #endif
 
-            void onSubscriberDiscovery(eprosima::fastrtps::Participant*,
-                                       eprosima::fastrtps::rtps::ReaderDiscoveryInfo&& info) override
+            void onSubscriberDiscovery(eprosima::fastrtps::Participant*, eprosima::fastrtps::rtps::ReaderDiscoveryInfo&& info) override
             {
                 if(info.status == eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERED_READER)
                 {
                     writer_.add_reader_info(info.info);
-
                 }
                 else if(info.status == eprosima::fastrtps::rtps::ReaderDiscoveryInfo::CHANGED_QOS_READER)
                 {
@@ -111,8 +107,7 @@ class PubSubWriter
                 }
             }
 
-            void onPublisherDiscovery(eprosima::fastrtps::Participant*,
-                                      eprosima::fastrtps::rtps::WriterDiscoveryInfo&& info) override
+            void onPublisherDiscovery(eprosima::fastrtps::Participant*, eprosima::fastrtps::rtps::WriterDiscoveryInfo&& info) override
             {
                 if(info.status == eprosima::fastrtps::rtps::WriterDiscoveryInfo::DISCOVERED_WRITER)
                 {
@@ -133,15 +128,13 @@ class PubSubWriter
             ParticipantListener& operator=(const ParticipantListener&) = delete;
 
             PubSubWriter& writer_;
-
     } participant_listener_;
 
     class Listener : public eprosima::fastrtps::PublisherListener
     {
         public:
 
-            Listener(
-                    PubSubWriter &writer)
+            Listener(PubSubWriter &writer)
                 : writer_(writer)
                 , times_deadline_missed_(0)
                 , times_liveliness_lost_(0)
@@ -155,12 +148,12 @@ class PubSubWriter
             {
                 if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                 {
-                    std::cout << "Publisher matched subscriber " << info.remoteEndpointGuid << std::endl;
+                    std::cout << "Matched subscriber " << info.remoteEndpointGuid << std::endl;
                     writer_.matched();
                 }
                 else
                 {
-                    std::cout << "Publisher unmatched subscriber " << info.remoteEndpointGuid << std::endl;
+                    std::cout << "Unmatched subscriber " << info.remoteEndpointGuid << std::endl;
                     writer_.unmatched();
                 }
             }
@@ -179,7 +172,6 @@ class PubSubWriter
             {
                 (void)pub;
                 times_liveliness_lost_ = status.total_count;
-                writer_.liveliness_lost();
             }
 
             unsigned int missed_deadlines() const
@@ -210,8 +202,7 @@ class PubSubWriter
     typedef TypeSupport type_support;
     typedef typename type_support::type type;
 
-    PubSubWriter(
-            const std::string &topic_name)
+    PubSubWriter(const std::string &topic_name)
         : participant_listener_(*this)
         , listener_(*this)
         , participant_(nullptr)
@@ -221,7 +212,6 @@ class PubSubWriter
         , participant_matched_(0)
         , discovery_result_(false)
         , onDiscovery_(nullptr)
-        , times_liveliness_lost_(0)
 #if HAVE_SECURITY
     , authorized_(0), unauthorized_(0)
 #endif
@@ -241,11 +231,6 @@ class PubSubWriter
         publisher_attr_.times.heartbeatPeriod.nanosec = 100000000;
         publisher_attr_.times.nackResponseDelay.seconds = 0;
         publisher_attr_.times.nackResponseDelay.nanosec = 100000000;
-
-        // Increase default max_blocking_time to 1 second, as our CI infrastructure shows some
-        // big CPU overhead sometimes
-        publisher_attr_.qos.m_reliability.max_blocking_time.seconds = 1;
-        publisher_attr_.qos.m_reliability.max_blocking_time.nanosec = 0;
     }
 
     ~PubSubWriter()
@@ -346,15 +331,35 @@ class PubSubWriter
         std::cout << "Writer discovery finished..." << std::endl;
     }
 
-    void wait_participant_undiscovery()
+    bool wait_participant_undiscovery(std::chrono::seconds timeout = std::chrono::seconds::zero())
     {
+        bool ret_value = true;
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
         std::cout << "Writer is waiting undiscovery..." << std::endl;
 
-        cv_.wait(lock, [&](){return participant_matched_ == 0;});
+        if(timeout == std::chrono::seconds::zero())
+        {
+            cv_.wait(lock, [&](){return participant_matched_ == 0;});
+        }
+        else
+        {
+            if (!cv_.wait_for(lock, timeout, [&](){return participant_matched_ == 0;}))
+            {
+                ret_value = false;
+            }
+        }
 
-        std::cout << "Writer undiscovery finished..." << std::endl;
+        if (ret_value)
+        {
+            std::cout << "Writer undiscovery finished successfully..." << std::endl;
+        }
+        else
+        {
+            std::cout << "Writer undiscovery finished unsuccessfully..." << std::endl;
+        }
+
+        return ret_value;
     }
 
     void wait_reader_undiscovery()
@@ -366,19 +371,6 @@ class PubSubWriter
         cv_.wait(lock, [&](){return matched_ == 0;});
 
         std::cout << "Writer removal finished..." << std::endl;
-    }
-
-    void wait_liveliness_lost(unsigned int times = 1)
-    {
-        std::unique_lock<std::mutex> lock(liveliness_mutex_);
-        liveliness_cv_.wait(lock, [&](){ return times_liveliness_lost_ == times; });
-    }
-
-    void liveliness_lost()
-    {
-        std::unique_lock<std::mutex> lock(liveliness_mutex_);
-        times_liveliness_lost_++;
-        liveliness_cv_.notify_one();
     }
 
 #if HAVE_SECURITY
@@ -653,9 +645,9 @@ class PubSubWriter
 
     PubSubWriter& static_discovery(const char* filename)
     {
-        participant_attr_.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
-        participant_attr_.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_attr_.rtps.builtin.discovery_config.setStaticEndpointXMLFilename(filename);
+        participant_attr_.rtps.builtin.use_SIMPLE_EndpointDiscoveryProtocol = false;
+        participant_attr_.rtps.builtin.use_STATIC_EndpointDiscoveryProtocol = true;
+        participant_attr_.rtps.builtin.setStaticEndpointXMLFilename(filename);
         return *this;
     }
 
@@ -714,8 +706,8 @@ class PubSubWriter
 
     PubSubWriter& lease_duration(eprosima::fastrtps::Duration_t lease_duration, eprosima::fastrtps::Duration_t announce_period)
     {
-        participant_attr_.rtps.builtin.discovery_config.leaseDuration = lease_duration;
-        participant_attr_.rtps.builtin.discovery_config.leaseDuration_announcementperiod = announce_period;
+        participant_attr_.rtps.builtin.leaseDuration = lease_duration;
+        participant_attr_.rtps.builtin.leaseDuration_announcementperiod = announce_period;
         return *this;
     }
 
@@ -1062,13 +1054,6 @@ void change_reader_info(const eprosima::fastrtps::rtps::ReaderProxyData& reader_
     bool discovery_result_;
 
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
-
-    //! A mutex for liveliness
-    std::mutex liveliness_mutex_;
-    //! A condition variable for liveliness
-    std::condition_variable liveliness_cv_;
-    //! The number of times liveliness was lost
-    unsigned int times_liveliness_lost_;
 
 #if HAVE_SECURITY
     std::mutex mutexAuthentication_;

@@ -95,27 +95,6 @@ public:
         collection_.reserve(cfg.initial);
     }
 
-    ResourceLimitedVector(
-            const ResourceLimitedVector& other)
-        : configuration_(other.configuration_)
-        , collection_(other.collection_.get_allocator())
-    {
-        collection_.reserve(other.collection_.capacity());
-        collection_.assign(other.collection_.begin(), other.collection_.end());
-    }
-
-    ResourceLimitedVector& operator = (const ResourceLimitedVector& other)
-    {
-        clear();
-        for (const_reference item : other)
-        {
-            push_back(item);
-        }
-
-        assert(size() == other.size());
-        return *this;
-    }
-
     /**
      * Add element at the end.
      *

@@ -1365,46 +1365,20 @@ ValidationResult_t PKIDH::begin_handshake_reply(HandshakeHandle** handshake_hand
         return ValidationResult_t::VALIDATION_FAILED;
     }
 
-    GUID_t participant_guid;
-    auto param_process = [& participant_guid](const Parameter_t* param)
-    {
-        switch (param->Pid)
-        {
-            case PID_KEY_HASH:
-            {
-                const ParameterKey_t* p = dynamic_cast<const ParameterKey_t*>(param);
-                assert(p != nullptr);
-                iHandle2GUID(participant_guid, p->key);
-                break;
-            }
-            case PID_PARTICIPANT_GUID:
-            {
-                const ParameterGuid_t* p = dynamic_cast<const ParameterGuid_t*>(param);
-                assert(p != nullptr);
-                participant_guid = p->guid;
-                break;
-            }
-
-            default: break;
-        }
-
-        return true;
-    };
-
     CDRMessage_t cdr_pdata(0);
     cdr_pdata.wraps = true;
     cdr_pdata.msg_endian = BIGEND;
     cdr_pdata.length = (uint32_t)pdata->size();
     cdr_pdata.max_size = (uint32_t)pdata->size();
     cdr_pdata.buffer = (octet*)pdata->data();
-    uint32_t qos_size;
-    if(!ParameterList::readParameterListfromCDRMsg(cdr_pdata, param_process, false, qos_size))
+    ParticipantProxyData remote_participant_data;
+    if(!remote_participant_data.readFromCDRMessage(&cdr_pdata, false))
     {
         logWarning(SECURITY_AUTHENTICATION, "Cannot deserialize ParticipantProxyData in property c.pdata");
         return ValidationResult_t::VALIDATION_FAILED;
     }
 
-    if((participant_guid.guidPrefix.value[0] & 0x80) != 0x80)
+    if((remote_participant_data.m_guid.guidPrefix.value[0] & 0x80) != 0x80)
     {
         logWarning(SECURITY_AUTHENTICATION, "Bad participant_key's first bit in c.pdata");
         return ValidationResult_t::VALIDATION_FAILED;
@@ -1422,12 +1396,12 @@ ValidationResult_t PKIDH::begin_handshake_reply(HandshakeHandle** handshake_hand
 
     md[5] &= 0xFE;
     unsigned char bytes[6]{
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[0] << 1) | (participant_guid.guidPrefix.value[1] >> 7)),
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[1] << 1) | (participant_guid.guidPrefix.value[2] >> 7)),
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[2] << 1) | (participant_guid.guidPrefix.value[3] >> 7)),
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[3] << 1) | (participant_guid.guidPrefix.value[4] >> 7)),
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[4] << 1) | (participant_guid.guidPrefix.value[5] >> 7)),
-        static_cast<unsigned char>(participant_guid.guidPrefix.value[5] << 1)
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[0] << 1) | (remote_participant_data.m_guid.guidPrefix.value[1] >> 7)),
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[1] << 1) | (remote_participant_data.m_guid.guidPrefix.value[2] >> 7)),
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[2] << 1) | (remote_participant_data.m_guid.guidPrefix.value[3] >> 7)),
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[3] << 1) | (remote_participant_data.m_guid.guidPrefix.value[4] >> 7)),
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[4] << 1) | (remote_participant_data.m_guid.guidPrefix.value[5] >> 7)),
+        static_cast<unsigned char>(remote_participant_data.m_guid.guidPrefix.value[5] << 1)
     };
 
     if(memcmp(md, bytes, 6) != 0)
@@ -1787,46 +1761,20 @@ ValidationResult_t PKIDH::process_handshake_request(HandshakeMessageToken** hand
         return ValidationResult_t::VALIDATION_FAILED;
     }
 
-    GUID_t participant_guid;
-    auto param_process = [&participant_guid](const Parameter_t* param)
-    {
-        switch (param->Pid)
-        {
-            case PID_KEY_HASH:
-            {
-                const ParameterKey_t* p = dynamic_cast<const ParameterKey_t*>(param);
-                assert(p != nullptr);
-                iHandle2GUID(participant_guid, p->key);
-                break;
-            }
-            case PID_PARTICIPANT_GUID:
-            {
-                const ParameterGuid_t* p = dynamic_cast<const ParameterGuid_t*>(param);
-                assert(p != nullptr);
-                participant_guid = p->guid;
-                break;
-            }
-
-            default: break;
-        }
-
-        return true;
-    };
-
     CDRMessage_t cdr_pdata(0);
     cdr_pdata.wraps = true;
     cdr_pdata.msg_endian = BIGEND;
     cdr_pdata.length = (uint32_t)pdata->size();
     cdr_pdata.max_size = (uint32_t)pdata->size();
     cdr_pdata.buffer = (octet*)pdata->data();
-    uint32_t qos_size;
-    if (!ParameterList::readParameterListfromCDRMsg(cdr_pdata, param_process, false, qos_size))
+    ParticipantProxyData remote_participant_data;
+    if(!remote_participant_data.readFromCDRMessage(&cdr_pdata, false))
     {
         logWarning(SECURITY_AUTHENTICATION, "Cannot deserialize ParticipantProxyData in property c.pdata");
         return ValidationResult_t::VALIDATION_FAILED;
     }
 
-    if((participant_guid.guidPrefix.value[0] & 0x80) != 0x80)
+    if((remote_participant_data.m_guid.guidPrefix.value[0] & 0x80) != 0x80)
     {
         logWarning(SECURITY_AUTHENTICATION, "Bad participant_key's first bit in c.pdata");
         return ValidationResult_t::VALIDATION_FAILED;
@@ -1843,12 +1791,12 @@ ValidationResult_t PKIDH::process_handshake_request(HandshakeMessageToken** hand
 
     md[5] &= 0xFE;
     unsigned char bytes[6]{
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[0] << 1) | (participant_guid.guidPrefix.value[1] >> 7)),
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[1] << 1) | (participant_guid.guidPrefix.value[2] >> 7)),
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[2] << 1) | (participant_guid.guidPrefix.value[3] >> 7)),
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[3] << 1) | (participant_guid.guidPrefix.value[4] >> 7)),
-        static_cast<unsigned char>((participant_guid.guidPrefix.value[4] << 1) | (participant_guid.guidPrefix.value[5] >> 7)),
-        static_cast<unsigned char>(participant_guid.guidPrefix.value[5] << 1)
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[0] << 1) | (remote_participant_data.m_guid.guidPrefix.value[1] >> 7)),
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[1] << 1) | (remote_participant_data.m_guid.guidPrefix.value[2] >> 7)),
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[2] << 1) | (remote_participant_data.m_guid.guidPrefix.value[3] >> 7)),
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[3] << 1) | (remote_participant_data.m_guid.guidPrefix.value[4] >> 7)),
+        static_cast<unsigned char>((remote_participant_data.m_guid.guidPrefix.value[4] << 1) | (remote_participant_data.m_guid.guidPrefix.value[5] >> 7)),
+        static_cast<unsigned char>(remote_participant_data.m_guid.guidPrefix.value[5] << 1)
     };
 
     if(memcmp(md, bytes, 6) != 0)

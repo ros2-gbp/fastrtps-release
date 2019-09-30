@@ -24,20 +24,18 @@
 #include <fastrtps/transport/TCPChannelResourceSecure.h>
 #include <fastrtps/transport/TCPAcceptorSecure.h>
 #endif
+#include "timedevent/TCPKeepAliveEvent.hpp"
 
 #include <asio/steady_timer.hpp>
 #include <utility>
 #include <cstring>
 #include <algorithm>
 
-#include <chrono>
-#include <thread>
-
 using namespace std;
 using namespace asio;
 
-namespace eprosima {
-namespace fastrtps {
+namespace eprosima{
+namespace fastrtps{
 namespace rtps {
 
 static const int s_default_keep_alive_frequency = 5000; // 5 SECONDS
@@ -109,7 +107,7 @@ TCPTransportInterface::TCPTransportInterface(int32_t transport_kind)
 #if TLS_FOUND
     , ssl_context_(asio::ssl::context::sslv23)
 #endif
-    , keep_alive_event_(io_service_timers_)
+    , keep_alive_event_(nullptr)
 {
 }
 
@@ -122,38 +120,35 @@ void TCPTransportInterface::clean()
     assert(receiver_resources_.size() == 0);
     alive_.store(false);
 
-    keep_alive_event_.cancel();
-    io_service_timers_.stop();
-    io_service_timers_thread_->join();
-    io_service_timers_thread_ = nullptr;
+    if(keep_alive_event_ != nullptr)
+    {
+        delete keep_alive_event_;
+        io_service_timers_.stop();
+        io_service_timers_thread_->join();
+        io_service_timers_thread_ = nullptr;
+    }
 
     {
-        std::vector<std::shared_ptr<TCPChannelResource>> channels;
-
-        {
-            std::unique_lock<std::mutex> scopedLock(sockets_map_mutex_);
-            std::unique_lock<std::mutex> unbound_lock(unbound_map_mutex_);
-
-            channels = unbound_channel_resources_;
-
-            for (auto& channel : channel_resources_)
-            {
-                channels.push_back(channel.second);
-            }
-        }
-        
-        for (auto& channel : channels)
-        {
-            if (channel->connection_established())
-            {
-                rtcp_message_manager_->sendUnbindConnectionRequest(channel);
-            }
-
-            channel->disconnect();
-            channel->clear();
-        }
-
         std::unique_lock<std::mutex> lock(rtcp_message_manager_mutex_);
+        std::unique_lock<std::mutex> scopedLock(sockets_map_mutex_);
+        std::unique_lock<std::mutex> unbound_lock(unbound_map_mutex_);
+
+        for (auto& unbound_channel_resource : unbound_channel_resources_)
+        {
+            unbound_channel_resource->disable();
+        }
+
+        for (auto& channel_resource : channel_resources_)
+        {
+            if (channel_resource.second->connection_established())
+            {
+                rtcp_message_manager_->sendUnbindConnectionRequest(channel_resource.second);
+            }
+
+            channel_resource.second->disable();
+        }
+        scopedLock.unlock();
+
         rtcp_message_manager_cv_.wait(lock, [&]()
         {
             return 1 >= rtcp_message_manager_.use_count();
@@ -166,12 +161,29 @@ void TCPTransportInterface::clean()
         }
     }
 
+    {
+        std::unique_lock<std::mutex> scopedLock(sockets_map_mutex_);
+        std::unique_lock<std::mutex> unbound_lock(unbound_map_mutex_);
+        for (auto& unbound_channel_resource : unbound_channel_resources_)
+        {
+            unbound_channel_resource->thread(std::thread());
+        }
+
+        for (auto& channel_resource : channel_resources_)
+        {
+            channel_resource.second->thread(std::thread());
+        }
+    }
+
     if (io_service_thread_)
     {
         io_service_.stop();
         io_service_thread_->join();
         io_service_thread_ = nullptr;
     }
+
+    channel_resources_.clear();
+    unbound_channel_resources_.clear();
 }
 
 void TCPTransportInterface::bind_socket(
@@ -184,7 +196,6 @@ void TCPTransportInterface::bind_socket(
     assert(it_remove != unbound_channel_resources_.end());
     unbound_channel_resources_.erase(it_remove);
     channel_resources_[channel->locator()] = channel;
-
 }
 
 bool TCPTransportInterface::check_crc(
@@ -390,6 +401,9 @@ bool TCPTransportInterface::init()
 #endif
             io_service_timers_.run();
         });
+        keep_alive_event_ = new TCPKeepAliveEvent(*this, io_service_timers_, *io_service_timers_thread_.get(),
+            configuration()->keep_alive_frequency_ms);
+        keep_alive_event_->restart_timer();
     }
 
     return true;
@@ -442,19 +456,6 @@ Locator_t TCPTransportInterface::RemoteToMainLocal(const Locator_t& remote) cons
     return mainLocal;
 }
 
-bool TCPTransportInterface::transform_remote_locator(
-    const Locator_t& remote_locator,
-    Locator_t& result_locator) const
-{
-    if (IsLocatorSupported(remote_locator) &&
-        (!is_local_locator(remote_locator) || is_locator_allowed(remote_locator)))
-    {
-        result_locator = remote_locator;
-        return true;
-    }
-
-    return false;
-}
 
 void TCPTransportInterface::CloseOutputChannel(std::shared_ptr<TCPChannelResource>& channel)
 {
@@ -501,7 +502,7 @@ void TCPTransportInterface::close_tcp_socket(
         std::shared_ptr<TCPChannelResource>& channel)
 {
     channel->disable();
-    // channel.reset(); lead to race conditions because TransportInterface functions used in the callbacks doesn't check validity.
+    channel.reset();
 }
 
 
@@ -679,6 +680,9 @@ void TCPTransportInterface::keep_alive()
                 }
             }
         }
+
+        //TODO Remove
+        eClock::my_sleep(100);
     }
     logInfo(RTCP, "End perform_rtcp_management_thread " << channel->locator());
     */
@@ -1048,31 +1052,45 @@ bool TCPTransportInterface::send(
     return success;
 }
 
-void TCPTransportInterface::select_locators(LocatorSelector& selector) const
+LocatorList_t TCPTransportInterface::ShrinkLocatorLists(const std::vector<LocatorList_t>& locatorLists)
 {
-    ResourceLimitedVector<LocatorSelectorEntry*>& entries =  selector.transport_starts();
-
-    for (size_t i = 0; i < entries.size(); ++i)
+    LocatorList_t unicastResult;
+    for (const LocatorList_t& locatorList : locatorLists)
     {
-        LocatorSelectorEntry* entry = entries[i];
-        if (entry->transport_should_process)
+        LocatorListConstIterator it = locatorList.begin();
+        LocatorList_t pendingUnicast;
+
+        while (it != locatorList.end())
         {
-            bool selected = false;
-            for (size_t j = 0; j < entry->unicast.size(); ++j)
+            assert((*it).kind == transport_kind_);
+
+            // Check is local interface.
+            auto localInterface = current_interfaces_.begin();
+            for (; localInterface != current_interfaces_.end(); ++localInterface)
             {
-                if (IsLocatorSupported(entry->unicast[j]) && !selector.is_selected(entry->unicast[j]))
+                if (compare_locator_ip(localInterface->locator, *it))
                 {
-                    entry->state.unicast.push_back(j);
-                    selected = true;
+                    // Loopback locator
+                    Locator_t loopbackLocator;
+                    fill_local_ip(loopbackLocator);
+                    IPLocator::setPhysicalPort(loopbackLocator, IPLocator::getPhysicalPort(*it));
+                    IPLocator::setLogicalPort(loopbackLocator, IPLocator::getLogicalPort(*it));
+                    pendingUnicast.push_back(loopbackLocator);
+                    break;
                 }
             }
 
-            if (selected)
-            {
-                selector.select(i);
-            }
+            if (localInterface == current_interfaces_.end())
+                pendingUnicast.push_back(*it);
+
+            ++it;
         }
+
+        unicastResult.push_back(pendingUnicast);
     }
+
+    LocatorList_t result(std::move(unicastResult));
+    return result;
 }
 
 void TCPTransportInterface::SocketAccepted(
@@ -1106,7 +1124,7 @@ void TCPTransportInterface::SocketAccepted(
         else
         {
             logInfo(RTCP, " Accepting connection (" << error.message() << ")");
-            std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Wait a little to accept again.
+            eClock::my_sleep(200); // Wait a little to accept again.
         }
 
         if (error.value() != eSocketErrorCodes::eConnectionAborted) // Operation Aborted
@@ -1152,7 +1170,7 @@ void TCPTransportInterface::SecureSocketAccepted(
         else
         {
             logInfo(RTCP, " Accepting connection (" << error.message() << ")");
-            std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Wait a little to accept again.
+            eClock::my_sleep(200); // Wait a little to accept again.
         }
 
         if (error.value() != eSocketErrorCodes::eConnectionAborted) // Operation Aborted

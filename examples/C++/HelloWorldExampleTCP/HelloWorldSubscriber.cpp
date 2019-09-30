@@ -24,6 +24,7 @@
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 #include <fastrtps/utils/IPLocator.h>
 
 using namespace eprosima::fastrtps;
@@ -68,8 +69,8 @@ bool HelloWorldSubscriber::init(
     pparam.rtps.builtin.initialPeersList.push_back(initial_peer_locator); // Publisher's meta channel
 
     pparam.rtps.builtin.domainId = 0;
-    pparam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
-    pparam.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(5, 0);
+    pparam.rtps.builtin.leaseDuration = c_TimeInfinite;
+    pparam.rtps.builtin.leaseDuration_announcementperiod = Duration_t(5, 0);
     pparam.rtps.setName("Participant_sub");
 
     pparam.rtps.useBuiltinTransports = false;
@@ -165,6 +166,6 @@ void HelloWorldSubscriber::run(uint32_t number)
     std::cout << "[RTCP] Subscriber running until " << number << "samples have been received" << std::endl;
     while (number < this->listener.n_samples)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        eClock::my_sleep(500);
     }
 }

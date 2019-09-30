@@ -20,17 +20,22 @@
 #include <fastrtps/rtps/messages/RTPSMessageCreator.h>
 #include <fastrtps/rtps/messages/CDRMessage.h>
 #include <fastrtps/qos/ParameterList.h>
+#include <fastrtps/utils/eClock.h>
 
 #include <fastrtps/log/Log.h>
 
 using namespace eprosima::fastrtps;
 
 namespace eprosima {
-namespace fastrtps {
-namespace rtps {
+namespace fastrtps{
+namespace rtps{
 
-RTPSMessageCreator::RTPSMessageCreator()
-{
+// Auxiliary message to avoid creation of new messages each time.
+eClock g_clock;
+
+
+RTPSMessageCreator::RTPSMessageCreator() {
+
 }
 
 RTPSMessageCreator::~RTPSMessageCreator() {
@@ -168,7 +173,7 @@ bool RTPSMessageCreator::addSubmessageInfoDST(CDRMessage_t* msg, const GuidPrefi
 bool RTPSMessageCreator::addSubmessageInfoTS_Now(CDRMessage_t* msg,bool invalidateFlag)
 {
     Time_t time_now;
-    Time_t::now(time_now);
+    g_clock.setTimeNow(&time_now);
     return RTPSMessageCreator::addSubmessageInfoTS(msg,time_now,invalidateFlag);
 }
 }

@@ -57,24 +57,6 @@ void Log::Reset()
     mResources.mConsumers.emplace_back(new StdoutConsumer);
 }
 
-void Log::Flush()
-{
-    std::unique_lock<std::mutex> guard(mResources.mCvMutex);
-
-    if (!mResources.mLogging && !mResources.mLoggingThread)
-    {
-        // already killed
-        return;
-    }
-
-    // Wait till the background thread signals and...
-    mResources.mCv.wait(guard, [&]()
-    {   // ... either the logging has ended or the queue is flushed
-        return !mResources.mLogging || mResources.mLogs.BothEmpty();
-    });
-
-}
-
 void Log::Run()
 {
     std::unique_lock<std::mutex> guard(mResources.mCvMutex);
@@ -102,7 +84,7 @@ void Log::Run()
             }
             guard.lock();
         }
-        mResources.mCv.notify_all();
+        mResources.mCv.notify_one();
         if (mResources.mLogging)
             mResources.mCv.wait(guard);
     }

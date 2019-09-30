@@ -23,16 +23,18 @@
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 
 #include <thread>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-HelloWorldPublisher::HelloWorldPublisher()
-    : mp_participant(nullptr)
-    , mp_publisher(nullptr)
+HelloWorldPublisher::HelloWorldPublisher():mp_participant(nullptr),
+mp_publisher(nullptr)
 {
+
+
 }
 
 bool HelloWorldPublisher::init()
@@ -40,12 +42,12 @@ bool HelloWorldPublisher::init()
     m_Hello.index(0);
     m_Hello.message("HelloWorld");
     ParticipantAttributes PParam;
-    PParam.rtps.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::SIMPLE;
-    PParam.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = true;
-    PParam.rtps.builtin.discovery_config.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter = true;
-    PParam.rtps.builtin.discovery_config.m_simpleEDP.use_PublicationWriterANDSubscriptionReader = true;
+    PParam.rtps.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
+    PParam.rtps.builtin.use_SIMPLE_EndpointDiscoveryProtocol = true;
+    PParam.rtps.builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter = true;
+    PParam.rtps.builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader = true;
     PParam.rtps.builtin.domainId = 0;
-    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_pub");
     mp_participant = Domain::createParticipant(PParam);
 
@@ -106,7 +108,7 @@ void HelloWorldPublisher::runThread(uint32_t samples, uint32_t sleep)
             {
                 std::cout << "Message: "<<m_Hello.message()<< " with index: "<< m_Hello.index()<< " SENT"<<std::endl;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
+            eClock::my_sleep(sleep);
         }
     }
     else
@@ -119,7 +121,7 @@ void HelloWorldPublisher::runThread(uint32_t samples, uint32_t sleep)
             {
                 std::cout << "Message: "<<m_Hello.message()<< " with index: "<< m_Hello.index()<< " SENT"<<std::endl;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
+            eClock::my_sleep(sleep);
         }
     }
 }

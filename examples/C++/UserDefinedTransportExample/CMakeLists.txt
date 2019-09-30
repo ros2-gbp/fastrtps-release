@@ -25,10 +25,6 @@ if(NOT fastcdr_FOUND)
     find_package(fastcdr REQUIRED)
 endif()
 
-if(NOT foonathan_memory_FOUND)
-    find_package(foonathan_memory REQUIRED)
-endif()
-
 if(NOT fastrtps_FOUND)
     find_package(fastrtps REQUIRED)
 endif()
@@ -51,6 +47,6 @@ file(GLOB USERDEFINEDTRANSPORTEXAMPLE_SOURCES_HXX "*.cpp")
 include_directories(${PROJECT_SOURCE_DIR}/../../../thirdparty/asio/asio/include)
 
 add_executable(UserDefinedTransportExample ${USERDEFINEDTRANSPORTEXAMPLE_SOURCES_HXX})
-target_link_libraries(UserDefinedTransportExample fastrtps fastcdr foonathan_memory)
+target_link_libraries(UserDefinedTransportExample fastrtps fastcdr)
 install(TARGETS UserDefinedTransportExample
     RUNTIME DESTINATION examples/C++/UserDefinedTransportExample/${BIN_INSTALL_DIR})

@@ -26,6 +26,8 @@
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/subscriber/Subscriber.h>
 
+#include <fastrtps/utils/eClock.h>
+
 #include <fastrtps/log/Log.h>
 
 #include <fastrtps/xmlparser/XMLProfileManager.h>
@@ -36,9 +38,6 @@
 #include <fastrtps/types/DynamicTypeBuilderFactory.h>
 #include <fastrtps/types/DynamicDataFactory.h>
 #include <fastrtps/types/TypeObjectFactory.h>
-
-#include <chrono>
-#include <thread>
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::xmlparser;
@@ -78,7 +77,7 @@ void Domain::stopAll()
     types::TypeObjectFactory::delete_instance();
     XMLProfileManager::DeleteInstance();
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    eClock::my_sleep(100);
     Log::KillThread();
 }
 
@@ -389,5 +388,5 @@ bool Domain::loadXMLProfilesFile(const std::string& xml_profile_file)
     return true;
 }
 
-} // namespace fastrtps
-} // namespace eprosima
+} /* namespace fastrtps */
+} /* namespace eprosima */

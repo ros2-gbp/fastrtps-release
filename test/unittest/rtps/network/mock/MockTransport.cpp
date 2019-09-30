@@ -128,22 +128,14 @@ LocatorList_t MockTransport::NormalizeLocator(const Locator_t& locator)
     return list;
 }
 
-void MockTransport::select_locators(LocatorSelector& selector) const
+LocatorList_t MockTransport::ShrinkLocatorLists(const std::vector<LocatorList_t>& locatorLists)
 {
-    ResourceLimitedVector<LocatorSelectorEntry*>& entries = selector.transport_starts();
-    for (size_t i = 0; i < entries.size(); ++i)
-    {
-        LocatorSelectorEntry* entry = entries[i];
-        if (entry->transport_should_process)
-        {
-            for (size_t j = 0; j < entry->unicast.size(); ++j)
-            {
-                entry->state.unicast.push_back(j);
-            }
+    LocatorList_t result;
 
-            selector.select(i);
-        }
-    }
+    for(auto locatorList : locatorLists)
+        result.push_back(locatorList);
+
+    return result;
 }
 
 } // namespace rtps

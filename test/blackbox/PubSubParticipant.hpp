@@ -161,12 +161,6 @@ public:
         publisher_attr_.times.heartbeatPeriod.nanosec = 100000000;
         publisher_attr_.times.nackResponseDelay.seconds = 0;
         publisher_attr_.times.nackResponseDelay.nanosec = 100000000;
-
-        // Increase default max_blocking_time to 1 second, as our CI infrastructure shows some
-        // big CPU overhead sometimes
-        publisher_attr_.qos.m_reliability.max_blocking_time.seconds = 1;
-        publisher_attr_.qos.m_reliability.max_blocking_time.nanosec = 0;
-
         // By default, heartbeat period delay is 100 milliseconds.
         subscriber_attr_.times.heartbeatResponseDelay = 0.1;
     }
@@ -278,22 +272,16 @@ public:
         std::cout << "Subscriber discovery finished " << std::endl;
     }
 
-    void pub_wait_liveliness_lost(unsigned int times = 1)
-    {
-        std::unique_lock<std::mutex> lock(pub_liveliness_mutex_);
-        pub_liveliness_cv_.wait(lock, [&]() { return pub_times_liveliness_lost_ == times; });
-    }
-
     void sub_wait_liveliness_recovered(unsigned int num_recovered)
     {
-        std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
-        sub_liveliness_cv_.wait(lock, [&]() { return sub_times_liveliness_recovered_ == num_recovered; });
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+        liveliness_cv_.wait(lock, [&]() { return sub_times_liveliness_recovered_ == num_recovered; });
     }
 
     void sub_wait_liveliness_lost(unsigned int num_lost)
     {
-        std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
-        sub_liveliness_cv_.wait(lock, [&]() { return sub_times_liveliness_lost_ == num_lost;  });
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
+        liveliness_cv_.wait(lock, [&]() { return sub_times_liveliness_lost_ == num_lost;  });
     }
 
     PubSubParticipant& pub_topic_name(std::string topicName)
@@ -381,40 +369,39 @@ public:
 
     void pub_liveliness_lost()
     {
-        std::unique_lock<std::mutex> lock(pub_liveliness_mutex_);
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
         pub_times_liveliness_lost_++;
-        pub_liveliness_cv_.notify_one();
     }
 
     void sub_liveliness_lost()
     {
-        std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
         sub_times_liveliness_lost_++;
-        sub_liveliness_cv_.notify_one();
+        liveliness_cv_.notify_one();
     }
 
     void sub_liveliness_recovered()
     {
-        std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
         sub_times_liveliness_recovered_++;
-        sub_liveliness_cv_.notify_one();
+        liveliness_cv_.notify_one();
     }
 
     unsigned int pub_times_liveliness_lost()
     {
-        std::unique_lock<std::mutex> lock(pub_liveliness_mutex_);
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
         return pub_times_liveliness_lost_;
     }
 
     unsigned int sub_times_liveliness_lost()
     {
-        std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
         return sub_times_liveliness_lost_;
     }
 
     unsigned int sub_times_liveliness_recovered()
     {
-        std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
+        std::unique_lock<std::mutex> lock(liveliness_mutex_);
         return sub_times_liveliness_recovered_;
     }
 
@@ -489,13 +476,9 @@ private:
     //! The number of times liveliness was recovered on the subscribing side
     unsigned int sub_times_liveliness_recovered_;
     //! A mutex protecting liveliness data
-    std::mutex sub_liveliness_mutex_;
+    std::mutex liveliness_mutex_;
     //! A condition variable for liveliness data
-    std::condition_variable sub_liveliness_cv_;
-    //! A mutex protecting liveliness of publisher
-    std::mutex pub_liveliness_mutex_;
-    //! A condition variable for liveliness of publisher
-    std::condition_variable pub_liveliness_cv_;
+    std::condition_variable liveliness_cv_;
 
     type_support type_;
 };

@@ -123,17 +123,15 @@ enum ParameterId_t	: uint16_t
 class Parameter_t
 {
 public:
-
-    RTPS_DllAPI Parameter_t() : Pid(PID_PAD), length(0) { }
-
+    RTPS_DllAPI Parameter_t();
     /**
      * Constructor using a parameter PID and the parameter length
      * @param pid Pid of the parameter
      * @param length Its associated length
      */
-    RTPS_DllAPI Parameter_t(ParameterId_t pid,uint16_t length) : Pid(pid), length(length) {}
+    RTPS_DllAPI Parameter_t(ParameterId_t pid,uint16_t length);
 
-    virtual RTPS_DllAPI ~Parameter_t() { }
+    virtual RTPS_DllAPI ~Parameter_t();
 
     bool operator==(const Parameter_t& b) const
     {
@@ -146,7 +144,7 @@ public:
      * @param[in,out] msg Pointer to the message where the parameter should be added.
      * @return True if the parameter was correctly added.
      */
-    RTPS_DllAPI virtual bool addToCDRMessage(rtps::CDRMessage_t* msg) = 0;
+    virtual bool addToCDRMessage(rtps::CDRMessage_t* msg) = 0;
 
 public:
     //!Parameter ID
@@ -180,36 +178,17 @@ class ParameterKey_t:public Parameter_t{
 /**
  *
  */
-class ParameterLocator_t: public Parameter_t
-{
+class ParameterLocator_t: public Parameter_t {
     public:
         rtps::Locator_t locator;
-
-        ParameterLocator_t()
-        {
-        }
-
+        ParameterLocator_t(){};
         /**
          * Constructor using a parameter PID and the parameter length
          * @param pid Pid of the parameter
          * @param in_length Its associated length
          */
-        ParameterLocator_t(
-                ParameterId_t pid,
-                uint16_t in_length)
-            : Parameter_t(pid,in_length)
-        {
-        }
-
-        ParameterLocator_t(
-                ParameterId_t pid,
-                uint16_t in_length,
-                const rtps::Locator_t& loc)
-            : Parameter_t(pid,in_length)
-            , locator(loc)
-        {
-        }
-
+        ParameterLocator_t(ParameterId_t pid,uint16_t in_length):Parameter_t(pid,in_length){};
+        ParameterLocator_t(ParameterId_t pid,uint16_t in_length, rtps::Locator_t& loc):Parameter_t(pid,in_length),locator(loc){};
         /**
          * Add the parameter to a CDRMessage_t message.
          * @param[in,out] msg Pointer to the message where the parameter should be added.
@@ -223,7 +202,7 @@ class ParameterLocator_t: public Parameter_t
 /**
  *
  */
-class ParameterString_t: public Parameter_t
+class ParameterString_t: public Parameter_t 
 {
     public:
         ParameterString_t(){};

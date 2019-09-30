@@ -751,10 +751,6 @@ class PublishModeQosPolicy : public QosPolicy {
         PublishModeQosPolicyKind kind;
         RTPS_DllAPI PublishModeQosPolicy() : kind(SYNCHRONOUS_PUBLISH_MODE){};
         virtual RTPS_DllAPI ~PublishModeQosPolicy(){};
-        bool operator == (const PublishModeQosPolicy& other) const
-        {
-            return other.kind == kind;
-        }
 };
 
 /**

@@ -15,9 +15,7 @@
 #include <fastrtps/transport/TCPChannelResource.h>
 #include <fastrtps/transport/TCPTransportInterface.h>
 #include <fastrtps/utils/IPLocator.h>
-
-#include <chrono>
-#include <thread>
+#include <fastrtps/utils/eClock.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -65,11 +63,13 @@ TCPChannelResource::TCPChannelResource(
 {
 }
 
+TCPChannelResource::~TCPChannelResource()
+{
+    alive_ = false;
+}
 
 void TCPChannelResource::disable()
 {
-    ChannelResource::disable(); // prevent asio callback workings on this channel.
-
     disconnect();
 }
 
@@ -149,7 +149,7 @@ void TCPChannelResource::send_pending_open_logical_ports(RTCPMessageManager* rtc
         {
             TCPTransactionId id = rtcp_manager->sendOpenLogicalPortRequest(this, port);
             negotiating_logical_ports_[id] = port;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            eClock::my_sleep(100);
         }
     }
 }

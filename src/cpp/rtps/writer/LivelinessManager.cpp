@@ -13,7 +13,8 @@ using LivelinessDataIterator = ResourceLimitedVector<LivelinessData>::iterator;
 
 LivelinessManager::LivelinessManager(
         const LivelinessCallback& callback,
-        ResourceEvent& service,
+        asio::io_service& service,
+        const std::thread& event_thread,
         bool manage_automatic)
     : callback_(callback)
     , manage_automatic_(manage_automatic)
@@ -21,17 +22,10 @@ LivelinessManager::LivelinessManager(
     , mutex_()
     , timer_owner_(nullptr)
     , timer_(
-            service,
-            [this](TimedEvent::EventCode code) -> bool
-            {
-                if (TimedEvent::EVENT_SUCCESS == code)
-                {
-                    return timer_expired();
-                }
-
-                return false;
-            },
-            0)
+          std::bind(&LivelinessManager::timer_expired, this),
+          0,
+          service,
+          event_thread)
 {
 }
 
@@ -115,8 +109,8 @@ bool LivelinessManager::remove_writer(
                         return true;
                     }
 
-                    // Some times the interval could be negative if a writer expired during the call to this function
-                    // Once in this situation there is not much we can do but let asio timers expire inmediately
+		    // Some times the interval could be negative if a writer expired during the call to this function
+		    // Once in this situation there is not much we can do but let asio timers expire inmediately
                     auto interval = timer_owner_->time - steady_clock::now();
                     timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
                     timer_.restart_timer();
@@ -245,14 +239,14 @@ bool LivelinessManager::calculate_next()
     return any_alive;
 }
 
-bool LivelinessManager::timer_expired()
+void LivelinessManager::timer_expired()
 {
     std::unique_lock<std::mutex> lock(mutex_);
 
     if (timer_owner_ == nullptr)
     {
         logError(RTPS_WRITER, "Liveliness timer expired but there is no writer");
-        return false;
+        return;
     }
 
     if (callback_ != nullptr)
@@ -271,10 +265,8 @@ bool LivelinessManager::timer_expired()
         // Once in this situation there is not much we can do but let asio timers expire inmediately
         auto interval = timer_owner_->time - steady_clock::now();
         timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
-        return true;
+        timer_.restart_timer();
     }
-    
-    return false;
 }
 
 bool LivelinessManager::find_writer(
@@ -298,8 +290,6 @@ bool LivelinessManager::find_writer(
 
 bool LivelinessManager::is_any_alive(LivelinessQosPolicyKind kind)
 {
-    std::unique_lock<std::mutex> lock(mutex_);
-
     for (const auto& writer : writers_)
     {
         if (writer.kind == kind && writer.status == LivelinessData::WriterStatus::ALIVE)

@@ -415,7 +415,7 @@ int main(int argc, char** argv)
         memorySub.run();
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    eClock::my_sleep(1000);
 
     cout << "EVERYTHING STOPPED FINE" << endl;
 

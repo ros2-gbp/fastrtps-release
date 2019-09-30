@@ -52,16 +52,9 @@ ChannelResource::~ChannelResource()
 void ChannelResource::clear()
 {
     alive_.store(false);
-    if (thread_.joinable())
+    if(thread_.joinable())
     {
-        if (thread_.get_id() != std::this_thread::get_id())
-        {   // wait for it to finish
-            thread_.join();
-        }
-        else
-        {   // killing my own thread
-            thread_.detach();
-        }
+        thread_.join();
     }
 }
 

@@ -67,9 +67,6 @@ class SubscriberAttributes
         //!Properties
         rtps::PropertyPolicy properties;
 
-        //!Matched publishers allocation limits
-        ResourceLimitedContainerConfig matched_publisher_allocation;
-
         SubscriberAttributes()
             : expectsInlineQos(false)
             , historyMemoryPolicy(rtps::PREALLOCATED_MEMORY_MODE)

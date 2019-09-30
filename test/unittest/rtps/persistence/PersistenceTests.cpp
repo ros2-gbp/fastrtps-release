@@ -127,9 +127,8 @@ TEST_F(PersistenceTest, Reader)
     service = PersistenceFactory::create_persistence_service(policy);
     ASSERT_NE(service, nullptr);
 
-    IPersistenceService::map_allocator_t pool(128, 1024);
-    foonathan::memory::map<GUID_t, SequenceNumber_t, IPersistenceService::map_allocator_t> seq_map(pool);
-    foonathan::memory::map<GUID_t, SequenceNumber_t, IPersistenceService::map_allocator_t> seq_map_loaded(pool);
+    std::map<GUID_t, SequenceNumber_t> seq_map;
+    std::map<GUID_t, SequenceNumber_t> seq_map_loaded;
     GUID_t guid_1(GuidPrefix_t::unknown(), 1U);
     SequenceNumber_t seq_1(0, 1);
     GUID_t guid_2(GuidPrefix_t::unknown(), 2U);

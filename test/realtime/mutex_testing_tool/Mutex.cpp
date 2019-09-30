@@ -21,7 +21,7 @@
 #include "TMutex.hpp"
 
 #include <dlfcn.h>
-#include <ctime>
+#include <time.h>
 
 int pthread_mutex_lock(pthread_mutex_t* mutex)
 {

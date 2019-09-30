@@ -22,6 +22,7 @@
 
 #include "History.h"
 #include "../common/CacheChange.h"
+#include <fastrtps/utils/Semaphore.h>
 
 namespace eprosima {
 namespace fastrtps{
@@ -83,11 +84,19 @@ public:
      */
     RTPS_DllAPI void updateMaxMinSeqNum() override;
 
+    //!Post to the semaphore
+    RTPS_DllAPI void postSemaphore();
+    //!Wait for the semaphore
+    RTPS_DllAPI void waitSemaphore();
+
+
     RTPS_DllAPI bool get_min_change_from(CacheChange_t** min_change, const GUID_t& writerGuid);
 
 protected:
     //!Pointer to the reader
     RTPSReader* mp_reader;
+    //!Pointer to the semaphore, used to halt execution until new message arrives.
+    Semaphore* mp_semaphore;
 };
 
 }

@@ -27,6 +27,9 @@
 #include <fastrtps/rtps/flowcontrol/ThroughputControllerDescriptor.h>
 
 #include <fastrtps/Domain.h>
+
+#include <fastrtps/utils/eClock.h>
+
 #include "FlowControlExamplePublisher.h"
 
 using namespace eprosima::fastrtps;
@@ -44,7 +47,7 @@ bool FlowControlExamplePublisher::init()
 
     ParticipantAttributes PParam;
     PParam.rtps.builtin.domainId = 0;
-    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_publisher");  //You can put here the name you want
 
     mp_participant = Domain::createParticipant(PParam);
@@ -103,7 +106,7 @@ void FlowControlExamplePublisher::run()
 {
     while(m_listener.n_matched == 0)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        eClock::my_sleep(250); // Sleep 250 ms
     }
 
     // Publication code

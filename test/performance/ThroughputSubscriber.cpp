@@ -20,6 +20,7 @@
 #include "ThroughputSubscriber.h"
 
 #include <fastrtps/utils/TimeConversion.h>
+#include <fastrtps/utils/eClock.h>
 #include <fastrtps/attributes/ParticipantAttributes.h>
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
@@ -220,7 +221,7 @@ void ThroughputSubscriber::processMessage()
                 mp_datasub = Domain::createSubscriber(mp_par, subAttr, &m_DataSubListener);
 
                 ThroughputCommandType command(BEGIN);
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                eClock::my_sleep(50);
                 m_DataSubListener.reset();
                 //cout << "SEND COMMAND: "<< command.m_command << endl;
                 //cout << "writecall "<< ++writecalls << endl;
@@ -277,7 +278,7 @@ void ThroughputSubscriber::processMessage()
     else
     {
         //std::cout << "Error reading command" << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        eClock::my_sleep(5);
     }
 }
 
@@ -481,7 +482,7 @@ ThroughputSubscriber::ThroughputSubscriber(bool reliable, uint32_t pid, bool hos
         ready = false;
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    eClock::my_sleep(1000);
 }
 
 void ThroughputSubscriber::run()
@@ -508,7 +509,7 @@ void ThroughputSubscriber::run()
             std::cout << "Waiting clean state" << std::endl;
             while (!mp_datasub->isInCleanState())
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                eClock::my_sleep(50);
             }
             std::cout << "Sending results" << std::endl;
             ThroughputCommandType comm;

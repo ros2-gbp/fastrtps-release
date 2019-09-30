@@ -48,10 +48,7 @@ struct ReaderDiscoveryInfo
             REMOVED_READER
         };
 
-        ReaderDiscoveryInfo(const ReaderProxyData& data)
-            : status(DISCOVERED_READER)
-            , info(data) 
-        {}
+        ReaderDiscoveryInfo(): status(DISCOVERED_READER) {}
 
         virtual ~ReaderDiscoveryInfo() {}
 
@@ -59,7 +56,7 @@ struct ReaderDiscoveryInfo
         DISCOVERY_STATUS status;
 
         //! Participant discovery info
-        const ReaderProxyData& info;
+        ReaderProxyData info;
 };
 
 }

@@ -49,7 +49,7 @@ class StatefulPersistentWriter : public StatefulWriter, private PersistentWriter
      */
     void unsent_change_added_to_history(
             CacheChange_t* p,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) override;
+            std::chrono::time_point<std::chrono::steady_clock> max_blocking_time) override;
 
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.

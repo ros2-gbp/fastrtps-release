@@ -23,6 +23,7 @@
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -35,12 +36,12 @@ mp_subscriber(nullptr)
 bool HelloWorldSubscriber::init()
 {
     ParticipantAttributes PParam;
-    PParam.rtps.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::SIMPLE;
-    PParam.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = true;
-    PParam.rtps.builtin.discovery_config.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter = true;
-    PParam.rtps.builtin.discovery_config.m_simpleEDP.use_PublicationWriterANDSubscriptionReader = true;
+    PParam.rtps.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
+    PParam.rtps.builtin.use_SIMPLE_EndpointDiscoveryProtocol = true;
+    PParam.rtps.builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter = true;
+    PParam.rtps.builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader = true;
     PParam.rtps.builtin.domainId = 0;
-    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_sub");
     mp_participant = Domain::createParticipant(PParam);
     if(mp_participant==nullptr)
@@ -113,7 +114,5 @@ void HelloWorldSubscriber::run(uint32_t number)
 {
     std::cout << "Subscriber running until "<< number << "samples have been received"<<std::endl;
     while(number > this->m_listener.n_samples)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
+        eClock::my_sleep(500);
 }

@@ -43,7 +43,7 @@ public:
 	//!Sample kind.
 	rtps::ChangeKind_t sampleKind;
 	//!Ownership Strength of the writer of the sample (0 if the ownership kind is set to SHARED_OWNERSHIP_QOS).
-	uint32_t ownershipStrength;
+	uint16_t ownershipStrength;
 	//!Source timestamp of the sample.
 	rtps::Time_t sourceTimestamp;
 	//!InstanceHandle of the data

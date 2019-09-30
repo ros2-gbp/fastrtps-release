@@ -21,7 +21,6 @@
 #define SUBSCRIBER_H_
 
 #include "../rtps/common/Guid.h"
-#include "../rtps/common/Time_t.h"
 #include "../attributes/SubscriberAttributes.h"
 #include "../qos/DeadlineMissedStatus.h"
 #include "../qos/LivelinessChangedStatus.h"
@@ -58,36 +57,29 @@ public:
      */
     const rtps::GUID_t& getGuid();
 
-    /*!
-     * @brief Blocks the current thread until an unread sample is available.
-     * @param timeout Maximum time the function will be blocked if any sample is received.
-     * @return true in case unread samples are available.
-     * In other case, false.
+    /**
+     * Method to block the current thread until an unread message is available
      */
-    bool wait_for_unread_samples(const Duration_t& timeout);
+    void waitForUnreadMessage();
 
     /**
-     * @brief Reads next unread sample from the Subscriber.
-     * @param sample Pointer to the object where you want the sample stored.
+     * Read next unread Data from the Subscriber.
+     * @param data Pointer to the object where you want the data stored.
      * @param info Pointer to a SampleInfo_t structure that informs you about your sample.
      * @return True if a sample was read.
-     * @note This method is blocked for a period of time.
-     * ReliabilityQosPolicy.max_blocking_time on SubscriberAttributes defines this period of time.
      */
     bool readNextData(
-            void* sample,
+            void* data,
             SampleInfo_t* info);
 
     /**
-     * @brief Takes next sample from the Subscriber. The sample is removed from the subscriber.
-     * @param sample Pointer to the object where you want the sample stored.
+     * Take next Data from the Subscriber. The data is removed from the subscriber.
+     * @param data Pointer to the object where you want the data stored.
      * @param info Pointer to a SampleInfo_t structure that informs you about your sample.
      * @return True if a sample was taken.
-     * @note This method is blocked for a period of time.
-     * ReliabilityQosPolicy.max_blocking_time on SubscriberAttributes defines this period of time.
      */
     bool takeNextData(
-            void* sample,
+            void* data,
             SampleInfo_t* info);
 
     /**
@@ -115,7 +107,7 @@ public:
      * Get the unread count.
      * @return Unread count
      */
-    uint64_t get_unread_count() const;
+    uint64_t getUnreadCount() const;
 
     /**
      * @brief Get the requested deadline missed status

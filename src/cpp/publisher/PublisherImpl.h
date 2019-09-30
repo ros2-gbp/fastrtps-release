@@ -30,6 +30,7 @@
 #include <fastrtps/publisher/PublisherHistory.h>
 
 #include <fastrtps/rtps/writer/WriterListener.h>
+#include <fastrtps/rtps/timedevent/TimedCallback.h>
 #include <fastrtps/qos/DeadlineMissedStatus.h>
 
 namespace eprosima {
@@ -38,7 +39,6 @@ namespace rtps
 {
 class RTPSWriter;
 class RTPSParticipant;
-class TimedEvent;
 }
 
 class TopicDataType;
@@ -184,7 +184,7 @@ class PublisherImpl
     uint32_t high_mark_for_frag_;
 
     //! A timer used to check for deadlines
-    rtps::TimedEvent* deadline_timer_;
+    rtps::TimedCallback deadline_timer_;
     //! Deadline duration in microseconds
     std::chrono::duration<double, std::ratio<1,1000000>> deadline_duration_us_;
     //! The current timer owner, i.e. the instance which started the deadline timer
@@ -193,26 +193,24 @@ class PublisherImpl
     OfferedDeadlineMissedStatus deadline_missed_status_;
 
     //! A timed callback to remove expired samples for lifespan QoS
-    rtps::TimedEvent* lifespan_timer_;
+    rtps::TimedCallback lifespan_timer_;
     //! The lifespan duration, in microseconds
     std::chrono::duration<double, std::ratio<1, 1000000>> lifespan_duration_us_;
 
     /**
      * @brief A method called when an instance misses the deadline
      */
-    bool deadline_missed();
+    void deadline_missed();
 
     /**
      * @brief A method to reschedule the deadline timer
-     * @return true value when the event has to be rescheduled. false value if not.
      */
-    bool deadline_timer_reschedule();
+    void deadline_timer_reschedule();
 
     /**
      * @brief A method to remove expired samples, invoked when the lifespan timer expires
-     * @return true value when the event has to be rescheduled. false value if not.
      */
-    bool lifespan_expired();
+    void lifespan_expired();
 };
 
 

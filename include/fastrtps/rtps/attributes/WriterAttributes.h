@@ -32,7 +32,6 @@ namespace eprosima{
 namespace fastrtps{
 namespace rtps{
 
-class ReaderProxyData;
 
 typedef enum RTPSWriterPublishMode : octet
 {
@@ -87,7 +86,6 @@ class WriterAttributes
         WriterAttributes()
             : liveliness_kind(AUTOMATIC_LIVELINESS_QOS)
             , liveliness_lease_duration(c_TimeInfinite)
-            , liveliness_announcement_period(c_TimeInfinite)
             , mode(SYNCHRONOUS_WRITER)
             , disable_heartbeat_piggyback(false)
             , disable_positive_acks(false)
@@ -112,9 +110,6 @@ class WriterAttributes
         //! Liveliness lease duration
         Duration_t liveliness_lease_duration;
 
-        //! Liveliness announcement period
-        Duration_t liveliness_announcement_period;
-
         //!Indicates if the Writer is synchronous or asynchronous
         RTPSWriterPublishMode mode;
 
@@ -134,8 +129,60 @@ class WriterAttributes
         Duration_t keep_duration;
 };
 
-} /* namespace rtps */
-} /* namespace fastrtps */
-} /* namespace eprosima */
+/**
+ * Class RemoteReaderAttributes, to define the attributes of a Remote Reader.
+ * @ingroup RTPS_ATTRIBUTES_MODULE
+ */
+class  RemoteReaderAttributes
+{
+    public:
+
+        RemoteReaderAttributes()
+            : expectsInlineQos(false)
+            , is_eprosima_endpoint(true)
+            , disable_positive_acks(false)
+        {
+            endpoint.endpointKind = READER;
+        }
+
+        RemoteReaderAttributes(const VendorId_t& vendor_id)
+            : expectsInlineQos(false)
+            , is_eprosima_endpoint(vendor_id == c_VendorId_eProsima)
+            , disable_positive_acks(false)
+        {
+            endpoint.endpointKind = READER;
+        }
+
+        virtual ~RemoteReaderAttributes()
+        {
+
+        }
+
+        std::function<bool(const RemoteReaderAttributes&)> compare_guid_function() const
+        {
+            return [this](const RemoteReaderAttributes& rhs)
+            {
+                return this->guid == rhs.guid;
+            };
+        }
+
+        //!Attributes of the associated endpoint.
+        EndpointAttributes endpoint;
+
+        //!GUID_t of the reader.
+        GUID_t guid;
+
+        //!Expects inline QOS.
+        bool expectsInlineQos;
+
+        bool is_eprosima_endpoint;
+
+        bool disable_positive_acks;
+};
+
+}
+}
+}
+
 
 #endif /* WRITERATTRIBUTES_H_ */

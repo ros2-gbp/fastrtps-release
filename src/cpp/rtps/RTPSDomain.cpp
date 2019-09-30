@@ -30,17 +30,15 @@
 
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/utils/eClock.h>
 #include <fastrtps/utils/System.h>
 #include <fastrtps/utils/md5.h>
 
 #include <fastrtps/rtps/writer/RTPSWriter.h>
 #include <fastrtps/rtps/reader/RTPSReader.h>
 
-#include <chrono>
-#include <thread>
-
 namespace eprosima {
-namespace fastrtps {
+namespace fastrtps{
 namespace rtps {
 
 std::mutex RTPSDomain::m_mutex;
@@ -58,7 +56,7 @@ void RTPSDomain::stopAll()
         RTPSDomain::removeRTPSParticipant_nts(m_RTPSParticipants.begin());
     }
     logInfo(RTPS_PARTICIPANT,"RTPSParticipants deleted correctly ");
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    eClock::my_sleep(100);
 }
 
 RTPSParticipant* RTPSDomain::createParticipant(
@@ -70,7 +68,7 @@ RTPSParticipant* RTPSDomain::createParticipant(
 
     RTPSParticipantAttributes PParam = attrs;
 
-    if(PParam.builtin.discovery_config.leaseDuration < c_TimeInfinite && PParam.builtin.discovery_config.leaseDuration <= PParam.builtin.discovery_config.leaseDuration_announcementperiod) //TODO CHeckear si puedo ser infinito
+    if(PParam.builtin.leaseDuration < c_TimeInfinite && PParam.builtin.leaseDuration <= PParam.builtin.leaseDuration_announcementperiod) //TODO CHeckear si puedo ser infinito
     {
         logError(RTPS_PARTICIPANT,"RTPSParticipant Attributes: LeaseDuration should be >= leaseDuration announcement period");
         return nullptr;
@@ -105,70 +103,53 @@ RTPSParticipant* RTPSDomain::createParticipant(
     }
 
     PParam.participantID = ID;
+    int pid = System::GetPID();
+    GuidPrefix_t guidP;
     LocatorList_t loc;
     IPFinder::getIP4Address(&loc);
 
-    if (loc.empty() && PParam.builtin.initialPeersList.empty())
+    guidP.value[0] = c_VendorId_eProsima[0];
+    guidP.value[1] = c_VendorId_eProsima[1];
+
+    if(loc.size()>0)
     {
-        Locator_t local;
-        IPLocator::setIPv4(local, 127, 0, 0, 1);
-        PParam.builtin.initialPeersList.push_back(local);
-    }
-
-    // Generate a new GuidPrefix_t
-    GuidPrefix_t guidP;
-
-    {
-        // Make a new participant GuidPrefix_t up
-        int pid = System::GetPID();
-
-        guidP.value[0] = c_VendorId_eProsima[0];
-        guidP.value[1] = c_VendorId_eProsima[1];
-
-        if (loc.size() > 0)
+        MD5 md5;
+        for(auto& l : loc)
         {
-            MD5 md5;
-            for (auto& l : loc)
-            {
-                md5.update(l.address, sizeof(l.address));
-            }
-            md5.finalize();
-            uint16_t hostid = 0;
-            for (size_t i = 0; i < sizeof(md5.digest); i += 2)
-            {
-                hostid ^= ((md5.digest[i] << 8) | md5.digest[i + 1]);
-            }
-            guidP.value[2] = octet(hostid);
-            guidP.value[3] = octet(hostid >> 8);
+            md5.update(l.address, sizeof(l.address));
         }
-        else
+        md5.finalize();
+        uint16_t hostid = 0;
+        for(size_t i = 0; i < sizeof(md5.digest); i += 2)
         {
-            guidP.value[2] = 127;
-            guidP.value[3] = 1;
+            hostid ^= ((md5.digest[i] << 8) | md5.digest[i+1]);
         }
-        guidP.value[4] = octet(pid);
-        guidP.value[5] = octet(pid >> 8);
-        guidP.value[6] = octet(pid >> 16);
-        guidP.value[7] = octet(pid >> 24);
-        guidP.value[8] = octet(ID);
-        guidP.value[9] = octet(ID >> 8);
-        guidP.value[10] = octet(ID >> 16);
-        guidP.value[11] = octet(ID >> 24);
-    }
-
-    RTPSParticipant* p = new RTPSParticipant(nullptr);
-    RTPSParticipantImpl* pimpl = nullptr;
-
-    // If we force the participant to have a specific prefix we must define a different persistence GuidPrefix_t that
-    // would ensure builtin endpoints are able to differentiate between a communication loss and a participant recovery
-    if(PParam.prefix != c_GuidPrefix_Unknown)
-    {
-        pimpl = new RTPSParticipantImpl(PParam, PParam.prefix, guidP, p, listen);
+        guidP.value[2] = octet(hostid);
+        guidP.value[3] = octet(hostid >> 8);
     }
     else
     {
-        pimpl = new RTPSParticipantImpl(PParam, guidP, p, listen);
+        guidP.value[2] = 127;
+        guidP.value[3] = 1;
+
+        if (PParam.builtin.initialPeersList.empty())
+        {
+            Locator_t local;
+            IPLocator::setIPv4(local, 127, 0, 0, 1);
+            PParam.builtin.initialPeersList.push_back(local);
+        }
     }
+    guidP.value[4] = octet(pid);
+    guidP.value[5] = octet(pid >> 8);
+    guidP.value[6] = octet(pid >> 16);
+    guidP.value[7] = octet(pid >> 24);
+    guidP.value[8] = octet(ID);
+    guidP.value[9] = octet(ID >> 8);
+    guidP.value[10] = octet(ID >> 16);
+    guidP.value[11] = octet(ID >> 24);
+
+    RTPSParticipant* p = new RTPSParticipant(nullptr);
+    RTPSParticipantImpl* pimpl = new RTPSParticipantImpl(PParam,guidP,p,listen);
 
 #if HAVE_SECURITY
     // Check security was correctly initialized
@@ -294,6 +275,6 @@ bool RTPSDomain::removeRTPSReader(RTPSReader* reader)
     return false;
 }
 
-} // namespace rtps
-} // namespace fastrtps
-} // namespace eprosima
+} /* namespace  rtps */
+} /* namespace  fastrtps */
+} /* namespace eprosima */

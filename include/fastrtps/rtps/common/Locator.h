@@ -19,7 +19,6 @@
 #ifndef RTPS_ELEM_LOCATOR_H_
 #define RTPS_ELEM_LOCATOR_H_
 #include "../../fastrtps_dll.h"
-
 #include "Types.h"
 #include <sstream>
 #include <vector>
@@ -27,9 +26,8 @@
 #include <cstring>
 #include <iomanip>
 #include <algorithm>
-
-namespace eprosima {
-namespace fastrtps {
+namespace eprosima{
+namespace fastrtps{
 namespace rtps {
 
 #define LOCATOR_INVALID(loc)  {loc.kind=LOCATOR_KIND_INVALID;loc.port= LOCATOR_PORT_INVALID;LOCATOR_ADDRESS_INVALID(loc.address);}
@@ -87,7 +85,7 @@ public:
 
     //!Port constructor
     Locator_t(uint32_t portin)
-        : kind(LOCATOR_KIND_UDPv4)
+        : kind(1)
     {
         port = portin;
         LOCATOR_ADDRESS_INVALID(address);

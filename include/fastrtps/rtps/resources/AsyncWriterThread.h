@@ -21,16 +21,15 @@
 
 #include <thread>
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 #include <list>
 
 #include <fastrtps/rtps/resources/AsyncInterestTree.h>
-#include <fastrtps/utils/TimedMutex.hpp>
-#include <fastrtps/utils/TimedConditionVariable.hpp>
 
 namespace eprosima{
 namespace fastrtps{
 namespace rtps{
-
 class RTPSWriter;
 
 /**
@@ -42,54 +41,53 @@ class RTPSWriter;
 class AsyncWriterThread
 {
 public:
+    /**
+     * @brief Adds a writer to be managed by this thread.
+     * Only asynchronous writers are permitted.
+     * @param writer Asynchronous writer to be added.
+     * @return Result of the operation.
+     */
+    static bool addWriter(RTPSWriter& writer);
 
-    AsyncWriterThread() = default;
-
-    ~AsyncWriterThread();
-
-    /*!
-     * @brief Unregister a writer if it is waiting to be processed.
+    /**
+     * @brief Removes a writer.
      * @param writer Asynchronous writer to be removed.
      * @return Result of the operation.
-     * @note Always call this function from writer's destructor.
      */
-    void unregister_writer(
-            RTPSWriter* writer);
+    static bool removeWriter(RTPSWriter& writer);
 
-    /*!
-     * Wakes the thread up and starts processing async writers.
-     * @param interested_writer The writer interested in an async write.
+    /**
+     * Wakes the thread up.
+     * @param interestedParticipant The participant interested in an async write.
      */
-    void wake_up(
-            RTPSWriter* interested_writer);
+    static void wakeUp(const RTPSParticipantImpl* interestedParticipant);
 
-    /*!
-     * Wakes the thread up and starts processing async writers.
-     * @param interested_writer The writer interested in an async write.
-     * @param max_blocking_time Time point until the function must be blocked.
-     * @note This method is blocked for a period of time.
+    /**
+     * Wakes the thread up.
+     * @param interestedWriter The writer interested in an async write.
      */
-    void wake_up(
-            RTPSWriter* interested_writer,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time);
+    static void wakeUp(const RTPSWriter* interestedWriter);
 
 private:
-
+    AsyncWriterThread() = delete;
+    ~AsyncWriterThread() = delete;
     AsyncWriterThread(const AsyncWriterThread&) = delete;
     const AsyncWriterThread& operator=(const AsyncWriterThread&) = delete;
 
     //! @brief runs main method
-    void run();
+    static void run();
 
-    std::thread* thread_ = nullptr;
-    RecursiveTimedMutex condition_variable_mutex_;
+    static std::thread* thread_;
+    static std::mutex data_structure_mutex_;
+    static std::mutex condition_variable_mutex_;
 
     //! List of asynchronous writers.
-    AsyncInterestTree interestTree_;
+    static std::list<RTPSWriter*> async_writers;
+    static AsyncInterestTree interestTree;
 
-    bool running_ = false;
-    bool run_scheduled_ = false;
-    TimedConditionVariable cv_;
+    static bool running_;
+    static bool run_scheduled_;
+    static std::condition_variable cv_;
 };
 
 } // namespace rtps

@@ -40,32 +40,22 @@ RTPSWriter::RTPSWriter(
     : Endpoint(impl, guid, att.endpoint)
     , m_pushMode(true)
     , m_cdrmessages(impl->getMaxMessageSize() > att.throughputController.bytesPerPeriod ?
-            att.throughputController.bytesPerPeriod > impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod ?
-            impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod :
-            att.throughputController.bytesPerPeriod :
-            impl->getMaxMessageSize() > impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod ?
-            impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod :
-            impl->getMaxMessageSize(), impl->getGuid().guidPrefix,
-#if HAVE_SECURITY
-            impl->is_secure()
-#else
-            false
-#endif
-            )
+        att.throughputController.bytesPerPeriod > impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod ?
+        impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod :
+        att.throughputController.bytesPerPeriod :
+        impl->getMaxMessageSize() > impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod ?
+        impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod :
+        impl->getMaxMessageSize(), impl->getGuid().guidPrefix)
     , mp_history(hist)
     , mp_listener(listen)
     , is_async_(att.mode == SYNCHRONOUS_WRITER ? false : true)
     , m_separateSendingEnabled(false)
-    , locator_selector_(att.matched_readers_allocation)
     , all_remote_readers_(att.matched_readers_allocation)
-    , all_remote_participants_(att.matched_readers_allocation)
 #if HAVE_SECURITY
     , encrypt_payload_(mp_history->getTypeMaxSerialized())
 #endif
     , liveliness_kind_(att.liveliness_kind)
     , liveliness_lease_duration_(att.liveliness_lease_duration)
-    , liveliness_announcement_period_(att.liveliness_announcement_period)
-    , next_{nullptr}
 {
     mp_history->mp_writer = this;
     mp_history->mp_mutex = &mp_mutex;
@@ -141,7 +131,7 @@ uint32_t RTPSWriter::getTypeMaxSerialized()
 bool RTPSWriter::remove_older_changes(unsigned int max)
 {
     logInfo(RTPS_WRITER, "Starting process clean_history for writer " << getGuid());
-    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+    std::lock_guard<std::recursive_timed_mutex> guard(mp_mutex);
     bool limit = (max != 0);
 
     bool remove_ret = mp_history->remove_min_change();
@@ -191,35 +181,10 @@ uint32_t RTPSWriter::calculateMaxDataSize(uint32_t length)
     return maxDataSize;
 }
 
-void RTPSWriter::add_guid(const GUID_t& remote_guid)
+void RTPSWriter::update_cached_info_nts(std::vector<LocatorList_t>& allLocatorLists)
 {
-    const GuidPrefix_t& prefix = remote_guid.guidPrefix;
-    all_remote_readers_.push_back(remote_guid);
-    if (std::find(all_remote_participants_.begin(), all_remote_participants_.end(), prefix) ==
-        all_remote_participants_.end())
-    {
-        all_remote_participants_.push_back(prefix);
-    }
-}
-
-void RTPSWriter::compute_selected_guids()
-{
-    all_remote_readers_.clear();
-    all_remote_participants_.clear();
-
-    for(LocatorSelectorEntry* entry : locator_selector_.transport_starts())
-    {
-        if (entry->enabled)
-        {
-            add_guid(entry->remote_guid);
-        }
-    }
-}
-
-void RTPSWriter::update_cached_info_nts()
-{
-    locator_selector_.reset(true);
-    mp_RTPSParticipant->network_factory().select_locators(locator_selector_);
+    mAllShrinkedLocatorList.clear();
+    mAllShrinkedLocatorList.push_back(mp_RTPSParticipant->network_factory().ShrinkLocatorLists(allLocatorLists));
 }
 
 #if HAVE_SECURITY
@@ -271,45 +236,6 @@ bool RTPSWriter::encrypt_cachechange(CacheChange_t* change)
 }
 #endif
 
-bool RTPSWriter::destinations_have_changed() const
-{
-    return false;
-}
-
-GuidPrefix_t RTPSWriter::destination_guid_prefix() const
-{
-    return all_remote_participants_.size() == 1 ? all_remote_participants_.at(0) : c_GuidPrefix_Unknown;
-}
-
-const std::vector<GuidPrefix_t>& RTPSWriter::remote_participants() const
-{
-    return all_remote_participants_;
-}
-
-const std::vector<GUID_t>& RTPSWriter::remote_guids() const
-{
-    return all_remote_readers_;
-}
-
-bool RTPSWriter::send(
-        CDRMessage_t* message,
-        std::chrono::steady_clock::time_point& max_blocking_time_point) const
-{
-    bool ret_val = true;
-
-    RTPSParticipantImpl* participant = getRTPSParticipant();
-    locator_selector_.for_each(
-        [participant, message, & max_blocking_time_point, & ret_val](const Locator_t& loc)
-        {
-            if(ret_val)
-            {
-                ret_val = participant->sendSync(message, loc, max_blocking_time_point);
-            }
-        });
-
-    return ret_val;
-}
-
 const LivelinessQosPolicyKind& RTPSWriter::get_liveliness_kind() const
 {
     return liveliness_kind_;
@@ -318,11 +244,6 @@ const LivelinessQosPolicyKind& RTPSWriter::get_liveliness_kind() const
 const Duration_t& RTPSWriter::get_liveliness_lease_duration() const
 {
     return liveliness_lease_duration_;
-}
-
-const Duration_t& RTPSWriter::get_liveliness_announcement_period() const
-{
-    return liveliness_announcement_period_;
 }
 
 }  // namespace rtps

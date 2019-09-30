@@ -21,7 +21,7 @@
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 #include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
-#include <fastrtps/rtps/resources/TimedEvent.h>
+#include <fastrtps/rtps/builtin/discovery/participant/timedevent/RemoteParticipantLeaseDuration.h>
 #include <fastrtps/rtps/builtin/BuiltinProtocols.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
 #include <fastrtps/log/Log.h>
@@ -36,74 +36,63 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-ParticipantProxyData::ParticipantProxyData(const RTPSParticipantAllocationAttributes& allocation)
-    : m_protocolVersion(c_ProtocolVersion)
-    , m_VendorId(c_VendorId_Unknown)
-    , m_expectsInlineQos(false)
-    , m_availableBuiltinEndpoints(0)
-    , metatraffic_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
-    , default_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
-    , m_manualLivelinessCount(0)
+ParticipantProxyData::ParticipantProxyData():
+    m_protocolVersion(c_ProtocolVersion),
+    m_VendorId(c_VendorId_Unknown),
+    m_expectsInlineQos(false),
+    m_availableBuiltinEndpoints(0),
+    m_manualLivelinessCount(0),
 #if HAVE_SECURITY
-    , security_attributes_(0UL)
-    , plugin_security_attributes_(0UL)
+    security_attributes_(0UL),
+    plugin_security_attributes_(0UL),
 #endif
-    , isAlive(false)
-    , lease_duration_event(nullptr)
-    , should_check_lease_duration(false)
-    , m_readers(allocation.readers)
-    , m_writers(allocation.writers)
+    isAlive(false),
+    mp_leaseDurationTimer(nullptr)
     {
     }
 
-ParticipantProxyData::ParticipantProxyData(const ParticipantProxyData& pdata) 
-    : m_protocolVersion(pdata.m_protocolVersion)
-    , m_guid(pdata.m_guid)
-    , m_VendorId(pdata.m_VendorId)
-    , m_expectsInlineQos(pdata.m_expectsInlineQos)
-    , m_availableBuiltinEndpoints(pdata.m_availableBuiltinEndpoints)
-    , metatraffic_locators(pdata.metatraffic_locators)
-    , default_locators(pdata.default_locators)
-    , m_manualLivelinessCount(pdata.m_manualLivelinessCount)
-    , m_participantName(pdata.m_participantName)
-    , m_key(pdata.m_key)
-    , m_leaseDuration(pdata.m_leaseDuration)
+ParticipantProxyData::ParticipantProxyData(const ParticipantProxyData& pdata) :
+    m_protocolVersion(pdata.m_protocolVersion),
+    m_guid(pdata.m_guid),
+    m_VendorId(pdata.m_VendorId),
+    m_expectsInlineQos(pdata.m_expectsInlineQos),
+    m_availableBuiltinEndpoints(pdata.m_availableBuiltinEndpoints),
+    m_metatrafficUnicastLocatorList(pdata.m_metatrafficUnicastLocatorList),
+    m_metatrafficMulticastLocatorList(pdata.m_metatrafficMulticastLocatorList),
+    m_defaultUnicastLocatorList(pdata.m_defaultUnicastLocatorList),
+    m_defaultMulticastLocatorList(pdata.m_defaultMulticastLocatorList),
+    m_manualLivelinessCount(pdata.m_manualLivelinessCount),
+    m_participantName(pdata.m_participantName),
+    m_key(pdata.m_key),
+    m_leaseDuration(pdata.m_leaseDuration),
 #if HAVE_SECURITY
-    , identity_token_(pdata.identity_token_)
-    , permissions_token_(pdata.permissions_token_)
-    , security_attributes_(pdata.security_attributes_)
-    , plugin_security_attributes_(pdata.plugin_security_attributes_)
+    identity_token_(pdata.identity_token_),
+    permissions_token_(pdata.permissions_token_),
+    security_attributes_(pdata.security_attributes_),
+    plugin_security_attributes_(pdata.plugin_security_attributes_),
 #endif
-    , isAlive(pdata.isAlive)
-    , m_properties(pdata.m_properties)
-    , m_userData(pdata.m_userData)
-    , lease_duration_event(nullptr)
-    , should_check_lease_duration(false)
-
-    // This method is only called from SecurityManager when a new participant is discovered and the
-    // corresponding DiscoveredParticipantInfo struct is created. Only participant info is used,
-    // so there is no need to copy m_readers and m_writers
+    isAlive(pdata.isAlive),
+    m_properties(pdata.m_properties),
+    m_userData(pdata.m_userData),
+    mp_leaseDurationTimer(nullptr)
     {
     }
 
 ParticipantProxyData::~ParticipantProxyData()
 {
-    logInfo(RTPS_PARTICIPANT, m_guid);
-
-    for (ReaderProxyData* it : m_readers)
+    logInfo(RTPS_PARTICIPANT,this->m_guid);
+    for(std::vector<ReaderProxyData*>::iterator it = this->m_readers.begin();
+            it!=this->m_readers.end();++it)
     {
-        delete it;
+        delete(*it);
     }
-
-    for (WriterProxyData* it : m_writers)
+    for(std::vector<WriterProxyData*>::iterator it = this->m_writers.begin();
+            it!=this->m_writers.end();++it)
     {
-        delete it;
+        delete(*it);
     }
-
-    if (lease_duration_event != nullptr)
-    {
-        delete lease_duration_event;
-    }
+    if(this->mp_leaseDurationTimer != nullptr)
+        delete(mp_leaseDurationTimer);
 }
 
 bool ParticipantProxyData::writeToCDRMessage(CDRMessage_t* msg, bool write_encapsulation)
@@ -133,24 +122,28 @@ bool ParticipantProxyData::writeToCDRMessage(CDRMessage_t* msg, bool write_encap
         ParameterGuid_t p(PID_PARTICIPANT_GUID, PARAMETER_GUID_LENGTH, m_guid);
         if (!p.addToCDRMessage(msg)) return false;
     }
-    for(const Locator_t& it : metatraffic_locators.multicast)
+    for(std::vector<Locator_t>::iterator it=this->m_metatrafficMulticastLocatorList.begin();
+            it!=this->m_metatrafficMulticastLocatorList.end();++it)
     {
-        ParameterLocator_t p(PID_METATRAFFIC_MULTICAST_LOCATOR, PARAMETER_LOCATOR_LENGTH, it);
+        ParameterLocator_t p(PID_METATRAFFIC_MULTICAST_LOCATOR, PARAMETER_LOCATOR_LENGTH, *it);
         if (!p.addToCDRMessage(msg)) return false;
     }
-    for(const Locator_t& it : metatraffic_locators.unicast)
+    for(std::vector<Locator_t>::iterator it=this->m_metatrafficUnicastLocatorList.begin();
+            it!=this->m_metatrafficUnicastLocatorList.end();++it)
     {
-        ParameterLocator_t p(PID_METATRAFFIC_UNICAST_LOCATOR, PARAMETER_LOCATOR_LENGTH, it);
+        ParameterLocator_t p(PID_METATRAFFIC_UNICAST_LOCATOR, PARAMETER_LOCATOR_LENGTH, *it);
         if (!p.addToCDRMessage(msg)) return false;
     }
-    for(const Locator_t& it : default_locators.unicast)
+    for(std::vector<Locator_t>::iterator it=this->m_defaultUnicastLocatorList.begin();
+            it!=this->m_defaultUnicastLocatorList.end();++it)
     {
-        ParameterLocator_t p(PID_DEFAULT_UNICAST_LOCATOR, PARAMETER_LOCATOR_LENGTH, it);
+        ParameterLocator_t p(PID_DEFAULT_UNICAST_LOCATOR, PARAMETER_LOCATOR_LENGTH, *it);
         if (!p.addToCDRMessage(msg)) return false;
     }
-    for(const Locator_t& it : default_locators.multicast)
+    for(std::vector<Locator_t>::iterator it=this->m_defaultMulticastLocatorList.begin();
+            it!=this->m_defaultMulticastLocatorList.end();++it)
     {
-        ParameterLocator_t p(PID_DEFAULT_MULTICAST_LOCATOR, PARAMETER_LOCATOR_LENGTH, it);
+        ParameterLocator_t p(PID_DEFAULT_MULTICAST_LOCATOR, PARAMETER_LOCATOR_LENGTH, *it);
         if (!p.addToCDRMessage(msg)) return false;
     }
     {
@@ -264,30 +257,28 @@ bool ParticipantProxyData::readFromCDRMessage(CDRMessage_t* msg, bool use_encaps
             {
                 const ParameterLocator_t* p = dynamic_cast<const ParameterLocator_t*>(param);
                 assert(p != nullptr);
-                // TODO: NetworkFactory
-                metatraffic_locators.add_multicast_locator(p->locator);
+                this->m_metatrafficMulticastLocatorList.push_back(p->locator);
                 break;
             }
             case PID_METATRAFFIC_UNICAST_LOCATOR:
             {
                 const ParameterLocator_t* p = dynamic_cast<const ParameterLocator_t*>(param);
                 assert(p != nullptr);
-                // TODO: NetworkFactory
-                metatraffic_locators.add_unicast_locator(p->locator);
+                this->m_metatrafficUnicastLocatorList.push_back(p->locator);
                 break;
             }
             case PID_DEFAULT_UNICAST_LOCATOR:
             {
                 const ParameterLocator_t* p = dynamic_cast<const ParameterLocator_t*>(param);
                 assert(p != nullptr);
-                default_locators.add_unicast_locator(p->locator);
+                this->m_defaultUnicastLocatorList.push_back(p->locator);
                 break;
             }
             case PID_DEFAULT_MULTICAST_LOCATOR:
             {
                 const ParameterLocator_t* p = dynamic_cast<const ParameterLocator_t*>(param);
                 assert(p != nullptr);
-                default_locators.add_multicast_locator(p->locator);
+                this->m_defaultMulticastLocatorList.push_back(p->locator);
                 break;
             }
             case PID_PARTICIPANT_LEASE_DURATION:
@@ -368,7 +359,6 @@ bool ParticipantProxyData::readFromCDRMessage(CDRMessage_t* msg, bool use_encaps
     };
 
     uint32_t qos_size;
-    clear();
     return ParameterList::readParameterListfromCDRMsg(*msg, param_process, use_encapsulation, qos_size);
 }
 
@@ -381,11 +371,10 @@ void ParticipantProxyData::clear()
     m_VendorId = c_VendorId_Unknown;
     m_expectsInlineQos = false;
     m_availableBuiltinEndpoints = 0;
-    metatraffic_locators.unicast.clear();
-    metatraffic_locators.multicast.clear();
-    default_locators.unicast.clear();
-    default_locators.multicast.clear();
-    m_manualLivelinessCount = 0;
+    m_metatrafficUnicastLocatorList.clear();
+    m_metatrafficMulticastLocatorList.clear();
+    m_defaultUnicastLocatorList.clear();
+    m_defaultMulticastLocatorList.clear();
     m_participantName = "";
     m_key = InstanceHandle_t();
     m_leaseDuration = Duration_t();
@@ -401,27 +390,23 @@ void ParticipantProxyData::clear()
     m_userData.clear();
 }
 
-void ParticipantProxyData::copy(const ParticipantProxyData& pdata)
+void ParticipantProxyData::copy(ParticipantProxyData& pdata)
 {
     m_protocolVersion = pdata.m_protocolVersion;
     m_guid = pdata.m_guid;
     m_VendorId[0] = pdata.m_VendorId[0];
     m_VendorId[1] = pdata.m_VendorId[1];
     m_availableBuiltinEndpoints = pdata.m_availableBuiltinEndpoints;
-    metatraffic_locators = pdata.metatraffic_locators;
-    default_locators = pdata.default_locators;
-    m_manualLivelinessCount = pdata.m_manualLivelinessCount;
+    m_metatrafficUnicastLocatorList = pdata.m_metatrafficUnicastLocatorList;
+    m_metatrafficMulticastLocatorList = pdata.m_metatrafficMulticastLocatorList;
+    m_defaultUnicastLocatorList = pdata.m_defaultUnicastLocatorList;
+    m_defaultMulticastLocatorList = pdata.m_defaultMulticastLocatorList;
     m_participantName = pdata.m_participantName;
     m_leaseDuration = pdata.m_leaseDuration;
     m_key = pdata.m_key;
     isAlive = pdata.isAlive;
     m_properties = pdata.m_properties;
     m_userData = pdata.m_userData;
-
-    // This method is only called when a new participant is discovered.The destination of the copy
-    // will always be a new ParticipantProxyData or one from the pool, so there is no need for
-    // m_readers and m_writers to be copied
-
 #if HAVE_SECURITY
     identity_token_ = pdata.identity_token_;
     permissions_token_ = pdata.permissions_token_;
@@ -432,9 +417,10 @@ void ParticipantProxyData::copy(const ParticipantProxyData& pdata)
 
 bool ParticipantProxyData::updateData(ParticipantProxyData& pdata)
 {
-    metatraffic_locators = pdata.metatraffic_locators;
-    default_locators = pdata.default_locators;
-    m_manualLivelinessCount = pdata.m_manualLivelinessCount;
+    m_metatrafficUnicastLocatorList = pdata.m_metatrafficUnicastLocatorList;
+    m_metatrafficMulticastLocatorList = pdata.m_metatrafficMulticastLocatorList;
+    m_defaultUnicastLocatorList = pdata.m_defaultUnicastLocatorList;
+    m_defaultMulticastLocatorList = pdata.m_defaultMulticastLocatorList;
     m_properties = pdata.m_properties;
     m_leaseDuration = pdata.m_leaseDuration;
     m_userData = pdata.m_userData;
@@ -445,76 +431,12 @@ bool ParticipantProxyData::updateData(ParticipantProxyData& pdata)
     security_attributes_ = pdata.security_attributes_;
     plugin_security_attributes_ = pdata.plugin_security_attributes_;
 #endif
-    if (this->lease_duration_event != nullptr)
+    if (this->mp_leaseDurationTimer != nullptr)
     {
-        lease_duration_event->update_interval(m_leaseDuration);
+        this->mp_leaseDurationTimer->update_lease_duration(m_leaseDuration);
     }
     return true;
 }
-
-void ParticipantProxyData::set_persistence_guid(const GUID_t& guid)
-{
-    // only valid values
-    if (guid == c_Guid_Unknown)
-    {
-        return;
-    }
-
-    // generate pair
-    std::pair<std::string, std::string> persistent_guid;
-    persistent_guid.first = "PID_PERSISTENCE_GUID";
-
-    std::ostringstream data;
-    data << guid;
-    persistent_guid.second = data.str();
-
-    // if exists replace
-    std::vector<std::pair<std::string, std::string>> & props = m_properties.properties;
-
-    std::vector<std::pair<std::string, std::string>>::iterator it =
-        std::find_if(
-            props.begin(),
-            props.end(),
-            [&persistent_guid](const std::pair<std::string, std::string> & p)
-            {
-                return persistent_guid.first == p.first;
-            });
-
-    if (it != props.end())
-    {
-        *it = std::move(persistent_guid);
-    }
-    else
-    {
-        // if not exists add
-        m_properties.properties.push_back(std::move(persistent_guid));
-    }
-}
-
-GUID_t ParticipantProxyData::get_persistence_guid() const
-{
-    GUID_t persistent(c_Guid_Unknown);
-
-    const std::vector<std::pair<std::string, std::string>> & props = m_properties.properties;
-
-    std::vector<std::pair<std::string, std::string>>::const_iterator it =
-        std::find_if(
-            props.cbegin(),
-            props.cend(),
-            [](const std::pair<std::string, std::string> & p)
-            {
-                return "PID_PERSISTENCE_GUID" == p.first;
-            });
-
-    if (it != props.end())
-    {
-        std::istringstream in(it->second);
-        in >> persistent;
-    }
-
-    return persistent;
-}
-
 
 } /* namespace rtps */
 } /* namespace fastrtps */

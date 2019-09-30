@@ -53,7 +53,8 @@ void WLPListener::onNewCacheChangeAdded(
         RTPSReader* reader,
         const CacheChange_t* const changeIN)
 {
-    std::lock_guard<std::recursive_mutex> guard2(*mp_WLP->mp_builtinProtocols->mp_PDP->getMutex());
+
+    std::lock_guard<std::recursive_mutex> guard2(*mp_WLP->getBuiltinProtocols()->mp_PDP->getMutex());
 
     GuidPrefix_t guidP;
     LivelinessQosPolicyKind livelinessKind;
@@ -65,7 +66,7 @@ void WLPListener::onNewCacheChangeAdded(
     }
     //Check the serializedPayload:
     auto history = reader->getHistory();
-    for(auto ch = history->changesBegin(); ch!=history->changesEnd(); ++ch)
+    for(auto ch = history->changesBegin(); ch!=history->changesEnd();++ch)
     {
         if((*ch)->instanceHandle == change->instanceHandle && (*ch)->sequenceNumber < change->sequenceNumber)
         {
@@ -73,22 +74,13 @@ void WLPListener::onNewCacheChangeAdded(
             break;
         }
     }
-    if (change->serializedPayload.length > 0)
+    if(change->serializedPayload.length>0)
     {
-        if (PL_CDR_BE == change->serializedPayload.data[1])
+        for(uint8_t i =0;i<12;++i)
         {
-            change->serializedPayload.encapsulation = (uint16_t)PL_CDR_BE;
+            guidP.value[i] = change->serializedPayload.data[i];
         }
-        else
-        {
-            change->serializedPayload.encapsulation = (uint16_t)PL_CDR_LE;
-        }
-
-        for(size_t i = 0; i<12; ++i)
-        {
-            guidP.value[i] = change->serializedPayload.data[i + 4];
-        }
-        livelinessKind = (LivelinessQosPolicyKind)(change->serializedPayload.data[19]-0x01);
+        livelinessKind = (LivelinessQosPolicyKind)(change->serializedPayload.data[15]-0x01);
 
     }
     else
@@ -138,9 +130,9 @@ bool WLPListener::computeKey(CacheChange_t* change)
     if(change->instanceHandle == c_InstanceHandle_Unknown)
     {
         SerializedPayload_t* pl = &change->serializedPayload;
-        if(pl->length >= 20)
+        if(pl->length >= 16)
         {
-            memcpy(change->instanceHandle.value, pl->data + 4, 16);
+            memcpy(change->instanceHandle.value, pl->data, 16);
             return true;
         }
         return false;

@@ -29,6 +29,7 @@
 #include <fastrtps/transport/TCPv6TransportDescriptor.h>
 #include <fastrtps/transport/UDPv6TransportDescriptor.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 #include <fastrtps/utils/IPLocator.h>
 
 #include <thread>
@@ -84,8 +85,8 @@ bool BenchMarkPublisher::init(int transport, ReliabilityQosPolicyKind reliabilit
 
     ParticipantAttributes PParam;
     PParam.rtps.builtin.domainId = domain;
-    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
-    PParam.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(1, 0);
+    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.leaseDuration_announcementperiod = Duration_t(1, 0);
     PParam.rtps.setName("Participant_pub");
 
     if (transport == 1)
@@ -360,15 +361,15 @@ void BenchMarkPublisher::PubListener::onPublicationMatched(Publisher* /*pub*/,Ma
 
 void BenchMarkPublisher::runThread()
 {
-    int iPrevCount = 0;
-    std::cout << "Publisher running..." << std::endl;
+	int iPrevCount = 0;
+	std::cout << "Publisher running..." << std::endl;
     while (!publish())
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+		eClock::my_sleep(10);
+	}
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(m_iWaitTime));
-    m_iCount = 0;
+	eClock::my_sleep(m_iWaitTime);
+	m_iCount = 0;
 
     while(!m_bBenchmarkFinished)
     {
@@ -380,14 +381,14 @@ void BenchMarkPublisher::runThread()
         }
         else
         {
-            if (m_iSamplesCount < m_iSamplesSize)
-            {
-                m_vSamples[m_iSamplesCount++] = m_iCount - iPrevCount;
-                iPrevCount = m_iCount;
-            }
+			if (m_iSamplesCount < m_iSamplesSize)
+			{
+				m_vSamples[m_iSamplesCount++] = m_iCount - iPrevCount;
+				iPrevCount = m_iCount;
+			}
 
             // WAIT
-            std::this_thread::sleep_for(std::chrono::milliseconds(m_iTickTime));
+            eClock::my_sleep(m_iTickTime);
         }
     }
 }

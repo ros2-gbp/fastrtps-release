@@ -370,60 +370,44 @@ void VideoTestPublisher::run()
 
 bool VideoTestPublisher::test(uint32_t datasize)
 {
+    //cout << "Beginning test of size: "<<datasize+4 <<endl;
     m_status = 0;
     n_received = 0;
-    // Create video sample with size <datasize>
     mp_video_out = new VideoType(datasize);
 
-    // Send READY command
     TestCommandType command;
     command.m_command = READY;
     mp_commandpub->write(&command);
 
     std::unique_lock<std::mutex> lock(mutex_);
-    // Wait for all the subscribers
-    comm_cond_.wait(lock, [&]() {
-        return comm_count_ >= n_subscribers;
-    });
+    comm_cond_.wait(lock, [&]() { return comm_count_ >= n_subscribers; });
     --comm_count_;
 
-    // BEGIN THE TEST
-    // --------------------------------------------------------------
-    // Get new sample
+    //BEGIN THE TEST:
+
     mp_video_out = new VideoType();
-    // Start "playing" on the pipeline
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
-    // Get start time
     send_start_ = std::chrono::steady_clock::now();
-    // Wait until timer returns "finished"
-    timer_cond_.wait(lock, [&]() {
-        return timer_on_;
-    });
 
-    // Paused the sending
+    timer_cond_.wait(lock, [&]() { return timer_on_; });
+
     gst_element_set_state(pipeline, GST_STATE_PAUSED);
 
-    // Send STOP command to subscriber
     command.m_command = STOP;
     mp_commandpub->write(&command);
 
-    // Wait until all subscribers unmatch
-    disc_cond_.wait(lock, [&]() {
-        return disc_count_ == 0;
-    });
+    eClock::my_sleep(500);
 
     if(m_status !=0)
     {
         cout << "Error in test "<<endl;
         return false;
     }
-    // --------------------------------------------------------------
-    //TEST FINISHED
-
-    // Clean up
-    size_t removed = 0;
+    //TEST FINISHED:
+    size_t removed=0;
     mp_datapub->removeAllChange(&removed);
+    //cout << "   REMOVED: "<< removed<<endl;
     delete(mp_video_out);
 
     return true;
@@ -481,7 +465,7 @@ GstFlowReturn VideoTestPublisher::new_sample(GstElement *sink, VideoTestPublishe
     {
         if (sub->m_sendSleepTime != 0)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(rand() % sub->m_sendSleepTime));
+            eClock::my_sleep(rand() % sub->m_sendSleepTime);
         }
 
         GstSample* sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));

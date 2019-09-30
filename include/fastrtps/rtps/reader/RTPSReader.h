@@ -18,30 +18,30 @@
 
 
 
-#ifndef FASTRTPS_RTPS_READER_RTPSREADER_H_
-#define FASTRTPS_RTPS_READER_RTPSREADER_H_
+#ifndef RTPSREADER_H_
+#define RTPSREADER_H_
+
 
 #include "../Endpoint.h"
 #include "../attributes/ReaderAttributes.h"
 #include "../common/SequenceNumber.h"
 #include "../../qos/LivelinessChangedStatus.h"
-#include "../common/Time_t.h"
-#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
-#include "../../utils/TimedConditionVariable.hpp"
+
+#include <map>
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
 // Forward declarations
+class FragmentedChangePitStop;
 class LivelinessManager;
 class ReaderHistory;
 class ReaderListener;
 class WriterProxy;
+struct SequenceNumber_t;
 class FragmentedChangePitStop;
 struct CacheChange_t;
-struct ReaderHistoryState;
-class WriterProxyData;
 
 /**
  * Class RTPSReader, manages the reception of data from its matched writers.
@@ -52,17 +52,16 @@ class RTPSReader : public Endpoint
     friend class ReaderHistory;
     friend class RTPSParticipantImpl;
     friend class MessageReceiver;
-    friend class EDP;
     friend class WLP;
 
 protected:
 
     RTPSReader(
             RTPSParticipantImpl*,
-            const GUID_t& guid,
-            const ReaderAttributes& att,
+            GUID_t& guid,
+            ReaderAttributes& att,
             ReaderHistory* hist,
-            ReaderListener* listen = nullptr);
+            ReaderListener* listen=nullptr);
 
     virtual ~RTPSReader();
 
@@ -73,45 +72,49 @@ public:
      * @param wdata Attributes of the writer to add.
      * @return True if correctly added.
      */
-    RTPS_DllAPI virtual bool matched_writer_add(const WriterProxyData& wdata) = 0;
+    RTPS_DllAPI virtual bool matched_writer_add(RemoteWriterAttributes& wdata) = 0;
 
     /**
      * Remove a writer represented by its attributes from the matched writers.
-     * @param writer_guid GUID of the writer to remove.
+     * @param wdata Attributes of the writer to remove.
      * @return True if correctly removed.
      */
-    RTPS_DllAPI virtual bool matched_writer_remove(const GUID_t& writer_guid) = 0;
+    RTPS_DllAPI virtual bool matched_writer_remove(const RemoteWriterAttributes& wdata) = 0;
 
     /**
-     * Tells us if a specific Writer is matched against this reader.
-     * @param writer_guid GUID of the writer to check.
+     * Tells us if a specific Writer is matched against this reader
+     * @param wdata Pointer to the WriterProxyData object
      * @return True if it is matched.
      */
-    RTPS_DllAPI virtual bool matched_writer_is_matched(const GUID_t& writer_guid) = 0;
+    RTPS_DllAPI virtual bool matched_writer_is_matched(const RemoteWriterAttributes& wdata) = 0;
 
     /**
-     * Processes a new DATA message.
+     * Returns true if the reader accepts a message directed to entityId.
+     */
+    RTPS_DllAPI bool acceptMsgDirectedTo(EntityId_t& entityId);
+
+    /**
+     * Processes a new DATA message. Previously the message must have been accepted by function acceptMsgDirectedTo.
      *
      * @param change Pointer to the CacheChange_t.
      * @return true if the reader accepts messages from the.
      */
-    RTPS_DllAPI virtual bool processDataMsg(CacheChange_t* change) = 0;
+    RTPS_DllAPI virtual bool processDataMsg(CacheChange_t *change) = 0;
 
     /**
-     * Processes a new DATA FRAG message.
+     * Processes a new DATA FRAG message. Previously the message must have been accepted by function
+     * acceptMsgDirectedTo.
      *
      * @param change Pointer to the CacheChange_t.
      * @param sampleSize Size of the complete, assembled message.
      * @param fragmentStartingNum Starting number of this particular fragment.
      * @return true if the reader accepts message.
      */
-    RTPS_DllAPI virtual bool processDataFragMsg(
-            CacheChange_t* change,
-            uint32_t sampleSize,
-            uint32_t fragmentStartingNum) = 0;
+    RTPS_DllAPI virtual bool processDataFragMsg(CacheChange_t *change, uint32_t sampleSize, uint32_t fragmentStartingNum) = 0;
 
     /**
-     * Processes a new HEARTBEAT message.
+     * Processes a new HEARTBEAT message. Previously the message must have been accepted by function
+     * acceptMsgDirectedTo.
      * @param writerGUID
      * @param hbCount
      * @param firstSN
@@ -121,24 +124,25 @@ public:
      * @return true if the reader accepts messages from the.
      */
     RTPS_DllAPI virtual bool processHeartbeatMsg(
-            const GUID_t& writerGUID,
+            GUID_t& writerGUID,
             uint32_t hbCount,
-            const SequenceNumber_t& firstSN,
-            const SequenceNumber_t& lastSN,
+            SequenceNumber_t& firstSN,
+            SequenceNumber_t& lastSN,
             bool finalFlag,
             bool livelinessFlag) = 0;
 
     /**
-     * Processes a new GAP message.
+     * Processes a new GAP message. Previously the message must have been accepted by function
+     * acceptMsgDirectedTo.
      * @param writerGUID
      * @param gapStart
      * @param gapList
      * @return true if the reader accepts messages from the.
      */
     RTPS_DllAPI virtual bool processGapMsg(
-            const GUID_t& writerGUID,
-            const SequenceNumber_t& gapStart,
-            const SequenceNumberSet_t& gapList) = 0;
+            GUID_t& writerGUID,
+            SequenceNumber_t& gapStart,
+            SequenceNumberSet_t& gapList) = 0;
 
     /**
      * Method to indicate the reader that some change has been removed due to HistoryQos requirements.
@@ -154,7 +158,7 @@ public:
      * Get the associated listener, secondary attached Listener in case it is of coumpound type
      * @return Pointer to the associated reader listener.
      */
-    RTPS_DllAPI ReaderListener* getListener() const;
+    RTPS_DllAPI ReaderListener* getListener();
 
     /**
      * Switch the ReaderListener kind for the Reader.
@@ -187,9 +191,7 @@ public:
      * @param wp Pointer to pointer to the WriterProxy
      * @return True if read.
      */
-    RTPS_DllAPI virtual bool nextUnreadCache(
-            CacheChange_t** change,
-            WriterProxy** wp) = 0;
+    RTPS_DllAPI virtual bool nextUnreadCache(CacheChange_t** change, WriterProxy** wp) = 0;
 
     /**
      * Get the next CacheChange_t from the history to take.
@@ -197,28 +199,15 @@ public:
      * @param wp Pointer to pointer to the WriterProxy.
      * @return True if read.
      */
-    RTPS_DllAPI virtual bool nextUntakenCache(
-            CacheChange_t** change,
-            WriterProxy** wp) = 0;
-
-    RTPS_DllAPI bool wait_for_unread_cache(
-            const eprosima::fastrtps::Duration_t &timeout);
-
-    RTPS_DllAPI uint64_t get_unread_count() const;
+    RTPS_DllAPI virtual bool nextUntakenCache(CacheChange_t** change, WriterProxy** wp) = 0;
 
     /**
      * @return True if the reader expects Inline QOS.
      */
-    RTPS_DllAPI inline bool expectsInlineQos()
-    {
-        return m_expectsInlineQos;
-    }
+    RTPS_DllAPI inline bool expectsInlineQos(){ return m_expectsInlineQos; };
 
     //! Returns a pointer to the associated History.
-    RTPS_DllAPI inline ReaderHistory* getHistory()
-    {
-        return mp_history;
-    };
+    RTPS_DllAPI inline ReaderHistory* getHistory() {return mp_history;};
 
     /*!
      * @brief Search if there is a CacheChange_t, giving SequenceNumber_t and writer GUID_t,
@@ -229,56 +218,50 @@ public:
      */
     CacheChange_t* findCacheInFragmentedCachePitStop(
             const SequenceNumber_t& sequence_number,
-            const GUID_t& writer_guid) const;
+            const GUID_t& writer_guid);
 
     /*!
      * @brief Returns there is a clean state with all Writers.
      * It occurs when the Reader received all samples sent by Writers. In other words,
      * its WriterProxies are up to date.
      * @return There is a clean state with all Writers.
-     */
+    */
     virtual bool isInCleanState() = 0;
 
     //! The liveliness changed status struct as defined in the DDS
     LivelinessChangedStatus liveliness_changed_status_;
 
-    inline void enableMessagesFromUnkownWriters(bool enable)
+    inline void enableMessagesFromUnknownWriters(bool enable)
     {
-        m_acceptMessagesFromUnkownWriters = enable;
-    }
-
-    void setTrustedWriter(const EntityId_t& writer)
-    {
-        m_acceptMessagesFromUnkownWriters = false;
-        m_trustedWriterEntityId = writer;
+        m_acceptMessagesFromUnknownWriters = enable;
     }
 
 protected:
 
+    void setTrustedWriter(EntityId_t writer)
+    {
+        m_acceptMessagesFromUnknownWriters = false;
+        m_trustedWriterEntityId = writer;
+    }
+
     /*!
      * @brief Add a remote writer to the persistence_guid map
-     * @param guid GUID of the remote writer
-     * @param persistence_guid Persistence GUID of the remote writer
+     * @param wdata Info of the remote writer
      */
-    void add_persistence_guid(
-            const GUID_t& guid,
-            const GUID_t& persistence_guid);
+    void add_persistence_guid(const RemoteWriterAttributes& wdata);
 
     /*!
-     * @brief Remove a remote writer from the persistence_guid map
-     * @param guid GUID of the remote writer
-     * @param persistence_guid Persistence GUID of the remote writer
-     */
-    void remove_persistence_guid(
-            const GUID_t& guid,
-            const GUID_t& persistence_guid);
+    * @brief Remove a remote writer from the persistence_guid map
+    * @param wdata Info of the remote writer
+    */
+    void remove_persistence_guid(const RemoteWriterAttributes& wdata);
 
     /*!
-     * @brief Get the last notified sequence for a RTPS guid
-     * @param guid The RTPS guid to query
-     * @return Last notified sequence number for input guid
-     * @remarks Takes persistence_guid into consideration
-     */
+    * @brief Get the last notified sequence for a RTPS guid
+    * @param guid The RTPS guid to query
+    * @return Last notified sequence number for input guid
+    * @remarks Takes persistence_guid into consideration
+    */
     SequenceNumber_t get_last_notified(const GUID_t& guid);
 
     /*!
@@ -288,9 +271,7 @@ protected:
     * @return Previous value of last notified sequence number for input guid
     * @remarks Takes persistence_guid into consideration
     */
-    SequenceNumber_t update_last_notified(
-            const GUID_t& guid,
-            const SequenceNumber_t& seq);
+    SequenceNumber_t update_last_notified(const GUID_t& guid, const SequenceNumber_t& seq);
 
     /*!
     * @brief Set the last notified sequence for a persistence guid
@@ -309,20 +290,23 @@ protected:
     //!Accept msg to unknwon readers (default=true)
     bool m_acceptMessagesToUnknownReaders;
     //!Accept msg from unknwon writers (BE-true,RE-false)
-    bool m_acceptMessagesFromUnkownWriters;
+    bool m_acceptMessagesFromUnknownWriters;
     //!Trusted writer (for Builtin)
     EntityId_t m_trustedWriterEntityId;
     //!Expects Inline Qos.
     bool m_expectsInlineQos;
 
-    //!ReaderHistoryState
-    ReaderHistoryState* history_state_;
+    //!Physical GUID to persistence GUID map
+    std::map<GUID_t, GUID_t> persistence_guid_map_;
+    //!Persistence GUID count map
+    std::map<GUID_t, uint16_t> persistence_guid_count_;
+    //!Information about max notified change
+    std::map<GUID_t, SequenceNumber_t> history_record_;
 
+    //TODO Select one
     FragmentedChangePitStop* fragmentedChangePitStop_;
 
-    uint64_t total_unread_ = 0;
-
-    TimedConditionVariable new_notification_cv_;
+protected:
 
     //! The liveliness kind of this reader
     LivelinessQosPolicyKind liveliness_kind_;
@@ -338,4 +322,4 @@ private:
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif /* FASTRTPS_RTPS_READER_RTPSREADER_H_ */
+#endif /* RTPSREADER_H_ */

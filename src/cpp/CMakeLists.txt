@@ -16,21 +16,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/dev/set_sources.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/dev/generate_msvc_libraries.cmake)
 
 # Set source files
-
-if(WIN32)
-
-file(GLOB_RECURSE ALL_HEADERS 
-	${PROJECT_SOURCE_DIR}/include/**/*.h
-	${PROJECT_SOURCE_DIR}/include/**/*.hpp
-	${PROJECT_SOURCE_DIR}/src/cpp/**/*.h
-	${PROJECT_SOURCE_DIR}/src/cpp/**/*.hpp
-	)  
-
-endif(WIN32)
-
 set(${PROJECT_NAME}_source_files
-	${ALL_HEADERS} 
-
     log/Log.cpp
     log/StdoutConsumer.cpp
     log/FileConsumer.cpp
@@ -46,16 +32,22 @@ set(${PROJECT_NAME}_source_files
     rtps/resources/TimedEventImpl.cpp
     rtps/resources/AsyncWriterThread.cpp
     rtps/resources/AsyncInterestTree.cpp
+    rtps/timedevent/TimedCallback.cpp
     rtps/writer/LivelinessManager.cpp
     rtps/writer/RTPSWriter.cpp
     rtps/writer/StatefulWriter.cpp
     rtps/writer/ReaderProxy.cpp
     rtps/writer/StatelessWriter.cpp
     rtps/writer/ReaderLocator.cpp
+    rtps/writer/timedevent/PeriodicHeartbeat.cpp
+    rtps/writer/timedevent/NackResponseDelay.cpp
+    rtps/writer/timedevent/NackSupressionDuration.cpp
     rtps/history/CacheChangePool.cpp
     rtps/history/History.cpp
     rtps/history/WriterHistory.cpp
     rtps/history/ReaderHistory.cpp
+    rtps/reader/timedevent/HeartbeatResponseDelay.cpp
+    rtps/reader/timedevent/InitialAckNack.cpp
     rtps/reader/WriterProxy.cpp
     rtps/reader/StatefulReader.cpp
     rtps/reader/StatelessReader.cpp
@@ -97,6 +89,7 @@ set(${PROJECT_NAME}_source_files
     transport/test_UDPv4Transport.cpp
     transport/tcp/TCPControlMessage.cpp
     transport/tcp/RTCPMessageManager.cpp
+    transport/timedevent/TCPKeepAliveEvent.cpp
 
     types/AnnotationDescriptor.cpp
     types/AnnotationParameterValue.cpp
@@ -128,24 +121,17 @@ set(${PROJECT_NAME}_source_files
     qos/WriterQos.cpp
     qos/ReaderQos.cpp
     rtps/builtin/BuiltinProtocols.cpp
-	rtps/builtin/discovery/participant/DirectMessageSender.cpp
-	rtps/builtin/discovery/participant/PDP.cpp
     rtps/builtin/discovery/participant/PDPSimple.cpp
-    rtps/builtin/discovery/participant/PDPListener.cpp
-	rtps/builtin/discovery/participant/PDPServerListener.cpp
-	rtps/builtin/discovery/participant/PDPClient.cpp
-	rtps/builtin/discovery/participant/PDPServer.cpp
-	rtps/builtin/discovery/participant/timedevent/DSClientEvent.cpp
-	rtps/builtin/discovery/participant/timedevent/DServerEvent.cpp
+    rtps/builtin/discovery/participant/PDPSimpleListener.cpp
+    rtps/builtin/discovery/participant/timedevent/RemoteParticipantLeaseDuration.cpp
+    rtps/builtin/discovery/participant/timedevent/ResendParticipantProxyDataPeriod.cpp
     rtps/builtin/discovery/endpoint/EDP.cpp
     rtps/builtin/discovery/endpoint/EDPSimple.cpp
-	rtps/builtin/discovery/endpoint/EDPClient.cpp
-	rtps/builtin/discovery/endpoint/EDPServer.cpp
     rtps/builtin/discovery/endpoint/EDPSimpleListeners.cpp
-	rtps/builtin/discovery/endpoint/EDPServerListeners.cpp
     rtps/builtin/discovery/endpoint/EDPStatic.cpp
     rtps/builtin/liveliness/WLP.cpp
     rtps/builtin/liveliness/WLPListener.cpp
+    rtps/builtin/liveliness/timedevent/WLivelinessPeriodicAssertion.cpp
     rtps/builtin/data/ParticipantProxyData.cpp
     rtps/builtin/data/WriterProxyData.cpp
     rtps/builtin/data/ReaderProxyData.cpp
@@ -168,7 +154,6 @@ set(${PROJECT_NAME}_source_files
     rtps/persistence/PersistenceFactory.cpp
     rtps/persistence/SQLite3PersistenceService.cpp
     rtps/persistence/sqlite3.c
-    utils/TimedConditionVariable.cpp
     )
 
 # TLS Support
@@ -189,6 +174,7 @@ set(${PROJECT_NAME}_security_source_files
     rtps/security/common/SharedSecretHandle.cpp
     rtps/security/SecurityManager.cpp
     rtps/security/SecurityPluginFactory.cpp
+    rtps/security/timedevent/HandshakeMessageTokenResent.cpp
     security/OpenSSLInit.cpp
     security/authentication/PKIDH.cpp
     security/accesscontrol/Permissions.cpp
@@ -306,7 +292,7 @@ elseif(NOT EPROSIMA_INSTALLER)
     endif()
 
     # Link library to external libraries.
-    target_link_libraries(${PROJECT_NAME} ${PRIVACY} fastcdr foonathan_memory
+    target_link_libraries(${PROJECT_NAME} ${PRIVACY} fastcdr
         ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS}
         ${TINYXML2_LIBRARY}
         $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
@@ -404,6 +390,7 @@ if(UNIX AND EPROSIMA_INSTALLER)
         COMPONENT sources
         )
 endif()
+
 # Install libraries
 if((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER)
     if(IS_TOP_LEVEL)
@@ -427,15 +414,8 @@ elseif(NOT EPROSIMA_INSTALLER)
         )
 
     export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-targets.cmake)
-
-    if(INSTALLER_PLATFORM)
-        set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}-${INSTALLER_PLATFORM}/cmake)
-    else()
-        set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}/cmake${MSVCARCH_DIR_EXTENSION_EXT})
-    endif()
-
     install(EXPORT ${PROJECT_NAME}-targets
-        DESTINATION ${INSTALL_DESTINATION_PATH}
+        DESTINATION ${DATA_INSTALL_DIR}/${PROJECT_NAME}/cmake${MSVCARCH_DIR_EXTENSION_EXT}
         COMPONENT cmake
         )
 
@@ -482,12 +462,6 @@ elseif(NOT EPROSIMA_INSTALLER)
     ###############################################################################
     include(CMakePackageConfigHelpers)
 
-    if(BUILD_SHARED_LIBS)
-        set(FASTRTPS_PACKAGE_OPT_BIN_DIR_CONDITION "if(MSVC OR MSVC_IDE)")
-    else()
-        set(FASTRTPS_PACKAGE_OPT_BIN_DIR_CONDITION "if(0)")
-    endif()
-
     # Add fastrtps dependencies in its CMake config file.
     if(LINK_SSL AND NOT EPROSIMA_INSTALLER_MINION)
         set(FASTRTPS_PACKAGE_OPT_DEPS "find_package(OpenSSL REQUIRED)")
@@ -495,7 +469,7 @@ elseif(NOT EPROSIMA_INSTALLER)
 
     configure_package_config_file(${PROJECT_SOURCE_DIR}/cmake/packaging/Config.cmake.in
         ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-config.cmake
-	INSTALL_DESTINATION ${INSTALL_DESTINATION_PATH}
+        INSTALL_DESTINATION ${DATA_INSTALL_DIR}$/${PROJECT_NAME}/cmake${MSVCARCH_DIR_EXTENSION_EXT}
         PATH_VARS BIN_INSTALL_DIR INCLUDE_INSTALL_DIR LIB_INSTALL_DIR
         )
     write_basic_package_version_file(${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-config-version.cmake
@@ -504,7 +478,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         )
     install(FILES ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-config.cmake
         ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-config-version.cmake
-	DESTINATION ${INSTALL_DESTINATION_PATH}
+        DESTINATION ${DATA_INSTALL_DIR}/${PROJECT_NAME}/cmake${MSVCARCH_DIR_EXTENSION_EXT}
         COMPONENT cmake
         )
 

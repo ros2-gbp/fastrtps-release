@@ -25,10 +25,6 @@ if(NOT fastcdr_FOUND)
     find_package(fastcdr REQUIRED)
 endif()
 
-if(NOT foonathan_memory_FOUND)
-    find_package(foonathan_memory REQUIRED)
-endif()
-
 if(NOT fastrtps_FOUND)
     find_package(fastrtps REQUIRED)
 endif()
@@ -53,6 +49,6 @@ file(COPY ${PROJECT_SOURCE_DIR}/XMLProfilesExample.xml
     )
 
 add_executable(XMLProfiles ${XMLPROFILESEXAMPLE_SOURCES_CXX} ${XMLPROFILESEXAMPLE_SOURCES_CPP})
-target_link_libraries(XMLProfiles fastrtps fastcdr foonathan_memory)
+target_link_libraries(XMLProfiles fastrtps fastcdr)
 install(TARGETS XMLProfiles
     RUNTIME DESTINATION examples/C++/XMLProfilesExample/${BIN_INSTALL_DIR})

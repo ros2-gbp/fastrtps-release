@@ -22,6 +22,11 @@
 #include <fastrtps/rtps/writer/RTPSWriter.h>
 
 #include <fastrtps/rtps/reader/StatefulReader.h>
+#include <fastrtps/rtps/reader/WriterProxy.h>
+
+#include <fastrtps/rtps/reader/timedevent/HeartbeatResponseDelay.h>
+
+#include <fastrtps/rtps/writer/timedevent/NackResponseDelay.h>
 
 #include <fastrtps/rtps/reader/ReaderListener.h>
 
@@ -90,24 +95,15 @@ void MessageReceiver::associateEndpoint(Endpoint *to_add){
     }
     else
     {
-        const auto reader = static_cast<RTPSReader*>(to_add);
-        const auto entityId = reader->getGuid().entityId;
-        // search for set of readers by entity ID
-        const auto readers = AssociatedReaders.find(entityId);
-        if (readers == AssociatedReaders.end()) {
-            auto vec = std::vector<RTPSReader*>();
-            vec.push_back(reader);
-            AssociatedReaders.emplace(entityId, vec);
-        }
-        else {
-            for (const auto & it : readers->second) {
-                if (it == reader) {
-                    found = true;
-                    break;
-                }
+        for(auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
+        {
+            if( (*it) == (RTPSReader*)to_add )
+            {
+                found = true;
+                break;
             }
-            if (!found) readers->second.push_back(reader);
         }
+        if(!found) AssociatedReaders.push_back((RTPSReader*)to_add);
     }
     return;
 }
@@ -123,15 +119,11 @@ void MessageReceiver::removeEndpoint(Endpoint *to_remove){
             }
         }
     }else{
-        auto readers = AssociatedReaders.find(to_remove->getGuid().entityId);
-        if (readers != AssociatedReaders.end()) {
-            RTPSReader *var = (RTPSReader *)to_remove;
-            for (auto it = readers->second.begin(); it != readers->second.end(); ++it) {
-                if (*it == var){
-                    readers->second.erase(it);
-                    if (readers->second.empty()) AssociatedReaders.erase(readers);
-                    break;
-                }
+        RTPSReader *var = (RTPSReader *)to_remove;
+        for(auto it=AssociatedReaders.begin(); it !=AssociatedReaders.end(); ++it){
+            if ((*it) == var){
+                AssociatedReaders.erase(it);
+                break;
             }
         }
     }
@@ -347,6 +339,8 @@ void MessageReceiver::processCDRMsg(const Locator_t& loc, CDRMessage_t*msg)
             break;
         }
     }
+
+    participant_->assertRemoteRTPSParticipantLiveliness(sourceGuidPrefix);
 }
 
 bool MessageReceiver::checkRTPSHeader(CDRMessage_t*msg) //check and proccess the RTPS Header
@@ -419,76 +413,6 @@ bool MessageReceiver::readSubmessageHeader(CDRMessage_t* msg, SubmessageHeader_t
     return true;
 }
 
-bool MessageReceiver::willAReaderAcceptMsgDirectedTo(
-        const EntityId_t& readerID)
-{
-    if(AssociatedReaders.empty())
-    {
-        logWarning(RTPS_MSG_IN,IDSTRING"Data received when NO readers are listening");
-        return false;
-    }
-
-    if (readerID != c_EntityId_Unknown)
-    {
-        const auto readers = AssociatedReaders.find(readerID);
-        if (readers != AssociatedReaders.end())
-        {
-            return true;
-        }
-    }
-    else
-    {
-        for(const auto& readers : AssociatedReaders)
-        {
-            if (readers.second.empty())
-            {
-                continue;
-            }
-
-            for (const auto& it : readers.second)
-            {
-                if (it->m_acceptMessagesToUnknownReaders)
-                {
-                    return true;
-                }
-            }
-        }
-    }
-
-    logWarning(RTPS_MSG_IN, IDSTRING"No Reader accepts this message (directed to: " <<readerID << ")");
-    return false;
-}
-
-void MessageReceiver::findAllReaders(
-        const EntityId_t& readerID,
-        std::function<void(RTPSReader*)> callback)
-{
-    if (readerID != c_EntityId_Unknown)
-    {
-        const auto readers = AssociatedReaders.find(readerID);
-        if (readers != AssociatedReaders.end())
-        {
-            for (const auto& it : readers->second)
-            {
-                callback(it);
-            }
-        }
-    }
-    else
-    {
-        for (const auto& readers : AssociatedReaders)
-        {
-            for (const auto& it : readers.second)
-            {
-                if (it->m_acceptMessagesToUnknownReaders)
-                {
-                    callback(it);
-                }
-            }
-        }
-    }
-}
-
 bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh)
 {
     std::lock_guard<std::mutex> guard(mtx);
@@ -528,8 +452,28 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
     valid &= CDRMessage::readEntityId(msg,&readerID);
 
     //WE KNOW THE READER THAT THE MESSAGE IS DIRECTED TO SO WE LOOK FOR IT:
-    if (!willAReaderAcceptMsgDirectedTo(readerID)) return false;
 
+    RTPSReader* firstReader = nullptr;
+    if(AssociatedReaders.empty())
+    {
+        logWarning(RTPS_MSG_IN,IDSTRING"Data received when NO readers are listening");
+        return false;
+    }
+
+    for(std::vector<RTPSReader*>::iterator it=AssociatedReaders.begin();
+            it != AssociatedReaders.end(); ++it)
+    {
+        if((*it)->acceptMsgDirectedTo(readerID)) //add
+        {
+            firstReader = *it;
+            break;
+        }
+    }
+    if(firstReader == nullptr) //Reader not found
+    {
+        logWarning(RTPS_MSG_IN, IDSTRING"No Reader accepts this message (directed to: " <<readerID << ")");
+        return false;
+    }
     //FOUND THE READER.
     //We ask the reader for a cachechange to store the information.
     CacheChange_t ch;
@@ -623,14 +567,16 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
 
 
     //FIXME: DO SOMETHING WITH PARAMETERLIST CREATED.
-    logInfo(RTPS_MSG_IN,IDSTRING"from Writer " << ch.writerGUID << "; possible RTPSReader entities: "
-        << AssociatedReaders.size());
+    logInfo(RTPS_MSG_IN,IDSTRING"from Writer " << ch.writerGUID << "; possible RTPSReaders: "<<AssociatedReaders.size());
     //Look for the correct reader to add the change
-    findAllReaders(readerID, [
-            &ch
-        ] (RTPSReader* reader) {
-            reader->processDataMsg(&ch);
-        });
+    for(std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
+            it != AssociatedReaders.end(); ++it)
+    {
+        if((*it)->acceptMsgDirectedTo(readerID))
+        {
+            (*it)->processDataMsg(&ch);
+        }
+    }
 
     //TODO(Ricardo) If a exception is thrown (ex, by fastcdr), this line is not executed -> segmentation fault
     ch.serializedPayload.data = nullptr;
@@ -673,7 +619,28 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
     valid &= CDRMessage::readEntityId(msg, &readerID);
 
     //WE KNOW THE READER THAT THE MESSAGE IS DIRECTED TO SO WE LOOK FOR IT:
-    if (!willAReaderAcceptMsgDirectedTo(readerID)) return false;
+    if(AssociatedReaders.empty())
+    {
+        logWarning(RTPS_MSG_IN, IDSTRING"Data received when NO readers are listening");
+        return false;
+    }
+
+    RTPSReader* firstReader = nullptr;
+    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
+            it != AssociatedReaders.end(); ++it)
+    {
+        if ((*it)->acceptMsgDirectedTo(readerID)) //add
+        {
+            firstReader = *it;
+            break;
+        }
+    }
+
+    if (firstReader == nullptr) //Reader not found
+    {
+        logWarning(RTPS_MSG_IN, IDSTRING"No Reader accepts this message (directed to: " << readerID << ")");
+        return false;
+    }
 
     //FOUND THE READER.
     //We ask the reader for a cachechange to store the information.
@@ -790,14 +757,16 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
         ch.sourceTimestamp = this->timestamp;
 
     //FIXME: DO SOMETHING WITH PARAMETERLIST CREATED.
-    logInfo(RTPS_MSG_IN, IDSTRING"from Writer " << ch.writerGUID << "; possible RTPSReader entities: "
-        << AssociatedReaders.size());
+    logInfo(RTPS_MSG_IN, IDSTRING"from Writer " << ch.writerGUID << "; possible RTPSReaders: " << AssociatedReaders.size());
     //Look for the correct reader to add the change
-    findAllReaders(readerID, [
-            &ch, sampleSize, fragmentStartingNum
-        ] (RTPSReader* reader) {
-            reader->processDataFragMsg(&ch, sampleSize, fragmentStartingNum);
-        });
+    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
+            it != AssociatedReaders.end(); ++it)
+    {
+        if ((*it)->acceptMsgDirectedTo(readerID))
+        {
+            (*it)->processDataFragMsg(&ch, sampleSize, fragmentStartingNum);
+        }
+    }
 
     ch.serializedPayload.data = nullptr;
 
@@ -837,12 +806,14 @@ bool MessageReceiver::proc_Submsg_Heartbeat(CDRMessage_t* msg,SubmessageHeader_t
 
     std::lock_guard<std::mutex> guard(mtx);
     //Look for the correct reader and writers:
-    findAllReaders(readerGUID.entityId, [
-            &writerGUID, &HBCount, &firstSN, &lastSN, finalFlag, livelinessFlag
-        ] (RTPSReader* reader) {
-            reader->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag);
-        });
-
+    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
+            it != AssociatedReaders.end(); ++it)
+    {
+        if((*it)->acceptMsgDirectedTo(readerGUID.entityId))
+        {
+            (*it)->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag);
+        }
+    }
     return true;
 }
 
@@ -910,11 +881,14 @@ bool MessageReceiver::proc_Submsg_Gap(CDRMessage_t* msg,SubmessageHeader_t* smh)
         return false;
 
     std::lock_guard<std::mutex> guard(mtx);
-    findAllReaders(readerGUID.entityId, [
-            &writerGUID, &gapStart, &gapList
-        ] (RTPSReader* reader) {
-            reader->processGapMsg(writerGUID, gapStart, gapList);
-        });
+    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
+            it != AssociatedReaders.end(); ++it)
+    {
+        if((*it)->acceptMsgDirectedTo(readerGUID.entityId))
+        {
+            (*it)->processGapMsg(writerGUID, gapStart, gapList);
+        }
+    }
 
     return true;
 }
@@ -1052,18 +1026,19 @@ bool MessageReceiver::proc_Submsg_HeartbeatFrag(CDRMessage_t*msg, SubmessageHead
 
     // XXX TODO VALIDATE DATA?
 
-    //Look for the correct reader and writers:
-    /* XXX TODO
     std::lock_guard<std::mutex> guard(mtx);
+    //Look for the correct reader and writers:
     for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
             it != AssociatedReaders.end(); ++it)
     {
+        /* XXX TODO PROCESS
            if ((*it)->acceptMsgDirectedTo(readerGUID.entityId))
            {
            (*it)->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag);
            }
+           */
     }
-    */
+
     return true;
 }
 

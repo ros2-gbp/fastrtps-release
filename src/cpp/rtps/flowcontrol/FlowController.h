@@ -48,8 +48,6 @@ class FlowController
         virtual void operator()(RTPSWriterCollector<ReaderLocator*>& changesToSend) = 0;
         virtual void operator()(RTPSWriterCollector<ReaderProxy*>& changesToSend) = 0;
 
-        virtual void disable() = 0;
-
         virtual ~FlowController();
         FlowController();
 

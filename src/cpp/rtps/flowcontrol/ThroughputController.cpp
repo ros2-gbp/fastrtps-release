@@ -14,8 +14,6 @@
 
 #include "ThroughputController.h"
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
-#include "../participant/RTPSParticipantImpl.h"
-#include <fastrtps/rtps/writer/RTPSWriter.h>
 #include <asio.hpp>
 #include <asio/steady_timer.hpp>
 #include <cassert>
@@ -25,7 +23,7 @@ namespace eprosima{
 namespace fastrtps{
 namespace rtps{
 
-ThroughputController::ThroughputController(const ThroughputControllerDescriptor& descriptor, RTPSWriter* associatedWriter):
+ThroughputController::ThroughputController(const ThroughputControllerDescriptor& descriptor, const RTPSWriter* associatedWriter):
     mBytesPerPeriod(descriptor.bytesPerPeriod),
     mAccumulatedPayloadSize(0),
     mPeriodMillisecs(descriptor.periodMillisecs),
@@ -34,7 +32,7 @@ ThroughputController::ThroughputController(const ThroughputControllerDescriptor&
 {
 }
 
-ThroughputController::ThroughputController(const ThroughputControllerDescriptor& descriptor, RTPSParticipantImpl* associatedParticipant):
+ThroughputController::ThroughputController(const ThroughputControllerDescriptor& descriptor, const RTPSParticipantImpl* associatedParticipant):
     mBytesPerPeriod(descriptor.bytesPerPeriod),
     mAccumulatedPayloadSize(0),
     mPeriodMillisecs(descriptor.periodMillisecs),
@@ -77,14 +75,6 @@ void ThroughputController::operator()(RTPSWriterCollector<ReaderProxy*>& changes
     changesToSend.items().erase(it, changesToSend.items().end());
 }
 
-
-void ThroughputController::disable()
-{
-    std::unique_lock<std::recursive_mutex> scopedLock(mThroughputControllerMutex);
-    mAssociatedWriter = nullptr;
-    mAssociatedParticipant = nullptr;
-}
-
 bool ThroughputController::process_change_nts_(CacheChange_t* change, const SequenceNumber_t& /*seqNum*/,
         const FragmentNumber_t fragNum)
 {
@@ -120,18 +110,9 @@ void ThroughputController::ScheduleRefresh(uint32_t sizeToRestore)
                 mAccumulatedPayloadSize = sizeToRestore > mAccumulatedPayloadSize ? 0 : mAccumulatedPayloadSize - sizeToRestore;
 
                 if (mAssociatedWriter)
-                {
-                    mAssociatedWriter->getRTPSParticipant()->async_thread().wake_up(mAssociatedWriter);
-                }
+                    AsyncWriterThread::wakeUp(mAssociatedWriter);
                 else if (mAssociatedParticipant)
-                {
-                    std::unique_lock<std::recursive_mutex> lock(*mAssociatedParticipant->getParticipantMutex());
-                    for (auto it = mAssociatedParticipant->userWritersListBegin();
-                            it != mAssociatedParticipant->userWritersListEnd(); ++it)
-                    {
-                        mAssociatedParticipant->async_thread().wake_up(*it);
-                    }
-                }
+                    AsyncWriterThread::wakeUp(mAssociatedParticipant);
             }
         };
 

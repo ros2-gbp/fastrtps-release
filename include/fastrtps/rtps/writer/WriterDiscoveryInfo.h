@@ -48,10 +48,7 @@ struct WriterDiscoveryInfo
             REMOVED_WRITER
         };
 
-        WriterDiscoveryInfo(const WriterProxyData& data)
-            : status(DISCOVERED_WRITER)
-            , info(data)
-        {}
+        WriterDiscoveryInfo(): status(DISCOVERED_WRITER) {}
 
         virtual ~WriterDiscoveryInfo() {}
 
@@ -59,7 +56,7 @@ struct WriterDiscoveryInfo
         DISCOVERY_STATUS status;
 
         //! Participant discovery info
-        const WriterProxyData& info;
+        WriterProxyData info;
 };
 
 }

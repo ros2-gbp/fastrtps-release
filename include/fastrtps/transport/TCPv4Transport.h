@@ -139,6 +139,8 @@ public:
     virtual bool fillUnicastLocator(
         Locator_t &locator,
         uint32_t well_known_port) const override;
+
+    virtual LocatorList_t ShrinkLocatorLists(const std::vector<LocatorList_t>& locatorLists) override;
 };
 
 } // namespace rtps

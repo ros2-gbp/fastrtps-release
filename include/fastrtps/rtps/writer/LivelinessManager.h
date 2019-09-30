@@ -19,8 +19,8 @@
 #define LIVELINESS_MANAGER_H_
 
 #include "LivelinessData.h"
+#include "../timedevent/TimedCallback.h"
 #include "../../utils/collections/ResourceLimitedVector.hpp"
-#include "../resources/TimedEvent.h"
 
 #include <mutex>
 
@@ -47,12 +47,14 @@ public:
     /**
      * @brief Constructor
      * @param callback A callback that will be invoked when a writer changes its liveliness status
-     * @param service ResourceEvent object that will operate with the events.
+     * @param service The asio I/O service
+     * @param event_thread The event thread
      * @param manage_automatic True to manage writers with automatic liveliness, false otherwise
      */
     LivelinessManager(
             const LivelinessCallback& callback,
-            ResourceEvent& service,
+            asio::io_service& service,
+            const std::thread& event_thread,
             bool manage_automatic = true);
 
     /**
@@ -150,9 +152,8 @@ private:
             ResourceLimitedVector<LivelinessData>::iterator* wit_out);
 
 
-    //! @brief A method called if the timer expires
-    //! @return True if the timer should be restarted
-    bool timer_expired();
+    //! A method called if the timer expires
+    void timer_expired();
 
     //! A callback to inform outside classes that a writer changed its liveliness status
     LivelinessCallback callback_;
@@ -170,7 +171,7 @@ private:
     LivelinessData* timer_owner_;
 
     //! A timed callback expiring when a writer (the timer owner) loses its liveliness
-    TimedEvent timer_;
+    TimedCallback timer_;
 };
 
 } /* namespace rtps */

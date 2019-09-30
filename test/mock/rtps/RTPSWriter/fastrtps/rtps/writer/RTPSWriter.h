@@ -31,7 +31,6 @@ namespace fastrtps {
 namespace rtps {
 
 class WriterHistory;
-class RTPSParticipantImpl;
 
 class RTPSWriter : public Endpoint
 {
@@ -39,16 +38,14 @@ class RTPSWriter : public Endpoint
 
         virtual ~RTPSWriter() = default;
 
-        virtual bool matched_reader_add(const ReaderProxyData& ratt) = 0;
+        virtual bool matched_reader_add(RemoteReaderAttributes& ratt) = 0;
 
-        virtual bool matched_reader_remove(const GUID_t& ratt) = 0;
+        virtual bool matched_reader_remove(RemoteReaderAttributes& ratt) = 0;
 
         MOCK_METHOD3(new_change, CacheChange_t*(const std::function<uint32_t()>&,
             ChangeKind_t, InstanceHandle_t));
-
-        MOCK_METHOD1(set_separate_sending, void(bool));
-
-        MOCK_METHOD0(getRTPSParticipant, RTPSParticipantImpl*());
+			
+		MOCK_METHOD1(set_separate_sending, void(bool));
 
         WriterHistory* history_;
 };

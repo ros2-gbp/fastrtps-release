@@ -78,7 +78,7 @@ public:
 	* @param p Pointer to the PDPSimple.
 	* @param part Pointer to the RTPSParticipantImpl.
 	*/
-	EDPStatic(PDP* p,RTPSParticipantImpl* part);
+	EDPStatic(PDPSimple* p,RTPSParticipantImpl* part);
 	virtual ~EDPStatic();
 	/**
 	 * Abstract method to initialize the EDP.
@@ -121,31 +121,20 @@ public:
 
 	/**
 	 * New Remote Writer has been found and this method process it and calls the pairing methods.
-	 * @param participant_guid  GUID of the participant.
-     * @param participant_name  Name of the participant.
-	 * @param user_id           User Id.
-	 * @param ent_id            Entity Id.
+	 * @param pdata Pointer to the RTPSParticipantProxyData object.
+	 * @param userId UserId.
+	 * @param entId EntityId.
 	 * @return True if correct.
 	 */
-	bool newRemoteWriter(
-            const GUID_t& participant_guid, 
-            const string_255& participant_name,
-            uint16_t user_id, 
-            EntityId_t ent_id = c_EntityId_Unknown);
+	bool newRemoteWriter(const ParticipantProxyData& pdata, uint16_t userId, EntityId_t entId=c_EntityId_Unknown);
 	/**
 	 * New Remote Reader has been found and this method process it and calls the pairing methods.
-     * @param participant_guid  GUID of the participant.
-     * @param participant_name  Name of the participant.
-     * @param user_id           User Id.
-     * @param ent_id            Entity Id.
-     * @return true if correct.
+	 * @param pdata Pointer to the RTPSParticipantProxyData object.
+	 * @param userId UserId.
+	 * @param entId EntityId.
+	 * @return true if correct.
 	 */
-	bool newRemoteReader(
-            const GUID_t& participant_guid,
-            const string_255& participant_name,
-            uint16_t user_id,
-            EntityId_t ent_id = c_EntityId_Unknown);
-
+	bool newRemoteReader(const ParticipantProxyData& pdata, uint16_t userId, EntityId_t entId=c_EntityId_Unknown);
 	/**
 	* This method checks the provided entityId against the topic type to see if it matches
 	* @param rdata Pointer to the readerProxyData
