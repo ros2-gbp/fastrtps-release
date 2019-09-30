@@ -35,9 +35,12 @@
 #include <condition_variable>
 #include <fstream>
 #include <string>
+#include <map>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
+
+bool run = true;
 
 class ParListener : public ParticipantListener
 {
@@ -75,9 +78,10 @@ class SubListener : public SubscriberListener
 {
     public:
 
-        SubListener() : number_samples_(0) {}
-
-        ~SubListener() {}
+        SubListener(const uint32_t max_number_samples)
+            : max_number_samples_(max_number_samples)
+        {
+        }
 
         void onSubscriptionMatched(Subscriber* /*subscriber*/, MatchingInfo& info) override
         {
@@ -101,17 +105,37 @@ class SubListener : public SubscriberListener
                 if(info.sampleKind == ALIVE)
                 {
                     std::unique_lock<std::mutex> lock(mutex_);
-                    ++number_samples_;
-                    std::cout << "Received sample: index(" << sample.index() << "), message("
+                    std::cout << "Received sample (" << info.sample_identity.writer_guid() << " - " <<
+                        info.sample_identity.sequence_number() << "): index(" << sample.index() << "), message("
                         << sample.message() << ")" << std::endl;
-                    cv_.notify_all();
+                    if(max_number_samples_ <= ++number_samples_[info.sample_identity.writer_guid()])
+                    {
+                        cv_.notify_all();
+                    }
                 }
+            }
+        }
+
+        void on_liveliness_changed(
+                Subscriber* sub,
+                const LivelinessChangedStatus& status) override
+        {
+            (void)sub;
+            if (status.alive_count_change == 1)
+            {
+                std::cout << "Publisher recovered liveliness" << std::endl;
+            }
+            else if (status.not_alive_count_change == 1)
+            {
+                std::cout << "Publisher lost liveliness" << std::endl;
+                run = false;
             }
         }
 
         std::mutex mutex_;
         std::condition_variable cv_;
-        unsigned int number_samples_;
+        const uint32_t max_number_samples_;
+        std::map<GUID_t, uint32_t> number_samples_;
 };
 
 int main(int argc, char** argv)
@@ -120,6 +144,7 @@ int main(int argc, char** argv)
     bool notexit = false;
     uint32_t seed = 7800;
     uint32_t samples = 4;
+    uint32_t publishers = 1;
     char* xml_file = nullptr;
     std::string magic;
 
@@ -169,6 +194,16 @@ int main(int argc, char** argv)
 
             xml_file = argv[arg_count];
         }
+        else if(strcmp(argv[arg_count], "--publishers") == 0)
+        {
+            if(++arg_count >= argc)
+            {
+                std::cout << "--publishers expects a parameter" << std::endl;
+                return -1;
+            }
+
+            publishers = strtol(argv[arg_count], nullptr, 10);
+        }
 
         ++arg_count;
     }
@@ -191,7 +226,7 @@ int main(int argc, char** argv)
     HelloWorldType type;
     Domain::registerType(participant, &type);
 
-    SubListener listener;
+    SubListener listener(samples);
 
     // Generate topic name
     std::ostringstream topic;
@@ -203,6 +238,8 @@ int main(int argc, char** argv)
     subscriber_attributes.topic.topicKind = NO_KEY;
     subscriber_attributes.topic.topicDataType = type.getName();
     subscriber_attributes.topic.topicName = topic.str();
+    subscriber_attributes.qos.m_liveliness.lease_duration = 3;
+    subscriber_attributes.qos.m_liveliness.kind = AUTOMATIC_LIVELINESS_QOS;
     Subscriber* subscriber = Domain::createSubscriber(participant, subscriber_attributes, &listener);
 
     if(subscriber == nullptr)
@@ -211,17 +248,45 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while(notexit)
+    while(notexit && run)
     {
         eClock::my_sleep(250);
     }
 
+    if (run)
     {
         std::unique_lock<std::mutex> lock(listener.mutex_);
-        listener.cv_.wait(lock, [&]{ return listener.number_samples_ >= samples; });
+        listener.cv_.wait(lock, [&]
+                {
+                    if(publishers < listener.number_samples_.size())
+                    {
+                        // Will fail later.
+                        return true;
+                    }
+                    else if( publishers > listener.number_samples_.size())
+                    {
+                        return false;
+                    }
+
+                    for(auto& number_samples : listener.number_samples_)
+                    {
+                        if(samples > number_samples.second)
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
     }
 
     Domain::removeParticipant(participant);
+
+    if(publishers < listener.number_samples_.size())
+    {
+        std::cout << "ERROR: detected more than " << publishers << " publishers" << std::endl;
+        return -1;
+    }
 
     return 0;
 }

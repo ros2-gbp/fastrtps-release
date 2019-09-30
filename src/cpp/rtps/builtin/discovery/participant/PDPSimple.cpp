@@ -54,6 +54,7 @@
 #include <fastrtps/log/Log.h>
 
 #include <mutex>
+#include <chrono>
 
 using namespace eprosima::fastrtps;
 
@@ -175,9 +176,11 @@ void PDPSimple::initializeParticipantProxyData(ParticipantProxyData* participant
             participant_data->m_key.value[i] = participant_data->m_guid.entityId.value[i - 12];
     }
 
-
-    participant_data->m_metatrafficMulticastLocatorList = this->mp_builtin->m_metatrafficMulticastLocatorList;
-    participant_data->m_metatrafficUnicastLocatorList = this->mp_builtin->m_metatrafficUnicastLocatorList;
+    participant_data->m_metatrafficUnicastLocatorList = mp_builtin->m_metatrafficUnicastLocatorList;
+    if (!m_discovery.avoid_builtin_multicast || participant_data->m_metatrafficUnicastLocatorList.empty())
+    {
+        participant_data->m_metatrafficMulticastLocatorList = mp_builtin->m_metatrafficMulticastLocatorList;
+    }
 
     participant_data->m_participantName = std::string(mp_RTPSParticipant->getAttributes().getName());
 
@@ -256,10 +259,42 @@ bool PDPSimple::initPDP(RTPSParticipantImpl* part)
     if(!mp_RTPSParticipant->enableReader(mp_SPDPReader))
         return false;
 
-    mp_resendParticipantTimer = new ResendParticipantProxyDataPeriod(
-        this, TimeConv::Duration_t2MilliSecondsDouble(m_discovery.leaseDuration_announcementperiod));
+    mp_resendParticipantTimer = new ResendParticipantProxyDataPeriod(this, m_discovery);
 
     return true;
+}
+
+void PDPSimple::get_metatraffic_locators(
+        EndpointAttributes& destination,
+        const ParticipantProxyData& origin)
+{
+    destination.unicastLocatorList = origin.m_metatrafficUnicastLocatorList;
+    if (!m_discovery.avoid_builtin_multicast || destination.unicastLocatorList.empty())
+    {
+        destination.multicastLocatorList = origin.m_metatrafficMulticastLocatorList;
+    }
+}
+
+void PDPSimple::get_metatraffic_locators(
+        ReaderProxyData& destination,
+        const ParticipantProxyData& origin)
+{
+    destination.unicastLocatorList(origin.m_metatrafficUnicastLocatorList);
+    if (!m_discovery.avoid_builtin_multicast || destination.unicastLocatorList().empty())
+    {
+        destination.multicastLocatorList(origin.m_metatrafficMulticastLocatorList);
+    }
+}
+
+void PDPSimple::get_metatraffic_locators(
+        WriterProxyData& destination,
+        const ParticipantProxyData& origin)
+{
+    destination.unicastLocatorList(origin.m_metatrafficUnicastLocatorList);
+    if (!m_discovery.avoid_builtin_multicast || destination.unicastLocatorList().empty())
+    {
+        destination.multicastLocatorList(origin.m_metatrafficMulticastLocatorList);
+    }
 }
 
 void PDPSimple::stopParticipantAnnouncement()
@@ -279,11 +314,10 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
 
     if(!dispose)
     {
-        if(new_change || m_hasChangedLocalPDP.load())
+        if(m_hasChangedLocalPDP.exchange(false) || new_change)
         {
             this->mp_mutex->lock();
             ParticipantProxyData* local_participant_data = getLocalParticipantProxyData();
-            local_participant_data->m_manualLivelinessCount++;
             InstanceHandle_t key = local_participant_data->m_key;
             ParticipantProxyData proxy_data_copy(*local_participant_data);
             this->mp_mutex->unlock();
@@ -316,8 +350,6 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
                     logError(RTPS_PDP, "Cannot serialize ParticipantProxyData.");
                 }
             }
-
-            m_hasChangedLocalPDP.exchange(false);
         }
         else
         {
@@ -666,8 +698,6 @@ bool PDPSimple::addWriterProxyData(WriterProxyData* wdata, ParticipantProxyData&
                 wdata->unicastLocatorList((*pit)->m_defaultUnicastLocatorList);
                 wdata->multicastLocatorList((*pit)->m_defaultMulticastLocatorList);
             }
-            // Set as alive.
-            wdata->isAlive(true);
 
             // Copy participant data to be used outside.
             pdata.copy(**pit);
@@ -889,65 +919,9 @@ void PDPSimple::assertRemoteParticipantLiveliness(const GuidPrefix_t& guidP)
             logInfo(RTPS_LIVELINESS,"RTPSParticipant "<< (*it)->m_guid << " is Alive");
             // TODO Ricardo: Study if isAlive attribute is necessary.
             (*it)->isAlive = true;
-            if((*it)->mp_leaseDurationTimer != nullptr)
+            if ((*it)->mp_leaseDurationTimer != nullptr)
             {
-                (*it)->mp_leaseDurationTimer->cancel_timer();
-                (*it)->mp_leaseDurationTimer->restart_timer();
-            }
-            break;
-        }
-    }
-}
-
-void PDPSimple::assertLocalWritersLiveliness(LivelinessQosPolicyKind kind)
-{
-    logInfo(RTPS_LIVELINESS,"of type " << (kind==AUTOMATIC_LIVELINESS_QOS?"AUTOMATIC":"")
-            <<(kind==MANUAL_BY_PARTICIPANT_LIVELINESS_QOS?"MANUAL_BY_PARTICIPANT":""));
-    std::lock_guard<std::recursive_mutex> guard(*this->mp_mutex);
-    for(std::vector<WriterProxyData*>::iterator wit = this->m_participantProxies.front()->m_writers.begin();
-            wit!=this->m_participantProxies.front()->m_writers.end();++wit)
-    {
-        if((*wit)->m_qos.m_liveliness.kind == kind)
-        {
-            logInfo(RTPS_LIVELINESS,"Local Writer "<< (*wit)->guid().entityId << " marked as ALIVE");
-            (*wit)->isAlive(true);
-        }
-    }
-}
-
-void PDPSimple::assertRemoteWritersLiveliness(GuidPrefix_t& guidP,LivelinessQosPolicyKind kind)
-{
-    std::lock_guard<std::recursive_mutex> guardP(*mp_RTPSParticipant->getParticipantMutex());
-    std::lock_guard<std::recursive_mutex> pguard(*this->mp_mutex);
-    logInfo(RTPS_LIVELINESS,"of type " << (kind==AUTOMATIC_LIVELINESS_QOS?"AUTOMATIC":"")
-            <<(kind==MANUAL_BY_PARTICIPANT_LIVELINESS_QOS?"MANUAL_BY_PARTICIPANT":""));
-
-    for(std::vector<ParticipantProxyData*>::iterator pit=this->m_participantProxies.begin();
-            pit!=this->m_participantProxies.end();++pit)
-    {
-        if((*pit)->m_guid.guidPrefix == guidP)
-        {
-            for(std::vector<WriterProxyData*>::iterator wit = (*pit)->m_writers.begin();
-                    wit != (*pit)->m_writers.end();++wit)
-            {
-                if((*wit)->m_qos.m_liveliness.kind == kind)
-                {
-                    (*wit)->isAlive(true);
-                    for(std::vector<RTPSReader*>::iterator rit = mp_RTPSParticipant->userReadersListBegin();
-                            rit!=mp_RTPSParticipant->userReadersListEnd();++rit)
-                    {
-                        if((*rit)->getAttributes().reliabilityKind == RELIABLE)
-                        {
-                            StatefulReader* sfr = (StatefulReader*)(*rit);
-                            WriterProxy* WP;
-                            if(sfr->matched_writer_lookup((*wit)->guid(), &WP))
-                            {
-                                WP->assertLiveliness();
-                                continue;
-                            }
-                        }
-                    }
-                }
+                (*it)->mp_leaseDurationTimer->assert_liveliness();
             }
             break;
         }

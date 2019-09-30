@@ -21,7 +21,6 @@
 #define _RTPS_BUILTIN_DATA_PARTICIPANTPROXYDATA_H_
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-#include <mutex>
 #include "../../../qos/ParameterList.h"
 
 #include "../../attributes/WriterAttributes.h"
@@ -103,7 +102,7 @@ class ParticipantProxyData
         //!Default multicast locator list
         LocatorList_t m_defaultMulticastLocatorList;
         //!Manual liveliness count
-        Count_t m_manualLivelinessCount;
+        Count_t m_manualLivelinessCount; // TODO(MiguelC): remove when safe to change ABI
         //!Participant name
         string_255 m_participantName;
         //!

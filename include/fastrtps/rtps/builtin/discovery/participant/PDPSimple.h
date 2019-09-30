@@ -24,10 +24,7 @@
 #include <mutex>
 #include "../../../common/Guid.h"
 #include "../../../attributes/RTPSParticipantAttributes.h"
-
-#include "../../../../qos/QosPolicies.h"
-
-
+#include "../../../messages/CDRMessage.h"
 
 namespace eprosima {
 namespace fastrtps{
@@ -41,12 +38,11 @@ class RTPSParticipantImpl;
 class BuiltinProtocols;
 class EDP;
 class ResendParticipantProxyDataPeriod;
-class RemoteParticipantLeaseDuration;
 class ReaderProxyData;
 class WriterProxyData;
 class ParticipantProxyData;
 class PDPSimpleListener;
-
+class EndpointAttributes;
 
 /**
  * Class PDPSimple that implements the SimpleRTPSParticipantDiscoveryProtocol as defined in the RTPS specification.
@@ -54,8 +50,6 @@ class PDPSimpleListener;
  */
 class PDPSimple
 {
-    friend class ResendRTPSParticipantProxyDataPeriod;
-    friend class RemoteRTPSParticipantLeaseDuration;
     friend class PDPSimpleListener;
     public:
     /**
@@ -188,25 +182,24 @@ class PDPSimple
     void assertRemoteParticipantLiveliness(const GuidPrefix_t& guidP);
 
     /**
-     * Assert the liveliness of a Local Writer.
-     * @param kind LivilinessQosPolicyKind to be asserted.
-     */
-    void assertLocalWritersLiveliness(LivelinessQosPolicyKind kind);
-
-    /**
-     * Assert the liveliness of remote writers.
-     * @param guidP GuidPrefix_t of the participant whose writers liveliness is begin asserted.
-     * @param kind LivelinessQosPolicyKind of the writers.
-     */
-    void assertRemoteWritersLiveliness(GuidPrefix_t& guidP,LivelinessQosPolicyKind kind);
-
-    /**
      * Activate a new Remote Endpoint that has been statically discovered.
      * @param pguid GUID_t of the participant.
      * @param userDefinedId User Defined ID.
      * @param kind Kind of endpoint.
      */
     bool newRemoteEndpointStaticallyDiscovered(const GUID_t& pguid, int16_t userDefinedId,EndpointKind_t kind);
+
+    void get_metatraffic_locators(
+            EndpointAttributes& destination,
+            const ParticipantProxyData& origin);
+
+    void get_metatraffic_locators(
+            WriterProxyData& destination,
+            const ParticipantProxyData& origin);
+
+    void get_metatraffic_locators(
+            ReaderProxyData& destination,
+            const ParticipantProxyData& origin);
 
     /**
      * Get the RTPS participant
@@ -251,6 +244,8 @@ class PDPSimple
      */
     bool createSPDPEndpoints();
     std::recursive_mutex* mp_mutex;
+
+    void check_remote_participant_liveliness(const GUID_t& remote_participant_guid);
 
 
 
