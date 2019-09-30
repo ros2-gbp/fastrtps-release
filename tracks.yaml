@@ -87,11 +87,11 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc}
     devel_branch: master
-    last_release: 6a6f79c4256a00fc13834a2aaa3c60a0aaac5e76
-    last_version: 1.8.0
+    last_release: b5f3fdfd711192e3d5a4af2adf24ef079f9b0c3f
+    last_version: 1.8.1
     name: fastrtps
     patches: dashing
-    release_inc: '0'
+    release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
     release_tag: b5f3fdfd711192e3d5a4af2adf24ef079f9b0c3f
     ros_distro: dashing
