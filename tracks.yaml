@@ -77,7 +77,7 @@ tracks:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
       :{vcs_uri} --name :{name} --output-dir :{archive_dir_path}
-    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 1.8.0+osrf3@gb5f3fdf
+    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 1.8.1+osrf21@gb5f3fdf
       --replace
     - git-bloom-generate -y rosrelease :{ros_distro} --source upstream -i :{release_inc}
     - git-bloom-generate -y rosdebian --prefix release/:{ros_distro} :{ros_distro}
@@ -97,7 +97,7 @@ tracks:
     ros_distro: dashing
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-RTPS.git
-    version: 1.8.0
+    version: 1.8.1
   eloquent:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
