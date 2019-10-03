@@ -73,15 +73,21 @@ set(LIB_VERSION_STR "${LIB_MAJOR_VERSION}.${LIB_MINOR_VERSION}.${LIB_PATCH_VERSI
 ###############################################################################
 # Project                                                                     #
 ###############################################################################
-if(CMAKE_VERSION VERSION_LESS 3.0)
-    project(fastrtps C CXX)
-    set(PROJECT_VERSION_MAJOR "${LIB_MAJOR_VERSION}")
-    set(PROJECT_VERSION_MINOR "${LIB_MINOR_VERSION}")
-    set(PROJECT_VERSION_PATCH "${LIB_PATCH_VERSION}")
-    set(PROJECT_VERSION "${LIB_VERSION_STR}")
-else()
+if (DEFINED PROJECT_VERSION)
+    message(STATUS "Manual version: ${PROJECT_VERSION}")
     cmake_policy(SET CMP0048 NEW)
-    project(fastrtps VERSION "${LIB_VERSION_STR}" LANGUAGES C CXX)
+    project(fastrtps VERSION "${PROJECT_VERSION}" LANGUAGES C CXX)
+else()
+    if(CMAKE_VERSION VERSION_LESS 3.0)
+        project(fastrtps C CXX)
+        set(PROJECT_VERSION_MAJOR "${LIB_MAJOR_VERSION}")
+        set(PROJECT_VERSION_MINOR "${LIB_MINOR_VERSION}")
+        set(PROJECT_VERSION_PATCH "${LIB_PATCH_VERSION}")
+        set(PROJECT_VERSION "${LIB_VERSION_STR}")
+    else()
+        cmake_policy(SET CMP0048 NEW)
+        project(fastrtps VERSION "${LIB_VERSION_STR}" LANGUAGES C CXX)
+    endif()
 endif()
 
 set(PROJECT_NAME_STYLED "FastRTPS")
@@ -242,31 +248,6 @@ else()
 endif()
 
 ###############################################################################
-# Java application
-###############################################################################
-option(BUILD_JAVA "Activate the compilation of the Java application" OFF)
-option(TEST_JAVA "Perform testing when compile the Java application" OFF)
-
-if(EPROSIMA_INSTALLER)
-    set(BUILD_JAVA ON)
-endif()
-
-if(BUILD_JAVA)
-    include(${PROJECT_SOURCE_DIR}/cmake/dev/java_support.cmake)
-
-    if(TEST_JAVA)
-        set(CMD_JAVA "build")
-    else()
-        set(CMD_JAVA "assemble")
-    endif()
-
-    gradle_build(${PROJECT_SOURCE_DIR}/${PROJECT_NAME}gen ${CMD_JAVA}
-        THIRDPARTY_DEPENDENCY idl
-        THIRDPARTY_DEPENDENCY fastcdr
-        )
-endif()
-
-###############################################################################
 # Compile library.
 ###############################################################################
 add_subdirectory(src/cpp)
@@ -363,10 +344,10 @@ if(BUILD_DOCUMENTATION)
     ### ReadTheDocs ########################
 
     add_custom_target(readthedocs
-        COMMAND "${WGET_EXE}" "https://media.readthedocs.org/htmlzip/eprosima-fast-rtps/latest/eprosima-fast-rtps.zip"
+        COMMAND "${WGET_EXE}" "https://media.readthedocs.org/htmlzip/eprosima-fast-rtps/v${PROJECT_VERSION}/eprosima-fast-rtps.zip"
         COMMAND "${UNZIP_EXE}" "eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/"
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}/doc/manual"
-        COMMAND ${CMAKE_COMMAND} -E rename "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-latest" "${PROJECT_BINARY_DIR}/doc/manual"
+        COMMAND ${CMAKE_COMMAND} -E rename "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual"
         COMMAND ${CMAKE_COMMAND} -E remove "eprosima-fast-rtps.zip"
         )
 
@@ -407,33 +388,6 @@ if(INSTALL_EXAMPLES)
   set(CPACK_COMPONENT_EXAMPLES_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} examples")
 
   set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} examples)
-endif()
-
-if(BUILD_JAVA)
-    install(FILES ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}gen/share/fastrtps/${PROJECT_NAME}gen.jar
-        DESTINATION ${DATA_INSTALL_DIR}/${PROJECT_NAME}
-        COMPONENT java
-        )
-
-    if(WIN32)
-        install(PROGRAMS
-            ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}gen/scripts/${PROJECT_NAME}gen.bat
-            DESTINATION ${BIN_INSTALL_DIR}
-            COMPONENT java
-            )
-    else()
-        install(PROGRAMS
-            ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}gen/scripts/${PROJECT_NAME}gen
-            DESTINATION ${BIN_INSTALL_DIR}
-            COMPONENT java
-            )
-    endif()
-
-    ### Java component
-    set(CPACK_COMPONENT_JAVA_DISPLAY_NAME "Java application")
-    set(CPACK_COMPONENT_JAVA_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} generator")
-
-    set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} java)
 endif()
 
 if(BUILD_DOCUMENTATION)
