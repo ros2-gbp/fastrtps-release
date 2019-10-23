@@ -112,11 +112,11 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc}
     devel_branch: 80b1c1674ca424512836cfffc711bdcfb2eae34e
-    last_release: 130e7c7f0c32bd27c543bb823a1b676407eb2656
-    last_version: 1.9.0
+    last_release: 80b1c1674ca424512836cfffc711bdcfb2eae34e
+    last_version: 1.9.2
     name: fastrtps
     patches: eloquent
-    release_inc: '0'
+    release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
     release_tag: 80b1c1674ca424512836cfffc711bdcfb2eae34e
     ros_distro: eloquent
