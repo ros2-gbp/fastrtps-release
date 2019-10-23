@@ -203,7 +203,8 @@ private:
 public:
 
     PubSubReader(
-            const std::string& topic_name)
+            const std::string& topic_name,
+            bool take = true)
         : participant_listener_(*this)
         , listener_(*this)
         , participant_(nullptr)
@@ -217,6 +218,7 @@ public:
         , number_samples_expected_(0)
         , discovery_result_(false)
         , onDiscovery_(nullptr)
+        , take_(take)
 #if HAVE_SECURITY
         , authorized_(0)
         , unauthorized_(0)
@@ -415,7 +417,7 @@ public:
     {
         std::unique_lock<std::mutex> lock(liveliness_mutex_);
 
-        liveliness_cv_.wait(lock, [&]() { return times_liveliness_lost_ == times; });
+        liveliness_cv_.wait(lock, [&](){ return times_liveliness_lost_ == times; });
     }
 
 #if HAVE_SECURITY
@@ -544,6 +546,19 @@ public:
         return *this;
     }
 
+    PubSubReader& matched_writers_allocation(size_t initial, size_t maximum)
+    {
+        subscriber_attr_.matched_publisher_allocation.initial = initial;
+        subscriber_attr_.matched_publisher_allocation.maximum = maximum;
+        return *this;
+    }
+
+    PubSubReader& expect_no_allocs()
+    {
+        // TODO(Mcc): Add no allocations check code when feature is completely ready
+        return *this;
+    }
+
     PubSubReader& heartbeatResponseDelay(const int32_t secs, const int32_t frac)
     {
         subscriber_attr_.times.heartbeatResponseDelay.seconds = secs;
@@ -629,9 +644,9 @@ public:
 
     PubSubReader& static_discovery(const char* filename)
     {
-        participant_attr_.rtps.builtin.use_SIMPLE_EndpointDiscoveryProtocol = false;
-        participant_attr_.rtps.builtin.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_attr_.rtps.builtin.setStaticEndpointXMLFilename(filename);
+        participant_attr_.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
+        participant_attr_.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
+        participant_attr_.rtps.builtin.discovery_config.setStaticEndpointXMLFilename(filename);
         return *this;
     }
 
@@ -693,8 +708,8 @@ public:
             eprosima::fastrtps::Duration_t lease_duration,
             eprosima::fastrtps::Duration_t announce_period)
     {
-        participant_attr_.rtps.builtin.leaseDuration = lease_duration;
-        participant_attr_.rtps.builtin.leaseDuration_announcementperiod = announce_period;
+        participant_attr_.rtps.builtin.discovery_config.leaseDuration = lease_duration;
+        participant_attr_.rtps.builtin.discovery_config.leaseDuration_announcementperiod = announce_period;
         return *this;
     }
 
@@ -847,7 +862,10 @@ private:
         type data;
         eprosima::fastrtps::SampleInfo_t info;
 
-        if(subscriber->takeNextData((void*)&data, &info))
+        bool success = take_ ?
+                    subscriber->takeNextData((void*)&data, &info) :
+                    subscriber->readNextData((void*)&data, &info);
+        if (success)
         {
             returnedValue = true;
 
@@ -939,6 +957,9 @@ private:
     bool discovery_result_;
 
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
+
+    //! True to take data from history. False to read
+    bool take_;
 
 #if HAVE_SECURITY
     std::mutex mutexAuthentication_;

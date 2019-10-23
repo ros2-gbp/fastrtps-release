@@ -277,9 +277,7 @@ typedef enum ReliabilityQosPolicyKind:rtps::octet {
 }ReliabilityQosPolicyKind;
 
 /**
- * Class ReliabilityQosPolicy, to indicate the reliability of the endpoints.
- * kind: Default value BEST_EFFORT_RELIABILITY_QOS for ReaderQos and RELIABLE_RELIABILITY_QOS for WriterQos.
- * max_blocking_time: Not Used in this version.
+ * Indicates the reliability of the endpoint.
  */
 class ReliabilityQosPolicy : public Parameter_t, public QosPolicy
 {
@@ -311,7 +309,22 @@ public:
     bool addToCDRMessage(rtps::CDRMessage_t* msg) override;
 
 public:
+
+    /*!
+     * @brief Defined the reliability kind of the endpoint.
+     *
+     * Default value BEST_EFFORT_RELIABILITY_QOS for ReaderQos and RELIABLE_RELIABILITY_QOS for WriterQos.
+     */
     ReliabilityQosPolicyKind kind;
+
+    /*!
+     * @brief Defines the maximum period of time certain methods will be blocked.
+     *
+     * Methods affected by this property are:
+     * - Publisher::write
+     * - Subscriber::takeNextData
+     * - Subscriber::readNextData
+     */
     Duration_t max_blocking_time;
 };
 
@@ -969,7 +982,7 @@ public:
     bool addToCDRMessage(rtps::CDRMessage_t* msg) override;
 };
 
-enum TypeConsistencyKind : uint32_t
+enum TypeConsistencyKind : uint16_t
 {
     DISALLOW_TYPE_COERCION,
     ALLOW_TYPE_COERCION
@@ -989,8 +1002,19 @@ public:
     bool m_prevent_type_widening;
     bool m_force_type_validation;
 
-    RTPS_DllAPI TypeConsistencyEnforcementQosPolicy() {};
-    virtual RTPS_DllAPI ~TypeConsistencyEnforcementQosPolicy() {};
+    RTPS_DllAPI TypeConsistencyEnforcementQosPolicy()
+        : Parameter_t(PID_TYPE_CONSISTENCY_ENFORCEMENT, 8)
+        , QosPolicy(true)
+    {
+        m_kind = ALLOW_TYPE_COERCION;
+        m_ignore_sequence_bounds = true;
+        m_ignore_string_bounds = true;
+        m_ignore_member_names = false;
+        m_prevent_type_widening = false;
+        m_force_type_validation = false;
+    }
+
+    virtual RTPS_DllAPI ~TypeConsistencyEnforcementQosPolicy() {}
     /**
     * Appends QoS to the specified CDR message.
     * @param msg Message to append the QoS Policy to.

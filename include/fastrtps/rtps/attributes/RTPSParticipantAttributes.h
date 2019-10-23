@@ -27,12 +27,63 @@
 #include "../../transport/TransportInterface.h"
 #include "../resources/ResourceManagement.h"
 #include "../../utils/fixed_size_string.hpp"
+#include "RTPSParticipantAllocationAttributes.hpp"
+#include "ServerAttributes.h"
 
 #include <memory>
+#include <sstream>
 
 namespace eprosima {
-namespace fastrtps{
+namespace fastrtps {
 namespace rtps {
+
+
+//!PDP subclass choice
+typedef enum DiscoveryProtocol
+{
+    NONE,
+    /*!<
+        NO discovery whatsoever would be used.
+        Publisher and Subscriber defined with the same topic name would NOT be linked.
+        All matching must be done manually through the addReaderLocator, addReaderProxy, addWriterProxy methods.
+    */
+    SIMPLE,
+    /*!<
+        Discovery works according to 'The Real-time Publish-Subscribe Protocol(RTPS) DDS
+        Interoperability Wire Protocol Specification'
+    */
+    EXTERNAL,
+    /*!<
+        A user defined PDP subclass object must be provided in the attributes that deals with the discovery.
+        Framework is not responsible of this object lifetime.
+     */
+    CLIENT, /*!< The participant will behave as a client concerning discovery operation.
+                 Server locators should be specified as attributes. */
+    SERVER, /*!< The participant will behave as a server concerning discovery operation.
+                 Discovery operation is volatile (discovery handshake must take place if shutdown). */
+    BACKUP  /*!< The participant will behave as a server concerning discovery operation.
+                 Discovery operation persist on a file (discovery handshake wouldn't repeat if shutdown). */
+
+} DiscoveryProtocol_t;
+
+//! PDP factory for EXTERNAL type
+class PDP;
+class BuiltinProtocols;
+
+typedef struct _PDPFactory
+{
+    // Pointer to the PDP creator
+    PDP * (*CreatePDPInstance)(BuiltinProtocols*);
+    // Pointer to the PDP destructor
+    void (*ReleasePDPInstance)(PDP*);
+
+    bool operator==(const struct _PDPFactory &e) const
+    {
+        return (CreatePDPInstance == e.CreatePDPInstance)
+            && (ReleasePDPInstance == e.ReleasePDPInstance);
+    }
+
+} PDPFactory;
 
 /**
  * Class SimpleEDPAttributes, to define the attributes of the Simple Endpoint Discovery Protocol.
@@ -96,58 +147,110 @@ struct InitialAnnouncementConfig
 };
 
 /**
+ * Class DiscoverySettings, to define the attributes of the several discovery protocols available
+ * @ingroup RTPS_ATTRIBUTES_MODULE
+ */
+
+class DiscoverySettings
+{
+public:
+    //! Chosen discovery protocol
+    DiscoveryProtocol_t discoveryProtocol = DiscoveryProtocol_t::SIMPLE;
+
+    /**
+     * If set to true, SimpleEDP would be used.
+     */
+    bool use_SIMPLE_EndpointDiscoveryProtocol = true;
+
+    /**
+     * If set to true, StaticEDP based on an XML file would be implemented.
+     * The XML filename must be provided.
+     */
+    bool use_STATIC_EndpointDiscoveryProtocol = false;
+
+    /**
+     * Lease Duration of the RTPSParticipant,
+     * indicating how much time remote RTPSParticipants should consider this RTPSParticipant alive.
+     */
+    Duration_t leaseDuration = { 20, 0 };
+
+    /**
+     * The period for the RTPSParticipant to send its Discovery Message to all other discovered RTPSParticipants
+     * as well as to all Multicast ports.
+     */
+    Duration_t leaseDuration_announcementperiod = { 3, 0 };
+
+    //!Initial announcements configuration
+    InitialAnnouncementConfig initial_announcements;
+
+    //!Attributes of the SimpleEDP protocol
+    SimpleEDPAttributes m_simpleEDP;
+
+    //! function that returns a PDP object (only if EXTERNAL selected)
+    PDPFactory m_PDPfactory{};
+    /**
+     * The period for the RTPSParticipant to:
+     *  send its Discovery Message to its servers
+     *  check for EDP endpoints matching
+     */
+    Duration_t discoveryServer_client_syncperiod = { 0, 450 * 1000000}; // 450 milliseconds
+
+    //! Discovery Server settings, only needed if use_CLIENT_DiscoveryProtocol=true
+    RemoteServerList_t  m_DiscoveryServers;
+
+    DiscoverySettings() = default;
+
+    bool operator==(const DiscoverySettings& b) const
+    {
+        return  (this->discoveryProtocol == b.discoveryProtocol) &&
+                (this->use_SIMPLE_EndpointDiscoveryProtocol == b.use_SIMPLE_EndpointDiscoveryProtocol) &&
+                (this->use_STATIC_EndpointDiscoveryProtocol == b.use_STATIC_EndpointDiscoveryProtocol) &&
+                (this->discoveryServer_client_syncperiod == b.discoveryServer_client_syncperiod) &&
+                (this->m_PDPfactory == b.m_PDPfactory) &&
+                (this->leaseDuration == b.leaseDuration) &&
+                (this->leaseDuration_announcementperiod == b.leaseDuration_announcementperiod) &&
+                (this->initial_announcements == b.initial_announcements) &&
+                (this->m_simpleEDP == b.m_simpleEDP) &&
+                (this->m_staticEndpointXMLFilename == b.m_staticEndpointXMLFilename) &&
+                (this->m_DiscoveryServers == b.m_DiscoveryServers);
+    }
+
+    /**
+     * Get the static endpoint XML filename
+     * @return Static endpoint XML filename
+     */
+    const char* getStaticEndpointXMLFilename() const { return m_staticEndpointXMLFilename.c_str(); }
+
+    /**
+     * Set the static endpoint XML filename
+     * @param str Static endpoint XML filename
+     */
+    void setStaticEndpointXMLFilename(const char* str) { m_staticEndpointXMLFilename = std::string(str); }
+
+    private:
+        //! StaticEDP XML filename, only necessary if use_STATIC_EndpointDiscoveryProtocol=true
+        std::string m_staticEndpointXMLFilename = "";
+};
+
+/**
  * Class BuiltinAttributes, to define the behavior of the RTPSParticipant builtin protocols.
  * @ingroup RTPS_ATTRIBUTES_MODULE
  */
+
 class BuiltinAttributes
 {
     public:
-        /**
-         * If set to false, NO discovery whatsoever would be used.
-         * Publisher and Subscriber defined with the same topic name would NOT be linked. All matching must be done
-         * manually through the addReaderLocator, addReaderProxy, addWriterProxy methods.
-         */
-        bool use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
+
+        //! Discovery protocol related attributes
+        DiscoverySettings discovery_config;
 
         //!Indicates to use the WriterLiveliness protocol.
         bool use_WriterLivelinessProtocol = true;
 
         /**
-         * If set to true, SimpleEDP would be used.
-         */
-        bool use_SIMPLE_EndpointDiscoveryProtocol = true;
-
-        /**
-         * If set to true, StaticEDP based on an XML file would be implemented.
-         * The XML filename must be provided.
-         */
-        bool use_STATIC_EndpointDiscoveryProtocol = false;
-
-        /**
-         * DomainId to be used by the RTPSParticipant (0 by default).
+         * DomainId to be used by the RTPSParticipant (80 by default).
          */
         uint32_t domainId = 0;
-
-        /**
-         * Lease Duration of the RTPSParticipant,
-         * indicating how much time remote RTPSParticipants should consider this RTPSParticipant alive.
-         */
-        Duration_t leaseDuration = { 20, 0 };
-
-        /**
-         * The period for the RTPSParticipant to send its Discovery Message to all other discovered RTPSParticipants
-         * as well as to all Multicast ports.
-         */
-        Duration_t leaseDuration_announcementperiod = { 3, 0 };
-
-        //!Initial announcements configuration
-        InitialAnnouncementConfig initial_announcements;
-
-        //!Set to true to avoid multicast traffic on builtin endpoints
-        bool avoid_builtin_multicast = true;
-
-        //!Attributes of the SimpleEDP protocol
-        SimpleEDPAttributes m_simpleEDP;
 
         //!Metatraffic Unicast Locator List
         LocatorList_t metatrafficUnicastLocatorList;
@@ -167,46 +270,26 @@ class BuiltinAttributes
         //! Mutation tries if the port is being used.
         uint32_t mutation_tries = 100u;
 
+        //!Set to true to avoid multicast traffic on builtin endpoints
+        bool avoid_builtin_multicast = true;
+
         BuiltinAttributes() = default;
 
         virtual ~BuiltinAttributes() = default;
 
         bool operator==(const BuiltinAttributes& b) const
         {
-            return (use_SIMPLE_RTPSParticipantDiscoveryProtocol == b.use_SIMPLE_RTPSParticipantDiscoveryProtocol) &&
-                   (use_WriterLivelinessProtocol == b.use_WriterLivelinessProtocol) &&
-                   (use_SIMPLE_EndpointDiscoveryProtocol == b.use_SIMPLE_EndpointDiscoveryProtocol) &&
-                   (use_STATIC_EndpointDiscoveryProtocol == b.use_STATIC_EndpointDiscoveryProtocol) &&
-                   (domainId == b.domainId) &&
-                   (leaseDuration == b.leaseDuration) &&
-                   (leaseDuration_announcementperiod == b.leaseDuration_announcementperiod) &&
-                   (initial_announcements == b.initial_announcements) &&
-                   (avoid_builtin_multicast == b.avoid_builtin_multicast) &&
-                   (m_simpleEDP == b.m_simpleEDP) &&
-                   (metatrafficUnicastLocatorList == b.metatrafficUnicastLocatorList) &&
-                   (metatrafficMulticastLocatorList == b.metatrafficMulticastLocatorList) &&
-                   (initialPeersList == b.initialPeersList) &&
-                   (readerHistoryMemoryPolicy == b.readerHistoryMemoryPolicy) &&
-                   (writerHistoryMemoryPolicy == b.writerHistoryMemoryPolicy) &&
-                   (m_staticEndpointXMLFilename == b.m_staticEndpointXMLFilename) &&
-                   (mutation_tries == b.mutation_tries);
+            return (this->discovery_config == b.discovery_config) &&
+                   (this->use_WriterLivelinessProtocol == b.use_WriterLivelinessProtocol) &&
+                   (this->domainId == b.domainId) &&
+                   (this->metatrafficUnicastLocatorList == b.metatrafficUnicastLocatorList) &&
+                   (this->metatrafficMulticastLocatorList == b.metatrafficMulticastLocatorList) &&
+                   (this->initialPeersList == b.initialPeersList) &&
+                   (this->readerHistoryMemoryPolicy == b.readerHistoryMemoryPolicy) &&
+                   (this->writerHistoryMemoryPolicy == b.writerHistoryMemoryPolicy) &&
+                   (this->mutation_tries == b.mutation_tries) &&
+                   (this->avoid_builtin_multicast == b.avoid_builtin_multicast);
         }
-
-        /**
-         * Get the static endpoint XML filename
-         * @return Static endpoint XML filename
-         */
-        const char* getStaticEndpointXMLFilename() const { return m_staticEndpointXMLFilename.c_str(); }
-
-        /**
-         * Set the static endpoint XML filename
-         * @param str Static endpoint XML filename
-         */
-        void setStaticEndpointXMLFilename(const char* str) { m_staticEndpointXMLFilename = std::string(str); }
-
-    private:
-        //! StaticEDP XML filename, only necessary if use_STATIC_EndpointDiscoveryProtocol=true
-        std::string m_staticEndpointXMLFilename = "";
 
 };
 
@@ -242,7 +325,8 @@ class RTPSParticipantAttributes
                    (this->participantID == b.participantID) &&
                    (this->throughputController == b.throughputController) &&
                    (this->useBuiltinTransports == b.useBuiltinTransports) &&
-                   (this->properties == b.properties);
+                   (this->properties == b.properties &&
+                   (this->prefix == b.prefix));
         }
 
         /**
@@ -268,6 +352,14 @@ class RTPSParticipantAttributes
          */
         uint32_t listenSocketBufferSize;
 
+        //! Optionally allows user to define the GuidPrefix_t
+        GuidPrefix_t prefix;
+
+        RTPS_DllAPI inline bool ReadguidPrefix(const char * pfx)
+        {
+            return bool(std::istringstream(pfx) >> prefix);
+        }
+
         //! Builtin parameters.
         BuiltinAttributes builtin;
 
@@ -288,6 +380,8 @@ class RTPSParticipantAttributes
 
         //!Set as false to disable the default UDPv4 implementation.
         bool useBuiltinTransports;
+        //!Holds allocation limits affecting collections managed by a participant.
+        RTPSParticipantAllocationAttributes allocation;
 
         //! Property policies
         PropertyPolicy properties;

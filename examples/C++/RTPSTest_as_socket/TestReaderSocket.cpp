@@ -52,7 +52,7 @@ bool TestReaderSocket::init(std::string ip, uint32_t port)
 {
     //CREATE PARTICIPANT
     RTPSParticipantAttributes PParam;
-    PParam.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = false;
+    PParam.builtin.discovery_config.discoveryProtocol = eprosima::fastrtps::rtps::DiscoveryProtocol_t::NONE;
     PParam.builtin.use_WriterLivelinessProtocol = false;
     mp_participant = RTPSDomain::createParticipant(PParam);
     if(mp_participant==nullptr)
@@ -64,12 +64,13 @@ bool TestReaderSocket::init(std::string ip, uint32_t port)
 
     //CREATE READER
     ReaderAttributes ratt;
+    ratt.endpoint.setEntityID(3);
     Locator_t loc;
     IPLocator::setIPv4(loc, ip);
     loc.port = static_cast<uint16_t>(port);
     ratt.endpoint.multicastLocatorList.push_back(loc);
     mp_reader = RTPSDomain::createRTPSReader(mp_participant,ratt,mp_history,&m_listener);
-    mp_reader->enableMessagesFromUnknownWriters(true);
+    mp_reader->enableMessagesFromUnkownWriters(true);
     if(mp_reader == nullptr)
         return false;
 

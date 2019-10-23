@@ -54,7 +54,7 @@ TCPReqRepHelloWorldRequester::~TCPReqRepHelloWorldRequester()
 }
 
 void TCPReqRepHelloWorldRequester::init(int participantId, int domainId, uint16_t listeningPort,
-        uint32_t maxInitialPeer, const char* certs_path)
+        uint32_t maxInitialPeer, const char* certs_path, bool force_localhost)
 {
     ParticipantAttributes pattr;
 
@@ -65,7 +65,7 @@ void TCPReqRepHelloWorldRequester::init(int participantId, int domainId, uint16_
 
     Locator_t initial_peer_locator;
     initial_peer_locator.kind = kind;
-    if (loc.size() > 0)
+    if (!force_localhost && loc.size() > 0)
     {
         IPLocator::setIPv4(initial_peer_locator, *(loc.begin()));
     }
@@ -103,10 +103,10 @@ void TCPReqRepHelloWorldRequester::init(int participantId, int domainId, uint16_
 
     pattr.rtps.builtin.domainId = domainId;
     pattr.rtps.participantID = participantId;
-    pattr.rtps.builtin.leaseDuration = c_TimeInfinite;
-    //pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(1, 0);
-    //pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(0, 2147483648);
-    pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(1, 0);
+    pattr.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    //pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(1, 0);
+    //pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(0, 2147483648);
+    pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(1, 0);
     participant_ = Domain::createParticipant(pattr);
     ASSERT_NE(participant_, nullptr);
 

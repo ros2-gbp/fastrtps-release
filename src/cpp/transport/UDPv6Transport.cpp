@@ -209,7 +209,7 @@ void UDPv6Transport::endpoint_to_locator(
     IPLocator::setIPv6(locator, ipBytes.data());
 }
 
-void UDPv6Transport::fill_local_ip(Locator_t& loc)
+void UDPv6Transport::fill_local_ip(Locator_t& loc) const
 {
     IPLocator::setIPv6(loc, "::1");
     loc.kind = LOCATOR_KIND_UDPv6;
@@ -440,12 +440,18 @@ bool UDPv6Transport::is_local_locator(const Locator_t& locator) const
 {
     assert(locator.kind == LOCATOR_KIND_UDPv4);
 
-    if(IPLocator::isLocal(locator))
+    if (IPLocator::isLocal(locator))
+    {
         return true;
+    }
 
-    for(auto localInterface : currentInterfaces)
+    for (const IPFinder::info_IP& localInterface : currentInterfaces)
+    {
         if(IPLocator::compareAddress(localInterface.locator, locator))
+        {
             return true;
+        }
+    }
 
     return false;
 }

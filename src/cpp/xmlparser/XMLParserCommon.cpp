@@ -63,6 +63,8 @@ const char* DATA_WRITER = "data_writer";
 const char* DATA_READER = "data_reader";
 
 /// RTPS Participant attributes
+const char* ALLOCATION = "allocation";
+const char* PREFIX = "prefix";
 const char* DEF_UNI_LOC_LIST = "defaultUnicastLocatorList";
 const char* DEF_MULTI_LOC_LIST = "defaultMulticastLocatorList";
 const char* SEND_SOCK_BUF_SIZE = "sendSocketBufferSize";
@@ -79,6 +81,12 @@ const char* USER_TRANS = "userTransports";
 const char* USE_BUILTIN_TRANS = "useBuiltinTransports";
 const char* PROPERTIES_POLICY = "propertiesPolicy";
 const char* NAME = "name";
+const char* REMOTE_LOCATORS = "remote_locators";
+const char* MAX_UNICAST_LOCATORS = "max_unicast_locators";
+const char* MAX_MULTICAST_LOCATORS = "max_multicast_locators";
+const char* TOTAL_PARTICIPANTS = "total_participants";
+const char* TOTAL_READERS = "total_readers";
+const char* TOTAL_WRITERS = "total_writers";
 
 /// Publisher-subscriber attributes
 const char* TOPIC = "topic";
@@ -94,6 +102,7 @@ const char* HIST_MEM_POLICY = "historyMemoryPolicy";
 const char* USER_DEF_ID = "userDefinedID";
 const char* ENTITY_ID = "entityID";
 const char* MATCHED_SUBSCRIBERS_ALLOCATION = "matchedSubscribersAllocation";
+const char* MATCHED_PUBLISHERS_ALLOCATION = "matchedPublishersAllocation";
 
 ///
 const char* PROPERTIES = "properties";
@@ -202,8 +211,13 @@ const char* OFFSETD0 = "offsetd0";
 const char* OFFSETD1 = "offsetd1";
 const char* OFFSETD2 = "offsetd2";
 const char* OFFSETD3 = "offsetd3";
-const char* SIMPLE_RTPS_PDP = "use_SIMPLE_RTPS_PDP";
+const char* RTPS_PDP_TYPE = "discoveryProtocol";
+const char* NONE = "NONE";
+const char* CLIENT = "CLIENT";
+const char* SERVER = "SERVER";
+const char* BACKUP = "BACKUP";
 const char* WRITER_LVESS_PROTOCOL = "use_WriterLivelinessProtocol";
+const char* DISCOVERY_SETTINGS = "discovery_config";
 const char* _EDP = "EDP";
 const char* DOMAIN_ID = "domainId";
 const char* LEASEDURATION = "leaseDuration";
@@ -214,6 +228,9 @@ const char* SIMPLE_EDP = "simpleEDP";
 const char* META_UNI_LOC_LIST = "metatrafficUnicastLocatorList";
 const char* META_MULTI_LOC_LIST = "metatrafficMulticastLocatorList";
 const char* INIT_PEERS_LIST = "initialPeersList";
+const char* CLIENTANNOUNCEMENTPERIOD = "clientAnnouncementPeriod";
+const char* SERVER_LIST = "discoveryServersList";
+const char* RSERVER = "RemoteServer";
 const char* SIMPLE = "SIMPLE";
 const char* STATIC = "STATIC";
 const char* PUBWRITER_SUBREADER = "PUBWRITER_SUBREADER";

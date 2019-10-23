@@ -21,11 +21,7 @@
 #include "HelloWorldSubscriber.h"
 
 #include <fastrtps/Domain.h>
-
-#include <fastrtps/utils/eClock.h>
 #include <fastrtps/log/Log.h>
-
-#include <fastrtps/rtps/rtps_all.h>
 
 using namespace eprosima;
 using namespace fastrtps;

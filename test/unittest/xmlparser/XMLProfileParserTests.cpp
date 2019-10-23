@@ -62,8 +62,6 @@ TEST_F(XMLProfileParserTests, XMLoadProfiles)
                 xmlparser::XMLProfileManager::loadXMLFile("test_xml_profiles.xml"));
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
                 xmlparser::XMLProfileManager::loadXMLFile("test_xml_security_profiles.xml"));
-    ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
-                xmlparser::XMLProfileManager::loadXMLFile("test_xml_profiles.xml"));
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_ERROR,
                 xmlparser::XMLProfileManager::loadXMLFile("missing_file.xml"));
 
@@ -102,20 +100,20 @@ TEST_F(XMLProfileParserTests, XMLParserParcipant)
     locator.port = 1979;
     EXPECT_EQ(rtps_atts.sendSocketBufferSize, 32u);
     EXPECT_EQ(rtps_atts.listenSocketBufferSize, 1000u);
-    EXPECT_EQ(builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol, true);
+    EXPECT_EQ(builtin.discovery_config.discoveryProtocol, eprosima::fastrtps::rtps::DiscoveryProtocol::SIMPLE);
     EXPECT_EQ(builtin.use_WriterLivelinessProtocol, false);
-    EXPECT_EQ(builtin.use_SIMPLE_EndpointDiscoveryProtocol, true);
-    EXPECT_EQ(builtin.use_STATIC_EndpointDiscoveryProtocol, false);
+    EXPECT_EQ(builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol, true);
+    EXPECT_EQ(builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol, false);
     EXPECT_EQ(builtin.domainId, 2019102u);
-    EXPECT_EQ(builtin.leaseDuration, c_TimeInfinite);
-    EXPECT_EQ(builtin.leaseDuration_announcementperiod.seconds, 10);
-    EXPECT_EQ(builtin.leaseDuration_announcementperiod.nanosec, 333u);
-    EXPECT_EQ(builtin.initial_announcements.count, 2u);
-    EXPECT_EQ(builtin.initial_announcements.period.seconds, 1);
-    EXPECT_EQ(builtin.initial_announcements.period.nanosec, 827u);
+    EXPECT_EQ(builtin.discovery_config.leaseDuration, c_TimeInfinite);
+    EXPECT_EQ(builtin.discovery_config.leaseDuration_announcementperiod.seconds, 10);
+    EXPECT_EQ(builtin.discovery_config.leaseDuration_announcementperiod.nanosec, 333u);
+    EXPECT_EQ(builtin.discovery_config.initial_announcements.count, 2u);
+    EXPECT_EQ(builtin.discovery_config.initial_announcements.period.seconds, 1);
+    EXPECT_EQ(builtin.discovery_config.initial_announcements.period.nanosec, 827u);
     EXPECT_FALSE(builtin.avoid_builtin_multicast);
-    EXPECT_EQ(builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader, false);
-    EXPECT_EQ(builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter, true);
+    EXPECT_EQ(builtin.discovery_config.m_simpleEDP.use_PublicationWriterANDSubscriptionReader, false);
+    EXPECT_EQ(builtin.discovery_config.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter, true);
     IPLocator::setIPv4(locator, 192, 168, 1, 5);
     locator.port = 9999;
     EXPECT_EQ(*(loc_list_it = builtin.metatrafficUnicastLocatorList.begin()), locator);
@@ -175,20 +173,20 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultParcipantProfile)
     locator.port = 1979;
     EXPECT_EQ(rtps_atts.sendSocketBufferSize, 32u);
     EXPECT_EQ(rtps_atts.listenSocketBufferSize, 1000u);
-    EXPECT_EQ(builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol, true);
+    EXPECT_EQ(builtin.discovery_config.discoveryProtocol, eprosima::fastrtps::rtps::DiscoveryProtocol::SIMPLE);
     EXPECT_EQ(builtin.use_WriterLivelinessProtocol, false);
-    EXPECT_EQ(builtin.use_SIMPLE_EndpointDiscoveryProtocol, true);
-    EXPECT_EQ(builtin.use_STATIC_EndpointDiscoveryProtocol, false);
+    EXPECT_EQ(builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol, true);
+    EXPECT_EQ(builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol, false);
     EXPECT_EQ(builtin.domainId, 2019102u);
-    EXPECT_EQ(builtin.leaseDuration, c_TimeInfinite);
-    EXPECT_EQ(builtin.leaseDuration_announcementperiod.seconds, 10);
-    EXPECT_EQ(builtin.leaseDuration_announcementperiod.nanosec, 333u);
-    EXPECT_EQ(builtin.initial_announcements.count, 2u);
-    EXPECT_EQ(builtin.initial_announcements.period.seconds, 1);
-    EXPECT_EQ(builtin.initial_announcements.period.nanosec, 827u);
+    EXPECT_EQ(builtin.discovery_config.leaseDuration, c_TimeInfinite);
+    EXPECT_EQ(builtin.discovery_config.leaseDuration_announcementperiod.seconds, 10);
+    EXPECT_EQ(builtin.discovery_config.leaseDuration_announcementperiod.nanosec, 333u);
+    EXPECT_EQ(builtin.discovery_config.initial_announcements.count, 2u);
+    EXPECT_EQ(builtin.discovery_config.initial_announcements.period.seconds, 1);
+    EXPECT_EQ(builtin.discovery_config.initial_announcements.period.nanosec, 827u);
     EXPECT_FALSE(builtin.avoid_builtin_multicast);
-    EXPECT_EQ(builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader, false);
-    EXPECT_EQ(builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter, true);
+    EXPECT_EQ(builtin.discovery_config.m_simpleEDP.use_PublicationWriterANDSubscriptionReader, false);
+    EXPECT_EQ(builtin.discovery_config.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter, true);
     IPLocator::setIPv4(locator, 192, 168, 1, 5);
     locator.port = 9999;
     EXPECT_EQ(*(loc_list_it = builtin.metatrafficUnicastLocatorList.begin()), locator);
@@ -423,6 +421,7 @@ TEST_F(XMLProfileParserTests, XMLParserSubscriber)
     EXPECT_EQ(subscriber_atts.historyMemoryPolicy, PREALLOCATED_WITH_REALLOC_MEMORY_MODE);
     EXPECT_EQ(subscriber_atts.getUserDefinedID(), 13);
     EXPECT_EQ(subscriber_atts.getEntityID(), 31);
+    EXPECT_EQ(subscriber_atts.matched_publisher_allocation, ResourceLimitedContainerConfig::fixed_size_configuration(10u));
 }
 
 TEST_F(XMLProfileParserTests, XMLParserDefaultSubscriberProfile)
@@ -487,6 +486,7 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultSubscriberProfile)
     EXPECT_EQ(subscriber_atts.historyMemoryPolicy, PREALLOCATED_WITH_REALLOC_MEMORY_MODE);
     EXPECT_EQ(subscriber_atts.getUserDefinedID(), 13);
     EXPECT_EQ(subscriber_atts.getEntityID(), 31);
+    EXPECT_EQ(subscriber_atts.matched_publisher_allocation, ResourceLimitedContainerConfig::fixed_size_configuration(10u));
 }
 
 #if HAVE_SECURITY

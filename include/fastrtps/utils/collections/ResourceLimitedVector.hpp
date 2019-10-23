@@ -95,13 +95,6 @@ public:
         collection_.reserve(cfg.initial);
     }
 
-    /**
-     * Copy constructor.
-     *
-     * Constructs a ResourceLimitedVector from another ResourceLimitedVector.
-     *
-     * @param other ResourceLimitedVector to be copied.
-     */
     ResourceLimitedVector(
             const ResourceLimitedVector& other)
         : configuration_(other.configuration_)
@@ -111,16 +104,6 @@ public:
         collection_.assign(other.collection_.begin(), other.collection_.end());
     }
 
-    /**
-     * Assignment operator.
-     *
-     * Makes the contents of the ResourceLimitedVector the same as the ones in other
-     * ResourceLimitedVector.
-     *
-     * @param other ResourceLimitedVector from where contents are copied.
-     *
-     * @return a reference to this ResourceLimitedVector.
-     */
     ResourceLimitedVector& operator = (const ResourceLimitedVector& other)
     {
         clear();

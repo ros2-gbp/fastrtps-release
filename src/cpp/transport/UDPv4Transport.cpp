@@ -200,7 +200,7 @@ void UDPv4Transport::endpoint_to_locator(
     IPLocator::setIPv4(locator, ipBytes.data());
 }
 
-void UDPv4Transport::fill_local_ip(Locator_t& loc)
+void UDPv4Transport::fill_local_ip(Locator_t& loc) const
 {
     IPLocator::setIPv4(loc, "127.0.0.1");
     loc.kind = LOCATOR_KIND_UDPv4;
@@ -476,14 +476,18 @@ bool UDPv4Transport::is_local_locator(const Locator_t& locator) const
 {
     assert(locator.kind == LOCATOR_KIND_UDPv4);
 
-    if(IPLocator::isLocal(locator))
+    if (IPLocator::isLocal(locator))
+    {
         return true;
+    }
 
-    for(auto localInterface : currentInterfaces)
-        if(IPLocator::compareAddress(locator, localInterface.locator))
+    for (const IPFinder::info_IP& localInterface : currentInterfaces)
+    {
+        if (IPLocator::compareAddress(locator, localInterface.locator))
         {
             return true;
         }
+    }
 
     return false;
 }

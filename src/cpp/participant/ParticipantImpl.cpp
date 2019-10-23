@@ -138,7 +138,7 @@ Publisher* ParticipantImpl::createPublisher(
         return nullptr;
     }
 
-    if(m_att.rtps.builtin.use_STATIC_EndpointDiscoveryProtocol)
+    if(m_att.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol)
     {
         if(att.getUserDefinedID() <= 0)
         {
@@ -266,7 +266,7 @@ Subscriber* ParticipantImpl::createSubscriber(
         logError(PARTICIPANT,"Keyed Topic needs getKey function");
         return nullptr;
     }
-    if(m_att.rtps.builtin.use_STATIC_EndpointDiscoveryProtocol)
+    if(m_att.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol)
     {
         if(att.getUserDefinedID() <= 0)
         {
@@ -312,6 +312,7 @@ Subscriber* ParticipantImpl::createSubscriber(
     if(att.getUserDefinedID()>0)
         ratt.endpoint.setUserDefinedID((uint8_t)att.getUserDefinedID());
     ratt.times = att.times;
+    ratt.matched_writers_allocation = att.matched_publisher_allocation;
     ratt.liveliness_kind_ = att.qos.m_liveliness.kind;
     ratt.liveliness_lease_duration = att.qos.m_liveliness.lease_duration;
 

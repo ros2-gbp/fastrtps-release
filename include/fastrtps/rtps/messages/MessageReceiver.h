@@ -25,14 +25,15 @@
 #include <unordered_map>
 #include "../common/all_common.h"
 #include "../../qos/ParameterList.h"
-#include <fastrtps/rtps/writer/StatelessWriter.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
 
+#include <mutex>
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+class RTPSParticipantImpl;
+class Endpoint;
 class RTPSWriter;
 class RTPSReader;
 struct SubmessageHeader_t;

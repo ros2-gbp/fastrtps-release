@@ -15,6 +15,7 @@ struct Log::Resources Log::mResources;
 
 Log::Resources::Resources() : mLogging(false),
         mWork(false),
+        current_loop(0),
         mFilenames(false),
         mFunctions(true),
         mVerbosity(Log::Error)
@@ -57,36 +58,83 @@ void Log::Reset()
     mResources.mConsumers.emplace_back(new StdoutConsumer);
 }
 
+void Log::Flush()
+{
+    std::unique_lock<std::mutex> guard(mResources.mCvMutex);
+
+    if (!mResources.mLogging && !mResources.mLoggingThread)
+    {
+        // already killed
+        return;
+    }
+
+    /*   Flush() two steps strategy:
+
+         I must assure Log::Run swaps the queues because only swapping the queues the background content
+         will be consumed (first Run() loop).
+
+         Then, I must assure the new front queue content is consumed (second Run() loop).
+     */
+
+    int last_loop = -1;
+
+    for (int i = 0; i < 2; ++i)
+    {
+        mResources.mCv.wait(guard, [&]()
+        {
+            /* I must avoid:
+                + the two calls be processed without an intermediate Run() loop (by using last_loop sequence number)
+                + deadlock by absence of Run() loop activity (by using BothEmpty() call)
+            */
+            return !mResources.mLogging ||
+                ( mResources.mLogs.Empty() &&
+                ( last_loop != mResources.current_loop || mResources.mLogs.BothEmpty()) );
+        });
+
+        last_loop = mResources.current_loop;
+
+    }
+}
+
 void Log::Run()
 {
     std::unique_lock<std::mutex> guard(mResources.mCvMutex);
+
     while (mResources.mLogging)
     {
-        while (mResources.mWork)
+        mResources.mCv.wait(guard, [&]()
         {
-            mResources.mWork = false;
-            guard.unlock();
-            {
-                mResources.mLogs.Swap();
-                while (!mResources.mLogs.Empty())
-                {
-                    std::unique_lock<std::mutex> configGuard(mResources.mConfigMutex);
-                    if (Preprocess(mResources.mLogs.Front()))
-                    {
-                        for (auto &consumer : mResources.mConsumers)
-                        {
-                            consumer->Consume(mResources.mLogs.Front());
-                        }
-                    }
+            return !mResources.mLogging || mResources.mWork;
+        });
 
-                    mResources.mLogs.Pop();
+        mResources.mWork = false;
+
+        guard.unlock();
+        {
+            mResources.mLogs.Swap();
+            while (!mResources.mLogs.Empty())
+            {
+                std::unique_lock<std::mutex> configGuard(mResources.mConfigMutex);
+                if (Preprocess(mResources.mLogs.Front()))
+                {
+                    for (auto &consumer : mResources.mConsumers)
+                    {
+                        consumer->Consume(mResources.mLogs.Front());
+                    }
                 }
+
+                mResources.mLogs.Pop();
             }
-            guard.lock();
         }
-        mResources.mCv.notify_one();
-        if (mResources.mLogging)
-            mResources.mCv.wait(guard);
+        guard.lock();
+
+        // avoid overflow
+        if (++mResources.current_loop > 10000)
+        {
+            mResources.current_loop = 0;
+        }
+
+        mResources.mCv.notify_all();
     }
 }
 

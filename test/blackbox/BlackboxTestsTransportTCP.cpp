@@ -51,7 +51,6 @@ TEST(BlackBox, TCPDomainHelloWorld_P0_P1_D0_D0)
         requester.send(count);
         requester.block();
     }
-
 }
 
 TEST(BlackBox, TCPDomainHelloWorld_P0_P1_D0_D1)
@@ -393,3 +392,32 @@ void tls_init()
     }
 }
 #endif
+
+// Regression test for ShrinkLocators/transform_remote_locators mechanism.
+TEST(BlackBox, TCPLocalhost)
+{
+    TCPReqRepHelloWorldRequester requester;
+    TCPReqRepHelloWorldReplier replier;
+    const uint16_t nmsgs = 5;
+
+    requester.init(0, 0, global_port, 0, nullptr, true);
+
+    ASSERT_TRUE(requester.isInitialized());
+
+    replier.init(1, 0, global_port);
+
+    ASSERT_TRUE(replier.isInitialized());
+
+    // Wait for discovery.
+    requester.wait_discovery();
+    replier.wait_discovery();
+
+    ASSERT_TRUE(requester.is_matched());
+    ASSERT_TRUE(replier.is_matched());
+
+    for (uint16_t count = 0; count < nmsgs; ++count)
+    {
+        requester.send(count);
+        requester.block();
+    }
+}

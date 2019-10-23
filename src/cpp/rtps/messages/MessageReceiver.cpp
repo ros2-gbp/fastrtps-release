@@ -22,11 +22,6 @@
 #include <fastrtps/rtps/writer/RTPSWriter.h>
 
 #include <fastrtps/rtps/reader/StatefulReader.h>
-#include <fastrtps/rtps/reader/WriterProxy.h>
-
-#include <fastrtps/rtps/reader/timedevent/HeartbeatResponseDelay.h>
-
-#include <fastrtps/rtps/writer/timedevent/NackResponseDelay.h>
 
 #include <fastrtps/rtps/reader/ReaderListener.h>
 
@@ -353,7 +348,8 @@ void MessageReceiver::processCDRMsg(const Locator_t& loc, CDRMessage_t*msg)
         }
     }
 
-    participant_->assertRemoteRTPSParticipantLiveliness(sourceGuidPrefix);
+
+    participant_->assert_remote_participant_liveliness(sourceGuidPrefix);
 }
 
 bool MessageReceiver::checkRTPSHeader(CDRMessage_t*msg) //check and proccess the RTPS Header
@@ -535,7 +531,10 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
     valid &= CDRMessage::readEntityId(msg,&readerID);
 
     //WE KNOW THE READER THAT THE MESSAGE IS DIRECTED TO SO WE LOOK FOR IT:
-    if (!willAReaderAcceptMsgDirectedTo(readerID)) return false;
+    if (!willAReaderAcceptMsgDirectedTo(readerID))
+    {
+        return false;
+    }
 
     //FOUND THE READER.
     //We ask the reader for a cachechange to store the information.

@@ -75,11 +75,19 @@ class SubscriberHistory: public rtps::ReaderHistory
          * Methods to read or take data from the History.
          * @param data Pointer to the object where you want to read or take the information.
          * @param info Pointer to a SampleInfo_t object where you want
+         * @param max_blocking_time Maximum time the function can be blocked.
          * to store the information about the retrieved data
          */
         ///@{
-        bool readNextData(void* data, SampleInfo_t* info);
-        bool takeNextData(void* data, SampleInfo_t* info);
+        bool readNextData(
+                void* data,
+                SampleInfo_t* info,
+                std::chrono::steady_clock::time_point& max_blocking_time);
+
+        bool takeNextData(
+                void* data,
+                SampleInfo_t* info,
+                std::chrono::steady_clock::time_point& max_blocking_time);
         ///@}
 
         /**
@@ -89,15 +97,6 @@ class SubscriberHistory: public rtps::ReaderHistory
          */
         bool remove_change_sub(
                 rtps::CacheChange_t* change);
-
-        /** Get the unread count.
-         * @return Unread count
-         */
-        inline uint64_t getUnreadCount() const
-        {
-            std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
-            return m_unreadCacheCount;
-        }
 
         /**
          * @brief A method to set the next deadline for the given instance
@@ -123,8 +122,6 @@ class SubscriberHistory: public rtps::ReaderHistory
 
         using t_m_Inst_Caches = std::map<rtps::InstanceHandle_t, KeyedChanges>;
 
-        //!Number of unread CacheChange_t.
-        uint64_t m_unreadCacheCount;
         //!Map where keys are instance handles and values vectors of cache changes
         t_m_Inst_Caches keyed_changes_;
         //!Time point when the next deadline will occur (only used for topics with no key)
@@ -151,19 +148,6 @@ class SubscriberHistory: public rtps::ReaderHistory
         bool find_key(
                 rtps::CacheChange_t* a_change,
                 t_m_Inst_Caches::iterator* map_it);
-
-        //!Increase the unread count.
-        inline void increaseUnreadCount()
-        {
-            ++m_unreadCacheCount;
-        }
-
-        //!Decrease the unread count.
-        inline void decreaseUnreadCount()
-        {
-            if (m_unreadCacheCount > 0)
-                --m_unreadCacheCount;
-        }
 
         /**
          * @brief Method that finds a key in m_keyedChanges or tries to add it if not found
@@ -209,7 +193,7 @@ class SubscriberHistory: public rtps::ReaderHistory
 
         void deserialize_change(
                 rtps::CacheChange_t* change,
-                uint16_t ownership_strength,
+                uint32_t ownership_strength,
                 void* data,
                 SampleInfo_t* info);
 };

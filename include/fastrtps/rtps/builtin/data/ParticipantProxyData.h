@@ -23,13 +23,17 @@
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #include "../../../qos/ParameterList.h"
 
+#include <fastrtps/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 #include "../../attributes/WriterAttributes.h"
 #include "../../attributes/ReaderAttributes.h"
 #include "../../common/Token.h"
+#include "../../common/RemoteLocators.hpp"
 
 #if HAVE_SECURITY
 #include "../../security/accesscontrol/ParticipantSecurityAttributes.h"
 #endif
+
+#include <chrono>
 
 #define DISCOVERY_PARTICIPANT_DATA_MAX_SIZE 5000
 #define DISCOVERY_TOPIC_DATA_MAX_SIZE 500
@@ -64,10 +68,11 @@ namespace rtps {
 
 struct CDRMessage_t;
 class PDPSimple;
-class RemoteParticipantLeaseDuration;
+class TimedEvent;
 class RTPSParticipantImpl;
 class ReaderProxyData;
 class WriterProxyData;
+class NetworkFactory;
 
 /**
 * ParticipantProxyData class is used to store and convert the information Participants send to each other during the PDP phase.
@@ -77,7 +82,7 @@ class ParticipantProxyData
 {
     public:
 
-        ParticipantProxyData();
+        ParticipantProxyData(const RTPSParticipantAllocationAttributes& allocation);
 
         ParticipantProxyData(const ParticipantProxyData& pdata);
 
@@ -93,16 +98,10 @@ class ParticipantProxyData
         bool m_expectsInlineQos;
         //!Available builtin endpoints
         BuiltinEndpointSet_t m_availableBuiltinEndpoints;
-        //!Metatraffic unicast locator list
-        LocatorList_t m_metatrafficUnicastLocatorList;
-        //!Metatraffic multicast locator list
-        LocatorList_t m_metatrafficMulticastLocatorList;
-        //!Default unicast locator list
-        LocatorList_t m_defaultUnicastLocatorList;
-        //!Default multicast locator list
-        LocatorList_t m_defaultMulticastLocatorList;
-        //!Manual liveliness count
-        Count_t m_manualLivelinessCount; // TODO(MiguelC): remove when safe to change ABI
+        //!Metatraffic locators
+        RemoteLocatorList metatraffic_locators;
+        //!Default locators
+        RemoteLocatorList default_locators;
         //!Participant name
         string_255 m_participantName;
         //!
@@ -126,11 +125,13 @@ class ParticipantProxyData
         //!
         std::vector<octet> m_userData;
         //!
-        RemoteParticipantLeaseDuration* mp_leaseDurationTimer;
+        TimedEvent* lease_duration_event;
         //!
-        std::vector<ReaderProxyData*> m_readers;
+        bool should_check_lease_duration;
         //!
-        std::vector<WriterProxyData*> m_writers;
+        ResourceLimitedVector<ReaderProxyData*> m_readers;
+        //!
+        ResourceLimitedVector<WriterProxyData*> m_writers;
 
         /**
          * Update the data.
@@ -149,16 +150,51 @@ class ParticipantProxyData
          * Read the parameter list from a recevied CDRMessage_t
          * @return True on success
          */
-        bool readFromCDRMessage(CDRMessage_t* msg, bool use_encapsulation=true);
+        bool readFromCDRMessage(
+                CDRMessage_t* msg,
+                bool use_encapsulation,
+                const NetworkFactory& network);
 
-        //!Clear the data (restore to default state.)
+        //! Clear the data (restore to default state).
         void clear();
 
         /**
          * Copy the data from another object.
          * @param pdata Object to copy the data from
          */
-        void copy(ParticipantProxyData& pdata);
+        void copy(const ParticipantProxyData& pdata);
+
+        /**
+         * Set participant persistent GUID_t
+         * @param guid valid GUID_t
+         */
+        void set_persistence_guid(const GUID_t & guid);
+
+        /**
+         * Retrieve participant persistent GUID_t
+         * @return guid persistent GUID_t or c_Guid_Unknown
+         */
+        GUID_t get_persistence_guid() const;
+
+        void assert_liveliness();
+
+        const std::chrono::steady_clock::time_point& last_received_message_tm() const
+        {
+            return last_received_message_tm_;
+        }
+
+        const std::chrono::microseconds& lease_duration() const
+        {
+            return lease_duration_;
+        }
+
+    private:
+
+        //! Store the last timestamp it was received a RTPS message from the remote participant.
+        std::chrono::steady_clock::time_point last_received_message_tm_;
+
+        //! Remote participant lease duration in microseconds.
+        std::chrono::microseconds lease_duration_;
 };
 
 } /* namespace rtps */

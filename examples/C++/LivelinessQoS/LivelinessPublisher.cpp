@@ -23,7 +23,6 @@
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/Domain.h>
-#include <fastrtps/utils/eClock.h>
 
 #include <thread>
 
@@ -44,10 +43,10 @@ bool LivelinessPublisher::init(
     topic_.message("HelloWorld");
 
     ParticipantAttributes PParam;
-    PParam.rtps.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
-    PParam.rtps.builtin.use_SIMPLE_EndpointDiscoveryProtocol = true;
-    PParam.rtps.builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter = true;
-    PParam.rtps.builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader = true;
+    PParam.rtps.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol::SIMPLE;
+    PParam.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = true;
+    PParam.rtps.builtin.discovery_config.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter = true;
+    PParam.rtps.builtin.discovery_config.m_simpleEDP.use_PublicationWriterANDSubscriptionReader = true;
     PParam.rtps.builtin.domainId = 0;
     PParam.rtps.builtin.use_WriterLivelinessProtocol = true;
     PParam.rtps.setName("Participant_pub");
@@ -125,7 +124,7 @@ void LivelinessPublisher::runThread(
         {
             std::cout << "Message with index: " << topic_.index()<< " SENT by publisher " << pub->getGuid() << std::endl;
         }
-        eClock::my_sleep(sleep);
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
     }
 
     std::cin.ignore();

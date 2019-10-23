@@ -21,7 +21,7 @@
 #include "SubscriberImpl.h"
 
 #include <fastrtps/rtps/reader/RTPSReader.h>
-#include <fastrtps/rtps/reader/WriterProxy.h>
+#include "../rtps/reader/WriterProxy.h"
 
 #include <fastrtps/TopicDataType.h>
 #include <fastrtps/log/Log.h>
@@ -50,7 +50,6 @@ SubscriberHistory::SubscriberHistory(
                         simpl->getAttributes().topic.getTopicKind() == NO_KEY ?
                             history.depth :
                             history.depth * resource.max_instances))
-    , m_unreadCacheCount(0)
     , m_historyQos(history)
     , m_resourceLimitsQos(resource)
     , mp_subImpl(simpl)
@@ -66,13 +65,13 @@ SubscriberHistory::SubscriberHistory(
 
     if (simpl->getAttributes().topic.getTopicKind() == NO_KEY)
     {
-        receive_fn_ = history.kind == KEEP_ALL_HISTORY_QOS ?
+        receive_fn_ = history.kind == KEEP_ALL_HISTORY_QOS ? 
             std::bind(&SubscriberHistory::received_change_keep_all_no_key, this, _1, _2) :
             std::bind(&SubscriberHistory::received_change_keep_last_no_key, this, _1, _2);
     }
     else
     {
-        receive_fn_ = history.kind == KEEP_ALL_HISTORY_QOS ?
+        receive_fn_ = history.kind == KEEP_ALL_HISTORY_QOS ? 
             std::bind(&SubscriberHistory::received_change_keep_all_with_key, this, _1, _2) :
             std::bind(&SubscriberHistory::received_change_keep_last_with_key, this, _1, _2);
     }
@@ -96,7 +95,7 @@ bool SubscriberHistory::received_change(
         return false;
     }
 
-    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
+    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
     return receive_fn_(a_change, unknown_missing_changes_up_to);
 }
 
@@ -201,7 +200,6 @@ bool SubscriberHistory::add_received_change(
 
     if (add_change(a_change))
     {
-        increaseUnreadCount();
         if (m_changes.size() == static_cast<size_t>(m_resourceLimitsQos.max_samples) )
         {
             m_isHistoryFull = true;
@@ -230,7 +228,6 @@ bool SubscriberHistory::add_received_change_with_key(
 
     if (add_change(a_change))
     {
-        increaseUnreadCount();
         if (m_changes.size() == static_cast<size_t>(m_resourceLimitsQos.max_samples))
         {
             m_isHistoryFull = true;
@@ -281,7 +278,7 @@ bool SubscriberHistory::find_key_for_change(
 
 void SubscriberHistory::deserialize_change(
         CacheChange_t* change,
-        uint16_t ownership_strength,
+        uint32_t ownership_strength,
         void* data,
         SampleInfo_t* info)
 {
@@ -312,7 +309,10 @@ void SubscriberHistory::deserialize_change(
     }
 }
 
-bool SubscriberHistory::readNextData(void* data, SampleInfo_t* info)
+bool SubscriberHistory::readNextData(
+        void* data,
+        SampleInfo_t* info,
+        std::chrono::steady_clock::time_point& max_blocking_time)
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
@@ -320,25 +320,29 @@ bool SubscriberHistory::readNextData(void* data, SampleInfo_t* info)
         return false;
     }
 
-    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
-    CacheChange_t* change = nullptr;
-    WriterProxy* wp = nullptr;
-    if (this->mp_reader->nextUnreadCache(&change, &wp))
-    {
-        change->isRead = true;
-        this->decreaseUnreadCount();
+    std::unique_lock<RecursiveTimedMutex> lock(*mp_mutex, std::defer_lock);
 
-        logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": reading " << change->sequenceNumber);
-        uint16_t ownership = wp && mp_subImpl->getAttributes().qos.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
-            wp->m_att.ownershipStrength : 0;
-        deserialize_change(change, ownership, data, info);
-        return true;
+    if(lock.try_lock_until(max_blocking_time))
+    {
+        CacheChange_t* change;
+        WriterProxy * wp;
+        if (mp_reader->nextUnreadCache(&change, &wp))
+        {
+            logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": reading " << change->sequenceNumber);
+            uint32_t ownership = wp && mp_subImpl->getAttributes().qos.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
+                wp->ownership_strength() : 0;
+            deserialize_change(change, ownership, data, info);
+            return true;
+        }
     }
     return false;
 }
 
 
-bool SubscriberHistory::takeNextData(void* data, SampleInfo_t* info)
+bool SubscriberHistory::takeNextData(
+        void* data,
+        SampleInfo_t* info,
+        std::chrono::steady_clock::time_point& max_blocking_time)
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
@@ -346,23 +350,22 @@ bool SubscriberHistory::takeNextData(void* data, SampleInfo_t* info)
         return false;
     }
 
-    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
-    CacheChange_t* change = nullptr;
-    WriterProxy* wp = nullptr;
-    if (this->mp_reader->nextUntakenCache(&change, &wp))
+    std::unique_lock<RecursiveTimedMutex> lock(*mp_mutex, std::defer_lock);
+
+    if(lock.try_lock_until(max_blocking_time))
     {
-        if (!change->isRead)
+        CacheChange_t* change;
+        WriterProxy * wp;
+        if (mp_reader->nextUntakenCache(&change, &wp))
         {
-            this->decreaseUnreadCount();
+            logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": taking seqNum" << change->sequenceNumber <<
+                    " from writer: " << change->writerGUID);
+            uint32_t ownership = wp && mp_subImpl->getAttributes().qos.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
+                wp->ownership_strength() : 0;
+            deserialize_change(change, ownership, data, info);
+            remove_change_sub(change);
+            return true;
         }
-        change->isRead = true;
-        logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": taking seqNum" << change->sequenceNumber <<
-                " from writer: " << change->writerGUID);
-        uint16_t ownership = wp && mp_subImpl->getAttributes().qos.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
-            wp->m_att.ownershipStrength : 0;
-        deserialize_change(change, ownership, data, info);
-        remove_change_sub(change);
-        return true;
     }
 
     return false;
@@ -411,17 +414,12 @@ bool SubscriberHistory::remove_change_sub(
         return false;
     }
 
-    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
-    bool read = change->isRead;
+    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
     if (mp_subImpl->getAttributes().topic.getTopicKind() == NO_KEY)
     {
         if (remove_change(change))
         {
             m_isHistoryFull = false;
-            if (!read)
-            {
-                this->decreaseUnreadCount();
-            }
             return true;
         }
         return false;
@@ -442,10 +440,6 @@ bool SubscriberHistory::remove_change_sub(
                 {
                     vit->second.cache_changes.erase(chit);
                     m_isHistoryFull = false;
-                    if (!read)
-                    {
-                        this->decreaseUnreadCount();
-                    }
                     return true;
                 }
             }
@@ -464,7 +458,7 @@ bool SubscriberHistory::set_next_deadline(
         logError(RTPS_HISTORY, "You need to create a Reader with this History before using it");
         return false;
     }
-    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
+    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
 
     if (mp_subImpl->getAttributes().topic.getTopicKind() == NO_KEY)
     {
@@ -494,7 +488,7 @@ bool SubscriberHistory::get_next_deadline(
         logError(RTPS_HISTORY, "You need to create a Reader with this History before using it");
         return false;
     }
-    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
+    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
 
     if (mp_subImpl->getAttributes().topic.getTopicKind() == NO_KEY)
     {
