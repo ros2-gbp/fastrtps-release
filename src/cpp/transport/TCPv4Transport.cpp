@@ -195,13 +195,25 @@ LocatorList_t TCPv4Transport::NormalizeLocator(const Locator_t& locator)
         get_ipv4s(locNames);
         for (const auto& infoIP : locNames)
         {
+            auto ip = asio::ip::address_v4::from_string(infoIP.name);
+            if (is_interface_allowed(ip))
+            {
+                Locator_t newloc(locator);
+                IPLocator::setIPv4(newloc, infoIP.locator);
+                list.push_back(newloc);
+            }
+        }
+        if (list.empty())
+        {
             Locator_t newloc(locator);
-            IPLocator::setIPv4(newloc, infoIP.locator);
+            IPLocator::setIPv4(newloc, "127.0.0.1");
             list.push_back(newloc);
         }
     }
     else
+    {
         list.push_back(locator);
+    }
 
     return list;
 }
@@ -210,12 +222,30 @@ bool TCPv4Transport::is_local_locator(const Locator_t& locator) const
 {
     assert(locator.kind == LOCATOR_KIND_TCPv4);
 
+    /*
+     * Check case: Remote WAN address isn't our WAN address.
+     */
+    if (IPLocator::hasWan(locator))
+    {
+        const octet* wan = IPLocator::getWan(locator);
+        if (memcmp(wan, configuration_.wan_addr, 4 * sizeof(octet)) != 0)
+        {
+            return false; // WAN mismatch
+        }
+    }
+
+    /*
+     * Check case: Address is localhost
+     */
     if (IPLocator::isLocal(locator))
     {
         return true;
     }
 
-    for (auto localInterface : current_interfaces_)
+    /*
+     * Check case: Address is one of our addresses.
+     */
+    for (const IPFinder::info_IP& localInterface : current_interfaces_)
     {
         if (IPLocator::compareAddress(locator, localInterface.locator))
         {

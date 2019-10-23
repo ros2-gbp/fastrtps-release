@@ -26,8 +26,10 @@
 #include <rtps/participant/RTPSParticipantImpl.h>
 #include <fastrtps/log/Log.h>
 #include <fastrtps/qos/QosPolicies.h>
+#include <fastrtps/utils/TimeConversion.h>
 
 #include <mutex>
+#include <chrono>
 
 using namespace eprosima::fastrtps;
 
@@ -43,7 +45,6 @@ ParticipantProxyData::ParticipantProxyData(const RTPSParticipantAllocationAttrib
     , m_availableBuiltinEndpoints(0)
     , metatraffic_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
     , default_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
-    , m_manualLivelinessCount(0)
 #if HAVE_SECURITY
     , security_attributes_(0UL)
     , plugin_security_attributes_(0UL)
@@ -56,7 +57,7 @@ ParticipantProxyData::ParticipantProxyData(const RTPSParticipantAllocationAttrib
     {
     }
 
-ParticipantProxyData::ParticipantProxyData(const ParticipantProxyData& pdata) 
+ParticipantProxyData::ParticipantProxyData(const ParticipantProxyData& pdata)
     : m_protocolVersion(pdata.m_protocolVersion)
     , m_guid(pdata.m_guid)
     , m_VendorId(pdata.m_VendorId)
@@ -64,7 +65,6 @@ ParticipantProxyData::ParticipantProxyData(const ParticipantProxyData& pdata)
     , m_availableBuiltinEndpoints(pdata.m_availableBuiltinEndpoints)
     , metatraffic_locators(pdata.metatraffic_locators)
     , default_locators(pdata.default_locators)
-    , m_manualLivelinessCount(pdata.m_manualLivelinessCount)
     , m_participantName(pdata.m_participantName)
     , m_key(pdata.m_key)
     , m_leaseDuration(pdata.m_leaseDuration)
@@ -79,6 +79,7 @@ ParticipantProxyData::ParticipantProxyData(const ParticipantProxyData& pdata)
     , m_userData(pdata.m_userData)
     , lease_duration_event(nullptr)
     , should_check_lease_duration(false)
+    , lease_duration_(std::chrono::microseconds(TimeConv::Duration_t2MicroSecondsInt64(pdata.m_leaseDuration)))
 
     // This method is only called from SecurityManager when a new participant is discovered and the
     // corresponding DiscoveredParticipantInfo struct is created. Only participant info is used,
@@ -210,9 +211,12 @@ bool ParticipantProxyData::writeToCDRMessage(CDRMessage_t* msg, bool write_encap
     return CDRMessage::addParameterSentinel(msg);
 }
 
-bool ParticipantProxyData::readFromCDRMessage(CDRMessage_t* msg, bool use_encapsulation)
+bool ParticipantProxyData::readFromCDRMessage(
+        CDRMessage_t* msg,
+        bool use_encapsulation,
+        const NetworkFactory& network)
 {
-    auto param_process = [this](const Parameter_t* param)
+    auto param_process = [this, &network](const Parameter_t* param)
     {
         switch (param->Pid)
         {
@@ -264,30 +268,44 @@ bool ParticipantProxyData::readFromCDRMessage(CDRMessage_t* msg, bool use_encaps
             {
                 const ParameterLocator_t* p = dynamic_cast<const ParameterLocator_t*>(param);
                 assert(p != nullptr);
-                // TODO: NetworkFactory
-                metatraffic_locators.add_multicast_locator(p->locator);
+                Locator_t temp_locator;
+                if (network.transform_remote_locator(p->locator, temp_locator))
+                {
+                    metatraffic_locators.add_multicast_locator(temp_locator);
+                }
                 break;
             }
             case PID_METATRAFFIC_UNICAST_LOCATOR:
             {
                 const ParameterLocator_t* p = dynamic_cast<const ParameterLocator_t*>(param);
                 assert(p != nullptr);
-                // TODO: NetworkFactory
-                metatraffic_locators.add_unicast_locator(p->locator);
+                Locator_t temp_locator;
+                if (network.transform_remote_locator(p->locator, temp_locator))
+                {
+                    metatraffic_locators.add_unicast_locator(temp_locator);
+                }
                 break;
             }
             case PID_DEFAULT_UNICAST_LOCATOR:
             {
                 const ParameterLocator_t* p = dynamic_cast<const ParameterLocator_t*>(param);
                 assert(p != nullptr);
-                default_locators.add_unicast_locator(p->locator);
+                Locator_t temp_locator;
+                if (network.transform_remote_locator(p->locator, temp_locator))
+                {
+                    default_locators.add_unicast_locator(temp_locator);
+                }
                 break;
             }
             case PID_DEFAULT_MULTICAST_LOCATOR:
             {
                 const ParameterLocator_t* p = dynamic_cast<const ParameterLocator_t*>(param);
                 assert(p != nullptr);
-                default_locators.add_multicast_locator(p->locator);
+                Locator_t temp_locator;
+                if (network.transform_remote_locator(p->locator, temp_locator))
+                {
+                    default_locators.add_multicast_locator(temp_locator);
+                }
                 break;
             }
             case PID_PARTICIPANT_LEASE_DURATION:
@@ -295,6 +313,7 @@ bool ParticipantProxyData::readFromCDRMessage(CDRMessage_t* msg, bool use_encaps
                 const ParameterTime_t* p = dynamic_cast<const ParameterTime_t*>(param);
                 assert(p != nullptr);
                 this->m_leaseDuration = p->time.to_duration_t();
+                lease_duration_ = std::chrono::microseconds(TimeConv::Duration_t2MicroSecondsInt64(m_leaseDuration));
                 break;
             }
             case PID_BUILTIN_ENDPOINT_SET:
@@ -385,10 +404,10 @@ void ParticipantProxyData::clear()
     metatraffic_locators.multicast.clear();
     default_locators.unicast.clear();
     default_locators.multicast.clear();
-    m_manualLivelinessCount = 0;
     m_participantName = "";
     m_key = InstanceHandle_t();
     m_leaseDuration = Duration_t();
+    lease_duration_ = std::chrono::microseconds::zero();
     isAlive = true;
 #if HAVE_SECURITY
     identity_token_ = IdentityToken();
@@ -410,9 +429,9 @@ void ParticipantProxyData::copy(const ParticipantProxyData& pdata)
     m_availableBuiltinEndpoints = pdata.m_availableBuiltinEndpoints;
     metatraffic_locators = pdata.metatraffic_locators;
     default_locators = pdata.default_locators;
-    m_manualLivelinessCount = pdata.m_manualLivelinessCount;
     m_participantName = pdata.m_participantName;
     m_leaseDuration = pdata.m_leaseDuration;
+    lease_duration_ = std::chrono::microseconds(TimeConv::Duration_t2MicroSecondsInt64(pdata.m_leaseDuration));
     m_key = pdata.m_key;
     isAlive = pdata.isAlive;
     m_properties = pdata.m_properties;
@@ -434,7 +453,6 @@ bool ParticipantProxyData::updateData(ParticipantProxyData& pdata)
 {
     metatraffic_locators = pdata.metatraffic_locators;
     default_locators = pdata.default_locators;
-    m_manualLivelinessCount = pdata.m_manualLivelinessCount;
     m_properties = pdata.m_properties;
     m_leaseDuration = pdata.m_leaseDuration;
     m_userData = pdata.m_userData;
@@ -445,10 +463,21 @@ bool ParticipantProxyData::updateData(ParticipantProxyData& pdata)
     security_attributes_ = pdata.security_attributes_;
     plugin_security_attributes_ = pdata.plugin_security_attributes_;
 #endif
+    auto new_lease_duration = std::chrono::microseconds(TimeConv::Duration_t2MicroSecondsInt64(m_leaseDuration));
     if (this->lease_duration_event != nullptr)
     {
-        lease_duration_event->update_interval(m_leaseDuration);
+        if(new_lease_duration < lease_duration_)
+        {
+            // Calculate next trigger.
+            auto real_lease_tm = last_received_message_tm_ + new_lease_duration;
+            auto next_trigger = real_lease_tm - std::chrono::steady_clock::now();
+            lease_duration_event->cancel_timer();
+            lease_duration_event->update_interval_millisec(
+                    (double)std::chrono::duration_cast<std::chrono::milliseconds>(next_trigger).count());
+            lease_duration_event->restart_timer();
+        }
     }
+    lease_duration_ = new_lease_duration;
     return true;
 }
 
@@ -515,6 +544,10 @@ GUID_t ParticipantProxyData::get_persistence_guid() const
     return persistent;
 }
 
+void ParticipantProxyData::assert_liveliness()
+{
+    last_received_message_tm_ = std::chrono::steady_clock::now();
+}
 
 } /* namespace rtps */
 } /* namespace fastrtps */

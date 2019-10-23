@@ -160,9 +160,13 @@ bool PublisherImpl::create_new_change_with_params(
     // Block lowlevel writer
     auto max_blocking_time = std::chrono::steady_clock::now() +
         std::chrono::microseconds(::TimeConv::Time_t2MicroSecondsInt64(m_att.qos.m_reliability.max_blocking_time));
-    std::unique_lock<RecursiveTimedMutex> lock(mp_writer->getMutex(), std::defer_lock);
 
+#if HAVE_STRICT_REALTIME
+    std::unique_lock<RecursiveTimedMutex> lock(mp_writer->getMutex(), std::defer_lock);
     if(lock.try_lock_until(max_blocking_time))
+#else
+    std::unique_lock<RecursiveTimedMutex> lock(mp_writer->getMutex());
+#endif
     {
         CacheChange_t* ch = mp_writer->new_change(mp_type->getSerializedSizeProvider(data), changeKind, handle);
         if(ch != nullptr)
@@ -223,6 +227,7 @@ bool PublisherImpl::create_new_change_with_params(
                 ch->setFragmentSize((uint16_t)final_high_mark_for_frag);
             }
 
+            InstanceHandle_t change_handle = ch->instanceHandle;
             if(!this->m_history.add_pub_change(ch, wparams, lock, max_blocking_time))
             {
                 m_history.release_Cache(ch);
@@ -232,7 +237,7 @@ bool PublisherImpl::create_new_change_with_params(
             if (m_att.qos.m_deadline.period != c_TimeInfinite)
             {
                 if (!m_history.set_next_deadline(
-                            ch->instanceHandle,
+                            change_handle,
                             steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
                 {
                     logError(PUBLISHER, "Could not set the next deadline in the history");

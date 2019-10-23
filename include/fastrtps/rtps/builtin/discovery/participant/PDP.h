@@ -92,17 +92,17 @@ public:
     /**
      * Creates an initializes a new participant proxy from a DATA(p) raw info
      * @param p from DATA msg deserialization
-     * @param c from DATA msg
+     * @param writer_guid GUID of originating writer
      * @return new ParticipantProxyData * or nullptr on failure
      */
     virtual ParticipantProxyData* createParticipantProxyData(
             const ParticipantProxyData& p,
-            const CacheChange_t& c) = 0;
+            const GUID_t& writer_guid) = 0;
 
     /**
      * Force the sending of our local DPD to all remote RTPSParticipants and multicast Locators.
      * @param new_change If true a new change (with new seqNum) is created and sent;If false the last change is re-sent
-     * @param dispose sets change kind to NOT_ALIVE_DISPOSED_UNREGISTERED 
+     * @param dispose sets change kind to NOT_ALIVE_DISPOSED_UNREGISTERED
      * @param wparams allows to identify the change
      */
     virtual void announceParticipantState(
@@ -223,7 +223,7 @@ public:
     virtual void notifyAboveRemoteEndpoints(const ParticipantProxyData& pdata) = 0;
 
     /**
-     * Some PDP classes require EDP matching with update PDP DATAs like EDPStatic 
+     * Some PDP classes require EDP matching with update PDP DATAs like EDPStatic
      * @return true if EDP endpoinst must be match
      */
     virtual bool updateInfoMatchesEDP() { return false; }
@@ -285,9 +285,10 @@ public:
 
     /**
      * Assert the liveliness of a Remote Participant.
-     * @param guidP GuidPrefix_t of the participant whose liveliness is being asserted.
+     * @param remote_guid GuidPrefix_t of the participant whose liveliness is being asserted.
      */
-    void assertRemoteParticipantLiveliness(const GuidPrefix_t& guidP);
+    void assert_remote_participant_liveliness(
+            const GuidPrefix_t& remote_guid);
 
     /**
      * Get the RTPS participant
@@ -306,8 +307,6 @@ public:
 protected:
     //!Pointer to the builtin protocols object.
     BuiltinProtocols* mp_builtin;
-    //!TimedEvent to periodically resend the local RTPSParticipant information.
-    TimedEvent* resend_participant_info_event_;
     //!Pointer to the local RTPSParticipant.
     RTPSParticipantImpl* mp_RTPSParticipant;
     //!Discovery attributes.
@@ -373,6 +372,25 @@ protected:
     bool lookup_participant_key(
             const GUID_t& participant_guid,
             InstanceHandle_t& key);
+
+private:
+    //!TimedEvent to periodically resend the local RTPSParticipant information.
+    TimedEvent* resend_participant_info_event_;
+    //!Participant's initial announcements config
+    InitialAnnouncementConfig initial_announcements_;
+
+    void check_remote_participant_liveliness(
+            ParticipantProxyData* remote_participant);
+
+    /**
+     * Calculates the next announcement interval
+     */
+    void set_next_announcement_interval();
+
+    /**
+     * Calculates the initial announcement interval
+     */
+    void set_initial_announcement_interval();
 
 };
 

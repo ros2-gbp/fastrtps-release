@@ -250,6 +250,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     {
         logError(RTPS_PARTICIPANT, "The builtin protocols were not correctly initialized");
     }
+
     logInfo(RTPS_PARTICIPANT, "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix);
 }
 
@@ -854,7 +855,7 @@ void RTPSParticipantImpl::createSenderResources(const LocatorList_t& locator_lis
 void RTPSParticipantImpl::createSenderResources(const Locator_t& locator)
 {
     std::unique_lock<std::timed_mutex> lock(m_send_resources_mutex_);
-    
+
     m_network_Factory.build_send_resources(send_resource_list_, locator);
 }
 
@@ -1070,9 +1071,13 @@ void RTPSParticipantImpl::ResourceSemaphoreWait()
     }
 }
 
-void RTPSParticipantImpl::assertRemoteRTPSParticipantLiveliness(const GuidPrefix_t& guidP)
+void RTPSParticipantImpl::assert_remote_participant_liveliness(
+        const GuidPrefix_t& remote_guid)
 {
-    this->mp_builtinProtocols->mp_PDP->assertRemoteParticipantLiveliness(guidP);
+    if (mp_builtinProtocols && mp_builtinProtocols->mp_PDP)
+    {
+        mp_builtinProtocols->mp_PDP->assert_remote_participant_liveliness(remote_guid);
+    }
 }
 
 uint32_t RTPSParticipantImpl::getMaxMessageSize() const
