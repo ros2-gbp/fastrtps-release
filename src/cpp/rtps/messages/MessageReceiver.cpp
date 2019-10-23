@@ -347,6 +347,9 @@ void MessageReceiver::processCDRMsg(const Locator_t& loc, CDRMessage_t*msg)
             break;
         }
     }
+
+
+    participant_->assert_remote_participant_liveliness(sourceGuidPrefix);
 }
 
 bool MessageReceiver::checkRTPSHeader(CDRMessage_t*msg) //check and proccess the RTPS Header
@@ -528,7 +531,10 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
     valid &= CDRMessage::readEntityId(msg,&readerID);
 
     //WE KNOW THE READER THAT THE MESSAGE IS DIRECTED TO SO WE LOOK FOR IT:
-    if (!willAReaderAcceptMsgDirectedTo(readerID)) return false;
+    if (!willAReaderAcceptMsgDirectedTo(readerID))
+    {
+        return false;
+    }
 
     //FOUND THE READER.
     //We ask the reader for a cachechange to store the information.
