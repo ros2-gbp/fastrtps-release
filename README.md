@@ -1,3 +1,26 @@
+## fastrtps (eloquent) - 1.9.2-2
+
+The packages in the `fastrtps` repository were released into the `eloquent` distro by running `/home/steven/osrf/bloom/.direnv/python-3.7.4/bin/bloom-release -r eloquent fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Wed, 13 Nov 2019 14:53:59 -0000`
+
+The `fastrtps` package was released.
+
+Version of package(s) in repository `fastrtps`:
+
+- upstream repository: https://github.com/eProsima/Fast-RTPS.git
+- release repository: https://github.com/ros2-gbp/fastrtps-release.git
+- rosdistro version: `1.9.2-1`
+- old version: `1.9.2-1`
+- new version: `1.9.2-2`
+
+Versions of tools used:
+
+- bloom version: `0.9.0`
+- catkin_pkg version: `0.4.13`
+- rosdep version: `0.15.2`
+- rosdistro version: `0.7.5`
+- vcstools version: `0.1.42`
+
+
 ## fastrtps (eloquent) - 1.9.2-1
 
 The packages in the `fastrtps` repository were released into the `eloquent` distro by running `/home/steven/osrf/bloom/.direnv/python-3.7.4/bin/bloom-release -r eloquent fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Wed, 23 Oct 2019 23:23:03 -0000`
