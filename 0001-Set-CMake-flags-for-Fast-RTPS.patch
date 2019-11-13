@@ -1,4 +1,4 @@
-From 533af202d6b5691381235135b24fbec7628d86a5 Mon Sep 17 00:00:00 2001
+From 78b7124a8e18c0b5c5ff03e8bbefb9e1e227dac1 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?= <steven@nuclearsandwich.com>
 Date: Thu, 15 Nov 2018 19:35:38 -0800
 Subject: [PATCH] Set CMake flags for Fast-RTPS.
@@ -21,5 +21,5 @@ index aa010fa..32d5dd3 100755
  override_dh_auto_build:
  	# In case we're installing to a non-standard location, look for a setup.sh
 -- 
-2.23.0
+2.24.0
 
