@@ -56,7 +56,6 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-
 // Default configuration values for PDP reliable entities.
 
 const Duration_t pdp_heartbeat_period{ 0, 350 * 1000  }; // 350 milliseconds
@@ -918,6 +917,7 @@ bool PDP::remove_remote_participant(
         auto listener =  mp_RTPSParticipant->getListener();
         if (listener != nullptr)
         {
+            std::lock_guard<std::mutex> lock(callback_mtx_);
             ParticipantDiscoveryInfo info(*pdata);
             info.status = reason;
             listener->onParticipantDiscovery(mp_RTPSParticipant->getUserRTPSParticipant(), std::move(info));
