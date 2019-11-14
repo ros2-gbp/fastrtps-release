@@ -38,6 +38,7 @@ extern const char* DEFAULT_FASTRTPS_PROFILES;
 
 extern const char* ROOT;
 extern const char* PROFILES;
+extern const char* LIBRARY_SETTINGS;
 extern const char* TRANSPORT_DESCRIPTORS;
 extern const char* PROFILE_NAME;
 extern const char* DEFAULT_PROF;
@@ -70,12 +71,20 @@ extern const char* LISTENING_PORTS;
 extern const char* CALCULATE_CRC;
 extern const char* CHECK_CRC;
 
+// IntraprocessDeliveryType
+extern const char* OFF;
+extern const char* USER_DATA_ONLY;
+extern const char* FULL;
+
 extern const char* QOS_PROFILE;
 extern const char* APPLICATION;
 extern const char* TYPE;
 // extern const char* TOPIC;
 extern const char* DATA_WRITER;
 extern const char* DATA_READER;
+
+/// LibrarySettings attributes
+extern const char* INTRAPROCESS_DELIVERY;
 
 /// RTPS Participant attributes
 extern const char* ALLOCATION;
@@ -233,6 +242,10 @@ extern const char* NONE;
 extern const char* CLIENT;
 extern const char* SERVER;
 extern const char* BACKUP;
+extern const char* IGNORE_PARTICIPANT_FLAGS;
+extern const char* FILTER_DIFFERENT_HOST;
+extern const char* FILTER_DIFFERENT_PROCESS;
+extern const char* FILTER_SAME_PROCESS;
 extern const char* WRITER_LVESS_PROTOCOL;
 extern const char* DISCOVERY_SETTINGS;
 extern const char* _EDP;
