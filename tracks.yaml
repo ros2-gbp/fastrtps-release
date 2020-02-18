@@ -1,4 +1,4 @@
-release_repo_url: git@github.com:ros2-gbp/fastrtps-release
+release_repo_url: git@github.com:ros2-gbp/fastrtps-release.git
 tracks:
   ardent:
     actions:
