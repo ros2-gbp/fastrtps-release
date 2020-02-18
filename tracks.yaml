@@ -118,7 +118,7 @@ tracks:
     patches: eloquent
     release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
-    release_tag: v1.9.3
+    release_tag: 6bfd02a1b468218858dc0365afcc8ca892c4027f
     ros_distro: eloquent
     vcs_type: git
     vcs_uri: https://github.com/ros2/Fast-RTPS.git
