@@ -102,7 +102,7 @@ tracks:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
       :{vcs_uri} --name :{name} --output-dir :{archive_dir_path}
-    - git-bloom-import-upstream :{archive_path} :{patches} --release-version :{version}
+    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 1.9.3+osrf1@g6bfd02a1b
       --replace
     - git-bloom-generate -y rosrelease :{ros_distro} --source upstream -i :{release_inc}
     - git-bloom-generate -y rosdebian --prefix release/:{ros_distro} :{ros_distro}
@@ -111,7 +111,7 @@ tracks:
       -i :{release_inc} --os-name debian --os-not-required
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc}
-    devel_branch: v1.9.3
+    devel_branch: eloquent
     last_release: v1.9.3
     last_version: 1.9.3
     name: fastrtps
@@ -121,7 +121,7 @@ tracks:
     release_tag: v1.9.3
     ros_distro: eloquent
     vcs_type: git
-    vcs_uri: https://github.com/eProsima/Fast-RTPS.git
+    vcs_uri: https://github.com/ros2/Fast-RTPS.git
     version: 1.9.3
   r2b2:
     actions:
