@@ -19,6 +19,8 @@
 #include "ReqRepAsReliableHelloWorldRequester.hpp"
 #include "ReqRepAsReliableHelloWorldReplier.hpp"
 
+#include <gtest/gtest.h>
+
 #include <fastrtps/utils/TimeConversion.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
@@ -158,8 +160,8 @@ TEST_P(DeadlineQos, KeyedTopicLongDeadline)
     // Deadline period in milliseconds
     uint32_t deadline_period_ms = 100000;
 
-    reader.deadline_period(deadline_period_ms * 1e-3).key(true).init();
-    writer.deadline_period(deadline_period_ms * 1e-3).key(true).init();
+    reader.deadline_period(deadline_period_ms * 1e-3).init();
+    writer.deadline_period(deadline_period_ms * 1e-3).init();
 
     ASSERT_TRUE(reader.isInitialized());
     ASSERT_TRUE(writer.isInitialized());
@@ -192,6 +194,7 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
     // This test sets a short deadline (short compared to the write rate),
     // makes the writer send a few samples and checks that the deadline was missed every time
     // Uses a topic with key
+
     PubSubReader<KeyedHelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
 
@@ -202,8 +205,8 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
     // Deadline period in ms
     uint32_t deadline_period_ms = 10;
 
-    reader.deadline_period(deadline_period_ms * 1e-3).key(true).init();
-    writer.deadline_period(deadline_period_ms * 1e-3).key(true).init();
+    reader.deadline_period(deadline_period_ms * 1e-3).init();
+    writer.deadline_period(deadline_period_ms * 1e-3).init();
 
     ASSERT_TRUE(reader.isInitialized());
     ASSERT_TRUE(writer.isInitialized());
@@ -231,13 +234,14 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
     EXPECT_GE(reader.missed_deadlines(), writer_samples);
 }
 
+
 INSTANTIATE_TEST_CASE_P(DeadlineQos,
         DeadlineQos,
         testing::Values(false, true),
         [](const testing::TestParamInfo<DeadlineQos::ParamType>& info) {
-            if (info.param)
-            {
-                return "Intraprocess";
-            }
-            return "NonIntraprocess";
-        });
+    if (info.param)
+    {
+        return "Intraprocess";
+    }
+    return "NonIntraprocess";
+});

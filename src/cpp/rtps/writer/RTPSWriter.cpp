@@ -17,12 +17,12 @@
  *
  */
 
-#include <fastrtps/rtps/writer/RTPSWriter.h>
-#include <fastrtps/rtps/history/WriterHistory.h>
-#include <fastrtps/rtps/messages/RTPSMessageCreator.h>
-#include <fastrtps/log/Log.h>
-#include "../participant/RTPSParticipantImpl.h"
-#include "../flowcontrol/FlowController.h"
+#include <fastdds/rtps/writer/RTPSWriter.h>
+#include <fastdds/rtps/history/WriterHistory.h>
+#include <fastdds/rtps/messages/RTPSMessageCreator.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/flowcontrol/FlowController.h>
 
 #include <mutex>
 
@@ -218,11 +218,10 @@ bool RTPSWriter::encrypt_cachechange(
     if (getAttributes().security_attributes().is_payload_protected && change->getFragmentCount() == 0)
     {
         if (encrypt_payload_.max_size < change->serializedPayload.length +
-                // In future v2 changepool is in writer, and writer set this value to cachechagepool.
-                +20 /*SecureDataHeader*/ + 4 + ((2 * 16) /*EVP_MAX_IV_LENGTH max block size*/ - 1) /* SecureDataBodey*/
-                + 16 + 4 /*SecureDataTag*/ &&
-                (mp_history->m_att.memoryPolicy == MemoryManagementPolicy_t::PREALLOCATED_WITH_REALLOC_MEMORY_MODE ||
-                mp_history->m_att.memoryPolicy == MemoryManagementPolicy_t::DYNAMIC_RESERVE_MEMORY_MODE))
+            // In future v2 changepool is in writer, and writer set this value to cachechagepool.
+            +20 /*SecureDataHeader*/ + 4 + ((2 * 16) /*EVP_MAX_IV_LENGTH max block size*/ - 1) /* SecureDataBodey*/
+            + 16 + 4 /*SecureDataTag*/ &&
+            (mp_history->m_att.memoryPolicy != MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE))
         {
             encrypt_payload_.data = (octet*)realloc(encrypt_payload_.data, change->serializedPayload.length +
                             // In future v2 changepool is in writer, and writer set this value to cachechagepool.
@@ -286,19 +285,9 @@ bool RTPSWriter::send(
         CDRMessage_t* message,
         std::chrono::steady_clock::time_point& max_blocking_time_point) const
 {
-    bool ret_val = true;
-
     RTPSParticipantImpl* participant = getRTPSParticipant();
-    locator_selector_.for_each(
-        [participant, message, &max_blocking_time_point, &ret_val](const Locator_t& loc)
-                {
-                    if (ret_val)
-                    {
-                        ret_val = participant->sendSync(message, loc, max_blocking_time_point);
-                    }
-                });
 
-    return ret_val;
+    return participant->sendSync(message, locator_selector_.begin(), locator_selector_.end(), max_blocking_time_point);
 }
 
 const LivelinessQosPolicyKind& RTPSWriter::get_liveliness_kind() const

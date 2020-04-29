@@ -42,9 +42,13 @@ public:
 
     PubListener()
         : n_matched(0)
-        , firstConnected(false) {}
+        , firstConnected(false)
+    {
+    }
 
-    ~PubListener() {}
+    ~PubListener()
+    {
+    }
 
     void onPublicationMatched(
             eprosima::fastrtps::Publisher* /*pub*/,
@@ -73,9 +77,13 @@ public:
 
     SubListener()
         : n_matched(0)
-        , n_samples(0) {}
+        , n_samples(0)
+    {
+    }
 
-    ~SubListener() {}
+    ~SubListener()
+    {
+    }
 
     void onSubscriptionMatched(
             eprosima::fastrtps::Subscriber* /*sub*/,
@@ -147,15 +155,15 @@ int main(
 
     switch (iMode)
     {
-    case 1:
-        publisherKeys();
-        break;
-    case 2:
-        subscriberKeys();
-        break;
-    default:
-        keys();
-        break;
+        case 1:
+            publisherKeys();
+            break;
+        case 2:
+            subscriberKeys();
+            break;
+        default:
+            keys();
+            break;
     }
     return 0;
 }
@@ -165,7 +173,6 @@ Publisher* initPublisher(
         PubListener& listener)
 {
     ParticipantAttributes PparamPub;
-    PparamPub.rtps.builtin.domainId = 0;
     PparamPub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PparamPub.rtps.setName("PublisherParticipant");
 
@@ -206,7 +213,6 @@ Subscriber* initSubscriber(
         SubListener* listener)
 {
     ParticipantAttributes PparamSub;
-    PparamSub.rtps.builtin.domainId = 0;
     PparamSub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PparamSub.rtps.setName("SubscriberParticipant");
 
@@ -360,7 +366,6 @@ void subscriberKeys()
 
     initSubscriber(sampleType, &subListener);
 
-    // wait for the connection
     std::unique_lock<std::mutex> lock(subListener.mutex_);
     subListener.cv_.wait(lock, [&subListener]()
     {

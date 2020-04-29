@@ -18,6 +18,8 @@
 #include "PubSubWriter.hpp"
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
+#include <gtest/gtest.h>
+
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
@@ -173,4 +175,3 @@ INSTANTIATE_TEST_CASE_P(PubSubFlowControllers,
             }
             return "NonIntraprocess";
         });
-

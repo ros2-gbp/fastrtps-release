@@ -13,16 +13,17 @@
 // limitations under the License.
 
 /**
- * @file all_attributes.h	
+ * @file all_attributes.h
  */
 
 #ifndef ALL_ATTRIBUTES_H_
 #define ALL_ATTRIBUTES_H_
 
-#include "ParticipantAttributes.h"
-#include "PublisherAttributes.h"
-#include "SubscriberAttributes.h"
-#include "TopicAttributes.h"
-
+#include <fastrtps/attributes/ParticipantAttributes.h>
+#include <fastrtps/attributes/PublisherAttributes.h>
+#include <fastrtps/attributes/SubscriberAttributes.h>
+#include <fastrtps/attributes/TopicAttributes.h>
+#include <fastrtps/attributes/RequesterAttributes.hpp>
+#include <fastrtps/attributes/ReplierAttributes.hpp>
 
 #endif /* ALL_ATTRIBUTES_H_ */

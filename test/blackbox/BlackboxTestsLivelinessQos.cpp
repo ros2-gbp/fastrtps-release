@@ -20,6 +20,7 @@
 #include "ReqRepAsReliableHelloWorldRequester.hpp"
 #include "ReqRepAsReliableHelloWorldReplier.hpp"
 
+#include <gtest/gtest.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
 using namespace eprosima::fastrtps;
@@ -50,6 +51,19 @@ public:
         }
     }
 
+    template<typename WriterType, typename ReaderType>
+    void config_pdp(
+            WriterType& writer,
+            ReaderType& reader)
+    {
+        constexpr unsigned int participant_announcement_period_ms = 50000;
+
+        writer.lease_duration(
+            participant_announcement_period_ms * 3e-3, participant_announcement_period_ms * 1e-3);
+        reader.lease_duration(
+            participant_announcement_period_ms * 3e-3, participant_announcement_period_ms * 1e-3);
+    }
+
 };
 
 //! Tests that when kind is automatic liveliness is never lost, even if the writer never sends data
@@ -57,6 +71,8 @@ TEST_P(LivelinessQos, Liveliness_Automatic_Reliable)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Liveliness lease duration and announcement period
     unsigned int lease_duration_ms = 1000;
@@ -93,6 +109,8 @@ TEST_P(LivelinessQos, Liveliness_Automatic_BestEffort)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Liveliness lease duration and announcement period
     unsigned int lease_duration_ms = 1000;
@@ -131,6 +149,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByParticipant_Reliable)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Number of samples to write
     unsigned int num_samples = 2;
@@ -194,6 +214,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByParticipant_BestEffort)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Number of samples to write
     unsigned int num_samples = 2;
 
@@ -256,6 +278,8 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByParticipant_Reliable)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Number of samples to write
     unsigned int num_samples = 2;
 
@@ -313,6 +337,8 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByParticipant_BestEffort)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Number of samples to write
     unsigned int num_samples = 2;
 
@@ -369,6 +395,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_Reliable)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Number of samples to write
     unsigned int num_samples = 2;
@@ -430,6 +458,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_BestEffort)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Number of samples to write
     unsigned int num_samples = 2;
 
@@ -490,6 +520,8 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByTopic_Reliable)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Number of samples to write
     unsigned int num_samples = 2;
 
@@ -546,6 +578,8 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByTopic_BestEffort)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Number of samples to write
     unsigned int num_samples = 2;
@@ -604,6 +638,8 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByParticipant_Automatic_Reliable)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Write rate in milliseconds and number of samples to write
     unsigned int num_samples = 2;
 
@@ -659,6 +695,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByParticipant_Automatic_Reliable)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Number of samples to write
     unsigned int num_samples = 2;
@@ -720,6 +758,8 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByParticipant_Automatic_BestEffort)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Number of samples to write
     unsigned int num_samples = 2;
 
@@ -776,6 +816,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByParticipant_Automatic_BestEffort)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Number of samples to write
     unsigned int num_samples = 2;
@@ -837,6 +879,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_Automatic_Reliable)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Number of samples to write
     unsigned int num_samples = 2;
 
@@ -895,6 +939,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_Automatic_BestEffort)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Number of times to assert liveliness
     unsigned int num_samples = 2;
@@ -955,6 +1001,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_ManualByParticipant_Reliable
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Number of samples to write
     unsigned int num_samples = 2;
 
@@ -1014,6 +1062,8 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_ManualByParticipant_BestEffo
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Write rate in milliseconds and number of samples to write
     unsigned int num_samples = 2;
 
@@ -1055,7 +1105,7 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_ManualByParticipant_BestEffo
     for (count = 0; count < num_samples; count++)
     {
         writer.assert_liveliness();
-        std::this_thread::sleep_for(std::chrono::milliseconds(lease_duration_ms * 2));
+        writer.wait_liveliness_lost(num_samples + count + 1);
     }
 
     EXPECT_EQ(writer.times_liveliness_lost(), num_samples * 2);
@@ -1360,6 +1410,7 @@ TEST_P(LivelinessQos, ThreeWriters_ThreeReaders)
     // The manual by participant subscriber will detect that two writers lost liveliness
     // The manual by topic subscriber will detect that one writer lost liveliness
     // This means that the subscribing participant will see that liveliness was lost three times
+    publishers.pub_wait_liveliness_lost(2u);
     subscribers.sub_wait_liveliness_lost(3u);
     EXPECT_EQ(publishers.pub_times_liveliness_lost(), 2u);
     EXPECT_EQ(subscribers.sub_times_liveliness_lost(), 3u);
@@ -1416,6 +1467,8 @@ TEST_P(LivelinessQos, LivelinessChangedStatus_Alive_NotAlive)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Liveliness lease duration and announcement period, in milliseconds
     unsigned int lease_duration_ms = 100;
     unsigned int announcement_period_ms = 10;
@@ -1471,6 +1524,8 @@ TEST_P(LivelinessQos, LivelinessChangedStatus_Alive_Unmatched)
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
+    config_pdp(writer, reader);
+
     // Liveliness lease duration and announcement period, in milliseconds
     unsigned int lease_duration_ms = 100;
     unsigned int announcement_period_ms = 10;
@@ -1521,6 +1576,8 @@ TEST_P(LivelinessQos, LivelinessChangedStatus_NotAlive_Unmatched)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    config_pdp(writer, reader);
 
     // Liveliness lease duration and announcement period, in milliseconds
     unsigned int lease_duration_ms = 100;
@@ -1597,7 +1654,7 @@ TEST_P(LivelinessQos, AssertLivelinessParticipant)
     .pub_liveliness_announcement_period(announcement_period_ms * 1e-3)
     .pub_liveliness_lease_duration(lease_duration_ms * 1e-3)
     .pub_liveliness_kind(MANUAL_BY_TOPIC_LIVELINESS_QOS);
-    ASSERT_TRUE(publishers.init_publisher(1u));
+    ASSERT_TRUE(publishers.init_publisher(2u));
 
     // Assert liveliness
     publishers.assert_liveliness_participant();
@@ -1614,10 +1671,10 @@ INSTANTIATE_TEST_CASE_P(LivelinessQos,
         LivelinessQos,
         testing::Values(false, true),
         [](const testing::TestParamInfo<LivelinessQos::ParamType>& info) {
-            if (info.param)
-            {
-                return "Intraprocess";
-            }
-            return "NonIntraprocess";
-        });
+    if (info.param)
+    {
+        return "Intraprocess";
+    }
+    return "NonIntraprocess";
+});
 

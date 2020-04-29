@@ -50,10 +50,10 @@ public:
         return (intraprocess_delivery == b.intraprocess_delivery);
     }
 
-    IntraprocessDeliveryType intraprocess_delivery = INTRAPROCESS_OFF;
+    IntraprocessDeliveryType intraprocess_delivery = INTRAPROCESS_FULL;
 };
 
-}
-}
+}  // namespace fastrtps
+}  // namespace eprosima
 
 #endif /* LIBRARYSETTINGS_ATTRIBUTES_H_ */

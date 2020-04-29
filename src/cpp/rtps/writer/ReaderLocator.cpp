@@ -17,13 +17,13 @@
  *
  */
 
-#include <fastrtps/rtps/writer/ReaderLocator.h>
-#include <fastrtps/rtps/common/CacheChange.h>
-#include <fastrtps/rtps/resources/AsyncWriterThread.h>
-#include <fastrtps/rtps/writer/StatelessWriter.h>
-#include <fastrtps/rtps/common/LocatorListComparisons.hpp>
+#include <fastdds/rtps/writer/ReaderLocator.h>
+#include <fastdds/rtps/common/CacheChange.h>
+#include <fastdds/rtps/resources/AsyncWriterThread.h>
+#include <fastdds/rtps/writer/StatelessWriter.h>
+#include <fastdds/rtps/common/LocatorListComparisons.hpp>
 
-#include "../participant/RTPSParticipantImpl.h"
+#include <rtps/participant/RTPSParticipantImpl.h>
 #include "rtps/RTPSDomainImpl.hpp"
 
 namespace eprosima {
@@ -68,7 +68,6 @@ bool ReaderLocator::start(
 
         locator_info_.reset();
         locator_info_.enable(true);
-
         return true;
     }
 
@@ -95,6 +94,7 @@ bool ReaderLocator::update(
             locator_info_.unicast = unicast_locators;
             locator_info_.multicast = multicast_locators;
         }
+
         locator_info_.reset();
         locator_info_.enable(true);
         ret_val = true;
@@ -132,23 +132,11 @@ bool ReaderLocator::send(
     {
         if (locator_info_.unicast.size() > 0)
         {
-            for (const Locator_t& locator : locator_info_.unicast)
-            {
-                if (!owner_->sendSync(message, locator, max_blocking_time_point))
-                {
-                    return false;
-                }
-            }
+            return owner_->sendSync(message, Locators(locator_info_.unicast.begin()), Locators(locator_info_.unicast.end()), max_blocking_time_point);
         }
         else
         {
-            for (const Locator_t& locator : locator_info_.multicast)
-            {
-                if (!owner_->sendSync(message, locator, max_blocking_time_point))
-                {
-                    return false;
-                }
-            }
+            return owner_->sendSync(message, Locators(locator_info_.multicast.begin()), Locators(locator_info_.multicast.end()), max_blocking_time_point);
         }
     }
 

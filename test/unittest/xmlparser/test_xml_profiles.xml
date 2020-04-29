@@ -1,10 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"  ?>
 <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
     <profiles>
         <library_settings>
             <intraprocess_delivery>FULL</intraprocess_delivery>
         </library_settings>
         <participant profile_name="test_participant_profile" is_default_profile="true">
+            <domainId>2019102</domainId>
             <rtps>
                 <allocation>
                     <remote_locators>
@@ -26,6 +27,10 @@
                         <maximum>20</maximum>
                         <increment>2</increment>
                     </total_writers>
+                    <send_buffers>
+                        <preallocated_number>127</preallocated_number>
+                        <dynamic>true</dynamic>
+                    </send_buffers>
                 </allocation>
                 <defaultUnicastLocatorList>
                     <locator>
@@ -48,8 +53,8 @@
                 <builtin>
                     <discovery_config>
                         <discoveryProtocol>SIMPLE</discoveryProtocol>
-                        <ignoreParticipantFlags>FILTER_SAME_PROCESS | FILTER_DIFFERENT_HOST</ignoreParticipantFlags>
                         <EDP>SIMPLE</EDP>
+                        <ignoreParticipantFlags>FILTER_SAME_PROCESS | FILTER_DIFFERENT_HOST</ignoreParticipantFlags>
                         <leaseAnnouncement>
                             <sec>10</sec>
                             <nanosec>333</nanosec>
@@ -71,7 +76,6 @@
                     </discovery_config>
                     <avoid_builtin_multicast>false</avoid_builtin_multicast>
                     <use_WriterLivelinessProtocol>false</use_WriterLivelinessProtocol>
-                    <domainId>2019102</domainId>
                     <metatrafficUnicastLocatorList>
                         <locator>
                             <udpv4>
@@ -110,6 +114,8 @@
                     </initialPeersList>
                     <readerHistoryMemoryPolicy>PREALLOCATED</readerHistoryMemoryPolicy>
                     <writerHistoryMemoryPolicy>PREALLOCATED</writerHistoryMemoryPolicy>
+                    <readerPayloadSize>1000</readerPayloadSize>
+                    <writerPayloadSize>2000</writerPayloadSize>
                     <mutation_tries>55</mutation_tries>
                 </builtin>
                 <port>
@@ -130,6 +136,7 @@
                 <name>test_name</name>
             </rtps>
         </participant>
+
         <publisher profile_name="test_publisher_profile"
         is_default_profile="true">
             <topic>
@@ -239,6 +246,7 @@
                 <increment>0</increment>
             </matchedSubscribersAllocation>
         </publisher>
+
         <subscriber profile_name="test_subscriber_profile" is_default_profile="true">
             <topic>
                 <kind>WITH_KEY</kind>
@@ -251,8 +259,7 @@
                 <resourceLimitsQos>
                     <max_samples>52</max_samples>
                     <max_instances>25</max_instances>
-                    <max_samples_per_instance>
-                    32</max_samples_per_instance>
+                    <max_samples_per_instance>32</max_samples_per_instance>
                     <allocated_samples>37</allocated_samples>
                 </resourceLimitsQos>
             </topic>
@@ -317,7 +324,8 @@
                     </udpv4>
                 </locator>
                 <locator>
-                    <udpv4></udpv4>
+                    <udpv4>
+                    </udpv4>
                 </locator>
                 <locator>
                     <udpv4>
@@ -336,5 +344,54 @@
                 <increment>0</increment>
             </matchedPublishersAllocation>
         </subscriber>
+
+        <requester profile_name="test_requester_profile"
+                   service_name="service_name"
+                   request_type="request_type"
+                   reply_type="reply_type">
+            <publisher>
+                <topic>
+                    <name>otherSamplePubSubTopic</name>
+                    <dataType>otherSamplePubSubTopicType</dataType>
+                </topic>
+                <qos>
+                    <durability>
+                        <kind>PERSISTENT</kind>
+                    </durability>
+                </qos>
+            </publisher>
+            <subscriber>
+                <qos>
+                    <durability>
+                        <kind>PERSISTENT</kind>
+                    </durability>
+                </qos>
+            </subscriber>
+        </requester>
+        <replier profile_name="test_replier_profile"
+                 service_name="service_name"
+                 request_type="request_type"
+                 reply_type="reply_type">
+            <request_topic_name>request_topic_name</request_topic_name>
+            <reply_topic_name>reply_topic_name</reply_topic_name>
+            <publisher>
+                <topic>
+                    <name>otherSamplePubSubTopic</name>
+                    <dataType>otherSamplePubSubTopicType</dataType>
+                </topic>
+                <qos>
+                    <liveliness>
+                        <kind>MANUAL_BY_TOPIC</kind>
+                    </liveliness>
+                </qos>
+            </publisher>
+            <subscriber>
+                <qos>
+                    <liveliness>
+                        <kind>MANUAL_BY_TOPIC</kind>
+                    </liveliness>
+                </qos>
+            </subscriber>
+        </replier>
     </profiles>
 </dds>

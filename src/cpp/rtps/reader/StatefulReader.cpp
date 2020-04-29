@@ -17,19 +17,19 @@
  *
  */
 
-#include <fastrtps/rtps/reader/StatefulReader.h>
-#include <fastrtps/rtps/reader/ReaderListener.h>
-#include <fastrtps/rtps/history/ReaderHistory.h>
-#include <fastrtps/log/Log.h>
-#include <fastrtps/rtps/messages/RTPSMessageCreator.h>
-#include "../participant/RTPSParticipantImpl.h"
-#include "WriterProxy.h"
+#include <fastdds/rtps/reader/StatefulReader.h>
+#include <fastdds/rtps/reader/ReaderListener.h>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/messages/RTPSMessageCreator.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/reader/WriterProxy.h>
 #include <fastrtps/utils/TimeConversion.h>
-#include "../history/HistoryAttributesExtension.hpp"
+#include <rtps/history/HistoryAttributesExtension.hpp>
 
-#include <fastrtps/rtps/builtin/BuiltinProtocols.h>
-#include <fastrtps/rtps/builtin/liveliness/WLP.h>
-#include <fastrtps/rtps/writer/LivelinessManager.h>
+#include <fastdds/rtps/builtin/BuiltinProtocols.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/writer/LivelinessManager.h>
 
 #include "rtps/RTPSDomainImpl.hpp"
 
@@ -214,7 +214,7 @@ bool StatefulReader::matched_writer_remove(
 
                 wproxy = *it;
                 matched_writers_.erase(it);
-                remove_persistence_guid(wproxy->guid(), wproxy->attributes().persistence_guid());
+                remove_persistence_guid(wproxy->guid(), wproxy->persistence_guid());
                 break;
             }
         }
@@ -311,7 +311,7 @@ bool StatefulReader::processDataMsg(
         if (liveliness_lease_duration_ < c_TimeInfinite)
         {
             if (liveliness_kind_ == MANUAL_BY_TOPIC_LIVELINESS_QOS ||
-                    pWP->attributes().m_qos.m_liveliness.kind == MANUAL_BY_TOPIC_LIVELINESS_QOS)
+                    pWP->liveliness_kind() == MANUAL_BY_TOPIC_LIVELINESS_QOS)
             {
                 auto wlp = this->mp_RTPSParticipant->wlp();
                 if (wlp != nullptr)
@@ -377,7 +377,6 @@ bool StatefulReader::processDataMsg(
                 releaseCache(change_to_add);
             }
         }
-
         return true;
     }
 
@@ -406,7 +405,7 @@ bool StatefulReader::processDataFragMsg(
         if (liveliness_lease_duration_ < c_TimeInfinite)
         {
             if (liveliness_kind_ == MANUAL_BY_TOPIC_LIVELINESS_QOS ||
-                    pWP->attributes().m_qos.m_liveliness.kind == MANUAL_BY_TOPIC_LIVELINESS_QOS)
+                    pWP->liveliness_kind() == MANUAL_BY_TOPIC_LIVELINESS_QOS)
             {
                 auto wlp = this->mp_RTPSParticipant->wlp();
                 if ( wlp != nullptr)
@@ -541,7 +540,7 @@ bool StatefulReader::processHeartbeatMsg(
                 if (liveliness_lease_duration_ < c_TimeInfinite)
                 {
                     if (liveliness_kind_ == MANUAL_BY_TOPIC_LIVELINESS_QOS ||
-                            writer->attributes().m_qos.m_liveliness.kind == MANUAL_BY_TOPIC_LIVELINESS_QOS)
+                            writer->liveliness_kind() == MANUAL_BY_TOPIC_LIVELINESS_QOS)
                     {
                         auto wlp = this->mp_RTPSParticipant->wlp();
                         if ( wlp != nullptr)
@@ -562,7 +561,6 @@ bool StatefulReader::processHeartbeatMsg(
             // Maybe now we have to notify user from new CacheChanges.
             NotifyChanges(writer);
         }
-
         return true;
     }
 
@@ -587,14 +585,20 @@ bool StatefulReader::processGapMsg(
         // TODO (Miguel C): Refactor this inside WriterProxy
         SequenceNumber_t auxSN;
         SequenceNumber_t finalSN = gapList.base() - 1;
+        History::const_iterator history_iterator = mp_history->changesBegin();
         for (auxSN = gapStart; auxSN <= finalSN; auxSN++)
         {
             if (pWP->irrelevant_change_set(auxSN))
             {
-                CacheChange_t* to_remove = findCacheInFragmentedProcess(auxSN, pWP->guid());
+                CacheChange_t* to_remove = nullptr;
+                auto ret_iterator = findCacheInFragmentedProcess(auxSN, pWP->guid(), &to_remove, history_iterator);
                 if (to_remove != nullptr)
                 {
-                    mp_history->remove_change(to_remove);
+                    history_iterator = mp_history->remove_change_nts(to_remove, ret_iterator);
+                }
+                else if (ret_iterator != mp_history->changesEnd())
+                {
+                    history_iterator = ret_iterator;
                 }
             }
         }
@@ -603,10 +607,15 @@ bool StatefulReader::processGapMsg(
         {
             if (pWP->irrelevant_change_set(it))
             {
-                CacheChange_t* to_remove = findCacheInFragmentedProcess(auxSN, pWP->guid());
+                CacheChange_t* to_remove = nullptr;
+                auto ret_iterator = findCacheInFragmentedProcess(auxSN, pWP->guid(), &to_remove, history_iterator);
                 if (to_remove != nullptr)
                 {
-                    mp_history->remove_change(to_remove);
+                    history_iterator = mp_history->remove_change_nts(to_remove, ret_iterator);
+                }
+                else if (ret_iterator != mp_history->changesEnd())
+                {
+                    history_iterator = ret_iterator;
                 }
             }
         });
@@ -667,6 +676,7 @@ bool StatefulReader::change_removed_by_history(
                     }
                 }
 
+
                 wp->change_removed_from_history(a_change->sequenceNumber);
             }
             return true;
@@ -705,6 +715,7 @@ bool StatefulReader::change_received(
                 {
                     if (mp_history->received_change(a_change, 0))
                     {
+                        Time_t::now(a_change->receptionTimestamp);
                         update_last_notified(a_change->writerGUID, a_change->sequenceNumber);
                         if (getListener() != nullptr)
                         {
@@ -727,6 +738,7 @@ bool StatefulReader::change_received(
     // inside the call to mp_history->received_change
     if (mp_history->received_change(a_change, unknown_missing_changes_up_to))
     {
+        Time_t::now(a_change->receptionTimestamp);
         GUID_t proxGUID = prox->guid();
 
         // If KEEP_LAST and history full, make older changes as lost.
@@ -1010,12 +1022,18 @@ void StatefulReader::send_acknack(
         {
             GUID_t guid = sender.remote_guids().at(0);
             SequenceNumberSet_t sns(writer->available_changes_max() + 1);
+            History::const_iterator history_iterator = mp_history->changesBegin();
 
             missing_changes.for_each(
                 [&](const SequenceNumber_t& seq)
             {
                 // Check if the CacheChange_t is uncompleted.
-                CacheChange_t* uncomplete_change = findCacheInFragmentedProcess(seq, guid);
+                CacheChange_t* uncomplete_change = nullptr;
+                auto ret_iterator = findCacheInFragmentedProcess(seq, guid, &uncomplete_change, history_iterator);
+                if (ret_iterator != mp_history->changesEnd())
+                {
+                    history_iterator = ret_iterator;
+                }
                 if (uncomplete_change == nullptr)
                 {
                     if (!sns.add(seq))
@@ -1052,8 +1070,9 @@ void StatefulReader::send_acknack(
 
 bool StatefulReader::send_sync_nts(
         CDRMessage_t* message,
-        const Locator_t& locator,
+        const Locators& locators_begin,
+        const Locators& locators_end,
         std::chrono::steady_clock::time_point& max_blocking_time_point)
 {
-    return mp_RTPSParticipant->sendSync(message, locator, max_blocking_time_point);
+    return mp_RTPSParticipant->sendSync(message, locators_begin, locators_end, max_blocking_time_point);
 }

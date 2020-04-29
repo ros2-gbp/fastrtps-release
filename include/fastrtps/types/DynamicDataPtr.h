@@ -33,17 +33,27 @@ public:
     using Base::operator*;
     using Base::operator bool;
 
-    DynamicData_ptr()
+    RTPS_DllAPI DynamicData_ptr()
     {
     }
 
-    RTPS_DllAPI DynamicData_ptr(DynamicData* pData);
+    RTPS_DllAPI explicit DynamicData_ptr(
+            DynamicData* pData);
 
-    RTPS_DllAPI DynamicData_ptr(const DynamicData_ptr& other) = default;
-    RTPS_DllAPI DynamicData_ptr(DynamicData_ptr&& other) = default;
+    RTPS_DllAPI DynamicData_ptr(
+            const DynamicData_ptr& other) = default;
 
-    RTPS_DllAPI DynamicData_ptr& operator=(const DynamicData_ptr&) = default;
-    RTPS_DllAPI DynamicData_ptr& operator=(DynamicData_ptr&&) = default;
+    RTPS_DllAPI DynamicData_ptr(
+            DynamicData_ptr&& other) = default;
+
+    RTPS_DllAPI DynamicData_ptr& operator =(
+            const DynamicData_ptr&) = default;
+
+    RTPS_DllAPI DynamicData_ptr& operator =(
+            DynamicData_ptr&&) = default;
+
+    RTPS_DllAPI DynamicData_ptr& operator =(
+            DynamicData*);
 };
 
 } // namespace types

@@ -18,20 +18,20 @@
  */
 
 
-#include <fastrtps/log/Log.h>
-#include <fastrtps/rtps/history/WriterHistory.h>
-#include <fastrtps/rtps/writer/ReaderProxy.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
-#include <fastrtps/rtps/resources/TimedEvent.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/history/WriterHistory.h>
+#include <fastdds/rtps/writer/ReaderProxy.h>
+#include <fastdds/rtps/writer/StatefulWriter.h>
+#include <fastdds/rtps/resources/TimedEvent.h>
 #include <fastrtps/utils/TimeConversion.h>
-#include <fastrtps/rtps/common/LocatorListComparisons.hpp>
-#include "../participant/RTPSParticipantImpl.h"
+#include <fastdds/rtps/common/LocatorListComparisons.hpp>
+
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/history/HistoryAttributesExtension.hpp>
 
 #include <mutex>
 #include <cassert>
 #include <algorithm>
-
-#include "../history/HistoryAttributesExtension.hpp"
 
 namespace eprosima {
 namespace fastrtps {
@@ -43,7 +43,10 @@ ReaderProxy::ReaderProxy(
         StatefulWriter* writer)
     : is_active_(false)
     , locator_info_(writer->getRTPSParticipant(), loc_alloc.max_unicast_locators, loc_alloc.max_multicast_locators)
-    , reader_attributes_(loc_alloc.max_unicast_locators, loc_alloc.max_multicast_locators)
+    , durability_kind_(VOLATILE)
+    , expects_inline_qos_(false)
+    , is_reliable_(false)
+    , disable_positive_acks_(false)
     , writer_(writer)
     , changes_for_reader_(resource_limits_from_history(writer->mp_history->m_att, 0))
     , nack_supression_event_(nullptr)
@@ -53,29 +56,19 @@ ReaderProxy::ReaderProxy(
     , last_nackfrag_count_(0)
 {
     nack_supression_event_ = new TimedEvent(writer_->getRTPSParticipant()->getEventResource(),
-                    [&](TimedEvent::EventCode code) -> bool
+            [&]() -> bool
+            {
+                writer_->perform_nack_supression(guid());
+                return false;
+            },
+            TimeConv::Time_t2MilliSecondsDouble(times.nackSupressionDuration));
+
+    initial_heartbeat_event_ = new TimedEvent(writer_->getRTPSParticipant()->getEventResource(),
+            [&]() -> bool
                 {
-                    if (TimedEvent::EVENT_SUCCESS == code)
-                    {
-                        writer_->perform_nack_supression(reader_attributes_.guid());
-                    }
-
+                    writer_->intraprocess_heartbeat(this);
                     return false;
-                },
-                    TimeConv::Time_t2MilliSecondsDouble(times.nackSupressionDuration));
-
-    initial_heartbeat_event_ =
-            new TimedEvent(writer->getRTPSParticipant()->getEventResource(), [&](
-                        TimedEvent::EventCode code) -> bool
-                {
-                    if (TimedEvent::EVENT_SUCCESS == code)
-                    {
-                        writer_->intraprocess_heartbeat(this);
-                    }
-
-                    return false;
-                },
-                    0);
+                }, 0);
 
     stop();
 }
@@ -105,10 +98,17 @@ void ReaderProxy::start(
         reader_attributes.m_expectsInlineQos);
 
     is_active_ = true;
-    reader_attributes_ = reader_attributes;
+    durability_kind_ = reader_attributes.m_qos.m_durability.durabilityKind();
+    expects_inline_qos_ = reader_attributes.m_expectsInlineQos;
+    is_reliable_ = reader_attributes.m_qos.m_reliability.kind != BEST_EFFORT_RELIABILITY_QOS;
+    disable_positive_acks_ = reader_attributes.disable_positive_acks();
+    acked_changes_set(SequenceNumber_t());  // Simulate initial acknack to set low mark
 
     timers_enabled_.store(is_remote_and_reliable());
-    initial_heartbeat_event_->restart_timer();
+    if (is_local_reader())
+    {
+        initial_heartbeat_event_->restart_timer();
+    }
 
     logInfo(RTPS_WRITER, "Reader Proxy started");
 }
@@ -116,15 +116,11 @@ void ReaderProxy::start(
 bool ReaderProxy::update(
         const ReaderProxyData& reader_attributes)
 {
-    if ((reader_attributes_.m_qos == reader_attributes.m_qos) &&
-            (reader_attributes_.remote_locators().unicast == reader_attributes.remote_locators().unicast) &&
-            (reader_attributes_.remote_locators().multicast == reader_attributes.remote_locators().multicast) &&
-            (reader_attributes_.m_expectsInlineQos == reader_attributes.m_expectsInlineQos))
-    {
-        return false;
-    }
+    durability_kind_ = reader_attributes.m_qos.m_durability.durabilityKind();
+    expects_inline_qos_ = reader_attributes.m_expectsInlineQos;
+    is_reliable_ = reader_attributes.m_qos.m_reliability.kind != BEST_EFFORT_RELIABILITY_QOS;
+    disable_positive_acks_ = reader_attributes.disable_positive_acks();
 
-    reader_attributes_ = reader_attributes;
     locator_info_.update(
         reader_attributes.remote_locators().unicast,
         reader_attributes.remote_locators().multicast,
@@ -135,9 +131,8 @@ bool ReaderProxy::update(
 
 void ReaderProxy::stop()
 {
-    locator_info_.stop(reader_attributes_.guid());
+    locator_info_.stop(guid());
     is_active_ = false;
-    reader_attributes_.guid(c_Guid_Unknown);
     disable_timers();
 
     changes_for_reader_.clear();
@@ -216,7 +211,7 @@ void ReaderProxy::add_change(
         // This should never happen
         assert(false);
         logError(RTPS_WRITER, "Error adding change " << change.getSequenceNumber() << " to reader proxy " << \
-                reader_attributes_.guid());
+                guid());
     }
 }
 
@@ -245,6 +240,31 @@ bool ReaderProxy::change_is_acked(
     return !chit->isRelevant() || chit->getStatus() == ACKNOWLEDGED;
 }
 
+bool ReaderProxy::change_is_unsent(
+        const SequenceNumber_t& seq_num,
+        bool& is_irrelevant) const
+{
+    if (seq_num <= changes_low_mark_ || changes_for_reader_.empty())
+    {
+        return false;
+    }
+
+    ChangeConstIterator chit = find_change(seq_num);
+     if (chit == changes_for_reader_.end())
+    {
+        // There is a hole in changes_for_reader_
+        // This means a change was removed.
+        return false;
+    }
+
+    if (chit->isRelevant())
+    {
+        is_irrelevant = false;
+    }
+
+    return chit->getStatus() == UNSENT;
+}
+
 void ReaderProxy::acked_changes_set(
         const SequenceNumber_t& seq_num)
 {
@@ -253,6 +273,14 @@ void ReaderProxy::acked_changes_set(
     if (seq_num > changes_low_mark_)
     {
         ChangeIterator chit = find_change(seq_num, false);
+        // continue advancing until next change is not acknowledged
+        while (chit != changes_for_reader_.end()
+                && chit->getSequenceNumber() == future_low_mark
+                && chit->getStatus() == ACKNOWLEDGED)
+        {
+            ++chit;
+            ++future_low_mark;
+        }
         changes_for_reader_.erase(changes_for_reader_.begin(), chit);
     }
     else
@@ -262,9 +290,9 @@ void ReaderProxy::acked_changes_set(
         if (seq_num == SequenceNumber_t())
         {
             // Special case. Currently only used on Builtin StatefulWriters
-            // after losing lease duration.
+            // after losing lease duration, and on late joiners to set
+            // changes_low_mark_ to match that of the writer.
             SequenceNumber_t min_sequence = writer_->get_seq_num_min();
-
             if (min_sequence != SequenceNumber_t::unknown())
             {
                 SequenceNumber_t current_sequence = seq_num;
@@ -299,16 +327,18 @@ void ReaderProxy::acked_changes_set(
                         }
                     }
                 }
-
                 // Keep changes sorted by sequence number
                 if (should_sort)
                 {
                     std::sort(changes_for_reader_.begin(), changes_for_reader_.end(), ChangeForReaderCmp());
                 }
             }
+            else if (!is_local_reader())
+            {
+                future_low_mark = writer_->next_sequence_number();
+            }
         }
     }
-
     changes_low_mark_ = future_low_mark - 1;
 }
 
@@ -529,7 +559,7 @@ bool ReaderProxy::process_nack_frag(
         const SequenceNumber_t& seq_num,
         const FragmentNumberSet_t& fragments_state)
 {
-    if (reader_attributes_.guid() == reader_guid)
+    if (guid() == reader_guid)
     {
         if (last_nackfrag_count_ < nack_count)
         {

@@ -40,6 +40,10 @@ using subscriber_map_t = std::map<std::string, up_subscriber_t>;
 using subs_map_iterator_t = subscriber_map_t::iterator;
 using topic_map_t = std::map<std::string, up_topic_t>;
 using topic_map_iterator_t = topic_map_t::iterator;
+using requester_map_t = std::map<std::string, up_requester_t>;
+using requester_map_iterator_t = requester_map_t::iterator;
+using replier_map_t = std::map<std::string, up_replier_t>;
+using replier_map_iterator_t = replier_map_t::iterator;
 using xmlfiles_map_t = std::map<std::string, XMLP_ret>;
 using xmlfile_map_iterator_t = xmlfiles_map_t::iterator;
 
@@ -107,8 +111,8 @@ public:
      * Search for the profile specified and fill the structure.
      * @param profile_name Name for the profile to be used to fill the structure.
      * @param atts Structure to be filled.
-     * @param log_error Flag to log an error if the profile_name is not found. Defaults true.
-     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case.
+     * @param log_error Flag to log an error if the profile_name is not found.
+     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case. Defaults true.
      */
     RTPS_DllAPI static XMLP_ret fillParticipantAttributes(
             const std::string& profile_name,
@@ -123,8 +127,8 @@ public:
      * Search for the profile specified and fill the structure.
      * @param profile_name Name for the profile to be used to fill the structure.
      * @param atts Structure to be filled.
-     * @param log_error Flag to log an error if the profile_name is not found. Defaults true.
-     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case.
+     * @param log_error Flag to log an error if the profile_name is not found.
+     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case. Defaults true.
      */
     RTPS_DllAPI static XMLP_ret fillPublisherAttributes(
             const std::string& profile_name,
@@ -139,8 +143,8 @@ public:
      * Search for the profile specified and fill the structure.
      * @param profile_name Name for the profile to be used to fill the structure.
      * @param atts Structure to be filled.
-     * @param log_error Flag to log an error if the profile_name is not found. Defaults true.
-     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case.
+     * @param log_error Flag to log an error if the profile_name is not found.
+     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case. Defaults true.
      */
     RTPS_DllAPI static XMLP_ret fillSubscriberAttributes(
             const std::string& profile_name,
@@ -183,6 +187,27 @@ public:
     RTPS_DllAPI static p_dynamictypebuilder_t getDynamicTypeByName(
             const std::string& type_name);
 
+
+    /**
+     * Search for the profile specified and fill the structure.
+     * @param profile_name Name for the profile to be used to fill the structure.
+     * @param atts Structure to be filled.
+     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case.
+     */
+    RTPS_DllAPI static XMLP_ret fillRequesterAttributes(
+            const std::string& profile_name,
+            RequesterAttributes& atts);
+
+    /**
+     * Search for the profile specified and fill the structure.
+     * @param profile_name Name for the profile to be used to fill the structure.
+     * @param atts Structure to be filled.
+     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case.
+     */
+    RTPS_DllAPI static XMLP_ret fillReplierAttributes(
+            const std::string& profile_name,
+            ReplierAttributes& atts);
+
     /**
      * Deletes the XMLProsileManager instance.
      * FastRTPS's Domain calls this method automatically on its destructor, but
@@ -195,12 +220,6 @@ public:
         subscriber_profiles_.clear();
         xml_files_.clear();
         transport_profiles_.clear();
-
-        for (auto pair : dynamic_types_)
-        {
-            types::DynamicTypeBuilderFactory::get_instance()->delete_builder(pair.second);
-        }
-        dynamic_types_.clear();
     }
 
     /**
@@ -254,6 +273,14 @@ private:
             up_base_node_t& profile,
             const std::string& filename);
 
+    RTPS_DllAPI static XMLP_ret extractRequesterProfile(
+            up_base_node_t& profile,
+            const std::string& filename);
+
+    RTPS_DllAPI static XMLP_ret extractReplierProfile(
+            up_base_node_t& profile,
+            const std::string& filename);
+
     static BaseNode* root;
 
     static LibrarySettingsAttributes library_settings_;
@@ -265,6 +292,10 @@ private:
     static subscriber_map_t subscriber_profiles_;
 
     static topic_map_t topic_profiles_;
+
+    static requester_map_t requester_profiles_;
+
+    static replier_map_t replier_profiles_;
 
     static xmlfiles_map_t xml_files_;
 

@@ -17,22 +17,24 @@
  *
  */
 
-#include <fastrtps/rtps/builtin/BuiltinProtocols.h>
-#include <fastrtps/rtps/common/Locator.h>
+#include <fastdds/rtps/builtin/BuiltinProtocols.h>
+#include <fastdds/rtps/common/Locator.h>
 
-#include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
-#include <fastrtps/rtps/builtin/discovery/participant/PDPClient.h>
-#include <fastrtps/rtps/builtin/discovery/participant/PDPServer.h>
-#include <fastrtps/rtps/builtin/discovery/endpoint/EDP.h>
-#include <fastrtps/rtps/builtin/discovery/endpoint/EDPStatic.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPClient.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPServer.h>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDPStatic.h>
 
-#include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
+#include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 
-#include <fastrtps/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
 
-#include "../participant/RTPSParticipantImpl.h"
+#include <fastdds/dds/builtin/typelookup/TypeLookupManager.hpp>
 
-#include <fastrtps/log/Log.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
+
+#include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/utils/IPFinder.h>
 
 #include <algorithm>
@@ -50,8 +52,9 @@ BuiltinProtocols::BuiltinProtocols()
     : mp_participantImpl(nullptr)
     , mp_PDP(nullptr)
     , mp_WLP(nullptr)
-    {
-    }
+    , tlm_(nullptr)
+{
+}
 
 BuiltinProtocols::~BuiltinProtocols()
 {
@@ -62,8 +65,9 @@ BuiltinProtocols::~BuiltinProtocols()
     }
 
     // TODO Auto-generated destructor stub
-    delete(mp_WLP);
-    delete(mp_PDP);
+    delete mp_WLP;
+    delete tlm_;
+    delete mp_PDP;
 
 }
 
@@ -78,6 +82,8 @@ bool BuiltinProtocols::initBuiltinProtocols(
     m_metatrafficMulticastLocatorList = m_att.metatrafficMulticastLocatorList;
     m_initialPeersList = m_att.initialPeersList;
     m_DiscoveryServers = m_att.discovery_config.m_DiscoveryServers;
+
+    transform_server_remote_locators(p_part->network_factory());
 
     const RTPSParticipantAllocationAttributes& allocation = p_part->getRTPSParticipantAttributes().allocation;
 
@@ -103,11 +109,11 @@ bool BuiltinProtocols::initBuiltinProtocols(
         case DiscoveryProtocol_t::SERVER:
             mp_PDP = new PDPServer(this, allocation, DurabilityKind_t::TRANSIENT_LOCAL);
             break;
-
+#if HAVE_SQLITE3
         case DiscoveryProtocol_t::BACKUP:
             mp_PDP = new PDPServer(this, allocation, DurabilityKind_t::TRANSIENT);
             break;
-
+#endif
         default:
             logError(RTPS_PDP, "Unknown DiscoveryProtocol_t specified.");
             return false;
@@ -125,7 +131,14 @@ bool BuiltinProtocols::initBuiltinProtocols(
         mp_WLP->initWL(mp_participantImpl);
     }
 
-    if(m_att.discovery_config.discoveryProtocol == DiscoveryProtocol_t::SIMPLE ||
+    // TypeLookupManager
+    if (m_att.typelookup_config.use_client || m_att.typelookup_config.use_server)
+    {
+        tlm_ = new fastdds::dds::builtin::TypeLookupManager(this);
+        tlm_->init_typelookup_service(mp_participantImpl);
+    }
+
+    if (m_att.discovery_config.discoveryProtocol == DiscoveryProtocol_t::SIMPLE ||
             m_att.discovery_config.discoveryProtocol == DiscoveryProtocol_t::CLIENT)
     {
         mp_PDP->enable();
@@ -141,6 +154,22 @@ bool BuiltinProtocols::updateMetatrafficLocators(LocatorList_t& loclist)
 {
     m_metatrafficUnicastLocatorList = loclist;
     return true;
+}
+
+void BuiltinProtocols::transform_server_remote_locators(
+        NetworkFactory & nf)
+{
+    for(RemoteServerAttributes & rs : m_DiscoveryServers)
+    {
+        for(Locator_t & loc : rs.metatrafficUnicastLocatorList)
+        {
+            Locator_t localized;
+            if(nf.transform_remote_locator(loc, localized))
+            {
+                loc = localized;
+            }
+        }
+    }
 }
 
 bool BuiltinProtocols::addLocalWriter(

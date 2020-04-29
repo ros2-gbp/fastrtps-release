@@ -19,7 +19,8 @@ namespace eprosima {
 namespace fastrtps {
 namespace xmlparser {
 
-#define draw(ident, text, ...) for (uint8_t i = ident + 1; i > 0; --i) (i == 1)? printf(text, ## __VA_ARGS__): printf("\t")
+#define draw(ident, text, ...) for (uint8_t i = ident + 1; i > 0; --i) (i == 1) ? printf(text, ## __VA_ARGS__) : printf( \
+            "\t")
 
 /**
  * Enum class XMLP_ret, used to provide a strongly typed result from the operations within this module.
@@ -48,6 +49,8 @@ extern const char* SUBSCRIBER;
 extern const char* RTPS;
 extern const char* TYPES;
 extern const char* LOG;
+extern const char* REQUESTER;
+extern const char* REPLIER;
 
 extern const char* TRANSPORT_DESCRIPTOR;
 extern const char* TRANSPORT_ID;
@@ -70,6 +73,14 @@ extern const char* METADATA_LOGICAL_PORT;
 extern const char* LISTENING_PORTS;
 extern const char* CALCULATE_CRC;
 extern const char* CHECK_CRC;
+extern const char* SEGMENT_SIZE;
+extern const char* PORT_QUEUE_CAPACITY;
+extern const char* PORT_OVERFLOW_POLICY;
+extern const char* SEGMENT_OVERFLOW_POLICY;
+extern const char* HEALTHY_CHECK_TIMEOUT_MS;
+extern const char* DISCARD;
+extern const char* FAIL;
+extern const char* RTPS_DUMP_FILE;
 
 // IntraprocessDeliveryType
 extern const char* OFF;
@@ -113,6 +124,12 @@ extern const char* MAX_MULTICAST_LOCATORS;
 extern const char* TOTAL_PARTICIPANTS;
 extern const char* TOTAL_READERS;
 extern const char* TOTAL_WRITERS;
+extern const char* SEND_BUFFERS;
+extern const char* PREALLOCATED_NUMBER;
+extern const char* DYNAMIC_LC;
+extern const char* MAX_PROPERTIES;
+extern const char* MAX_USER_DATA;
+extern const char* MAX_PARTITIONS;
 
 /// Publisher-subscriber attributes
 extern const char* TOPIC;
@@ -139,6 +156,7 @@ extern const char* PROPAGATE;
 extern const char* PREALLOCATED;
 extern const char* PREALLOCATED_WITH_REALLOC;
 extern const char* DYNAMIC;
+extern const char* DYNAMIC_REUSABLE;
 extern const char* LOCATOR;
 extern const char* UDPv4_LOCATOR;
 extern const char* UDPv6_LOCATOR;
@@ -153,6 +171,7 @@ extern const char* UDPv4;
 extern const char* UDPv6;
 extern const char* TCPv4;
 extern const char* TCPv6;
+extern const char* SHM;
 extern const char* INIT_ACKNACK_DELAY;
 extern const char* HEARTB_RESP_DELAY;
 extern const char* INIT_HEARTB_DELAY;
@@ -268,6 +287,8 @@ extern const char* PUBREADER_SUBWRITER;
 extern const char* STATIC_ENDPOINT_XML;
 extern const char* READER_HIST_MEM_POLICY;
 extern const char* WRITER_HIST_MEM_POLICY;
+extern const char* READER_PAYLOAD_SIZE;
+extern const char* WRITER_PAYLOAD_SIZE;
 extern const char* MUTATION_TRIES;
 extern const char* ACCESS_SCOPE;
 extern const char* ENABLED;
@@ -311,6 +332,9 @@ extern const char* BOOLEAN;
 extern const char* CHAR;
 extern const char* WCHAR;
 extern const char* TBYTE;
+extern const char* OCTET;
+extern const char* UINT8;
+extern const char* INT8;
 extern const char* SHORT;
 extern const char* LONG;
 extern const char* USHORT;
@@ -402,6 +426,13 @@ extern const char* TLS_VERIFY_NONE;
 extern const char* TLS_VERIFY_PEER;
 extern const char* TLS_VERIFY_FAIL_IF_NO_PEER_CERT;
 extern const char* TLS_VERIFY_CLIENT_ONCE;
+
+// Requester and Replier
+extern const char* SERVICE_NAME;
+extern const char* REQUEST_TYPE;
+extern const char* REPLY_TYPE;
+extern const char* REQUEST_TOPIC_NAME;
+extern const char* REPLY_TOPIC_NAME;
 
 } /* xmlparser */
 } /* namespace */

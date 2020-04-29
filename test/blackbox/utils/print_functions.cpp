@@ -14,10 +14,18 @@
 
 #include "../BlackboxTests.hpp"
 
+#include <iostream>
+
 template<>
 void default_receive_print(const HelloWorld& hello)
 {
     std::cout << "Received HelloWorld " << hello.index() << std::endl;
+}
+
+template<>
+void default_receive_print(const KeyedHelloWorld& hello)
+{
+    std::cout << "Received HelloWorld " << hello.index() << " with key " << hello.key() << std::endl;
 }
 
 template<>
@@ -55,6 +63,12 @@ template<>
 void default_send_print(const HelloWorld& hello)
 {
     std::cout << "Sent HelloWorld " << hello.index() << std::endl;
+}
+
+template<>
+void default_send_print(const KeyedHelloWorld& hello)
+{
+    std::cout << "Sent HelloWorld " << hello.index() << " with key " << hello.key() << std::endl;
 }
 
 template<>

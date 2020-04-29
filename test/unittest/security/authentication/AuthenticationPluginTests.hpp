@@ -15,7 +15,7 @@
 #ifndef _UNITTEST_SECURITY_AUTHENTICATION_AUTHENTICATIONPLUGINTESTS_HPP_
 #define _UNITTEST_SECURITY_AUTHENTICATION_AUTHENTICATIONPLUGINTESTS_HPP_
 
-#include "../../../../src/cpp/security/authentication/PKIDH.h"
+#include "../../../../src/cpp/fastrtps_deprecated/security/authentication/PKIDH.h"
 
 // Include first necessary mocks
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
@@ -195,7 +195,7 @@ TEST_F(AuthenticationPluginTest, handshake_process_ok)
     eprosima::fastrtps::rtps::security::HandshakeMessageToken *handshake_message = nullptr;
     eprosima::fastrtps::rtps::ParticipantProxyData participant_data1(eprosima::fastrtps::rtps::c_default_RTPSParticipantAllocationAttributes);
     participant_data1.m_guid = adjusted_participant_key1;
-    eprosima::fastrtps::rtps::CDRMessage_t auxMsg;
+    eprosima::fastrtps::rtps::CDRMessage_t auxMsg(RTPSMESSAGE_DEFAULT_SIZE);
     auxMsg.msg_endian = eprosima::fastrtps::rtps::BIGEND;
     ASSERT_TRUE(participant_data1.writeToCDRMessage(&auxMsg, false));
 

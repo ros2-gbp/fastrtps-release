@@ -20,10 +20,10 @@
 #ifndef PARTICIPANTATTRIBUTES_H_
 #define PARTICIPANTATTRIBUTES_H_
 
-#include "../rtps/attributes/RTPSParticipantAttributes.h"
+#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 
-namespace eprosima{
-namespace fastrtps{
+namespace eprosima {
+namespace fastrtps {
 
 /**
  * Class ParticipantAttributes, used by the user to define the attributes of a Participant.
@@ -33,18 +33,28 @@ namespace fastrtps{
  */
 class ParticipantAttributes
 {
-    public:
-        //!Attributes of the associated RTPSParticipant.
-        rtps::RTPSParticipantAttributes rtps;
+public:
 
-        ParticipantAttributes() {}
+    //! DomainId to be used by the associated RTPSParticipant (default: 0)
+    uint32_t domainId = 0;
 
-        virtual ~ParticipantAttributes() {}
+    //!Attributes of the associated RTPSParticipant.
+    rtps::RTPSParticipantAttributes rtps;
 
-        bool operator==(const ParticipantAttributes& b) const
-        {
-            return (this->rtps == b.rtps);
-        }
+    ParticipantAttributes()
+    {
+    }
+
+    virtual ~ParticipantAttributes()
+    {
+    }
+
+    bool operator ==(
+            const ParticipantAttributes& b) const
+    {
+        return (this->rtps == b.rtps);
+    }
+
 };
 
 }

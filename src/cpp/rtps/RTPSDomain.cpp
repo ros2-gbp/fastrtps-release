@@ -17,35 +17,49 @@
  *
  */
 
-#include <fastrtps/rtps/RTPSDomain.h>
+#include <fastdds/rtps/RTPSDomain.h>
 
-#include <fastrtps/rtps/participant/RTPSParticipant.h>
-#include "participant/RTPSParticipantImpl.h"
+#include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
 
-#include <fastrtps/log/Log.h>
+#include <fastdds/dds/log/Log.hpp>
 
-#include <fastrtps/transport/UDPv4Transport.h>
-#include <fastrtps/transport/UDPv6Transport.h>
-#include <fastrtps/transport/test_UDPv4Transport.h>
+#include <fastdds/rtps/transport/UDPv4Transport.h>
+#include <fastdds/rtps/transport/UDPv6Transport.h>
+#include <fastdds/rtps/transport/test_UDPv4Transport.h>
 
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/utils/System.h>
 #include <fastrtps/utils/md5.h>
 
-#include <fastrtps/rtps/writer/RTPSWriter.h>
-#include <fastrtps/rtps/reader/RTPSReader.h>
+#include <fastdds/rtps/writer/RTPSWriter.h>
+#include <fastdds/rtps/reader/RTPSReader.h>
 
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
 #include "RTPSDomainImpl.hpp"
+#include <utils/Host.hpp>
 
 #include <chrono>
 #include <thread>
+#include <cstdlib>
+#include <regex>
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
+
+// environment variables that forces server-client discovery
+// it must contain an IPv4 address
+const char* DEFAULT_ROS2_MASTER_URI = "ROS2_AUTO_CLIENT_SERVER";
+const char* DEFAULT_FASTDDS_MASTER_URI = "FASTDDS_AUTO_CLIENT_SERVER";
+// ros environment variable pattern, example: 192.168.2.23:24353 where the port is optional
+const std::regex ROS2_IPV4_PATTERN(R"(^((?:[0-9]{1,3}\.){3}[0-9]{1,3})?:?(?:(\d+))?$)");
+// port use if the ros environment variable doesn't specified one
+const int DEFAULT_ROS2_SERVER_PORT = 11311;
+// default server guidPrefix
+const char* DEFAULT_AUTO_SERVER_GUIDPREFIX = "41.55.54.4F.5F.43.4C.54.5F.53.56.52";
 
 std::mutex RTPSDomain::m_mutex;
 std::atomic<uint32_t> RTPSDomain::m_maxRTPSParticipantID(1);
@@ -72,6 +86,16 @@ void RTPSDomain::stopAll()
 }
 
 RTPSParticipant* RTPSDomain::createParticipant(
+        uint32_t domain_id,
+        const RTPSParticipantAttributes& attrs,
+        RTPSParticipantListener* listen)
+{
+    return createParticipant(domain_id, true, attrs, listen);
+}
+
+RTPSParticipant* RTPSDomain::createParticipant(
+        uint32_t domain_id,
+        bool enabled,
         const RTPSParticipantAttributes& attrs,
         RTPSParticipantListener* listen)
 {
@@ -81,13 +105,12 @@ RTPSParticipant* RTPSDomain::createParticipant(
 
     if (PParam.builtin.discovery_config.leaseDuration < c_TimeInfinite &&
             PParam.builtin.discovery_config.leaseDuration <=
-            PParam.builtin.discovery_config.leaseDuration_announcementperiod)                                                                                                               //TODO CHeckear si puedo ser infinito
+            PParam.builtin.discovery_config.leaseDuration_announcementperiod)
     {
         logError(RTPS_PARTICIPANT,
                 "RTPSParticipant Attributes: LeaseDuration should be >= leaseDuration announcement period");
         return nullptr;
     }
-
     uint32_t ID;
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -142,27 +165,10 @@ RTPSParticipant* RTPSDomain::createParticipant(
         guidP.value[0] = c_VendorId_eProsima[0];
         guidP.value[1] = c_VendorId_eProsima[1];
 
-        if (loc.size() > 0)
-        {
-            MD5 md5;
-            for (auto& l : loc)
-            {
-                md5.update(l.address, sizeof(l.address));
-            }
-            md5.finalize();
-            uint16_t hostid = 0;
-            for (size_t i = 0; i < sizeof(md5.digest); i += 2)
-            {
-                hostid ^= ((md5.digest[i] << 8) | md5.digest[i + 1]);
-            }
-            guidP.value[2] = octet(hostid);
-            guidP.value[3] = octet(hostid >> 8);
-        }
-        else
-        {
-            guidP.value[2] = 127;
-            guidP.value[3] = 1;
-        }
+        uint16_t host_id = Host::get().id();
+        guidP.value[2] = octet(host_id);
+        guidP.value[3] = octet(host_id >> 8);
+
         guidP.value[4] = octet(pid);
         guidP.value[5] = octet(pid >> 8);
         guidP.value[6] = octet(pid >> 16);
@@ -180,11 +186,34 @@ RTPSParticipant* RTPSDomain::createParticipant(
     // would ensure builtin endpoints are able to differentiate between a communication loss and a participant recovery
     if (PParam.prefix != c_GuidPrefix_Unknown)
     {
-        pimpl = new RTPSParticipantImpl(PParam, PParam.prefix, guidP, p, listen);
+        pimpl = new RTPSParticipantImpl(domain_id, PParam, PParam.prefix, guidP, p, listen);
     }
     else
     {
-        pimpl = new RTPSParticipantImpl(PParam, guidP, p, listen);
+        pimpl = new RTPSParticipantImpl(domain_id, PParam, guidP, p, listen);
+    }
+
+    // Above constructors create the sender resources. If a given listening port cannot be allocated an iterative
+    // mechanism will allocate another by default. Change the default listening port is unacceptable for server
+    // discovery.
+    if ((PParam.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol_t::SERVER
+         || PParam.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol_t::BACKUP)
+         && pimpl->did_mutation_took_place_on_meta(
+             PParam.builtin.metatrafficMulticastLocatorList,
+             PParam.builtin.metatrafficUnicastLocatorList))
+    {
+        // we do not log an error because the library may use participant creation as a trial for server existence
+        logInfo(RTPS_PARTICIPANT, "Server wasn't able to allocate the specified listening port");
+        delete pimpl;
+        return nullptr;
+     }
+
+    // Check there is at least one transport registered.
+    if (!pimpl->networkFactoryHasRegisteredTransports())
+    {
+        logError(RTPS_PARTICIPANT, "Cannot create participant, because there is any transport");
+        delete pimpl;
+        return nullptr;
     }
 
 #if HAVE_SECURITY
@@ -197,21 +226,16 @@ RTPSParticipant* RTPSDomain::createParticipant(
     }
 #endif
 
-    // Check there is at least one transport registered.
-    if (!pimpl->networkFactoryHasRegisteredTransports())
-    {
-        logError(RTPS_PARTICIPANT, "Cannot create participant, because there is any transport");
-        delete pimpl;
-        return nullptr;
-    }
-
     {
         std::lock_guard<std::mutex> guard(m_mutex);
         m_RTPSParticipants.push_back(t_p_RTPSParticipant(p, pimpl));
     }
 
-    // Start protocols
-    pimpl->enable();
+    if (enabled)
+    {
+        // Start protocols
+        pimpl->enable();
+    }
     return p;
 }
 
@@ -331,6 +355,150 @@ bool RTPSDomain::removeRTPSReader(
         }
     }
     return false;
+}
+
+RTPSParticipant* RTPSDomain::clientServerEnvironmentCreationOverride(
+        uint32_t domain_id,
+        const RTPSParticipantAttributes& att,
+        RTPSParticipantListener* listen /*= nullptr*/)
+{
+    // Check the specified discovery protocol: if other than simple it has priority over ros environment variable
+    if(att.builtin.discovery_config.discoveryProtocol != DiscoveryProtocol_t::SIMPLE)
+    {
+        logInfo(DOMAIN, "Detected non simple discovery protocol attributes."
+            << " Ignoring auto default client-server setup.");
+        return nullptr;
+    }
+
+    // Check for the environment variable
+    #pragma warning( push )
+    #pragma warning( disable:4996 )
+
+    std::string address;
+    const char *address_ros, *address_fastdds;
+
+    address_ros = std::getenv(DEFAULT_ROS2_MASTER_URI);
+    address_fastdds = std::getenv(DEFAULT_FASTDDS_MASTER_URI);
+
+    #pragma warning( pop )
+
+    // ros variable has preference over fastdds one
+    if( address_ros )
+    {
+        address = address_ros;
+
+        if( address_fastdds && address.compare(address_fastdds) )
+        {
+            logError(DOMAIN, "The environment variables " << DEFAULT_ROS2_MASTER_URI
+                << " and " << DEFAULT_FASTDDS_MASTER_URI << " are both present with different values."
+                << " Using configuration from " << DEFAULT_ROS2_MASTER_URI);
+        }
+    }
+    else if( address_fastdds )
+    {
+        address = address_fastdds;
+    }
+    else
+    {
+        // Back to default creation procedure
+        return nullptr;
+    }
+
+    logInfo(DOMAIN, "Detected auto client-server environment variable. Trying to setup client-server default setup.");
+
+    // Parse the IPv4Address and port.
+    std::smatch mr;
+    std::string ip_address;
+    int port = DEFAULT_ROS2_SERVER_PORT;
+
+    if(regex_match(address, mr, ROS2_IPV4_PATTERN))
+    {
+        std::smatch::iterator it = mr.cbegin();
+        ip_address = (++it)->str();
+
+        if((++it)->matched)
+        {
+            port = std::stoi(it->str());
+        }
+    }
+    else
+    {
+        logError(DOMAIN, "The environment variable '" << DEFAULT_ROS2_MASTER_URI
+            << "' has an invalid IPv4 pattern '" << address << "'");
+        return nullptr;
+    }
+
+    // Check if the IP address belong to the local interfaces
+    RTPSParticipant* part = nullptr;
+    LocatorList_t locals;
+    Locator_t server_address(port);
+    IPLocator::setIPv4(server_address, ip_address);
+
+    IPFinder::getIP4Address(&locals);
+    if( IPLocator::isAny(server_address)
+        || IPLocator::isLocal(server_address)
+        || (locals.end() != std::find_if(locals.begin(), locals.end(),
+            [&server_address](const Locator_t & loc) -> bool
+            {
+                return IPLocator::compareAddress(server_address, loc);
+            })))
+    {
+        Locator_t listening_locator(server_address);
+
+        // indulge the people that thinks 127.0.0.1 means actually 0.0.0.0
+        if(IPLocator::isLocal(listening_locator))
+        {
+            // by doing this using 127.0.0.1 allows over network not only interprocess (the expected result)
+            IPLocator::setIPv4(listening_locator, "0.0.0.0");
+        }
+
+        RTPSParticipantAttributes server_attr = att;
+        server_attr.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::SERVER;
+        server_attr.ReadguidPrefix(DEFAULT_AUTO_SERVER_GUIDPREFIX);
+        server_attr.builtin.metatrafficUnicastLocatorList.push_back(listening_locator);
+
+        part = RTPSDomain::createParticipant(domain_id, server_attr, listen);
+        if(nullptr != part)
+        {
+            // There wasn't any previous default server, now there is one
+            logInfo(DOMAIN, "Auto default client-server setup. Default server created.");
+            return part;
+        }
+    }
+
+    // Try to create a Server. If it's already a default one the creation process would fail and we will create
+    // a client instead
+    logInfo(DOMAIN, "Auto default client-server setup. Server already present trying to create client.");
+
+    // There was a server already or server IP doesn't match this machine. Let's create a client
+    {
+        // if a real IP was not specified then we can only reach localhost servers
+        if(IPLocator::isAny(server_address))
+        {
+            // by doing this using 127.0.0.1 allows over network not only interprocess (the expected result)
+            IPLocator::setIPv4(server_address, "127.0.0.1");
+        }
+
+        rtps::RTPSParticipantAttributes client_attr = att;
+        client_attr.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::CLIENT;
+
+        RemoteServerAttributes ratt;
+        ratt.ReadguidPrefix(DEFAULT_AUTO_SERVER_GUIDPREFIX);
+        ratt.metatrafficUnicastLocatorList.push_back(server_address);
+        client_attr.builtin.discovery_config.m_DiscoveryServers.push_back(ratt);
+
+        part = RTPSDomain::createParticipant(domain_id, client_attr, listen);
+        if(nullptr != part)
+        {
+            // client successfully created
+            logInfo(DOMAIN, "Auto default client-server setup. Default client created.");
+            return part;
+        }
+    }
+
+    // unable to create auto client server default participants
+    logError(DOMAIN, "Auto default client-server setup. Unable to create either server or client.");
+    return nullptr;
 }
 
 RTPSReader* RTPSDomainImpl::find_local_reader(

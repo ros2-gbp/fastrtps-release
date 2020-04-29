@@ -3,7 +3,7 @@
     <profiles>
         <library_settings>
             <intraprocess_delivery>FULL</intraprocess_delivery>
-        </library_settings>
+        </library_settings>        
         <participant profile_name="simple_participant_profile" is_default_profile="true">
             <rtps>
                 <builtin>
@@ -12,7 +12,7 @@
                             <sec>360</sec>
                         </leaseDuration>
                     </discovery_config>
-                </builtin>
+                </builtin>                
             </rtps>
         </participant>
     </profiles>

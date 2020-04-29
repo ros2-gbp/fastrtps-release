@@ -2,21 +2,21 @@ repositories:
     foonathan_memory_vendor:
         type: git
         url: https://github.com/eProsima/foonathan_memory_vendor.git
-        version: v0.3.0
+        version: master
     fastcdr:
         type: git
         url: https://github.com/eProsima/Fast-CDR.git
-        version: v1.0.11
+        version: master
     fastrtps:
         type: git
         url: https://github.com/eProsima/Fast-RTPS.git
-        version: v1.9.3
+        version: master
     fastrtpsgen:
         type: git
         url: https://github.com/eProsima/Fast-RTPS-Gen.git
-        version: v1.0.2
+        version: master
     fastrtpsgen/thirdparty/idl-parser:
         type: git
         url: https://github.com/eProsima/IDL-Parser.git
-        version: v1.0.1
+        version: master
 

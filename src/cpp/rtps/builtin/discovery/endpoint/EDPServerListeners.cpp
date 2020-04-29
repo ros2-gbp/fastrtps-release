@@ -17,43 +17,47 @@
  *
  */
 
-#include "EDPServerListeners.h"
-#include <fastrtps/rtps/builtin/discovery/endpoint/EDPServer.h>
-#include <fastrtps/rtps/builtin/discovery/participant/PDPServer.h>
+#include <rtps/builtin/discovery/endpoint/EDPServerListeners.h>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDPServer.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPServer.h>
 
-#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
-#include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
-#include "../../../participant/RTPSParticipantImpl.h"
-#include <fastrtps/rtps/reader/StatefulReader.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include <fastdds/rtps/builtin/data/WriterProxyData.h>
+#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
+#include <fastrtps_deprecated/participant/ParticipantImpl.h>
+#include <fastdds/rtps/reader/StatefulReader.h>
+#include <fastdds/rtps/writer/StatefulWriter.h>
 
-#include <fastrtps/rtps/history/ReaderHistory.h>
-#include <fastrtps/rtps/history/WriterHistory.h>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/history/WriterHistory.h>
 
-#include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
+#include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 
 #include <mutex>
 
-#include <fastrtps/log/Log.h>
+#include <fastdds/dds/log/Log.hpp>
 
 namespace eprosima {
-namespace fastrtps{
+namespace fastrtps {
 namespace rtps {
 
-EDPServerPUBListener::EDPServerPUBListener(EDPServer* sedp) 
-    : EDPBasePUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators)
-    , sedp_(sedp) 
+EDPServerPUBListener::EDPServerPUBListener(
+        EDPServer* sedp)
+    : EDPBasePUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators,
+            sedp->mp_RTPSParticipant->getAttributes().allocation.data_limits)
+    , sedp_(sedp)
 {
 }
 
-void EDPServerPUBListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change_in)
+void EDPServerPUBListener::onNewCacheChangeAdded(
+        RTPSReader* reader,
+        const CacheChange_t* const change_in)
 {
     CacheChange_t* change = (CacheChange_t*)change_in;
     //std::lock_guard<std::recursive_mutex> guard(*this->sedp_->publications_reader_.first->getMutex());
-    logInfo(RTPS_EDP,"");
-    if(!computeKey(change))
+    logInfo(RTPS_EDP, "");
+    if (!computeKey(change))
     {
-        logWarning(RTPS_EDP,"Received change with no Key");
+        logWarning(RTPS_EDP, "Received change with no Key");
     }
 
     ReaderHistory* reader_history = sedp_->publications_reader_.second;
@@ -65,27 +69,30 @@ void EDPServerPUBListener::onNewCacheChangeAdded(RTPSReader* reader, const Cache
         return; // already there
     }
 
-    if(change->kind == ALIVE)
+    if (change->kind == ALIVE)
     {
-        add_writer_from_change(reader, change, sedp_);
+        // Note: change is removed from history inside this method.
+        add_writer_from_change(reader, reader_history, change, sedp_);
     }
     else
     {
         //REMOVE WRITER FROM OUR READERS:
-        logInfo(RTPS_EDP,"Disposed Remote Writer, removing...");
+        logInfo(RTPS_EDP, "Disposed Remote Writer, removing...");
 
         GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
         this->sedp_->mp_PDP->removeWriterProxyData(auxGUID);
         sedp_->removePublisherFromHistory(change->instanceHandle);
-    }
 
-    //Removing change from history
-    reader_history->remove_change(change);
+        //Removing change from history
+        reader_history->remove_change(change);
+    }
 
     return;
 }
 
-void EDPServerPUBListener::onWriterChangeReceivedByAll(RTPSWriter* writer, CacheChange_t* change)
+void EDPServerPUBListener::onWriterChangeReceivedByAll(
+        RTPSWriter* writer,
+        CacheChange_t* change)
 {
     (void)writer;
 
@@ -93,29 +100,33 @@ void EDPServerPUBListener::onWriterChangeReceivedByAll(RTPSWriter* writer, Cache
     {
         WriterHistory* writer_history =
 #if HAVE_SECURITY
-            writer == sedp_->publications_secure_writer_.first ?
-            sedp_->publications_secure_writer_.second :
+                writer == sedp_->publications_secure_writer_.first ?
+                sedp_->publications_secure_writer_.second :
 #endif
-            sedp_->publications_writer_.second;
+                sedp_->publications_writer_.second;
 
         writer_history->remove_change(change);
     }
 }
 
-EDPServerSUBListener::EDPServerSUBListener(EDPServer* sedp)
-    : EDPBaseSUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators)
+EDPServerSUBListener::EDPServerSUBListener(
+        EDPServer* sedp)
+    : EDPBaseSUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators,
+            sedp->mp_RTPSParticipant->getAttributes().allocation.data_limits)
     , sedp_(sedp)
 {
 }
 
-void EDPServerSUBListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change_in)
+void EDPServerSUBListener::onNewCacheChangeAdded(
+        RTPSReader* reader,
+        const CacheChange_t* const change_in)
 {
     CacheChange_t* change = (CacheChange_t*)change_in;
     //std::lock_guard<std::recursive_mutex> guard(*this->sedp_->subscriptions_reader_.first->getMutex());
-    logInfo(RTPS_EDP,"");
-    if(!computeKey(change))
+    logInfo(RTPS_EDP, "");
+    if (!computeKey(change))
     {
-        logWarning(RTPS_EDP,"Received change with no Key");
+        logWarning(RTPS_EDP, "Received change with no Key");
     }
 
     ReaderHistory* reader_history = sedp_->subscriptions_reader_.second;
@@ -127,28 +138,28 @@ void EDPServerSUBListener::onNewCacheChangeAdded(RTPSReader* reader, const Cache
         return; // already there
     }
 
-    if(change->kind == ALIVE)
+    if (change->kind == ALIVE)
     {
-        add_reader_from_change(reader, change, sedp_);
+        // Note: change is removed from history inside this method.
+        add_reader_from_change(reader, reader_history, change, sedp_);
     }
     else
     {
         //REMOVE WRITER FROM OUR READERS:
-        logInfo(RTPS_EDP,"Disposed Remote Reader, removing...");
+        logInfo(RTPS_EDP, "Disposed Remote Reader, removing...");
 
         GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
         this->sedp_->mp_PDP->removeReaderProxyData(auxGUID);
         sedp_->removeSubscriberFromHistory(change->instanceHandle);
+
+        // Remove change from history.
+        reader_history->remove_change(change);
     }
-
-    // Remove change from history.
-    reader_history->remove_change(change);
-
-    return;
 }
 
-
-void EDPServerSUBListener::onWriterChangeReceivedByAll(RTPSWriter* writer, CacheChange_t* change)
+void EDPServerSUBListener::onWriterChangeReceivedByAll(
+        RTPSWriter* writer,
+        CacheChange_t* change)
 {
     (void)writer;
 
@@ -156,10 +167,10 @@ void EDPServerSUBListener::onWriterChangeReceivedByAll(RTPSWriter* writer, Cache
     {
         WriterHistory* writer_history =
 #if HAVE_SECURITY
-            writer == sedp_->subscriptions_secure_writer_.first ?
-            sedp_->subscriptions_secure_writer_.second :
+                writer == sedp_->subscriptions_secure_writer_.first ?
+                sedp_->subscriptions_secure_writer_.second :
 #endif
-            sedp_->subscriptions_writer_.second;
+                sedp_->subscriptions_writer_.second;
 
         writer_history->remove_change(change);
     }

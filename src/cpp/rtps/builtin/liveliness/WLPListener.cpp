@@ -17,17 +17,17 @@
  *
  */
 
-#include <fastrtps/rtps/builtin/liveliness/WLPListener.h>
-#include <fastrtps/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/builtin/liveliness/WLPListener.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
 
-#include <fastrtps/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/history/ReaderHistory.h>
 
-#include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
-#include <fastrtps/rtps/builtin/BuiltinProtocols.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
+#include <fastdds/rtps/builtin/BuiltinProtocols.h>
 
-#include <fastrtps/rtps/reader/StatefulReader.h>
-#include <fastrtps/rtps/writer/LivelinessManager.h>
-#include <fastrtps/log/Log.h>
+#include <fastdds/rtps/reader/StatefulReader.h>
+#include <fastdds/rtps/writer/LivelinessManager.h>
+#include <fastdds/dds/log/Log.hpp>
 
 #include <mutex>
 

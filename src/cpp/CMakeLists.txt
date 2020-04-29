@@ -1,4 +1,4 @@
-# Copyright 2016 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+# Copyright 2019 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,27 +19,29 @@ include(${PROJECT_SOURCE_DIR}/cmake/dev/generate_msvc_libraries.cmake)
 
 if(WIN32)
 
-file(GLOB_RECURSE ALL_HEADERS 
+file(GLOB_RECURSE ALL_HEADERS
     ${PROJECT_SOURCE_DIR}/include/**/*.h
     ${PROJECT_SOURCE_DIR}/include/**/*.hpp
     ${PROJECT_SOURCE_DIR}/src/cpp/**/*.h
     ${PROJECT_SOURCE_DIR}/src/cpp/**/*.hpp
     )
 
+add_definitions(-DNOMINMAX)
+
 endif(WIN32)
 
 set(${PROJECT_NAME}_source_files
     ${ALL_HEADERS}
 
-    log/Log.cpp
-    log/StdoutConsumer.cpp
-    log/FileConsumer.cpp
-    utils/eClock.cpp
-    utils/IPFinder.cpp
-    utils/md5.cpp
-    utils/StringMatching.cpp
-    utils/IPLocator.cpp
-    utils/System.cpp
+    fastdds/log/Log.cpp
+    fastdds/log/StdoutConsumer.cpp
+    fastdds/log/FileConsumer.cpp
+    fastrtps_deprecated/utils/eClock.cpp
+    fastrtps_deprecated/utils/IPFinder.cpp
+    fastrtps_deprecated/utils/md5.cpp
+    fastrtps_deprecated/utils/StringMatching.cpp
+    fastrtps_deprecated/utils/IPLocator.cpp
+    fastrtps_deprecated/utils/System.cpp
     rtps/common/Time_t.cpp
     rtps/resources/ResourceEvent.cpp
     rtps/resources/TimedEvent.cpp
@@ -62,6 +64,8 @@ set(${PROJECT_NAME}_source_files
     rtps/reader/RTPSReader.cpp
     rtps/messages/RTPSMessageCreator.cpp
     rtps/messages/RTPSMessageGroup.cpp
+    rtps/messages/RTPSGapBuilder.cpp
+    rtps/messages/SendBuffersManager.cpp
     rtps/messages/MessageReceiver.cpp
     rtps/messages/submessages/AckNackMsg.hpp
     rtps/messages/submessages/DataMsg.hpp
@@ -72,60 +76,89 @@ set(${PROJECT_NAME}_source_files
     rtps/participant/RTPSParticipant.cpp
     rtps/participant/RTPSParticipantImpl.cpp
     rtps/RTPSDomain.cpp
-    Domain.cpp
-    participant/Participant.cpp
-    participant/ParticipantImpl.cpp
-    publisher/Publisher.cpp
-    publisher/PublisherImpl.cpp
-    publisher/PublisherHistory.cpp
-    subscriber/Subscriber.cpp
-    subscriber/SubscriberImpl.cpp
-    subscriber/SubscriberHistory.cpp
-    transport/ChannelResource.cpp
-    transport/UDPChannelResource.cpp
-    transport/TCPChannelResource.cpp
-    transport/TCPChannelResourceBasic.cpp
-    transport/TCPAcceptor.cpp
-    transport/TCPAcceptorBasic.cpp
-    transport/UDPv4Transport.cpp
-    transport/TCPTransportInterface.cpp
-    transport/UDPTransportInterface.cpp
-    transport/TCPv4Transport.cpp
-    transport/UDPv6Transport.cpp
-    transport/TCPv6Transport.cpp
-    transport/test_UDPv4Transport.cpp
-    transport/tcp/TCPControlMessage.cpp
-    transport/tcp/RTCPMessageManager.cpp
+    fastrtps_deprecated/Domain.cpp
+    fastrtps_deprecated/participant/Participant.cpp
+    fastrtps_deprecated/participant/ParticipantImpl.cpp
+    fastrtps_deprecated/publisher/Publisher.cpp
+    fastrtps_deprecated/publisher/PublisherImpl.cpp
+    fastrtps_deprecated/publisher/PublisherHistory.cpp
+    fastrtps_deprecated/subscriber/Subscriber.cpp
+    fastrtps_deprecated/subscriber/SubscriberImpl.cpp
+    fastrtps_deprecated/subscriber/SubscriberHistory.cpp
+    fastdds/subscriber/DataReader.cpp
+    fastdds/publisher/DataWriter.cpp
+    fastdds/subscriber/DataReaderImpl.cpp
+    fastdds/publisher/DataWriterImpl.cpp
+    fastdds/topic/Topic.cpp
+    fastdds/topic/TopicImpl.cpp
+    fastdds/topic/TypeSupport.cpp
+    fastdds/topic/qos/TopicQos.cpp
+    fastdds/publisher/qos/DataWriterQos.cpp
+    fastdds/subscriber/qos/DataReaderQos.cpp
+    fastdds/topic/TypeSupport.cpp
+    fastdds/publisher/PublisherImpl.cpp
+    fastdds/publisher/qos/PublisherQos.cpp
+    fastdds/publisher/Publisher.cpp
+    fastdds/subscriber/SubscriberImpl.cpp
+    fastdds/subscriber/qos/SubscriberQos.cpp
+    fastdds/subscriber/Subscriber.cpp
+    fastdds/subscriber/DataReader.cpp
+    fastdds/subscriber/DataReaderImpl.cpp
+    fastdds/domain/DomainParticipantFactory.cpp
+    fastdds/domain/DomainParticipantImpl.cpp
+    fastdds/domain/DomainParticipant.cpp
+    fastdds/domain/qos/DomainParticipantQos.cpp
+    fastdds/domain/qos/DomainParticipantFactoryQos.cpp
+    fastdds/builtin/typelookup/common/TypeLookupTypes.cpp
+    fastdds/builtin/common/RPCHeadersImpl.cpp
+    fastdds/builtin/typelookup/TypeLookupManager.cpp
+    fastdds/builtin/typelookup/TypeLookupRequestListener.cpp
+    fastdds/builtin/typelookup/TypeLookupReplyListener.cpp
+    rtps/transport/ChannelResource.cpp
+    rtps/transport/UDPChannelResource.cpp
+    rtps/transport/TCPChannelResource.cpp
+    rtps/transport/TCPChannelResourceBasic.cpp
+    rtps/transport/TCPAcceptor.cpp
+    rtps/transport/TCPAcceptorBasic.cpp
+    rtps/transport/UDPv4Transport.cpp
+    rtps/transport/TCPTransportInterface.cpp
+    rtps/transport/UDPTransportInterface.cpp
+    rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
+    rtps/transport/TCPv4Transport.cpp
+    rtps/transport/UDPv6Transport.cpp
+    rtps/transport/TCPv6Transport.cpp
+    rtps/transport/test_UDPv4Transport.cpp
+    rtps/transport/tcp/TCPControlMessage.cpp
+    rtps/transport/tcp/RTCPMessageManager.cpp
 
-    types/AnnotationDescriptor.cpp
-    types/AnnotationParameterValue.cpp
-    types/DynamicData.cpp
-    types/DynamicDataFactory.cpp
-    types/DynamicType.cpp
-    types/DynamicPubSubType.cpp
-    types/DynamicTypePtr.cpp
-    types/DynamicDataPtr.cpp
-    types/DynamicTypeBuilder.cpp
-    types/DynamicTypeBuilderPtr.cpp
-    types/DynamicTypeBuilderFactory.cpp
-    types/DynamicTypeMember.cpp
-    types/MemberDescriptor.cpp
-    types/TypeDescriptor.cpp
-    types/TypeIdentifier.cpp
-    types/TypeIdentifierTypes.cpp
-    types/TypeObject.cpp
-    types/TypeObjectHashId.cpp
-    types/TypeObjectFactory.cpp
-    types/TypeNamesGenerator.cpp
-    types/TypesBase.cpp
-    types/BuiltinAnnotationsTypeObject.cpp
+    fastrtps_deprecated/types/AnnotationDescriptor.cpp
+    fastrtps_deprecated/types/AnnotationParameterValue.cpp
+    fastrtps_deprecated/types/DynamicData.cpp
+    fastrtps_deprecated/types/DynamicDataFactory.cpp
+    fastrtps_deprecated/types/DynamicType.cpp
+    fastrtps_deprecated/types/DynamicPubSubType.cpp
+    fastrtps_deprecated/types/DynamicTypePtr.cpp
+    fastrtps_deprecated/types/DynamicDataPtr.cpp
+    fastrtps_deprecated/types/DynamicTypeBuilder.cpp
+    fastrtps_deprecated/types/DynamicTypeBuilderPtr.cpp
+    fastrtps_deprecated/types/DynamicTypeBuilderFactory.cpp
+    fastrtps_deprecated/types/DynamicTypeMember.cpp
+    fastrtps_deprecated/types/MemberDescriptor.cpp
+    fastrtps_deprecated/types/TypeDescriptor.cpp
+    fastrtps_deprecated/types/TypeIdentifier.cpp
+    fastrtps_deprecated/types/TypeIdentifierTypes.cpp
+    fastrtps_deprecated/types/TypeObject.cpp
+    fastrtps_deprecated/types/TypeObjectHashId.cpp
+    fastrtps_deprecated/types/TypeObjectFactory.cpp
+    fastrtps_deprecated/types/TypeNamesGenerator.cpp
+    fastrtps_deprecated/types/TypesBase.cpp
+    fastrtps_deprecated/types/BuiltinAnnotationsTypeObject.cpp
+    fastrtps_deprecated/types/DynamicDataHelper.cpp
 
-    attributes/TopicAttributes.cpp
-    qos/ParameterList.cpp
-    qos/ParameterTypes.cpp
-    qos/QosPolicies.cpp
-    qos/WriterQos.cpp
-    qos/ReaderQos.cpp
+    fastrtps_deprecated/attributes/TopicAttributes.cpp
+    fastdds/core/policy/ParameterList.cpp
+    fastdds/publisher/qos/WriterQos.cpp
+    fastdds/subscriber/qos/ReaderQos.cpp
     rtps/builtin/BuiltinProtocols.cpp
     rtps/builtin/discovery/participant/DirectMessageSender.cpp
     rtps/builtin/discovery/participant/PDP.cpp
@@ -154,27 +187,43 @@ set(${PROJECT_NAME}_source_files
     rtps/exceptions/Exception.cpp
     rtps/attributes/PropertyPolicy.cpp
     rtps/common/Token.cpp
-    xmlparser/XMLParserCommon.cpp
-    xmlparser/XMLElementParser.cpp
-    xmlparser/XMLEndpointParser.cpp
-    xmlparser/XMLParser.cpp
-    xmlparser/XMLProfileManager.cpp
+    rtps/xmlparser/XMLParserCommon.cpp
+    rtps/xmlparser/XMLElementParser.cpp
+    rtps/xmlparser/XMLEndpointParser.cpp
+    rtps/xmlparser/XMLParser.cpp
+    rtps/xmlparser/XMLProfileManager.cpp
     rtps/writer/PersistentWriter.cpp
     rtps/writer/StatelessPersistentWriter.cpp
     rtps/writer/StatefulPersistentWriter.cpp
     rtps/reader/StatelessPersistentReader.cpp
     rtps/reader/StatefulPersistentReader.cpp
     rtps/persistence/PersistenceFactory.cpp
-    rtps/persistence/SQLite3PersistenceService.cpp
-    rtps/persistence/sqlite3.c
-    utils/TimedConditionVariable.cpp
+    fastrtps_deprecated/utils/TimedConditionVariable.cpp
+
+    dds/core/types.cpp
+    dds/core/Exception.cpp
+    dds/domain/DomainParticipant.cpp
+    dds/pub/Publisher.cpp
+    dds/pub/AnyDataWriter.cpp
+    dds/pub/DataWriter.cpp
+    dds/sub/Subscriber.cpp
+    dds/sub/DataReader.cpp
+    dds/topic/Topic.cpp
     )
+
+# SHM Transport
+if(IS_THIRDPARTY_BOOST_OK)
+    list(APPEND ${PROJECT_NAME}_source_files
+        rtps/transport/shared_mem/test_SharedMemTransport.cpp
+        rtps/transport/shared_mem/SharedMemTransport.cpp
+        )
+endif()
 
 # TLS Support
 if(TLS_FOUND)
     list(APPEND ${PROJECT_NAME}_source_files
-        transport/TCPChannelResourceSecure.cpp
-        transport/TCPAcceptorSecure.cpp
+        rtps/transport/TCPChannelResourceSecure.cpp
+        rtps/transport/TCPAcceptorSecure.cpp
         )
 endif()
 
@@ -186,22 +235,24 @@ set_sources(${${PROJECT_NAME}_source_files})
 set(${PROJECT_NAME}_security_source_files
     rtps/security/exceptions/SecurityException.cpp
     rtps/security/common/SharedSecretHandle.cpp
+    rtps/security/logging/Logging.cpp
     rtps/security/SecurityManager.cpp
     rtps/security/SecurityPluginFactory.cpp
-    security/OpenSSLInit.cpp
-    security/authentication/PKIDH.cpp
-    security/accesscontrol/Permissions.cpp
-    security/cryptography/AESGCMGMAC.cpp
-    security/cryptography/AESGCMGMAC_KeyExchange.cpp
-    security/cryptography/AESGCMGMAC_KeyFactory.cpp
-    security/cryptography/AESGCMGMAC_Transform.cpp
-    security/cryptography/AESGCMGMAC_Types.cpp
-    security/authentication/PKIIdentityHandle.cpp
-    security/authentication/PKIHandshakeHandle.cpp
-    security/accesscontrol/AccessPermissionsHandle.cpp
-    security/accesscontrol/CommonParser.cpp
-    security/accesscontrol/GovernanceParser.cpp
-    security/accesscontrol/PermissionsParser.cpp
+    fastrtps_deprecated/security/OpenSSLInit.cpp
+    fastrtps_deprecated/security/authentication/PKIDH.cpp
+    fastrtps_deprecated/security/accesscontrol/Permissions.cpp
+    fastrtps_deprecated/security/cryptography/AESGCMGMAC.cpp
+    fastrtps_deprecated/security/cryptography/AESGCMGMAC_KeyExchange.cpp
+    fastrtps_deprecated/security/cryptography/AESGCMGMAC_KeyFactory.cpp
+    fastrtps_deprecated/security/cryptography/AESGCMGMAC_Transform.cpp
+    fastrtps_deprecated/security/cryptography/AESGCMGMAC_Types.cpp
+    fastrtps_deprecated/security/authentication/PKIIdentityHandle.cpp
+    fastrtps_deprecated/security/authentication/PKIHandshakeHandle.cpp
+    fastrtps_deprecated/security/accesscontrol/AccessPermissionsHandle.cpp
+    fastrtps_deprecated/security/accesscontrol/CommonParser.cpp
+    fastrtps_deprecated/security/accesscontrol/GovernanceParser.cpp
+    fastrtps_deprecated/security/accesscontrol/PermissionsParser.cpp
+    fastrtps_deprecated/security/logging/LogTopic.cpp
     )
 
 # Add sources to Makefile.am
@@ -223,6 +274,28 @@ if(WIN32 AND (MSVC OR MSVC_IDE))
         ${PROJECT_SOURCE_DIR}/src/cpp/fastrtps.rc
         )
 endif()
+
+
+#SQLITE3 persistence service sources
+set(${PROJECT_NAME}_sqlite3_source_files
+    rtps/persistence/SQLite3PersistenceService.cpp
+    rtps/persistence/sqlite3.c
+    )
+
+# Add sources to Makefile.am
+set_sources(SECTION SQLITE3)
+set_sources(${${PROJECT_NAME}_sqlite3_source_files})
+set_sources(ENDSECTION)
+
+if(SQLITE3_SUPPORT)
+    list(APPEND ${PROJECT_NAME}_source_files
+        ${${PROJECT_NAME}_sqlite3_source_files}
+        )
+    set(HAVE_SQLITE3 1)
+else()
+    set(HAVE_SQLITE3 0)
+endif()
+
 
 # External sources
 if(TINYXML2_SOURCE_DIR)
@@ -280,6 +353,8 @@ elseif(NOT EPROSIMA_INSTALLER)
     set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
     set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 
+    option(INTERNAL_DEBUG "Activate developer debug messages" OFF)
+    
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         ${PROJECT_NAME_UPPER}_SOURCE
         BOOST_ASIO_STANDALONE
@@ -290,6 +365,9 @@ elseif(NOT EPROSIMA_INSTALLER)
         $<$<AND:$<BOOL:${WIN32}>,$<NOT:$<STREQUAL:"${CMAKE_SYSTEM_NAME}","WindowsStore">>>:_WIN32_WINNT=0x0601>
         $<$<AND:$<BOOL:${WIN32}>,$<STREQUAL:"${CMAKE_SYSTEM_NAME}","WindowsStore">>:SQLITE_OS_WINRT>
         $<$<AND:$<BOOL:${ANDROID}>,$<NOT:$<BOOL:${HAVE_CXX14}>>,$<NOT:$<BOOL:${HAVE_CXX1Y}>>>:ASIO_DISABLE_STD_STRING_VIEW>
+        $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
+        $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
+        $<$<BOOL:${SHM_TRANSPORT_DEFAULT}>:SHM_TRANSPORT_BUILTIN> # Enable SHM as built-in transport
         )
 
     # Define public headers
@@ -303,6 +381,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         ${ASIO_INCLUDE_DIR}
         ${TINYXML2_INCLUDE_DIR}
         $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
+        ${THIRDPARTY_BOOST_INCLUDE_DIR}
         )
 
     # Made linked libraries PRIVATE to prevent local directories in Windows installer.
@@ -321,6 +400,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         ${TINYXML2_LIBRARY}
         $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
         $<$<BOOL:${WIN32}>:iphlpapi$<SEMICOLON>Shlwapi>
+        ${THIRDPARTY_BOOST_LINK_LIBS}
         )
 
     if(MSVC OR MSVC_IDE)
@@ -363,6 +443,11 @@ set_public_headers_directory(${PROJECT_SOURCE_DIR}/include ${PROJECT_NAME}
     COMPONENT headers
     INSTALL
     )
+set_public_headers_directory(${PROJECT_SOURCE_DIR}/include fastdds
+    DESTINATION ${INCLUDE_INSTALL_DIR}
+    COMPONENT headers
+    INSTALL
+    )
 
 # Install config.h header
 set_public_header(${PROJECT_BINARY_DIR}/include ${PROJECT_NAME} config.h
@@ -389,6 +474,7 @@ set(CPACK_COMPONENT_HEADERS_DISPLAY_NAME "C++ Headers" PARENT_SCOPE)
 set(CPACK_COMPONENT_HEADERS_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} C++ Headers" PARENT_SCOPE)
 
 # Install sources
+
 if(UNIX AND EPROSIMA_INSTALLER)
     install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/cpp
         DESTINATION src
@@ -505,7 +591,7 @@ elseif(NOT EPROSIMA_INSTALLER)
 
     configure_package_config_file(${PROJECT_SOURCE_DIR}/cmake/packaging/Config.cmake.in
         ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-config.cmake
-	INSTALL_DESTINATION ${INSTALL_DESTINATION_PATH}
+        INSTALL_DESTINATION ${INSTALL_DESTINATION_PATH}
         PATH_VARS BIN_INSTALL_DIR INCLUDE_INSTALL_DIR LIB_INSTALL_DIR
         )
     write_basic_package_version_file(${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-config-version.cmake
@@ -514,7 +600,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         )
     install(FILES ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-config.cmake
         ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-config-version.cmake
-	DESTINATION ${INSTALL_DESTINATION_PATH}
+        DESTINATION ${INSTALL_DESTINATION_PATH}
         COMPONENT cmake
         )
 

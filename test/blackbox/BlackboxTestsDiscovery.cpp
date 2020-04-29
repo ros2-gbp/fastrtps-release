@@ -18,6 +18,8 @@
 #include "PubSubReader.hpp"
 #include "PubSubWriter.hpp"
 
+#include <gtest/gtest.h>
+
 #include <fastrtps/transport/test_UDPv4Transport.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
@@ -84,7 +86,7 @@ TEST_P(Discovery, ParticipantRemoval)
 
 TEST(Discovery, StaticDiscovery)
 {
-    //Log::SetVerbosity(Log::Info);
+    //Log::SetVerbosity(eprosima::fastdds::dds::Log::Info);
     char* value = nullptr;
     std::string TOPIC_RANDOM_NUMBER;
     std::string W_UNICAST_PORT_RANDOM_NUMBER_STR;
@@ -224,7 +226,6 @@ TEST_P(Discovery, EDPSlaveReaderAttachment)
     checker.block_until_discover_partition("othertest", 0);
 }
 
-
 // Used to detect Github issue #155
 TEST(Discovery, EndpointRediscovery)
 {
@@ -332,14 +333,14 @@ TEST(Discovery, ParticipantLivelinessAssertion)
     test_UDPv4Transport::always_drop_participant_builtin_topic_data = true;
 
     std::thread thread([&writer]()
+    {
+        HelloWorld msg;
+        for (int count = 0; count < 20; ++count)
         {
-            HelloWorld msg;
-            for (int count = 0; count < 20; ++count)
-            {
-                writer.send_sample(msg);
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-        });
+            writer.send_sample(msg);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    });
 
     EXPECT_FALSE(reader.wait_participant_undiscovery(std::chrono::seconds(1)));
     EXPECT_FALSE(writer.wait_participant_undiscovery(std::chrono::seconds(1)));
@@ -717,6 +718,71 @@ TEST_P(Discovery, TwentyParticipantsSeveralEndpointsUnicast)
     discoverParticipantsSeveralEndpointsTest(true, 20, 20, 20, TEST_TOPIC_NAME);
 }
 
+//! Regression test for support case 7552 (CRM #353)
+TEST_P(Discovery, RepeatPubGuid)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer2(TEST_TOPIC_NAME);
+
+    reader
+        .history_kind(eprosima::fastrtps::KEEP_LAST_HISTORY_QOS)
+        .history_depth(10)
+        .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
+        .participant_id(2)
+        .init();
+
+    writer
+        .history_kind(eprosima::fastrtps::KEEP_LAST_HISTORY_QOS)
+        .history_depth(10)
+        .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
+        .participant_id(1)
+        .init();
+
+    ASSERT_TRUE(reader.isInitialized());
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Wait for discovery.
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    auto data = default_helloworld_data_generator();
+    reader.startReception(data);
+
+    // Send data
+    writer.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    reader.block_for_all();
+
+    writer.destroy();
+    reader.wait_writer_undiscovery();
+    reader.wait_participant_undiscovery();
+
+    writer2
+        .history_kind(eprosima::fastrtps::KEEP_LAST_HISTORY_QOS)
+        .history_depth(10)
+        .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
+        .participant_id(1)
+        .init();
+
+    ASSERT_TRUE(writer2.isInitialized());
+
+    writer2.wait_discovery();
+    reader.wait_discovery();
+
+    data = default_helloworld_data_generator();
+    reader.startReception(data);
+
+    // Send data
+    writer2.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    reader.block_for_all();
+}
+
 INSTANTIATE_TEST_CASE_P(Discovery,
         Discovery,
         testing::Values(false, true),
@@ -727,4 +793,6 @@ INSTANTIATE_TEST_CASE_P(Discovery,
             }
             return "NonIntraprocess";
         });
+
+
 

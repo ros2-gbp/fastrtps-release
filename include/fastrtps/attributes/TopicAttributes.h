@@ -21,8 +21,8 @@
 
 #include <string>
 
-#include "../rtps/common/Types.h"
-#include "../qos/QosPolicies.h"
+#include <fastdds/rtps/common/Types.h>
+#include <fastrtps/qos/QosPolicies.h>
 
 
 namespace eprosima {
@@ -43,21 +43,22 @@ public:
         : topicKind(rtps::NO_KEY)
         , topicName("UNDEF")
         , topicDataType("UNDEF")
+        , auto_fill_type_object(true)
+        , auto_fill_type_information(true)
     {
-        topicDiscoveryKind = rtps::TopicDiscoveryKind_t::NO_CHECK;
     }
 
     //!Constructor, you need to provide the topic name and the topic data type.
     TopicAttributes(
             const char* name,
             const char* dataType,
-            rtps::TopicKind_t tKind= rtps::NO_KEY,
-            rtps::TopicDiscoveryKind_t tDiscovery = rtps::NO_CHECK)
+            rtps::TopicKind_t tKind= rtps::NO_KEY)
         {
             topicKind = tKind;
-            topicDiscoveryKind = tDiscovery;
             topicName = name;
             topicDataType = dataType;
+            auto_fill_type_object = true;
+            auto_fill_type_information = true;
         }
 
         virtual ~TopicAttributes() {}
@@ -87,15 +88,6 @@ public:
         }
 
         /**
-        * Get the Topic discoreryKind
-        * @return Topic discoreryKind
-        */
-        rtps::TopicDiscoveryKind_t getTopicDiscoveryKind() const {
-            return topicDiscoveryKind;
-        }
-
-
-        /**
          * Get the topic name
          * @return Topic name
          */
@@ -105,8 +97,6 @@ public:
 
         //! TopicKind_t, default value NO_KEY.
         rtps::TopicKind_t topicKind;
-        //! Topic discovery kind, default value NO_CHECK.
-        rtps::TopicDiscoveryKind_t topicDiscoveryKind;
         //! Topic Name.
         string_255 topicName;
         //!Topic Data Type.
@@ -115,14 +105,16 @@ public:
         HistoryQosPolicy historyQos;
         //!QOS Regarding the resources to allocate.
         ResourceLimitsQosPolicy resourceLimitsQos;
-        //!QOS Regarding the format of the data.
-        DataRepresentationQosPolicy dataRepresentationQos;
-        //!QOS Regarding the consistency data to check.
-        TypeConsistencyEnforcementQosPolicy typeConsistencyQos;
-        //!Type Identifier
+        //!Type Identifier XTYPES 1.1
         TypeIdV1 type_id;
-        //!Type Object
+        //!Type Object XTYPES 1.1
         TypeObjectV1 type;
+        //!XTYPES 1.2
+        xtypes::TypeInformation type_information;
+        //!Tries to complete type identifier and type object (TypeObjectV1)
+        bool auto_fill_type_object;
+        //!Tries to complete type information (TypeObjectV2)
+        bool auto_fill_type_information;
 
         /**
          * Method to check whether the defined QOS are correct.
@@ -141,10 +133,11 @@ public:
  */
 bool inline operator!=(const TopicAttributes& t1, const TopicAttributes& t2)
 {
-    if(t1.topicKind != t2.topicKind || t1.topicDiscoveryKind != t2.topicDiscoveryKind
-        || t1.topicName != t2.topicName || t1.topicDataType != t2.topicDataType
-        || t1.historyQos.kind != t2.historyQos.kind
-        || (t1.historyQos.kind == KEEP_LAST_HISTORY_QOS && t1.historyQos.depth != t2.historyQos.depth))
+    if(t1.topicKind != t2.topicKind
+            || t1.topicName != t2.topicName
+            || t1.topicDataType != t2.topicDataType
+            || t1.historyQos.kind != t2.historyQos.kind
+            || (t1.historyQos.kind == KEEP_LAST_HISTORY_QOS && t1.historyQos.depth != t2.historyQos.depth))
     {
         return true;
     }

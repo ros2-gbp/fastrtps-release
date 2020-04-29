@@ -20,15 +20,15 @@
 
 #include <rtps/security/SecurityPluginFactory.h>
 
-#include <fastrtps/rtps/security/authentication/Handshake.h>
-#include <fastrtps/rtps/security/common/ParticipantGenericMessage.h>
-#include <fastrtps/rtps/reader/ReaderListener.h>
-#include <fastrtps/rtps/common/SequenceNumber.h>
-#include <fastrtps/rtps/common/SerializedPayload.h>
-#include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
-#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
-#include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
-#include <fastrtps/rtps/resources/TimedEvent.h>
+#include <fastdds/rtps/security/authentication/Handshake.h>
+#include <fastdds/rtps/security/common/ParticipantGenericMessage.h>
+#include <fastdds/rtps/reader/ReaderListener.h>
+#include <fastdds/rtps/common/SequenceNumber.h>
+#include <fastdds/rtps/common/SerializedPayload.h>
+#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
+#include <fastdds/rtps/builtin/data/WriterProxyData.h>
+#include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
+#include <fastdds/rtps/resources/TimedEvent.h>
 
 #include <map>
 #include <mutex>
@@ -69,6 +69,8 @@ public:
             ParticipantSecurityAttributes& attributes,
             const PropertyPolicy& participant_properties,
             bool& security_activated);
+
+    bool create_entities();
 
     void destroy();
 
@@ -416,6 +418,8 @@ private:
             SecurityManager &manager_;
     } participant_volatile_message_secure_listener_;
 
+    void cancel_init();
+
     void remove_discovered_participant_info(
             DiscoveredParticipantInfo::AuthUniquePtr& auth_ptr);
 
@@ -423,7 +427,6 @@ private:
             const GUID_t& remote_participant_key,
             DiscoveredParticipantInfo::AuthUniquePtr& auth_ptr);
 
-    bool create_entities();
     void delete_entities();
     bool create_participant_stateless_message_entities();
     void delete_participant_stateless_message_entities();
@@ -520,6 +523,8 @@ private:
     StatefulReader* participant_volatile_message_secure_reader_;
     ReaderHistory* participant_volatile_message_secure_reader_history_;
     SecurityPluginFactory factory_;
+
+    Logging* logging_plugin_;
 
     Authentication* authentication_plugin_;
 

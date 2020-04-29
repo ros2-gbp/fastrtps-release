@@ -15,16 +15,16 @@
 /*
  * RTPSReader.cpp
  *
-*/
+ */
 
-#include <fastrtps/rtps/reader/RTPSReader.h>
-#include <fastrtps/rtps/history/ReaderHistory.h>
-#include <fastrtps/log/Log.h>
-#include "ReaderHistoryState.hpp"
+#include <fastdds/rtps/reader/RTPSReader.h>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <rtps/reader/ReaderHistoryState.hpp>
 
-#include <fastrtps/rtps/reader/ReaderListener.h>
-#include <fastrtps/rtps/resources/ResourceEvent.h>
-#include "../participant/RTPSParticipantImpl.h"
+#include <fastdds/rtps/reader/ReaderListener.h>
+#include <fastdds/rtps/resources/ResourceEvent.h>
+#include <fastrtps_deprecated/participant/ParticipantImpl.h>
 
 #include <foonathan/memory/namespace_alias.hpp>
 
@@ -55,25 +55,26 @@ RTPSReader::RTPSReader(
     mp_history->mp_reader = this;
     mp_history->mp_mutex = &mp_mutex;
 
-    logInfo(RTPS_READER,"RTPSReader created correctly");
+    logInfo(RTPS_READER, "RTPSReader created correctly");
 }
 
 RTPSReader::~RTPSReader()
 {
-    logInfo(RTPS_READER,"Removing reader "<<this->getGuid().entityId;);
+    logInfo(RTPS_READER, "Removing reader " << this->getGuid().entityId; );
     delete history_state_;
     mp_history->mp_reader = nullptr;
     mp_history->mp_mutex = nullptr;
 }
 
 bool RTPSReader::reserveCache(
-        CacheChange_t** change, 
+        CacheChange_t** change,
         uint32_t dataCdrSerializedSize)
 {
     return mp_history->reserve_Cache(change, dataCdrSerializedSize);
 }
 
-void RTPSReader::releaseCache(CacheChange_t* change)
+void RTPSReader::releaseCache(
+        CacheChange_t* change)
 {
     return mp_history->release_Cache(change);
 }
@@ -83,22 +84,27 @@ ReaderListener* RTPSReader::getListener() const
     return mp_listener;
 }
 
-bool RTPSReader::setListener(ReaderListener *target)
+bool RTPSReader::setListener(
+        ReaderListener* target)
 {
     mp_listener = target;
     return true;
 }
 
-CacheChange_t* RTPSReader::findCacheInFragmentedProcess(
+History::const_iterator RTPSReader::findCacheInFragmentedProcess(
         const SequenceNumber_t& sequence_number,
-        const GUID_t& writer_guid) const
+        const GUID_t& writer_guid,
+        CacheChange_t** change,
+        History::const_iterator hint) const
 {
-    CacheChange_t* ret_val = nullptr;
-    if (mp_history->get_change(sequence_number, writer_guid, &ret_val))
+    History::const_iterator ret_val = mp_history->get_change_nts(sequence_number, writer_guid, change, hint);
+
+    if (nullptr != *change && (*change)->is_fully_assembled())
     {
-        return ret_val->is_fully_assembled() ? nullptr : ret_val;
+        *change = nullptr;
     }
-    return nullptr;
+
+    return ret_val;
 }
 
 void RTPSReader::add_persistence_guid(
@@ -119,11 +125,12 @@ void RTPSReader::remove_persistence_guid(
     GUID_t persistence_guid_stored = (c_Guid_Unknown == persistence_guid) ? guid : persistence_guid;
     history_state_->persistence_guid_map.erase(guid);
     auto count = --history_state_->persistence_guid_count[persistence_guid_stored];
-    if (count == 0)
+    if (count <= 0)
     {
         if (m_att.durabilityKind < TRANSIENT)
         {
             history_state_->history_record.erase(persistence_guid_stored);
+            history_state_->persistence_guid_count.erase(persistence_guid_stored);
         }
     }
 }
@@ -156,7 +163,8 @@ SequenceNumber_t RTPSReader::update_last_notified(
     return ret_val;
 }
 
-SequenceNumber_t RTPSReader::get_last_notified(const GUID_t& guid)
+SequenceNumber_t RTPSReader::get_last_notified(
+        const GUID_t& guid)
 {
     SequenceNumber_t ret_val;
     std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
@@ -177,27 +185,26 @@ SequenceNumber_t RTPSReader::get_last_notified(const GUID_t& guid)
 }
 
 void RTPSReader::set_last_notified(
-        const GUID_t& peristence_guid, 
+        const GUID_t& peristence_guid,
         const SequenceNumber_t& seq)
 {
     history_state_->history_record[peristence_guid] = seq;
 }
 
-
 bool RTPSReader::wait_for_unread_cache(
-        const eprosima::fastrtps::Duration_t &timeout)
+        const eprosima::fastrtps::Duration_t& timeout)
 {
     auto time_out = std::chrono::steady_clock::now() + std::chrono::seconds(timeout.seconds) +
-        std::chrono::nanoseconds(timeout.nanosec);
+            std::chrono::nanoseconds(timeout.nanosec);
 
     std::unique_lock<RecursiveTimedMutex> lock(mp_mutex, std::defer_lock);
 
-    if(lock.try_lock_until(time_out))
+    if (lock.try_lock_until(time_out))
     {
-        if(new_notification_cv_.wait_until(lock, time_out, [&]()
-            {
-                return total_unread_ > 0;
-            }))
+        if (new_notification_cv_.wait_until(lock, time_out, [&]()
+                    {
+                        return total_unread_ > 0;
+                    }))
         {
             return true;
         }

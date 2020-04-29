@@ -19,6 +19,8 @@
 #include "ReqRepAsReliableHelloWorldRequester.hpp"
 #include "ReqRepAsReliableHelloWorldReplier.hpp"
 
+#include <gtest/gtest.h>
+
 #include <fastrtps/utils/TimeConversion.h>
 #include <fastrtps/xmlparser//XMLProfileManager.h>
 
@@ -51,6 +53,7 @@ public:
     }
 
 };
+
 
 TEST_P(LifespanQos, LongLifespan)
 {
@@ -99,10 +102,9 @@ TEST_P(LifespanQos, LongLifespan)
 
     // On the reader side we should be able to take the data
     HelloWorldType::type msg;
-    eprosima::fastrtps::SampleInfo_t info;
-    EXPECT_EQ(reader.takeNextData(&msg, &info), true);
-    EXPECT_EQ(reader.takeNextData(&msg, &info), true);
-    EXPECT_EQ(reader.takeNextData(&msg, &info), true);
+    EXPECT_EQ(reader.takeNextData(&msg), true);
+    EXPECT_EQ(reader.takeNextData(&msg), true);
+    EXPECT_EQ(reader.takeNextData(&msg), true);
 }
 
 TEST_P(LifespanQos, ShortLifespan)
@@ -147,19 +149,19 @@ TEST_P(LifespanQos, ShortLifespan)
 
     // On the reader side we should not be able to take the data
     HelloWorldType::type msg;
-    eprosima::fastrtps::SampleInfo_t info;
-    EXPECT_EQ(reader.takeNextData(&msg, &info), false);
-    EXPECT_EQ(reader.takeNextData(&msg, &info), false);
-    EXPECT_EQ(reader.takeNextData(&msg, &info), false);
+    EXPECT_EQ(reader.takeNextData(&msg), false);
+    EXPECT_EQ(reader.takeNextData(&msg), false);
+    EXPECT_EQ(reader.takeNextData(&msg), false);
 }
 
 INSTANTIATE_TEST_CASE_P(LifespanQos,
         LifespanQos,
         testing::Values(false, true),
         [](const testing::TestParamInfo<LifespanQos::ParamType>& info) {
-            if (info.param)
-            {
-                return "Intraprocess";
-            }
-            return "NonIntraprocess";
-        });
+    if (info.param)
+    {
+        return "Intraprocess";
+    }
+    return "NonIntraprocess";
+});
+
