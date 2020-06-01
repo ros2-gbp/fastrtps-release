@@ -77,6 +77,7 @@ private:
 
     DomainParticipantImpl(
             DomainParticipant* dp,
+            DomainId_t did,
             const DomainParticipantQos& qos,
             DomainParticipantListener* listen = nullptr);
 
@@ -118,6 +119,18 @@ public:
             PublisherListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all());
 
+    /**
+     * Create a Publisher in this Participant.
+     * @param profile Publisher profile name.
+     * @param listen Pointer to the listener.
+     * @param mask StatusMask
+     * @return Pointer to the created Publisher.
+     */
+    Publisher* create_publisher_with_profile(
+            const std::string& profile_name,
+            PublisherListener* listener = nullptr,
+            const StatusMask& mask = StatusMask::all());
+
     ReturnCode_t delete_publisher(
             Publisher* publisher);
 
@@ -132,6 +145,18 @@ public:
             const SubscriberQos& qos,
             SubscriberListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all());
+
+    /**
+     * Create a Subscriber in this Participant.
+     * @param profile Subscriber profile name.
+     * @param listen Pointer to the listener.
+     * @param mask StatusMask
+     * @return Pointer to the created Subscriber.
+     */
+    Subscriber* create_subscriber_with_profile(
+            const std::string& profile_name,
+            SubscriberListener* listener,
+            const StatusMask& mask);
 
     ReturnCode_t delete_subscriber(
             Subscriber* subscriber);
@@ -149,6 +174,22 @@ public:
             const std::string& topic_name,
             const std::string& type_name,
             const TopicQos& qos = TOPIC_QOS_DEFAULT,
+            TopicListener* listener = nullptr,
+            const StatusMask& mask = StatusMask::all());
+
+    /**
+     * Create a Topic in this Participant.
+     * @param topic_name Name of the Topic.
+     * @param type_name Data type of the Topic.
+     * @param profile Topic profile name.
+     * @param listen Pointer to the listener.
+     * @param mask StatusMask that holds statuses the listener responds to
+     * @return Pointer to the created Topic.
+     */
+    Topic* create_topic_with_profile(
+            const std::string& topic_name,
+            const std::string& type_name,
+            const std::string& profile_name,
             TopicListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all());
 
@@ -219,15 +260,21 @@ public:
     ReturnCode_t set_default_publisher_qos(
             const PublisherQos& qos);
 
+    void reset_default_publisher_qos();
+
     const PublisherQos& get_default_publisher_qos() const;
 
     ReturnCode_t set_default_subscriber_qos(
             const SubscriberQos& qos);
 
+    void reset_default_subscriber_qos();
+
     const SubscriberQos& get_default_subscriber_qos() const;
 
     ReturnCode_t set_default_topic_qos(
             const TopicQos& qos);
+
+    void reset_default_topic_qos();
 
     const TopicQos& get_default_topic_qos() const;
 
@@ -324,6 +371,18 @@ public:
     bool has_active_entities();
 
 private:
+
+    //!Domain id
+    DomainId_t domain_id_;
+
+    //!Participant id
+    int32_t participant_id_ = -1;
+
+    //!Pre-calculated guid
+    fastrtps::rtps::GUID_t guid_;
+
+    //!For instance handle creation
+    uint32_t next_instance_id_;
 
     //!Participant Qos
     DomainParticipantQos qos_;
@@ -432,7 +491,9 @@ public:
 
     } rtps_listener_;
 
-
+    void create_instance_handle(
+            fastrtps::rtps::InstanceHandle_t& handle);
+    
     bool exists_entity_id(
             const fastrtps::rtps::EntityId_t& entity_id) const;
 

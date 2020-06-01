@@ -85,8 +85,7 @@ bool WriterHistory::add_change_(CacheChange_t* a_change, WriteParams &wparams,
 
     ++m_lastCacheChangeSeqNum;
     a_change->sequenceNumber = m_lastCacheChangeSeqNum;
-    a_change->sourceTimestamp = Time_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                           std::chrono::system_clock::now().time_since_epoch()).count() * 1e-9);
+    Time_t::now(a_change->sourceTimestamp);
 
     a_change->write_params = wparams;
     // Updated sample identity
@@ -102,7 +101,6 @@ bool WriterHistory::add_change_(CacheChange_t* a_change, WriteParams &wparams,
 
     logInfo(RTPS_HISTORY,"Change "<< a_change->sequenceNumber << " added with "<<a_change->serializedPayload.length<< " bytes");
 
-    updateMaxMinSeqNum();
     mp_writer->unsent_change_added_to_history(a_change, max_blocking_time);
 
     return true;
@@ -139,7 +137,6 @@ bool WriterHistory::remove_change(CacheChange_t* a_change)
             mp_writer->change_removed_by_history(a_change);
             m_changePool.release_Cache(a_change);
             m_changes.erase(chit);
-            updateMaxMinSeqNum();
             m_isHistoryFull = false;
             return true;
         }
@@ -171,7 +168,6 @@ bool WriterHistory::remove_change(const SequenceNumber_t& sequence_number)
             mp_writer->change_removed_by_history(*chit);
             m_changePool.release_Cache(*chit);
             m_changes.erase(chit);
-            updateMaxMinSeqNum();
             m_isHistoryFull = false;
             return true;
         }
@@ -199,7 +195,6 @@ CacheChange_t* WriterHistory::remove_change_and_reuse(const SequenceNumber_t& se
             CacheChange_t* change = *chit;
             mp_writer->change_removed_by_history(change);
             m_changes.erase(chit);
-            updateMaxMinSeqNum();
             m_isHistoryFull = false;
             return change;
         }
@@ -208,21 +203,6 @@ CacheChange_t* WriterHistory::remove_change_and_reuse(const SequenceNumber_t& se
     logWarning(RTPS_HISTORY,"SequenceNumber " <<  sequence_number << " not found");
     return nullptr;
 }
-
-void WriterHistory::updateMaxMinSeqNum()
-{
-    if(m_changes.size()==0)
-    {
-        mp_minSeqCacheChange = mp_invalidCache;
-        mp_maxSeqCacheChange = mp_invalidCache;
-    }
-    else
-    {
-        mp_minSeqCacheChange = m_changes.front();
-        mp_maxSeqCacheChange = m_changes.back();
-    }
-}
-
 
 bool WriterHistory::remove_min_change()
 {
@@ -234,9 +214,8 @@ bool WriterHistory::remove_min_change()
     }
 
     std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
-    if(m_changes.size() > 0 && remove_change_g(mp_minSeqCacheChange))
+    if(m_changes.size() > 0 && remove_change_g(m_changes.front()))
     {
-        updateMaxMinSeqNum();
         return true;
     }
     else

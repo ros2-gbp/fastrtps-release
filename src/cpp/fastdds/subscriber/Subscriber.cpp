@@ -42,6 +42,24 @@ Subscriber::Subscriber(
 {
 }
 
+ReturnCode_t Subscriber::enable()
+{
+    if (enable_)
+    {
+        return ReturnCode_t::RETCODE_OK;
+    }
+
+    if (false == impl_->get_participant()->is_enabled())
+    {
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    enable_ = true;
+    ReturnCode_t ret_code = impl_->enable();
+    enable_ = ReturnCode_t::RETCODE_OK == ret_code;
+    return ret_code;
+}
+
 const SubscriberQos& Subscriber::get_qos() const
 {
     return impl_->get_qos();
@@ -78,6 +96,15 @@ DataReader* Subscriber::create_datareader(
         const StatusMask& mask)
 {
     return impl_->create_datareader(topic, reader_qos, listener, mask);
+}
+
+DataReader* Subscriber::create_datareader_with_profile(
+        TopicDescription* topic,
+        const std::string& profile_name,
+        DataReaderListener* listener,
+        const StatusMask& mask)
+{
+    return impl_->create_datareader_with_profile(topic, profile_name, listener, mask);
 }
 
 ReturnCode_t Subscriber::delete_datareader(

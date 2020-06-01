@@ -25,6 +25,8 @@ using TestType = eprosima::fastrtps::BitmapRange<ValueType>;
 struct TestResult
 {
     bool result;
+    ValueType min;
+    ValueType max;
     uint32_t num_bits;
     uint32_t num_longs;
     TestType::bitmap_type bitmap;
@@ -42,6 +44,16 @@ struct TestResult
         {
             return false;
         }
+
+        if (!uut.empty())
+        {
+            ValueType base = uut.base();
+            if (uut.max() != (base + max) || uut.min() != (base + min))
+            {
+                return false;
+            }
+        }
+
         return std::equal(bitmap.cbegin(), bitmap.cbegin() + num_longs, check.bitmap.cbegin());
     }
 };
@@ -68,6 +80,21 @@ struct TestInputAddRange
     }
 };
 
+struct TestInputRemove
+{
+    uint32_t offset_begin;
+    uint32_t offset_end;
+
+    bool perform_input(ValueType base, TestType& uut) const
+    {
+        for (uint32_t offset = offset_begin; offset < offset_end; ++offset)
+        {
+            uut.remove(base + offset);
+        }
+        return true;
+    }
+};
+
 template<
         typename InputType>
 struct TestStep
@@ -86,7 +113,6 @@ struct TestCase
     void Test(ValueType base, TestType& uut) const
     {
         ASSERT_TRUE(initialization.Check(initialization.result, uut));
-
         
         for (auto step : steps)
         {
@@ -107,7 +133,7 @@ class BitmapRangeTests: public ::testing::Test
         {
             // initialization
             {
-                true, 0, 0, {0,0,0,0,0,0,0,0}
+                true, 0, 0, 0, 0, {0,0,0,0,0,0,0,0}
             },
             // steps
             {
@@ -115,63 +141,63 @@ class BitmapRangeTests: public ::testing::Test
                 {
                     {0},
                     {
-                        true, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
+                        true, 0, 0, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // Adding base again
                 {
                     {0},
                     {
-                        true, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
+                        true, 0, 0, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // Adding out of range
                 {
                     {256},
                     {
-                        false, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
+                        false, 0, 0, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // Middle of first word
                 {
                     {16},
                     {
-                        true, 17, 1, {0x80008000UL,0,0,0,0,0,0,0}
+                        true, 0, 16, 17, 1, {0x80008000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // Before previous one
                 {
                     {15},
                     {
-                        true, 17, 1, {0x80018000UL,0,0,0,0,0,0,0}
+                        true, 0, 16, 17, 1, {0x80018000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // On third word
                 {
                     {67},
                     {
-                        true, 68, 3, {0x80018000UL,0,0x10000000UL,0,0,0,0,0}
+                        true, 0, 67, 68, 3, {0x80018000UL,0,0x10000000UL,0,0,0,0,0}
                     }
                 },
                 // Before last on third word
                 {
                     {94},
                     {
-                        true, 95, 3, {0x80018000UL,0,0x10000002UL,0,0,0,0,0}
+                        true, 0, 94, 95, 3, {0x80018000UL,0,0x10000002UL,0,0,0,0,0}
                     }
                 },
                 // Last on third word
                 {
                     {95},
                     {
-                        true, 96, 3, {0x80018000UL,0,0x10000003UL,0,0,0,0,0}
+                        true, 0, 95, 96, 3, {0x80018000UL,0,0x10000003UL,0,0,0,0,0}
                     }
                 },
                 // Last possible item
                 {
                     {255},
                     {
-                        true, 256, 8, {0x80018000UL,0,0x10000003UL,0,0,0,0,0x00000001UL}
+                        true, 0, 255, 256, 8, {0x80018000UL,0,0x10000003UL,0,0,0,0,0x00000001UL}
                     }
                 }
             }
@@ -180,6 +206,8 @@ class BitmapRangeTests: public ::testing::Test
         const TestResult all_ones =
         {
             true,
+            0UL,
+            255UL,
             256UL,
             8UL,
             { 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL }
@@ -189,7 +217,7 @@ class BitmapRangeTests: public ::testing::Test
         {
             // initialization
             {
-                true, 0, 0, {0,0,0,0,0,0,0,0}
+                true, 0, 0, 0, 0, {0,0,0,0,0,0,0,0}
             },
             // steps
             {
@@ -197,69 +225,136 @@ class BitmapRangeTests: public ::testing::Test
                 {
                     {0, 0},
                     {
-                        true, 0, 0, {0,0,0,0,0,0,0,0}
+                        true, 0, 0, 0, 0, {0,0,0,0,0,0,0,0}
                     }
                 },
                 // Adding base
                 {
                     {0, 1},
                     {
-                        true, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
+                        true, 0, 0, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // Wrong order params
                 {
                     {10, 1},
                     {
-                        true, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
+                        true, 0, 0, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // Adding out of range
                 {
                     {256, 257},
                     {
-                        true, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
+                        true, 0, 0, 1, 1, {0x80000000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // Middle of first word
                 {
                     {15, 17},
                     {
-                        true, 17, 1, {0x80018000UL,0,0,0,0,0,0,0}
+                        true, 0, 16, 17, 1, {0x80018000UL,0,0,0,0,0,0,0}
                     }
                 },
                 // On second and third word
                 {
                     {35, 68},
                     {
-                        true, 68, 3, {0x80018000UL,0x1FFFFFFF,0xF0000000,0,0,0,0,0}
+                        true, 0, 67, 68, 3, {0x80018000UL,0x1FFFFFFF,0xF0000000,0,0,0,0,0}
                     }
                 },
                 // Crossing more than one word
                 {
                     {94, 133},
                     {
-                        true, 133, 5, {0x80018000UL,0x1FFFFFFF,0xF0000003,0xFFFFFFFF,0xF8000000,0,0,0}
+                        true, 0, 132, 133, 5, {0x80018000UL,0x1FFFFFFF,0xF0000003,0xFFFFFFFF,0xF8000000,0,0,0}
                     }
                 },
                 // Exactly one word
                 {
                     {64, 96},
                     {
-                        true, 133, 5, {0x80018000UL,0x1FFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xF8000000,0,0,0}
+                        true, 0, 132, 133, 5, {0x80018000UL,0x1FFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xF8000000,0,0,0}
                     }
                 },
                 // Exactly two words
                 {
                     {128, 192},
                     {
-                        true, 192, 6, {0x80018000UL,0x1FFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0,0}
+                        true, 0, 191, 192, 6, {0x80018000UL,0x1FFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0,0}
                     }
                 },
                 // Full range
                 {
                     {0, 512},
                     all_ones
+                }
+            }
+        };
+
+        const TestCase<TestInputRemove> test_remove0 =
+        {
+            // initialization (starts from full word)
+            {
+                true, 0, 31, 32, 1, {0xFFFFFFFFUL, 0, 0, 0, 0, 0, 0, 0}
+            },
+            // steps
+            {
+                // Removing out of range
+                {
+                    {32, 33},
+                    {
+                        true, 0, 31, 32, 1, {0xFFFFFFFFUL, 0, 0, 0, 0, 0, 0, 0}
+                    }
+                },
+                // Removing single in the middle
+                {
+                    {5, 6},
+                    {
+                        true, 0, 31, 32, 1, {0xFBFFFFFFUL, 0, 0, 0, 0, 0, 0, 0}
+                    }
+                },
+                // Removing several in the middle
+                {
+                    {6, 31},
+                    {
+                        true, 0, 31, 32, 1, {0xF8000001UL, 0, 0, 0, 0, 0, 0, 0}
+                    }
+                },
+                // Removing last
+                {
+                    {31, 32},
+                    {
+                        true, 0, 4, 5, 1, {0xF8000000UL, 0, 0, 0, 0, 0, 0, 0}
+                    }
+                },
+                // Removing first
+                {
+                    {0, 1},
+                    {
+                        true, 1, 4, 5, 1, {0x78000000UL, 0, 0, 0, 0, 0, 0, 0}
+                    }
+                },
+                // Removing all except first and last
+                {
+                    {2, 4},
+                    {
+                        true, 1, 4, 5, 1, {0x48000000UL, 0, 0, 0, 0, 0, 0, 0}
+                    }
+                },
+                // Removing last
+                {
+                    {4, 5},
+                    {
+                        true, 1, 1, 2, 1, {0x40000000UL, 0, 0, 0, 0, 0, 0, 0}
+                    }
+                },
+                // Removing first
+                {
+                    {1, 2},
+                    {
+                        true, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}
+                    }
                 }
             }
         };
@@ -389,6 +484,14 @@ TEST_F(BitmapRangeTests, sliding_window)
     ASSERT_EQ(uut.max(), sliding_base - 100UL);
     uut.base_update(0);
     ASSERT_TRUE(uut.empty());
+}
+
+TEST_F(BitmapRangeTests, remove)
+{
+    TestType uut(explicit_base);
+    uut.add_range(explicit_base, explicit_base + 32UL);
+
+    test_remove0.Test(explicit_base, uut);
 }
 
 int main(int argc, char **argv)

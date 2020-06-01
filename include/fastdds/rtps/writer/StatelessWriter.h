@@ -124,11 +124,8 @@ public:
             const CacheChange_t* change) const override;
 
     bool try_remove_change(
-            std::chrono::steady_clock::time_point&,
-            std::unique_lock<RecursiveTimedMutex>&) override
-    {
-        return remove_older_changes(1);
-    }
+            const std::chrono::steady_clock::time_point&,
+            std::unique_lock<RecursiveTimedMutex>&) override;
 
     void add_flow_controller(
             std::unique_ptr<FlowController> controller) override;
@@ -163,13 +160,19 @@ private:
     bool is_inline_qos_expected_ = false;
     LocatorList_t fixed_locators_;
     ResourceLimitedVector<ReaderLocator> matched_readers_;
+
+    ResourceLimitedVector<GUID_t> late_joiner_guids_;
+    SequenceNumber_t first_seq_for_all_readers_;
+    bool ignore_fixed_locators_ = false;
+
     ResourceLimitedVector<ChangeForReader_t, std::true_type> unsent_changes_;
     std::vector<std::unique_ptr<FlowController> > flow_controllers_;
     uint64_t last_intraprocess_sequence_number_;
     bool there_are_remote_readers_ = false;
 };
-}
+
 } /* namespace rtps */
+} /* namespace fastrtps */
 } /* namespace eprosima */
 
 #endif
