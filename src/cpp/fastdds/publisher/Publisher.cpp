@@ -48,6 +48,24 @@ Publisher::~Publisher()
 {
 }
 
+ReturnCode_t Publisher::enable()
+{
+    if (enable_)
+    {
+        return ReturnCode_t::RETCODE_OK;
+    }
+
+    if (false == impl_->get_participant()->is_enabled())
+    {
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    enable_ = true;
+    ReturnCode_t ret_code = impl_->enable();
+    enable_ = ReturnCode_t::RETCODE_OK == ret_code;
+    return ret_code;
+}
+
 const PublisherQos& Publisher::get_qos() const
 {
     return impl_->get_qos();
@@ -84,6 +102,15 @@ DataWriter* Publisher::create_datawriter(
         const StatusMask& mask)
 {
     return impl_->create_datawriter(topic, qos, listener, mask);
+}
+
+DataWriter* Publisher::create_datawriter_with_profile(
+        Topic* topic,
+        const std::string& profile_name,
+        DataWriterListener* listener,
+        const StatusMask& mask)
+{
+    return impl_->create_datawriter_with_profile(topic, profile_name, listener, mask);
 }
 
 ReturnCode_t Publisher::delete_datawriter(

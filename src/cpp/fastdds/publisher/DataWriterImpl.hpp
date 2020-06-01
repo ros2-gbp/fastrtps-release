@@ -82,6 +82,8 @@ public:
 
     virtual ~DataWriterImpl();
 
+    ReturnCode_t enable();
+
     /**
      * Write data to the topic.
      * @param data Pointer to the data
@@ -116,11 +118,40 @@ public:
             void* data,
             const fastrtps::rtps::InstanceHandle_t& handle);
 
+    /*!
+     * @brief Implementation of the DDS `register_instance` operation.
+     * It deduces the instance's key and tries to get resources in the PublisherHistory.
+     * @param[in] instance Sample used to get the instance's key.
+     * @return Handle containing the instance's key.
+     * This handle could be used in successive `write` or `dispose` operations.
+     * In case of error, HANDLE_NIL will be returned.
+     */
+    fastrtps::rtps::InstanceHandle_t register_instance(
+            void* instance);
+
+    /*!
+     * @brief Implementation of the DDS `unregister_instance` and `dispose` operations.
+     * It sends a CacheChange_t with a kind that depends on the `dispose` parameter and
+     * `writer_data_lifecycle` QoS.
+     * @param[in] instance Sample used to deduce instance's key in case of `handle` parameter is HANDLE_NIL.
+     * @param[in] handle Instance's key to be unregistered or disposed.
+     * @param[in] dispose If it is `false`, a CacheChange_t with kind set to NOT_ALIVE_UNREGISTERED is sent, or if
+     * `writer_data_lifecycle.autodispose_unregistered_instances` is `true` then it is sent with kind set to
+     * NOT_ALIVE_DISPOSED_UNREGISTERED.
+     * If `dispose` is `true`, a CacheChange_t with kind set to NOT_ALIVE_DISPOSED is sent.
+     * @return Returns the operation's result.
+     * If the operation finishes successfully, ReturnCode_t::RETCODE_OK is returned.
+     */
+    ReturnCode_t unregister_instance(
+            void* instance,
+            const fastrtps::rtps::InstanceHandle_t& handle,
+            bool dispose = false);
+
     /**
      *
      * @return
      */
-    const fastrtps::rtps::GUID_t& guid();
+    const fastrtps::rtps::GUID_t& guid() const;
 
     fastrtps::rtps::InstanceHandle_t get_instance_handle() const;
 
@@ -161,13 +192,6 @@ public:
             const fastrtps::rtps::InstanceHandle_t& handle);
      */
 
-    ReturnCode_t dispose(
-            void* data,
-            const fastrtps::rtps::InstanceHandle_t& handle);
-
-    bool dispose(
-            void* data);
-
     ReturnCode_t get_liveliness_lost_status(
             LivelinessLostStatus& status);
 
@@ -198,15 +222,15 @@ public:
 
 private:
 
-    PublisherImpl* publisher_;
+    PublisherImpl* publisher_ = nullptr;
 
     //! Pointer to the associated Data Writer.
-    fastrtps::rtps::RTPSWriter* writer_;
+    fastrtps::rtps::RTPSWriter* writer_ = nullptr;
 
     //! Pointer to the TopicDataType object.
     TypeSupport type_;
 
-    Topic* topic_;
+    Topic* topic_ = nullptr;
 
     DataWriterQos qos_;
 
@@ -214,7 +238,7 @@ private:
     fastrtps::PublisherHistory history_;
 
     //! DataWriterListener
-    DataWriterListener* listener_;
+    DataWriterListener* listener_ = nullptr;
 
     //!Listener to capture the events of the Writer
     class InnerDataWriterListener : public fastrtps::rtps::WriterListener
@@ -249,7 +273,7 @@ public:
     uint32_t high_mark_for_frag_;
 
     //! A timer used to check for deadlines
-    fastrtps::rtps::TimedEvent* deadline_timer_;
+    fastrtps::rtps::TimedEvent* deadline_timer_ = nullptr;
 
     //! Deadline duration in microseconds
     std::chrono::duration<double, std::ratio<1, 1000000> > deadline_duration_us_;
@@ -261,12 +285,12 @@ public:
     fastrtps::OfferedDeadlineMissedStatus deadline_missed_status_;
 
     //! A timed callback to remove expired samples for lifespan QoS
-    fastrtps::rtps::TimedEvent* lifespan_timer_;
+    fastrtps::rtps::TimedEvent* lifespan_timer_ = nullptr;
 
     //! The lifespan duration, in microseconds
     std::chrono::duration<double, std::ratio<1, 1000000> > lifespan_duration_us_;
 
-    DataWriter* user_datawriter_;
+    DataWriter* user_datawriter_ = nullptr;
 
     /**
      *

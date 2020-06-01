@@ -42,7 +42,9 @@ ReaderProxy::ReaderProxy(
         const RemoteLocatorsAllocationAttributes& loc_alloc,
         StatefulWriter* writer)
     : is_active_(false)
-    , locator_info_(writer->getRTPSParticipant(), loc_alloc.max_unicast_locators, loc_alloc.max_multicast_locators)
+    , locator_info_(
+        writer, loc_alloc.max_unicast_locators,
+        loc_alloc.max_multicast_locators)
     , durability_kind_(VOLATILE)
     , expects_inline_qos_(false)
     , is_reliable_(false)
@@ -56,15 +58,15 @@ ReaderProxy::ReaderProxy(
     , last_nackfrag_count_(0)
 {
     nack_supression_event_ = new TimedEvent(writer_->getRTPSParticipant()->getEventResource(),
-            [&]() -> bool
-            {
-                writer_->perform_nack_supression(guid());
-                return false;
-            },
-            TimeConv::Time_t2MilliSecondsDouble(times.nackSupressionDuration));
+                    [&]() -> bool
+                {
+                    writer_->perform_nack_supression(guid());
+                    return false;
+                },
+                    TimeConv::Time_t2MilliSecondsDouble(times.nackSupressionDuration));
 
     initial_heartbeat_event_ = new TimedEvent(writer_->getRTPSParticipant()->getEventResource(),
-            [&]() -> bool
+                    [&]() -> bool
                 {
                     writer_->intraprocess_heartbeat(this);
                     return false;
@@ -102,7 +104,16 @@ void ReaderProxy::start(
     expects_inline_qos_ = reader_attributes.m_expectsInlineQos;
     is_reliable_ = reader_attributes.m_qos.m_reliability.kind != BEST_EFFORT_RELIABILITY_QOS;
     disable_positive_acks_ = reader_attributes.disable_positive_acks();
-    acked_changes_set(SequenceNumber_t());  // Simulate initial acknack to set low mark
+    if (durability_kind_ == DurabilityKind_t::VOLATILE)
+    {
+        SequenceNumber_t min_sequence = writer_->get_seq_num_min();
+        changes_low_mark_ = (min_sequence == SequenceNumber_t::unknown()) ?
+                writer_->next_sequence_number() - 1 : min_sequence - 1;
+    }
+    else
+    {
+        acked_changes_set(SequenceNumber_t());  // Simulate initial acknack to set low mark
+    }
 
     timers_enabled_.store(is_remote_and_reliable());
     if (is_local_reader())
@@ -198,7 +209,7 @@ void ReaderProxy::add_change(
     // Irrelevant changes are not added to the collection
     if (!change.isRelevant())
     {
-        if (is_local_reader() && changes_for_reader_.empty())
+        if (changes_for_reader_.empty())
         {
             changes_low_mark_ = change.getSequenceNumber();
         }
@@ -250,7 +261,7 @@ bool ReaderProxy::change_is_unsent(
     }
 
     ChangeConstIterator chit = find_change(seq_num);
-     if (chit == changes_for_reader_.end())
+    if (chit == changes_for_reader_.end())
     {
         // There is a hole in changes_for_reader_
         // This means a change was removed.
@@ -287,7 +298,7 @@ void ReaderProxy::acked_changes_set(
     {
         future_low_mark = changes_low_mark_ + 1;
 
-        if (seq_num == SequenceNumber_t())
+        if (seq_num == SequenceNumber_t() && durability_kind_ != DurabilityKind_t::VOLATILE)
         {
             // Special case. Currently only used on Builtin StatefulWriters
             // after losing lease duration, and on late joiners to set
