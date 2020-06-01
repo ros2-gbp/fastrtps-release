@@ -18,32 +18,26 @@
  */
 
 #include <fastdds/domain/DomainParticipantImpl.hpp>
+
+#include <fastdds/dds/builtin/typelookup/TypeLookupManager.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
-#include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
-#include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
-#include <fastdds/rtps/builtin/liveliness/WLP.h>
-
-#include <fastdds/rtps/participant/RTPSParticipant.h>
-
-#include <fastdds/topic/TopicImpl.hpp>
-
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastdds/publisher/PublisherImpl.hpp>
+#include <fastdds/dds/log/Log.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
-
-#include <fastrtps/attributes/SubscriberAttributes.h>
-#include <fastdds/subscriber/SubscriberImpl.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
-
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
 
-#include <fastdds/dds/builtin/typelookup/TypeLookupManager.hpp>
-
 #include <fastdds/rtps/RTPSDomain.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
+#include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
+#include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
+
+#include <fastrtps/attributes/PublisherAttributes.h>
+#include <fastrtps/attributes/SubscriberAttributes.h>
 
 #include <fastrtps/types/TypeObjectFactory.h>
 #include <fastrtps/types/DynamicTypeBuilderFactory.h>
@@ -51,14 +45,26 @@
 #include <fastrtps/types/DynamicType.h>
 #include <fastrtps/types/DynamicTypeMember.h>
 
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include <fastdds/publisher/PublisherImpl.hpp>
+#include <fastdds/subscriber/SubscriberImpl.hpp>
+#include <fastdds/topic/TopicImpl.hpp>
+
+#include <rtps/RTPSDomainImpl.hpp>
 
 #include <chrono>
 
-using namespace eprosima;
-using namespace eprosima::fastdds::dds;
+namespace eprosima {
+namespace fastdds {
+namespace dds {
 
+using fastrtps::xmlparser::XMLProfileManager;
+using fastrtps::xmlparser::XMLP_ret;
 using fastrtps::ParticipantAttributes;
+using fastrtps::TopicAttributes;
+using fastrtps::SubscriberAttributes;
+using fastrtps::PublisherAttributes;
 using fastrtps::rtps::RTPSDomain;
 using fastrtps::rtps::RTPSParticipant;
 using fastrtps::rtps::ParticipantDiscoveryInfo;
@@ -75,21 +81,87 @@ using fastrtps::rtps::EndpointKind_t;
 using fastrtps::rtps::ResourceEvent;
 using eprosima::fastdds::dds::Log;
 
+static void set_attributes_from_qos(
+    fastrtps::rtps::RTPSParticipantAttributes& attr,
+    const DomainParticipantQos& qos)
+{
+    attr.allocation = qos.allocation();
+    attr.properties = qos.properties();
+    attr.setName(qos.name());
+    attr.prefix = qos.wire_protocol().prefix;
+    attr.participantID = qos.wire_protocol().participant_id;
+    attr.builtin = qos.wire_protocol().builtin;
+    attr.port = qos.wire_protocol().port;
+    attr.throughputController = qos.wire_protocol().throughput_controller;
+    attr.defaultUnicastLocatorList = qos.wire_protocol().default_unicast_locator_list;
+    attr.defaultMulticastLocatorList = qos.wire_protocol().default_multicast_locator_list;
+    attr.userTransports = qos.transport().user_transports;
+    attr.useBuiltinTransports = qos.transport().use_builtin_transports;
+    attr.sendSocketBufferSize = qos.transport().send_socket_buffer_size;
+    attr.listenSocketBufferSize = qos.transport().listen_socket_buffer_size;
+    attr.userData = qos.user_data().data_vec();
+}
+
+static void set_qos_from_attributes(
+        TopicQos& qos,
+        const TopicAttributes& attr)
+{
+    qos.history() = attr.historyQos;
+    qos.resource_limits() = attr.resourceLimitsQos;
+}
+
+static void set_qos_from_attributes(
+        SubscriberQos& qos,
+        const SubscriberAttributes& attr)
+{
+    qos.group_data().setValue(attr.qos.m_groupData);
+    qos.partition() = attr.qos.m_partition;
+    qos.presentation() = attr.qos.m_presentation;
+}
+
+static void set_qos_from_attributes(
+        PublisherQos& qos,
+        const PublisherAttributes& attr)
+{
+    qos.group_data().setValue(attr.qos.m_groupData);
+    qos.partition() = attr.qos.m_partition;
+    qos.presentation() = attr.qos.m_presentation;
+}
 
 DomainParticipantImpl::DomainParticipantImpl(
         DomainParticipant* dp,
+        DomainId_t did,
         const DomainParticipantQos& qos,
         DomainParticipantListener* listen)
-    : qos_(qos)
+    : domain_id_(did)
+    , next_instance_id_(0)
+    , qos_(qos)
     , rtps_participant_(nullptr)
     , participant_(dp)
     , listener_(listen)
     , default_pub_qos_(PUBLISHER_QOS_DEFAULT)
     , default_sub_qos_(SUBSCRIBER_QOS_DEFAULT)
+    , default_topic_qos_(TOPIC_QOS_DEFAULT)
 #pragma warning (disable : 4355 )
     , rtps_listener_(this)
 {
     participant_->impl_ = this;
+
+    PublisherAttributes pub_attr;
+    XMLProfileManager::getDefaultPublisherAttributes(pub_attr);
+    set_qos_from_attributes(default_pub_qos_, pub_attr);
+
+    SubscriberAttributes sub_attr;
+    XMLProfileManager::getDefaultSubscriberAttributes(sub_attr);
+    set_qos_from_attributes(default_sub_qos_, sub_attr);
+
+    TopicAttributes top_attr;
+    XMLProfileManager::getDefaultTopicAttributes(top_attr);
+    set_qos_from_attributes(default_topic_qos_, top_attr);
+
+    // Pre calculate participant id and generated guid
+    participant_id_ = qos_.wire_protocol().participant_id;
+    eprosima::fastrtps::rtps::RTPSDomainImpl::create_participant_guid(participant_id_, guid_);
 }
 
 void DomainParticipantImpl::disable()
@@ -99,20 +171,26 @@ void DomainParticipantImpl::disable()
         participant_->set_listener(nullptr);
     }
     rtps_listener_.participant_ = nullptr;
-    rtps_participant_->set_listener(nullptr);
-    {
-        std::lock_guard<std::mutex> lock(mtx_pubs_);
-        for (auto pub_it = publishers_.begin(); pub_it != publishers_.end(); ++pub_it)
-        {
-            pub_it->second->disable();
-        }
-    }
 
+    // We only need to disable lower entities if we have been previously enabled
+    if (rtps_participant_ != nullptr)
     {
-        std::lock_guard<std::mutex> lock(mtx_subs_);
-        for (auto sub_it = subscribers_.begin(); sub_it != subscribers_.end(); ++sub_it)
+        rtps_participant_->set_listener(nullptr);
+
         {
-            sub_it->second->disable();
+            std::lock_guard<std::mutex> lock(mtx_pubs_);
+            for (auto pub_it = publishers_.begin(); pub_it != publishers_.end(); ++pub_it)
+            {
+                pub_it->second->disable();
+            }
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(mtx_subs_);
+            for (auto sub_it = subscribers_.begin(); sub_it != subscribers_.end(); ++sub_it)
+            {
+                sub_it->second->disable();
+            }
         }
     }
 }
@@ -171,35 +249,88 @@ DomainParticipantImpl::~DomainParticipantImpl()
 
 ReturnCode_t DomainParticipantImpl::enable()
 {
+    // Should not have been previously enabled
+    assert(rtps_participant_ == nullptr);
+
+    fastrtps::rtps::RTPSParticipantAttributes rtps_attr;
+    set_attributes_from_qos(rtps_attr, qos_);
+    rtps_attr.participantID = participant_id_;
+    RTPSParticipant* part = RTPSDomain::createParticipant(domain_id_, false, rtps_attr, &rtps_listener_);
+
+    if (part == nullptr)
+    {
+        logError(DOMAIN_PARTICIPANT, "Problem creating RTPSParticipant");
+        return ReturnCode_t::RETCODE_ERROR;
+    }
+
+    guid_ = part->getGuid();
+    rtps_participant_ = part;
     rtps_participant_->enable();
+
+    rtps_participant_->set_check_type_function(
+        [this](const std::string& type_name) -> bool
+        {
+            return find_type(type_name).get() != nullptr;
+        });
+
+    if (qos_.entity_factory().autoenable_created_entities)
+    {
+        // Enable topics first
+        {
+            std::lock_guard<std::mutex> lock(mtx_topics_);
+
+            for (auto topic : topics_)
+            {
+                topic.second->user_topic_->enable();
+            }
+        }
+
+        // Enable publishers
+        {
+            std::lock_guard<std::mutex> lock(mtx_pubs_);
+            for (auto pub : publishers_)
+            {
+                pub.second->rtps_participant_ = rtps_participant_;
+                pub.second->user_publisher_->enable();
+            }
+        }
+
+        // Enable subscribers
+        {
+            std::lock_guard<std::mutex> lock(mtx_subs_);
+
+            for (auto sub : subscribers_)
+            {
+                sub.second->rtps_participant_ = rtps_participant_;
+                sub.second->user_subscriber_->enable();
+            }
+        }
+    }
+
     return ReturnCode_t::RETCODE_OK;
 }
 
 ReturnCode_t DomainParticipantImpl::set_qos(
         const DomainParticipantQos& qos)
 {
-    if (&qos == &PARTICIPANT_QOS_DEFAULT)
+    bool enabled = (rtps_participant_ != nullptr);
+    const DomainParticipantQos& qos_to_set = (&qos == &PARTICIPANT_QOS_DEFAULT) ?
+        DomainParticipantFactory::get_instance()->get_default_participant_qos() : qos;
+
+    if (&qos != &PARTICIPANT_QOS_DEFAULT)
     {
-        const DomainParticipantQos& default_qos =
-                DomainParticipantFactory::get_instance()->get_default_participant_qos();
-        if (!can_qos_be_updated(qos_, qos))
+        ReturnCode_t ret_val = check_qos(qos_to_set);
+        if (!ret_val)
         {
-            return ReturnCode_t::RETCODE_IMMUTABLE_POLICY;
+            return ret_val;
         }
-        set_qos(qos_, default_qos, false);
-        return ReturnCode_t::RETCODE_OK;
     }
 
-    ReturnCode_t ret_val = check_qos(qos);
-    if (!ret_val)
-    {
-        return ret_val;
-    }
-    if (!can_qos_be_updated(qos_, qos))
+    if (enabled && !can_qos_be_updated(qos_, qos_to_set))
     {
         return ReturnCode_t::RETCODE_IMMUTABLE_POLICY;
     }
-    set_qos(qos_, qos, false);
+    set_qos(qos_, qos_to_set, !enabled);
     return ReturnCode_t::RETCODE_OK;
 }
 
@@ -301,12 +432,12 @@ ReturnCode_t DomainParticipantImpl::delete_topic(
 
 const InstanceHandle_t& DomainParticipantImpl::get_instance_handle() const
 {
-    return static_cast<const InstanceHandle_t&>(rtps_participant_->getGuid());
+    return static_cast<const InstanceHandle_t&>(guid_);
 }
 
 const GUID_t& DomainParticipantImpl::guid() const
 {
-    return rtps_participant_->getGuid();
+    return guid_;
 }
 
 Publisher* DomainParticipantImpl::create_publisher(
@@ -314,29 +445,58 @@ Publisher* DomainParticipantImpl::create_publisher(
         PublisherListener* listener,
         const StatusMask& mask)
 {
+    if (!PublisherImpl::check_qos(qos))
+    {
+        logError(PARTICIPANT, "PublisherQos inconsistent or not supported");
+        return nullptr;
+    }
+
     //TODO CONSTRUIR LA IMPLEMENTACION DENTRO DEL OBJETO DEL USUARIO.
     PublisherImpl* pubimpl = new PublisherImpl(this, qos, listener);
     Publisher* pub = new Publisher(pubimpl, mask);
     pubimpl->user_publisher_ = pub;
     pubimpl->rtps_participant_ = rtps_participant_;
 
-    // Create InstanceHandle for the new publisher
-    GUID_t pub_guid = guid();
-    do
-    {
-        pub_guid.entityId = fastrtps::rtps::c_EntityId_Unknown;
-        rtps_participant_->get_new_entity_id(pub_guid.entityId);
-    } while (exists_entity_id(pub_guid.entityId));
+    bool enabled = rtps_participant_ != nullptr;
 
-    InstanceHandle_t pub_handle(pub_guid);
-    pubimpl->handle_ = pub_handle;
+    // Create InstanceHandle for the new publisher
+    InstanceHandle_t pub_handle;
+    create_instance_handle(pub_handle);
+    pubimpl->handle_ = pub_handle; 
 
     //SAVE THE PUBLISHER INTO MAPS
     std::lock_guard<std::mutex> lock(mtx_pubs_);
     publishers_by_handle_[pub_handle] = pub;
     publishers_[pub] = pubimpl;
 
+    // Enable publisher if appropriate
+    if (enabled && qos_.entity_factory().autoenable_created_entities)
+    {
+        if (ReturnCode_t::RETCODE_OK != pub->enable())
+        {
+            delete_publisher(pub);
+            return nullptr;
+        }
+    }
+
     return pub;
+}
+
+Publisher* DomainParticipantImpl::create_publisher_with_profile(
+        const std::string& profile_name,
+        PublisherListener* listener,
+        const StatusMask& mask)
+{
+    // TODO (ILG): Change when we have full XML support for DDS QoS profiles
+    PublisherAttributes attr;
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(profile_name, attr))
+    {
+        PublisherQos qos = default_pub_qos_;
+        set_qos_from_attributes(qos, attr);
+        return create_publisher(qos, listener, mask);
+    }
+
+    return nullptr;
 }
 
 /* TODO
@@ -389,11 +549,7 @@ Publisher* DomainParticipantImpl::create_publisher(
 
 DomainId_t DomainParticipantImpl::get_domain_id() const
 {
-    if (rtps_participant())
-    {
-        return rtps_participant_->get_domain_id();
-    }
-    return (DomainId_t) -1;
+    return domain_id_;
 }
 
 /* TODO
@@ -406,6 +562,11 @@ DomainId_t DomainParticipantImpl::get_domain_id() const
 
 ReturnCode_t DomainParticipantImpl::assert_liveliness()
 {
+    if (rtps_participant_ == nullptr)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
     if (rtps_participant_->wlp() != nullptr)
     {
         if (rtps_participant_->wlp()->assert_liveliness_manual_by_participant())
@@ -425,7 +586,7 @@ ReturnCode_t DomainParticipantImpl::set_default_publisher_qos(
 {
     if (&qos == &PUBLISHER_QOS_DEFAULT)
     {
-        PublisherImpl::set_qos(default_pub_qos_, PUBLISHER_QOS_DEFAULT, true);
+        reset_default_publisher_qos();
         return ReturnCode_t::RETCODE_OK;
     }
 
@@ -438,6 +599,15 @@ ReturnCode_t DomainParticipantImpl::set_default_publisher_qos(
     return ReturnCode_t::RETCODE_OK;
 }
 
+void DomainParticipantImpl::reset_default_publisher_qos()
+{
+    // TODO (ILG): Change when we have full XML support for DDS QoS profiles
+    PublisherImpl::set_qos(default_pub_qos_, PUBLISHER_QOS_DEFAULT, true);
+    PublisherAttributes attr;
+    XMLProfileManager::getDefaultPublisherAttributes(attr);
+    set_qos_from_attributes(default_pub_qos_, attr);
+}
+
 const PublisherQos& DomainParticipantImpl::get_default_publisher_qos() const
 {
     return default_pub_qos_;
@@ -448,7 +618,7 @@ ReturnCode_t DomainParticipantImpl::set_default_subscriber_qos(
 {
     if (&qos == &SUBSCRIBER_QOS_DEFAULT)
     {
-        SubscriberImpl::set_qos(default_sub_qos_, SUBSCRIBER_QOS_DEFAULT, true);
+        reset_default_subscriber_qos();
         return ReturnCode_t::RETCODE_OK;
     }
     ReturnCode_t check_result = SubscriberImpl::check_qos(qos);
@@ -458,6 +628,15 @@ ReturnCode_t DomainParticipantImpl::set_default_subscriber_qos(
     }
     SubscriberImpl::set_qos(default_sub_qos_, qos, true);
     return ReturnCode_t::RETCODE_OK;
+}
+
+void DomainParticipantImpl::reset_default_subscriber_qos()
+{
+    // TODO (ILG): Change when we have full XML support for DDS QoS profiles
+    SubscriberImpl::set_qos(default_sub_qos_, SUBSCRIBER_QOS_DEFAULT, true);
+    SubscriberAttributes attr;
+    XMLProfileManager::getDefaultSubscriberAttributes(attr);
+    set_qos_from_attributes(default_sub_qos_, attr);
 }
 
 const SubscriberQos& DomainParticipantImpl::get_default_subscriber_qos() const
@@ -470,7 +649,7 @@ ReturnCode_t DomainParticipantImpl::set_default_topic_qos(
 {
     if (&qos == &TOPIC_QOS_DEFAULT)
     {
-        TopicImpl::set_qos(default_topic_qos_, TOPIC_QOS_DEFAULT, true);
+        reset_default_topic_qos();
         return ReturnCode_t::RETCODE_OK;
     }
 
@@ -482,6 +661,15 @@ ReturnCode_t DomainParticipantImpl::set_default_topic_qos(
 
     TopicImpl::set_qos(default_topic_qos_, qos, true);
     return ReturnCode_t::RETCODE_OK;
+}
+
+void DomainParticipantImpl::reset_default_topic_qos()
+{
+    // TODO (ILG): Change when we have full XML support for DDS QoS profiles
+    TopicImpl::set_qos(default_topic_qos_, TOPIC_QOS_DEFAULT, true);
+    TopicAttributes attr;
+    XMLProfileManager::getDefaultTopicAttributes(attr);
+    set_qos_from_attributes(default_topic_qos_, attr);
 }
 
 const TopicQos& DomainParticipantImpl::get_default_topic_qos() const
@@ -597,7 +785,9 @@ DomainParticipant* DomainParticipantImpl::get_participant()
 
 std::vector<std::string> DomainParticipantImpl::get_participant_names() const
 {
-    return rtps_participant_->getParticipantNames();
+    return rtps_participant_ == nullptr ?
+        std::vector<std::string> {} :
+        rtps_participant_->getParticipantNames();
 }
 
 Subscriber* DomainParticipantImpl::create_subscriber(
@@ -607,6 +797,7 @@ Subscriber* DomainParticipantImpl::create_subscriber(
 {
     if (!SubscriberImpl::check_qos(qos))
     {
+        logError(PARTICIPANT, "SubscriberQos inconsistent or not supported");
         return nullptr;
     }
 
@@ -617,14 +808,11 @@ Subscriber* DomainParticipantImpl::create_subscriber(
     subimpl->rtps_participant_ = this->rtps_participant_;
 
     // Create InstanceHandle for the new subscriber
-    GUID_t sub_guid = guid();
-    do
-    {
-        sub_guid.entityId = fastrtps::rtps::c_EntityId_Unknown;
-        rtps_participant_->get_new_entity_id(sub_guid.entityId);
-    } while (exists_entity_id(sub_guid.entityId));
+    InstanceHandle_t sub_handle;
+    bool enabled = rtps_participant_ != nullptr;
 
-    InstanceHandle_t sub_handle(sub_guid);
+    // Create InstanceHandle for the new subscriber
+    create_instance_handle(sub_handle);
     subimpl->handle_ = sub_handle;
 
     //SAVE THE PUBLISHER INTO MAPS
@@ -632,7 +820,34 @@ Subscriber* DomainParticipantImpl::create_subscriber(
     subscribers_by_handle_[sub_handle] = sub;
     subscribers_[sub] = subimpl;
 
+    // Enable subscriber if appropriate
+    if (enabled && qos_.entity_factory().autoenable_created_entities)
+    {
+        if (ReturnCode_t::RETCODE_OK != sub->enable())
+        {
+            delete_subscriber(sub);
+            return nullptr;
+        }
+    }
+
     return sub;
+}
+
+Subscriber* DomainParticipantImpl::create_subscriber_with_profile(
+        const std::string& profile_name,
+        SubscriberListener* listener,
+        const StatusMask& mask)
+{
+    // TODO (ILG): Change when we have full XML support for DDS QoS profiles
+    SubscriberAttributes attr;
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr))
+    {
+        SubscriberQos qos = default_sub_qos_;
+        set_qos_from_attributes(qos, attr);
+        return create_subscriber(qos, listener, mask);
+    }
+
+    return nullptr;
 }
 
 Topic* DomainParticipantImpl::create_topic(
@@ -656,13 +871,7 @@ Topic* DomainParticipantImpl::create_topic(
         return nullptr;
     }
 
-    GUID_t topic_guid = guid();
-    do
-    {
-        topic_guid.entityId = fastrtps::rtps::c_EntityId_Unknown;
-        rtps_participant_->get_new_entity_id(topic_guid.entityId);
-    } while (exists_entity_id(topic_guid.entityId));
-    InstanceHandle_t topic_handle(topic_guid);
+    bool enabled = rtps_participant_ != nullptr;
 
     std::lock_guard<std::mutex> lock(mtx_topics_);
 
@@ -672,6 +881,9 @@ Topic* DomainParticipantImpl::create_topic(
         logError(PARTICIPANT, "Topic with name : " << topic_name << " already exists");
         return nullptr;
     }
+
+    InstanceHandle_t topic_handle;
+    create_instance_handle(topic_handle);
 
     //TODO CONSTRUIR LA IMPLEMENTACION DENTRO DEL OBJETO DEL USUARIO.
     TopicImpl* topic_impl = new TopicImpl(this, type_support, qos, listener);
@@ -683,7 +895,36 @@ Topic* DomainParticipantImpl::create_topic(
     topics_by_handle_[topic_handle] = topic;
     topics_[topic_name] = topic_impl;
 
+    // Enable topic if appropriate
+    if (enabled && qos_.entity_factory().autoenable_created_entities)
+    {
+        if (ReturnCode_t::RETCODE_OK != topic->enable())
+        {
+            delete_topic(topic);
+            return nullptr;
+        }
+    }
+
     return topic;
+}
+
+Topic* DomainParticipantImpl::create_topic_with_profile(
+        const std::string& topic_name,
+        const std::string& type_name,
+        const std::string& profile_name,
+        TopicListener* listener,
+        const StatusMask& mask)
+{
+    // TODO (ILG): Change when we have full XML support for DDS QoS profiles
+    TopicAttributes attr;
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillTopicAttributes(profile_name, attr))
+    {
+        TopicQos qos = default_topic_qos_;
+        set_qos_from_attributes(qos, attr);
+        return create_topic(topic_name, type_name, qos, listener, mask);
+    }
+
+    return nullptr;
 }
 
 TopicDescription* DomainParticipantImpl::lookup_topicdescription(
@@ -943,14 +1184,19 @@ bool DomainParticipantImpl::new_remote_endpoint_discovered(
         uint16_t endpointId,
         EndpointKind_t kind)
 {
-    if (kind == fastrtps::rtps::WRITER)
+    if (rtps_participant_ != nullptr)
     {
-        return rtps_participant_->newRemoteWriterDiscovered(partguid, static_cast<int16_t>(endpointId));
+        if (kind == fastrtps::rtps::WRITER)
+        {
+            return rtps_participant_->newRemoteWriterDiscovered(partguid, static_cast<int16_t>(endpointId));
+        }
+        else
+        {
+            return rtps_participant_->newRemoteReaderDiscovered(partguid, static_cast<int16_t>(endpointId));
+        }
     }
-    else
-    {
-        return rtps_participant_->newRemoteReaderDiscovered(partguid, static_cast<int16_t>(endpointId));
-    }
+
+    return false;
 }
 
 ResourceEvent& DomainParticipantImpl::get_resource_event() const
@@ -986,6 +1232,12 @@ ReturnCode_t DomainParticipantImpl::register_remote_type(
         std::function<void(const std::string& name, const fastrtps::types::DynamicType_ptr type)>& callback)
 {
     using namespace fastrtps::types;
+
+    if (rtps_participant_ == nullptr)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
     TypeObjectFactory* factory = TypeObjectFactory::get_instance();
     // Check if plain
     if (type_information.complete().typeid_with_size().type_id()._d() < EK_MINIMAL)
@@ -1465,27 +1717,44 @@ bool DomainParticipantImpl::can_qos_be_updated(
     if (!(to.allocation() == from.allocation()))
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "ParticipantResourceLimitsQos cannot be changed after the participant creation");
+        logWarning(RTPS_QOS_CHECK, "ParticipantResourceLimitsQos cannot be changed after the participant is enabled");
     }
     if (!(to.properties() == from.properties()))
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "PropertyPolilyQos cannot be changed after the participant creation");
+        logWarning(RTPS_QOS_CHECK, "PropertyPolilyQos cannot be changed after the participant is enabled");
     }
     if (!(to.wire_protocol() == from.wire_protocol()))
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "WireProtocolConfigQos cannot be changed after the participant creation");
+        logWarning(RTPS_QOS_CHECK, "WireProtocolConfigQos cannot be changed after the participant is enabled");
     }
     if (!(to.transport() == from.transport()))
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "TransportConfigQos cannot be changed after the participant creation");
+        logWarning(RTPS_QOS_CHECK, "TransportConfigQos cannot be changed after the participant is enabled");
     }
     if (!(to.name() == from.name()))
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Participant name cannot be changed after the participant creation");
+        logWarning(RTPS_QOS_CHECK, "Participant name cannot be changed after the participant is enabled");
     }
     return updatable;
 }
+
+void DomainParticipantImpl::create_instance_handle(
+        fastrtps::rtps::InstanceHandle_t& handle)
+{
+    using eprosima::fastrtps::rtps::octet;
+
+    ++next_instance_id_;
+    handle = guid_;
+    handle.value[15] = 0x01; // Vendor specific;
+    handle.value[14] = static_cast<octet>(next_instance_id_ & 0xFF);
+    handle.value[13] = static_cast<octet>((next_instance_id_ >> 8) & 0xFF);
+    handle.value[12] = static_cast<octet>((next_instance_id_ >> 16) & 0xFF);;
+}
+
+}  // namespace dds
+}  // namespace fastdds
+}  // namespace eprosima

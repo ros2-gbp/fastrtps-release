@@ -30,12 +30,51 @@
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/dds/log/Log.hpp>
 
-using namespace eprosima::fastrtps;
-using namespace eprosima::fastrtps::rtps;
+#include <fastrtps/attributes/SubscriberAttributes.h>
+
+#include <fastrtps/xmlparser/XMLProfileManager.h>
 
 namespace eprosima {
 namespace fastdds {
 namespace dds {
+
+using fastrtps::xmlparser::XMLProfileManager;
+using fastrtps::xmlparser::XMLP_ret;
+using fastrtps::rtps::InstanceHandle_t;
+using fastrtps::Duration_t;
+using fastrtps::SubscriberAttributes;
+
+static void set_qos_from_attributes(
+        DataReaderQos& qos,
+        const SubscriberAttributes& attr)
+{
+    qos.reader_resource_limits().matched_publisher_allocation = attr.matched_publisher_allocation;
+    qos.properties() = attr.properties;
+    qos.expects_inline_qos(attr.expectsInlineQos);
+    qos.endpoint().unicast_locator_list = attr.unicastLocatorList;
+    qos.endpoint().multicast_locator_list = attr.multicastLocatorList;
+    qos.endpoint().remote_locator_list = attr.remoteLocatorList;
+    qos.endpoint().history_memory_policy = attr.historyMemoryPolicy;
+    qos.endpoint().user_defined_id = attr.getUserDefinedID();
+    qos.endpoint().entity_id = attr.getEntityID();
+    qos.reliable_reader_qos().times = attr.times;
+    qos.reliable_reader_qos().disable_positive_ACKs = attr.qos.m_disablePositiveACKs;
+    qos.durability() = attr.qos.m_durability;
+    qos.durability_service() = attr.qos.m_durabilityService;
+    qos.deadline() = attr.qos.m_deadline;
+    qos.latency_budget() = attr.qos.m_latencyBudget;
+    qos.liveliness() = attr.qos.m_liveliness;
+    qos.reliability() = attr.qos.m_reliability;
+    qos.lifespan() = attr.qos.m_lifespan;
+    qos.user_data().setValue(attr.qos.m_userData);
+    qos.ownership() = attr.qos.m_ownership;
+    qos.destination_order() = attr.qos.m_destinationOrder;
+    qos.type_consistency().type_consistency = attr.qos.type_consistency;
+    qos.type_consistency().representation = attr.qos.representation;
+    qos.time_based_filter() = attr.qos.m_timeBasedFilter;
+    qos.history() = attr.topic.historyQos;
+    qos.resource_limits() = attr.topic.resourceLimitsQos;
+}
 
 SubscriberImpl::SubscriberImpl(
         DomainParticipantImpl* p,
@@ -49,6 +88,26 @@ SubscriberImpl::SubscriberImpl(
     , rtps_participant_(p->rtps_participant())
     , default_datareader_qos_(DATAREADER_QOS_DEFAULT)
 {
+    SubscriberAttributes sub_attr;
+    XMLProfileManager::getDefaultSubscriberAttributes(sub_attr);
+    set_qos_from_attributes(default_datareader_qos_, sub_attr);
+}
+
+ReturnCode_t SubscriberImpl::enable()
+{
+    if (qos_.entity_factory().autoenable_created_entities)
+    {
+        std::lock_guard<std::mutex> lock(mtx_readers_);
+        for (auto topic_readers : readers_)
+        {
+            for (DataReaderImpl* dr : topic_readers.second)
+            {
+                dr->user_datareader_->enable();
+            }
+        }
+    }
+
+    return ReturnCode_t::RETCODE_OK;
 }
 
 void SubscriberImpl::disable()
@@ -92,16 +151,27 @@ const SubscriberQos& SubscriberImpl::get_qos() const
 ReturnCode_t SubscriberImpl::set_qos(
         const SubscriberQos& qos)
 {
-    if (&qos == &SUBSCRIBER_QOS_DEFAULT)
+    bool enabled = user_subscriber_->is_enabled();
+    const SubscriberQos& qos_to_set = (&qos == &SUBSCRIBER_QOS_DEFAULT) ?
+        participant_->get_default_subscriber_qos() : qos;
+
+    if (&qos != &SUBSCRIBER_QOS_DEFAULT)
     {
-        const SubscriberQos& default_qos = participant_->get_default_subscriber_qos();
-        if (!can_qos_be_updated(qos_, default_qos))
+        ReturnCode_t check_result = check_qos(qos_to_set);
+        if (!check_result)
         {
-            return ReturnCode_t::RETCODE_IMMUTABLE_POLICY;
+            return check_result;
         }
+    }
 
-        set_qos(qos_, default_qos, false);
+    if (enabled && !can_qos_be_updated(qos_, qos_to_set))
+    {
+        return ReturnCode_t::RETCODE_IMMUTABLE_POLICY;
+    }
+    set_qos(qos_, qos_to_set, !enabled);
 
+    if (enabled)
+    {
         std::lock_guard<std::mutex> lock(mtx_readers_);
         for (auto topic_readers : readers_)
         {
@@ -109,28 +179,6 @@ ReturnCode_t SubscriberImpl::set_qos(
             {
                 reader->subscriber_qos_updated();
             }
-        }
-
-        return ReturnCode_t::RETCODE_OK;
-    }
-
-    ReturnCode_t check_result = check_qos(qos);
-    if (!check_result)
-    {
-        return check_result;
-    }
-    if (!can_qos_be_updated(qos_, qos))
-    {
-        return ReturnCode_t::RETCODE_IMMUTABLE_POLICY;
-    }
-    set_qos(qos_, qos, false);
-
-    std::lock_guard<std::mutex> lock(mtx_readers_);
-    for (auto topic_readers : readers_)
-    {
-        for (auto reader : topic_readers.second)
-        {
-            reader->subscriber_qos_updated();
         }
     }
 
@@ -181,26 +229,42 @@ DataReader* SubscriberImpl::create_datareader(
         qos,
         listener);
 
-    if (impl->reader_ == nullptr)
-    {
-        logError(SUBSCRIBER, "Problem creating associated Reader");
-        delete impl;
-        topic->get_impl()->dereference();
-        return nullptr;
-    }
-
     DataReader* reader = new DataReader(impl, mask);
     impl->user_datareader_ = reader;
-
-    ReaderQos rqos = qos.get_readerqos(qos_);
-    rtps_participant_->registerReader(impl->reader_, impl->topic_attributes(), rqos);
 
     {
         std::lock_guard<std::mutex> lock(mtx_readers_);
         readers_[topic->get_name()].push_back(impl);
     }
 
+    if (user_subscriber_->is_enabled() && qos_.entity_factory().autoenable_created_entities)
+    {
+        if (ReturnCode_t::RETCODE_OK != reader->enable())
+        {
+            delete_datareader(reader);
+            return nullptr;
+        }
+    }
+
     return reader;
+}
+
+DataReader* SubscriberImpl::create_datareader_with_profile(
+        TopicDescription* topic,
+        const std::string& profile_name,
+        DataReaderListener* listener,
+        const StatusMask& mask)
+{
+    // TODO (ILG): Change when we have full XML support for DDS QoS profiles
+    SubscriberAttributes attr;
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr))
+    {
+        DataReaderQos qos = default_datareader_qos_;
+        set_qos_from_attributes(qos, attr);
+        return create_datareader(topic, qos, listener, mask);
+    }
+
+    return nullptr;
 }
 
 ReturnCode_t SubscriberImpl::delete_datareader(
@@ -307,7 +371,7 @@ ReturnCode_t SubscriberImpl::set_default_datareader_qos(
 {
     if (&qos == &DATAREADER_QOS_DEFAULT)
     {
-        DataReaderImpl::set_qos(default_datareader_qos_, DATAREADER_QOS_DEFAULT, true);
+        reset_default_datareader_qos();
         return ReturnCode_t::RETCODE_OK;
     }
 
@@ -319,6 +383,15 @@ ReturnCode_t SubscriberImpl::set_default_datareader_qos(
 
     DataReaderImpl::set_qos(default_datareader_qos_, qos, true);
     return ReturnCode_t::RETCODE_OK;
+}
+
+void SubscriberImpl::reset_default_datareader_qos()
+{
+    // TODO (ILG): Change when we have full XML support for DDS QoS profiles
+    DataReaderImpl::set_qos(default_datareader_qos_, DATAREADER_QOS_DEFAULT, true);
+    SubscriberAttributes attr;
+    XMLProfileManager::getDefaultSubscriberAttributes(attr);
+    set_qos_from_attributes(default_datareader_qos_, attr);
 }
 
 const DataReaderQos& SubscriberImpl::get_default_datareader_qos() const

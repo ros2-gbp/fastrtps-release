@@ -351,6 +351,26 @@ public:
         }
     }
 
+    eprosima::fastrtps::rtps::InstanceHandle_t register_instance(
+            type& msg)
+    {
+        return publisher_->register_instance((void*)&msg);
+    }
+
+    bool unregister_instance(
+            type& msg,
+            const eprosima::fastrtps::rtps::InstanceHandle_t& instance_handle)
+    {
+        return publisher_->unregister_instance((void*)&msg, instance_handle);
+    }
+
+    bool dispose(
+            type& msg,
+            const eprosima::fastrtps::rtps::InstanceHandle_t& instance_handle)
+    {
+        return publisher_->dispose((void*)&msg, instance_handle);
+    }
+
     bool send_sample(
             type& msg)
     {
@@ -379,6 +399,30 @@ public:
         {
             cv_.wait_for(lock, timeout, [&](){
                 return matched_ != 0;
+            });
+        }
+
+        std::cout << "Writer discovery finished..." << std::endl;
+    }
+
+    void wait_discovery(
+            unsigned int expected_match,
+            std::chrono::seconds timeout = std::chrono::seconds::zero())
+    {
+        std::unique_lock<std::mutex> lock(mutexDiscovery_);
+
+        std::cout << "Writer is waiting discovery..." << std::endl;
+
+        if (timeout == std::chrono::seconds::zero())
+        {
+            cv_.wait(lock, [&](){
+                return matched_ == expected_match;
+            });
+        }
+        else
+        {
+            cv_.wait_for(lock, timeout, [&](){
+                return matched_ == expected_match;
             });
         }
 

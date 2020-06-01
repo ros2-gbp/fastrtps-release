@@ -88,11 +88,16 @@ public:
     RTPS_DllAPI virtual ~DataWriter();
 
     /**
+     * @brief This operation enables the DataWriter
+     * @return RETCODE_OK is successfully enabled. RETCODE_PRECONDITION_NOT_MET if the Publisher creating this
+     *         DataWriter is not enabled.
+     */
+    RTPS_DllAPI ReturnCode_t enable() override;
+
+    /**
      * Write data to the topic.
      * @param data Pointer to the data
-     * @return True if correct
-     * @par Calling example:
-     * @snippet fastrtps_example.cpp ex_PublisherWrite
+     * @return True if correct, false otherwise
      */
     RTPS_DllAPI bool write(
             void* data);
@@ -101,9 +106,7 @@ public:
      * Write data with params to the topic.
      * @param data Pointer to the data
      * @param params Extra write parameters.
-     * @return True if correct
-     * @par Calling example:
-     * @snippet fastrtps_example.cpp ex_PublisherWrite
+     * @return True if correct, false otherwise
      */
     RTPS_DllAPI bool write(
             void* data,
@@ -111,34 +114,66 @@ public:
 
     /**
      * Write data with handle.
+     *
+     * The special value HANDLE_NIL can be used for the parameter handle.This indicates that the identity of the
+     * instance should be automatically deduced from the instance_data (by means of the key).
+     *
      * @param data Pointer to the data
      * @param handle InstanceHandle_t.
-     * @return True if correct
-     * @par Calling example:
-     * @snippet fastrtps_example.cpp ex_PublisherWrite
+     * @return RETCODE_PRECONDITION_NOT_MET if the handle introduced does not match with the one associated to the data,
+     * RETCODE_OK if the data is correctly sent and RETCODE_ERROR otherwise.
      */
     RTPS_DllAPI ReturnCode_t write(
             void* data,
             const fastrtps::rtps::InstanceHandle_t& handle);
 
+    /*!
+     * @brief Informs that the application will be modifying a particular instance.
+     * It gives an opportunity to the middleware to pre-configure itself to improve performance.
+     * @param[in] instance Sample used to get the instance's key.
+     * @return Handle containing the instance's key.
+     * This handle could be used in successive `write` or `dispose` operations.
+     * In case of error, HANDLE_NIL will be returned.
+     */
+    RTPS_DllAPI fastrtps::rtps::InstanceHandle_t register_instance(
+            void* instance);
+
+    /*!
+     * @brief This operation reverses the action of `register_instance`.
+     * It should only be called on an instance that is currently registered.
+     * Informs the middleware that the DataWriter is not intending to modify any more of that data instance.
+     * Also indicates that the middleware can locally remove all information regarding that instance.
+     * @param[in] instance Sample used to deduce instance's key in case of `handle` parameter is HANDLE_NIL.
+     * @param[in] handle Instance's key to be unregistered.
+     * @return Returns the operation's result.
+     * If the operation finishes successfully, ReturnCode_t::RETCODE_OK is returned.
+     */
+    RTPS_DllAPI ReturnCode_t unregister_instance(
+            void* instance,
+            const fastrtps::rtps::InstanceHandle_t& handle);
+
     /**
      * Returns the DataWriter's GUID
+     * @return Reference to the DataWriter GUID
      */
     RTPS_DllAPI const fastrtps::rtps::GUID_t& guid();
 
     /**
      * Returns the DataWriter's InstanceHandle
+     * @return Copy of the DataWriter InstanceHandle
      */
     RTPS_DllAPI fastrtps::rtps::InstanceHandle_t get_instance_handle() const;
 
     /**
-     * Get topic data type
-     * @return Topic data type
+     * Get data type associated to the DataWriter
+     * @return Copy of the TypeSupport
      */
     RTPS_DllAPI TypeSupport get_type() const;
 
     /**
      * Waits the current thread until all writers have received their acknowledgments.
+     * @param max_wait Maximum blocking time for this operation
+     * @return RETCODE_OK if the DataWriter receive the acknowledgments before the time expires and RETCODE_ERROR otherwise
      */
     RTPS_DllAPI ReturnCode_t wait_for_acknowledgments(
             const fastrtps::Duration_t& max_wait);
@@ -146,40 +181,50 @@ public:
     /**
      * @brief Returns the offered deadline missed status
      * @param status Deadline missed status struct
+     * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t get_offered_deadline_missed_status(
             fastrtps::OfferedDeadlineMissedStatus& status);
 
     /**
      * Establishes the DataWriterQos for this DataWriter.
+     * @param qos DataWriterQos to be set
+     * @return RETCODE_IMMUTABLE_POLICY if any of the Qos cannot be changed, RETCODE_INCONSISTENT_POLICY if the Qos is not
+     * self consistent and RETCODE_OK if the qos is changed correctly.
      */
     RTPS_DllAPI ReturnCode_t set_qos(
             const DataWriterQos& qos);
 
     /**
      * Retrieves the DataWriterQos for this DataWriter.
+     * @return Reference to the current DataWriterQos
      */
     RTPS_DllAPI const DataWriterQos& get_qos() const;
 
     /**
      * Fills the DataWriterQos with the values of this DataWriter.
-     * @return true
+     * @param qos DataWriterQos object where the qos is returned.
+     * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t get_qos(
             DataWriterQos& qos) const;
 
     /**
      * Retrieves the topic for this DataWriter.
+     * @return Pointer to the associated Topic
      */
     RTPS_DllAPI Topic* get_topic() const;
 
     /**
      * Retrieves the listener for this DataWriter.
+     * @return Pointer to the DataWriterListener
      */
     RTPS_DllAPI const DataWriterListener* get_listener() const;
 
     /**
      * Establishes the listener for this DataWriter.
+     * @param listener Pointer to DataWriterListener to be set
+     * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t set_listener(
             DataWriterListener* listener);
@@ -190,13 +235,29 @@ public:
             const fastrtps::rtps::InstanceHandle_t& handle);
      */
 
+    /**
+     * @brief This operation requests the middleware to delete the data (the actual deletion is postponed until there is no
+     * more use for that data in the whole system). In general, applications are made aware of the deletion by means of
+     * operations on the DataReader objects that already knew that instance. This operation does not modify the value of
+     * the instance. The instance parameter is passed just for the purposes of identifying the instance.
+     * When this operation is used, the Service will automatically supply the value of the source_timestamp that is made
+     * available to DataReader objects by means of the source_timestamp attribute inside the SampleInfo. The constraints
+     * on the values of the handle parameter and the corresponding error behavior are the same specified for the
+     * unregister_instance operation.
+     * @param[in] data Sample used to deduce instance's key in case of `handle` parameter is HANDLE_NIL.
+     * @param[in] handle InstanceHandle of the data
+     * @return RETCODE_PRECONDITION_NOT_MET if the handle introduced does not match with the one associated to the data,
+     * RETCODE_OK if the data is correctly sent and RETCODE_ERROR otherwise.
+     */
     RTPS_DllAPI ReturnCode_t dispose(
             void* data,
             const fastrtps::rtps::InstanceHandle_t& handle);
 
-    RTPS_DllAPI bool dispose(
-            void* data);
-
+    /**
+     * @brief Returns the liveliness lost status
+     * @param status Liveliness lost status struct
+     * @return RETCODE_OK
+     */
     RTPS_DllAPI ReturnCode_t get_liveliness_lost_status(
             LivelinessLostStatus& status);
 
@@ -210,10 +271,29 @@ public:
        }
      */
 
+    /**
+     * @brief Getter for the Publisher that creates this DataWriter
+     * @return Pointer to the Publisher
+     */
     RTPS_DllAPI const Publisher* get_publisher() const;
 
+    /**
+     * @brief This operation manually asserts the liveliness of the DataWriter. This is used in combination with the
+     * LivelinessQosPolicy to indicate to the Service that the entity remains active.
+     * This operation need only be used if the LIVELINESS setting is either MANUAL_BY_PARTICIPANT or MANUAL_BY_TOPIC.
+     * Otherwise, it has no effect.
+     * @note Writing data via the write operation on a DataWriter asserts liveliness on the DataWriter itself and its
+     * DomainParticipant. Consequently the use of assert_liveliness is only needed if the application is not writing data
+     * regularly.
+     * @return RETCODE_OK if asserted, RETCODE_ERROR otherwise
+     */
     RTPS_DllAPI ReturnCode_t assert_liveliness();
 
+    /**
+     * @brief Clears the DataWriter history
+     * @param removed size_t pointer to return the size of the data removed
+     * @return RETCODE_OK if the samples are removed and RETCODE_ERROR otherwise
+     */
     RTPS_DllAPI ReturnCode_t clear_history(
             size_t* removed);
 

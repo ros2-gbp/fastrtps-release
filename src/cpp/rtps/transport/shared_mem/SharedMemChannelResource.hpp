@@ -36,7 +36,8 @@ public:
             std::shared_ptr<SharedMemManager::Listener> listener,
             const fastrtps::rtps::Locator_t& locator,
             TransportReceiverInterface* receiver,
-            const std::string& dump_file)
+            const std::string& dump_file,
+            bool should_init_thread = true)
         : ChannelResource()
         , message_receiver_(receiver)
         , listener_(listener)
@@ -52,7 +53,10 @@ public:
             packet_logger_->RegisterConsumer(std::move(packets_file_consumer));
         }
 
-        thread(std::thread(&SharedMemChannelResource::perform_listen_operation, this, locator));
+        if (should_init_thread)
+        {
+            init_thread(locator);
+        }
     }
 
     virtual ~SharedMemChannelResource() override
@@ -99,7 +103,14 @@ public:
 
     void release()
     {
-        listener_->close();
+        try
+        {
+            listener_->close();
+        }
+        catch(const std::exception& e)
+        {
+            logWarning(RTPS_MSG_IN, e.what());
+        }
     }
 
 private:
@@ -150,6 +161,13 @@ private:
     }
 
 protected:
+
+    void init_thread(
+            const fastrtps::rtps::Locator_t& locator)
+    {
+        this->thread(std::thread(&SharedMemChannelResource::perform_listen_operation, this, locator));
+    }
+
 
     /**
      * Blocking Receive from the specified channel.

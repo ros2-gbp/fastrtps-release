@@ -81,6 +81,8 @@ public:
 
     virtual ~PublisherImpl();
 
+    ReturnCode_t enable();
+
     const PublisherQos& get_qos() const;
 
     ReturnCode_t set_qos(
@@ -94,6 +96,12 @@ public:
     DataWriter* create_datawriter(
             Topic* topic,
             const DataWriterQos& qos,
+            DataWriterListener* listener,
+            const StatusMask& mask = StatusMask::all());
+
+    DataWriter* create_datawriter_with_profile(
+            Topic* topic,
+            const std::string& profile_name,
             DataWriterListener* listener,
             const StatusMask& mask = StatusMask::all());
 
@@ -138,6 +146,8 @@ public:
 
     ReturnCode_t set_default_datawriter_qos(
             const DataWriterQos& qos);
+
+    void reset_default_datawriter_qos();
 
     const DataWriterQos& get_default_datawriter_qos() const;
 

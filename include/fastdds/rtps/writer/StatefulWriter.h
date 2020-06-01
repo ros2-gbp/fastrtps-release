@@ -173,7 +173,7 @@ public:
      * @return True if removed.
      */
     bool try_remove_change(
-            std::chrono::steady_clock::time_point& max_blocking_time_point,
+            const std::chrono::steady_clock::time_point& max_blocking_time_point,
             std::unique_lock<RecursiveTimedMutex>& lock) override;
 
     /**
@@ -342,6 +342,9 @@ private:
     void send_unsent_changes_with_flow_control(
             SequenceNumber_t max_sequence,
             bool& activateHeartbeatPeriod);
+
+    bool send_hole_gaps_to_group(
+            RTPSMessageGroup& group);
 
     //! True to disable piggyback heartbeats
     bool disable_heartbeat_piggyback_;
