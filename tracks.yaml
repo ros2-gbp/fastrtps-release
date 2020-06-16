@@ -214,7 +214,7 @@ tracks:
     last_version: 2.0.0
     name: fastrtps
     patches: foxy
-    release_inc: '3'
+    release_inc: '4'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
     release_tag: v:{version}
     ros_distro: rolling
