@@ -86,7 +86,7 @@ tracks:
       -i :{release_inc} --os-name debian --os-not-required
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc}
-    devel_branch: master
+    devel_branch: 6a6f79c4256a00fc13834a2aaa3c60a0aaac5e76
     last_release: v1.8.2
     last_version: 1.8.2
     name: fastrtps
