@@ -111,7 +111,7 @@ tracks:
       -i :{release_inc} --os-name debian --os-not-required
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc}
-    devel_branch: eloquent
+    devel_branch: ros2-eloquent
     last_release: 6bfd02a1b468218858dc0365afcc8ca892c4027f
     last_version: 1.9.3
     name: fastrtps
