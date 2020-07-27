@@ -1,3 +1,26 @@
+## fastrtps (foxy) - 2.0.1-1
+
+The packages in the `fastrtps` repository were released into the `foxy` distro by running `/usr/bin/bloom-release -r foxy fastrtps --edit` on `Mon, 27 Jul 2020 18:47:20 -0000`
+
+The `fastrtps` package was released.
+
+Version of package(s) in repository `fastrtps`:
+
+- upstream repository: https://github.com/eProsima/Fast-DDS.git
+- release repository: https://github.com/ros2-gbp/fastrtps-release.git
+- rosdistro version: `2.0.0-3`
+- old version: `2.0.0-3`
+- new version: `2.0.1-1`
+
+Versions of tools used:
+
+- bloom version: `0.9.7`
+- catkin_pkg version: `0.4.22`
+- rosdep version: `0.19.0`
+- rosdistro version: `0.8.2`
+- vcstools version: `0.1.42`
+
+
 ## fastrtps (foxy) - 2.0.0-3
 
 The packages in the `fastrtps` repository were released into the `foxy` distro by running `/usr/bin/bloom-release -r foxy fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Mon, 01 Jun 2020 19:22:00 -0000`
