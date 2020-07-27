@@ -147,7 +147,7 @@ tracks:
     ros_distro: foxy
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-DDS.git
-    version: 2.0.0
+    version: 2.0.1
   r2b2:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
