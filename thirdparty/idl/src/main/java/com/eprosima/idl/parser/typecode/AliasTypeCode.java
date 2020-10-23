@@ -46,6 +46,18 @@ public class AliasTypeCode extends ContainerTypeCode
         return super.getContentTypeCode();
     }
 
+    public boolean isUnbound()
+    {
+        if(super.getContentTypeCode() instanceof SequenceTypeCode)
+        {
+            return ((SequenceTypeCode)super.getContentTypeCode()).isUnbound();
+        }
+        else
+        {
+            return false;
+        }
+    }
+
     @Override
     public boolean isObjectType() { return true; }
 
@@ -65,6 +77,14 @@ public class AliasTypeCode extends ContainerTypeCode
             return m_name;
 
         return m_scope + "::" + m_name;
+    }
+
+    public String getROS2Scopedname()
+    {
+        if(m_scope.isEmpty())
+            return m_name;
+
+        return m_scope + "::dds_::" + m_name + "_";
     }
 
     public String getScope()
@@ -168,6 +188,9 @@ public class AliasTypeCode extends ContainerTypeCode
     {
         return super.getContentTypeCode().isIsType_e();
     }
+
+    @Override
+    public boolean isIsSequenceType() { return super.getContentTypeCode().isIsSequenceType(); }
 
     public boolean isIsType_10()
     {
