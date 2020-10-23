@@ -21,6 +21,8 @@
 #include "DisablePositiveACKsSubscriber.h"
 
 #include <fastrtps/Domain.h>
+
+#include <fastrtps/utils/eClock.h>
 #include <fastrtps/log/Log.h>
 
 using namespace eprosima;

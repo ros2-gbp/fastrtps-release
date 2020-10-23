@@ -25,10 +25,6 @@ if(NOT fastcdr_FOUND)
     find_package(fastcdr REQUIRED)
 endif()
 
-if(NOT foonathan_memory_FOUND)
-    find_package(foonathan_memory REQUIRED)
-endif()
-
 if(NOT fastrtps_FOUND)
     find_package(fastrtps REQUIRED)
 endif()
@@ -49,13 +45,13 @@ message(STATUS "Configuring UseCaseDemonstrator example...")
 file(GLOB USECASEDEMONSTRATOR_EXAMPLE_SOURCES "*.cxx")
 
 add_executable(UseCasePublisher ${USECASEDEMONSTRATOR_EXAMPLE_SOURCES} UseCasePublisher.cpp)
-target_link_libraries(UseCasePublisher fastrtps fastcdr foonathan_memory)
+target_link_libraries(UseCasePublisher fastrtps fastcdr)
 install(TARGETS UseCasePublisher
     RUNTIME DESTINATION examples/C++/UseCaseDemonstrator/${BIN_INSTALL_DIR}
     )
 
 add_executable(UseCaseSubscriber ${USECASEDEMONSTRATOR_EXAMPLE_SOURCES} UseCaseSubscriber.cpp)
-target_link_libraries(UseCaseSubscriber fastrtps fastcdr foonathan_memory)
+target_link_libraries(UseCaseSubscriber fastrtps fastcdr)
 install(TARGETS UseCaseSubscriber
     RUNTIME DESTINATION examples/C++/UseCaseDemonstrator/${BIN_INSTALL_DIR}
     )

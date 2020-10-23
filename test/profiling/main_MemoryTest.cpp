@@ -24,7 +24,7 @@
 #include <bitset>
 #include <cstdint>
 
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/log/Log.h>
 #include <fastrtps/Domain.h>
 #include <fastrtps/fastrtps_dll.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
@@ -36,9 +36,6 @@
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
-
-using std::cout;
-using std::endl;
 
 #if defined(__LITTLE_ENDIAN__)
 const Endianness_t DEFAULT_ENDIAN = LITTLEEND;
@@ -418,7 +415,7 @@ int main(int argc, char** argv)
         memorySub.run();
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    eClock::my_sleep(1000);
 
     cout << "EVERYTHING STOPPED FINE" << endl;
 

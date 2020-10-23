@@ -25,10 +25,6 @@ if(NOT fastcdr_FOUND)
     find_package(fastcdr REQUIRED)
 endif()
 
-if(NOT foonathan_memory_FOUND)
-    find_package(foonathan_memory REQUIRED)
-endif()
-
 if(NOT fastrtps_FOUND)
     find_package(fastrtps REQUIRED)
 endif()
@@ -50,6 +46,6 @@ file(GLOB HELLOWORLD_EXAMPLE_SOURCES_CXX "*.cxx")
 file(GLOB HELLOWORLD_EXAMPLE_SOURCES_CPP "*.cpp")
 
 add_executable(DynamicHelloWorldExample ${HELLOWORLD_EXAMPLE_SOURCES_CXX} ${HELLOWORLD_EXAMPLE_SOURCES_CPP})
-target_link_libraries(DynamicHelloWorldExample fastrtps fastcdr foonathan_memory)
+target_link_libraries(DynamicHelloWorldExample fastrtps fastcdr)
 install(TARGETS DynamicHelloWorldExample
     RUNTIME DESTINATION examples/C++/DynamicHelloWorldExample/${BIN_INSTALL_DIR})

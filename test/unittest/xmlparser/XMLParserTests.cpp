@@ -14,7 +14,7 @@
 
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/log/Log.h>
 #include <fastrtps/utils/IPLocator.h>
 
 #include <gtest/gtest.h>
@@ -33,8 +33,7 @@ using eprosima::fastrtps::xmlparser::XMLParser;
 
 class XMLTreeTests : public ::testing::Test
 {
-public:
-
+  public:
     XMLTreeTests()
     {
     }
@@ -42,7 +41,6 @@ public:
     ~XMLTreeTests()
     {
     }
-
 };
 
 TEST_F(XMLTreeTests, OnlyRoot)
@@ -129,21 +127,18 @@ TEST_F(XMLTreeTests, DataNode)
 
 class XMLParserTests : public ::testing::Test
 {
-public:
-
+  public:
     XMLParserTests()
     {
     }
 
     ~XMLParserTests()
     {
-        eprosima::fastdds::dds::Log::Reset();
-        eprosima::fastdds::dds::Log::KillThread();
+        eprosima::fastrtps::Log::Reset();
+        eprosima::fastrtps::Log::KillThread();
     }
 
-    bool get_participant_attributes(
-            std::unique_ptr<BaseNode>& root,
-            ParticipantAttributes& participant_atts)
+    bool get_participant_attributes(std::unique_ptr<BaseNode>& root, ParticipantAttributes& participant_atts)
     {
         const std::string name_attribute{"profile_name"};
         const std::string profile_name{"missing_profile"};
@@ -163,7 +158,6 @@ public:
         }
         return participant_profile;
     }
-
 };
 
 TEST_F(XMLParserTests, NoFIle)
@@ -300,15 +294,11 @@ TEST_F(XMLParserTests, Types)
     std::unique_ptr<BaseNode> root;
     ASSERT_EQ(XMLParser::loadXML("test_xml_profiles.xml", root), XMLP_ret::XML_OK);
 
-    BaseNode* profiles(root->getChild(0));
-    ASSERT_TRUE(profiles);
-    ASSERT_EQ(profiles->getType(), xmlparser::NodeType::PROFILES);
-
     ParticipantAttributes participant_atts;
     bool participant_profile = false;
     bool publisher_profile   = false;
     bool subscriber_profile  = false;
-    for (const auto& profile : profiles->getChildren())
+    for (const auto& profile : root->getChildren())
     {
         if (profile->getType() == NodeType::PARTICIPANT)
         {
@@ -337,15 +327,11 @@ TEST_F(XMLParserTests, TypesBuffer)
     std::unique_ptr<BaseNode> root;
     ASSERT_EQ(XMLParser::loadXML(strStream.str().data(), strStream.str().size(), root), XMLP_ret::XML_OK);
 
-    BaseNode* profiles(root->getChild(0));
-    ASSERT_TRUE(profiles);
-    ASSERT_EQ(profiles->getType(), xmlparser::NodeType::PROFILES);
-
     ParticipantAttributes participant_atts;
     bool participant_profile = false;
     bool publisher_profile   = false;
     bool subscriber_profile  = false;
-    for (const auto& profile : profiles->getChildren())
+    for (const auto& profile : root->getChildren())
     {
         if (profile->getType() == NodeType::PARTICIPANT)
         {
@@ -365,22 +351,16 @@ TEST_F(XMLParserTests, TypesBuffer)
     ASSERT_TRUE(subscriber_profile);
 }
 
-TEST_F(XMLParserTests, DurationCheck)
+TEST_F(XMLParserTests, Data)
 {
     std::unique_ptr<BaseNode> root;
     const std::string name_attribute{"profile_name"};
     const std::string profile_name{"test_participant_profile"};
-    const std::string profile_name2{"test_publisher_profile"};
-    const std::string profile_name3{"test_subscriber_profile"};
 
-    ASSERT_EQ(XMLParser::loadXML("test_xml_duration.xml", root), XMLP_ret::XML_OK);
+    ASSERT_EQ(XMLParser::loadXML("test_xml_profiles.xml", root), XMLP_ret::XML_OK);
 
     ParticipantAttributes participant_atts;
     bool participant_profile = false;
-    PublisherAttributes publisher_atts;
-    bool publisher_profile = false;
-    SubscriberAttributes subscriber_atts;
-    bool subscriber_profile = false;
     for (const auto& profile : root->getChildren())
     {
         if (profile->getType() == NodeType::PARTICIPANT)
@@ -393,77 +373,9 @@ TEST_F(XMLParserTests, DurationCheck)
                 participant_profile = true;
             }
         }
-        else if (profile->getType() == NodeType::PUBLISHER)
-        {
-            auto data_node = dynamic_cast<DataNode<PublisherAttributes>*>(profile.get());
-            auto search    = data_node->getAttributes().find(name_attribute);
-            if ((search != data_node->getAttributes().end()) && (search->second == profile_name2))
-            {
-                publisher_atts    = *data_node->get();
-                publisher_profile = true;
-            }
-        }
-        else if (profile->getType() == NodeType::SUBSCRIBER)
-        {
-            auto data_node = dynamic_cast<DataNode<SubscriberAttributes>*>(profile.get());
-            auto search    = data_node->getAttributes().find(name_attribute);
-            if ((search != data_node->getAttributes().end()) && (search->second == profile_name3))
-            {
-                subscriber_atts    = *data_node->get();
-                subscriber_profile = true;
-            }
-        }
-    }
-    ASSERT_TRUE(participant_profile);
-    EXPECT_EQ(participant_atts.rtps.builtin.discovery_config.leaseDuration, c_TimeInfinite);
-    EXPECT_EQ(participant_atts.rtps.builtin.discovery_config.leaseDuration_announcementperiod.seconds, 10);
-    EXPECT_EQ(participant_atts.rtps.builtin.discovery_config.leaseDuration_announcementperiod.nanosec, 333u);
-
-    ASSERT_TRUE(publisher_profile);
-    EXPECT_EQ(publisher_atts.qos.m_deadline.period.seconds, 15);
-    EXPECT_EQ(publisher_atts.qos.m_liveliness.lease_duration.seconds, 1);
-    EXPECT_EQ(publisher_atts.qos.m_liveliness.lease_duration.nanosec, 2u);
-    EXPECT_EQ(publisher_atts.qos.m_liveliness.announcement_period, c_TimeInfinite);
-    EXPECT_EQ(publisher_atts.qos.m_latencyBudget.duration.seconds, 10);
-
-    ASSERT_TRUE(subscriber_profile);
-    EXPECT_EQ(subscriber_atts.qos.m_deadline.period, c_TimeInfinite);
-    EXPECT_EQ(subscriber_atts.qos.m_liveliness.lease_duration, c_TimeInfinite);
-    EXPECT_EQ(subscriber_atts.qos.m_liveliness.announcement_period.seconds, 0);
-    EXPECT_EQ(subscriber_atts.qos.m_liveliness.announcement_period.nanosec, 0u);
-    EXPECT_EQ(subscriber_atts.qos.m_latencyBudget.duration.seconds, 20);
-}
-
-TEST_F(XMLParserTests, Data)
-{
-    std::unique_ptr<BaseNode> root;
-    const std::string name_attribute{"profile_name"};
-    const std::string profile_name{"test_participant_profile"};
-
-    ASSERT_EQ(XMLParser::loadXML("test_xml_profiles.xml", root), XMLP_ret::XML_OK);
-
-    BaseNode* profiles(root->getChild(0));
-    ASSERT_TRUE(profiles);
-    ASSERT_EQ(profiles->getType(), xmlparser::NodeType::PROFILES);
-
-    ParticipantAttributes participant_atts;
-    bool participant_profile = false;
-    for (const auto& profile : profiles->getChildren())
-    {
-        if (profile->getType() == NodeType::PARTICIPANT)
-        {
-            auto data_node = dynamic_cast<DataNode<ParticipantAttributes>*>(profile.get());
-            auto search    = data_node->getAttributes().find(name_attribute);
-            if ((search != data_node->getAttributes().end()) && (search->second == profile_name))
-            {
-                participant_atts    = *data_node->get();
-                participant_profile = true;
-            }
-        }
     }
 
     ASSERT_TRUE(participant_profile);
-    EXPECT_EQ(participant_atts.domainId, 2019102u);
     RTPSParticipantAttributes& rtps_atts = participant_atts.rtps;
     BuiltinAttributes& builtin           = rtps_atts.builtin;
     Locator_t locator;
@@ -479,15 +391,16 @@ TEST_F(XMLParserTests, Data)
     locator.port = 1979;
     EXPECT_EQ(rtps_atts.sendSocketBufferSize, 32u);
     EXPECT_EQ(rtps_atts.listenSocketBufferSize, 1000u);
-    EXPECT_EQ(builtin.discovery_config.discoveryProtocol, eprosima::fastrtps::rtps::DiscoveryProtocol::SIMPLE);
+    EXPECT_EQ(builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol, true);
     EXPECT_EQ(builtin.use_WriterLivelinessProtocol, false);
-    EXPECT_EQ(builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol, true);
-    EXPECT_EQ(builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol, false);
-    EXPECT_EQ(builtin.discovery_config.leaseDuration, c_TimeInfinite);
-    EXPECT_EQ(builtin.discovery_config.leaseDuration_announcementperiod.seconds, 10);
-    EXPECT_EQ(builtin.discovery_config.leaseDuration_announcementperiod.nanosec, 333u);
-    EXPECT_EQ(builtin.discovery_config.m_simpleEDP.use_PublicationWriterANDSubscriptionReader, false);
-    EXPECT_EQ(builtin.discovery_config.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter, true);
+    EXPECT_EQ(builtin.use_SIMPLE_EndpointDiscoveryProtocol, true);
+    EXPECT_EQ(builtin.use_STATIC_EndpointDiscoveryProtocol, false);
+    EXPECT_EQ(builtin.domainId, 2019102u);
+    EXPECT_EQ(builtin.leaseDuration, c_TimeInfinite);
+    EXPECT_EQ(builtin.leaseDuration_announcementperiod.seconds, 10);
+    EXPECT_EQ(builtin.leaseDuration_announcementperiod.nanosec, 333u);
+    EXPECT_EQ(builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader, false);
+    EXPECT_EQ(builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter, true);
     IPLocator::setIPv4(locator, 192, 168, 1, 5);
     locator.port = 9999;
     EXPECT_EQ(*(loc_list_it = builtin.metatrafficUnicastLocatorList.begin()), locator);
@@ -507,8 +420,6 @@ TEST_F(XMLParserTests, Data)
     EXPECT_EQ(*(loc_list_it = builtin.initialPeersList.begin()), locator);
     EXPECT_EQ(builtin.readerHistoryMemoryPolicy, PREALLOCATED_MEMORY_MODE);
     EXPECT_EQ(builtin.writerHistoryMemoryPolicy, PREALLOCATED_MEMORY_MODE);
-    EXPECT_EQ(builtin.readerPayloadSize, 1000u);
-    EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
@@ -535,13 +446,9 @@ TEST_F(XMLParserTests, DataBuffer)
     std::unique_ptr<BaseNode> root;
     ASSERT_EQ(XMLParser::loadXML(strStream.str().data(), strStream.str().size(), root), XMLP_ret::XML_OK);
 
-    BaseNode* profiles(root->getChild(0));
-    ASSERT_TRUE(profiles);
-    ASSERT_EQ(profiles->getType(), xmlparser::NodeType::PROFILES);
-
     ParticipantAttributes participant_atts;
     bool participant_profile = false;
-    for (const auto& profile : profiles->getChildren())
+    for (const auto& profile : root->getChildren())
     {
         if (profile->getType() == NodeType::PARTICIPANT)
         {
@@ -556,7 +463,6 @@ TEST_F(XMLParserTests, DataBuffer)
     }
 
     ASSERT_TRUE(participant_profile);
-    EXPECT_EQ(participant_atts.domainId, 2019102u);
     RTPSParticipantAttributes& rtps_atts = participant_atts.rtps;
     BuiltinAttributes& builtin           = rtps_atts.builtin;
     Locator_t locator;
@@ -572,15 +478,16 @@ TEST_F(XMLParserTests, DataBuffer)
     locator.port = 1979;
     EXPECT_EQ(rtps_atts.sendSocketBufferSize, 32u);
     EXPECT_EQ(rtps_atts.listenSocketBufferSize, 1000u);
-    EXPECT_EQ(builtin.discovery_config.discoveryProtocol, eprosima::fastrtps::rtps::DiscoveryProtocol::SIMPLE);
+    EXPECT_EQ(builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol, true);
     EXPECT_EQ(builtin.use_WriterLivelinessProtocol, false);
-    EXPECT_EQ(builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol, true);
-    EXPECT_EQ(builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol, false);
-    EXPECT_EQ(builtin.discovery_config.leaseDuration, c_TimeInfinite);
-    EXPECT_EQ(builtin.discovery_config.leaseDuration_announcementperiod.seconds, 10);
-    EXPECT_EQ(builtin.discovery_config.leaseDuration_announcementperiod.nanosec, 333u);
-    EXPECT_EQ(builtin.discovery_config.m_simpleEDP.use_PublicationWriterANDSubscriptionReader, false);
-    EXPECT_EQ(builtin.discovery_config.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter, true);
+    EXPECT_EQ(builtin.use_SIMPLE_EndpointDiscoveryProtocol, true);
+    EXPECT_EQ(builtin.use_STATIC_EndpointDiscoveryProtocol, false);
+    EXPECT_EQ(builtin.domainId, 2019102u);
+    EXPECT_EQ(builtin.leaseDuration, c_TimeInfinite);
+    EXPECT_EQ(builtin.leaseDuration_announcementperiod.seconds, 10);
+    EXPECT_EQ(builtin.leaseDuration_announcementperiod.nanosec, 333u);
+    EXPECT_EQ(builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader, false);
+    EXPECT_EQ(builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter, true);
     IPLocator::setIPv4(locator, 192, 168, 1, 5);
     locator.port = 9999;
     EXPECT_EQ(*(loc_list_it = builtin.metatrafficUnicastLocatorList.begin()), locator);
@@ -600,8 +507,6 @@ TEST_F(XMLParserTests, DataBuffer)
     EXPECT_EQ(*(loc_list_it = builtin.initialPeersList.begin()), locator);
     EXPECT_EQ(builtin.readerHistoryMemoryPolicy, PREALLOCATED_MEMORY_MODE);
     EXPECT_EQ(builtin.writerHistoryMemoryPolicy, PREALLOCATED_MEMORY_MODE);
-    EXPECT_EQ(builtin.readerPayloadSize, 1000u);
-    EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
@@ -617,9 +522,7 @@ TEST_F(XMLParserTests, DataBuffer)
     EXPECT_EQ(std::string(rtps_atts.getName()), "test_name");
 }
 
-int main(
-        int argc,
-        char** argv)
+int main(int argc, char** argv)
 {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

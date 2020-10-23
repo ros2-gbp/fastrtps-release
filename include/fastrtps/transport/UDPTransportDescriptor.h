@@ -15,18 +15,50 @@
 #ifndef UDP_TRANSPORT_DESCRIPTOR
 #define UDP_TRANSPORT_DESCRIPTOR
 
-#include <fastrtps/transport/SocketTransportDescriptor.h>
-
-#include <fastdds/rtps/transport/UDPTransportDescriptor.h>
+#include "./SocketTransportDescriptor.h"
 
 namespace eprosima{
 namespace fastrtps{
 namespace rtps{
 
-using UDPTransportDescriptor = fastdds::rtps::UDPTransportDescriptor;
+class TransportInterface;
+
+/**
+ * UDP Transport configuration
+ *
+ * - bufferSize:    length of the buffers used for transmission. Passing
+ *                  a buffer of different size will cause transmission to
+ *                  fail.
+ *
+ * - interfaceWhiteList: Lists the allowed interfaces.
+ * @ingroup TRANSPORT_MODULE
+ */
+typedef struct UDPTransportDescriptor: public SocketTransportDescriptor
+{
+   virtual ~UDPTransportDescriptor(){}
+
+   RTPS_DllAPI UDPTransportDescriptor();
+
+   RTPS_DllAPI UDPTransportDescriptor(const UDPTransportDescriptor& t);
+
+   uint16_t m_output_udp_socket;
+
+   /**
+    * Whether to use non-blocking calls to send_to().
+    *
+    * When set to true, calls to send_to() will return inmediately if the buffer is full, but
+    * no error will be returned to the upper layer. This means that the application will behave
+    * as if the datagram is sent but lost (i.e. throughput may be reduced). This value is
+    * specially useful on high-frequency best-effort writers.
+    *
+    * When set to false, calls to send_to() will block until the network buffer has space for the
+    * datagram. This may hinder performance on high-frequency writers.
+    */
+   bool non_blocking_send = false;
+} UDPTransportDescriptor;
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // UDP_TRANSPORT_DESCRIPTOR
+#endif

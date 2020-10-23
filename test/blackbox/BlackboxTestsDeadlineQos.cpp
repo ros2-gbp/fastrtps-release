@@ -19,42 +19,12 @@
 #include "ReqRepAsReliableHelloWorldRequester.hpp"
 #include "ReqRepAsReliableHelloWorldReplier.hpp"
 
-#include <gtest/gtest.h>
-
 #include <fastrtps/utils/TimeConversion.h>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-class DeadlineQos : public testing::TestWithParam<bool>
-{
-public:
-
-    void SetUp() override
-    {
-        LibrarySettingsAttributes library_settings;
-        if (GetParam())
-        {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
-        }
-
-    }
-
-    void TearDown() override
-    {
-        LibrarySettingsAttributes library_settings;
-        if (GetParam())
-        {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
-        }
-    }
-
-};
-
-TEST_P(DeadlineQos, NoKeyTopicLongDeadline)
+TEST(DeadlineQos, NoKeyTopicLongDeadline)
 {
     // This test sets a long deadline (long in comparison to the write rate),
     // makes the writer send a few samples and checks that the deadline was
@@ -65,14 +35,16 @@ TEST_P(DeadlineQos, NoKeyTopicLongDeadline)
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
-    uint32_t writer_sleep_ms = 10;
+    uint32_t writer_sleep_ms = 100;
     // Number of samples written by writer
     uint32_t writer_samples = 3;
-    // Deadline period in milliseconds
-    uint32_t deadline_period_ms = 100000;
+    // Deadline period in seconds
+    eprosima::fastrtps::Duration_t deadline_s(writer_sleep_ms * 1000 * 1e-3);
 
-    reader.deadline_period(deadline_period_ms * 1e-3).init();
-    writer.deadline_period(deadline_period_ms * 1e-3).init();
+    reader.deadline_period(deadline_s);
+    writer.deadline_period(deadline_s);
+    reader.init();
+    writer.init();
 
     ASSERT_TRUE(reader.isInitialized());
     ASSERT_TRUE(writer.isInitialized());
@@ -99,7 +71,7 @@ TEST_P(DeadlineQos, NoKeyTopicLongDeadline)
     EXPECT_EQ(reader.missed_deadlines(), 0u);
 }
 
-TEST_P(DeadlineQos, NoKeyTopicShortDeadline)
+TEST(DeadlineQos, NoKeyTopicShortDeadline)
 {
     // This test sets a short deadline (short compared to the write rate),
     // makes the writer send a few samples and checks that the deadline was missed every time
@@ -109,14 +81,16 @@ TEST_P(DeadlineQos, NoKeyTopicShortDeadline)
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
-    uint32_t writer_sleep_ms = 1000;
+    uint32_t writer_sleep_ms = 100;
     // Number of samples written by writer
     uint32_t writer_samples = 3;
-    // Deadline period in milliseconds
-    uint32_t deadline_period_ms = 10;
+    // Deadline period in seconds
+    eprosima::fastrtps::Duration_t deadline_s(writer_sleep_ms * 0.1 * 1e-3);
 
-    reader.deadline_period(deadline_period_ms * 1e-3).init();
-    writer.deadline_period(deadline_period_ms * 1e-3).init();
+    reader.deadline_period(deadline_s);
+    writer.deadline_period(deadline_s);
+    reader.init();
+    writer.init();
 
     ASSERT_TRUE(reader.isInitialized());
     ASSERT_TRUE(writer.isInitialized());
@@ -144,7 +118,7 @@ TEST_P(DeadlineQos, NoKeyTopicShortDeadline)
     EXPECT_GE(reader.missed_deadlines(), writer_samples);
 }
 
-TEST_P(DeadlineQos, KeyedTopicLongDeadline)
+TEST(DeadlineQos, KeyedTopicLongDeadline)
 {
     // This test sets a long deadline (long in comparison to the write rate),
     // makes the writer send a few samples and checks that the deadline was met
@@ -154,14 +128,18 @@ TEST_P(DeadlineQos, KeyedTopicLongDeadline)
     PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
-    uint32_t writer_sleep_ms = 10;
+    uint32_t writer_sleep_ms = 100;
     // Number of samples written by writer
     uint32_t writer_samples = 4;
-    // Deadline period in milliseconds
-    uint32_t deadline_period_ms = 100000;
+    // Deadline period in seconds
+    eprosima::fastrtps::Duration_t deadline_s(writer_sleep_ms * 1000 * 1e-3);
 
-    reader.deadline_period(deadline_period_ms * 1e-3).init();
-    writer.deadline_period(deadline_period_ms * 1e-3).init();
+    reader.deadline_period(deadline_s);
+    writer.deadline_period(deadline_s);
+    reader.key(true);
+    writer.key(true);
+    reader.init();
+    writer.init();
 
     ASSERT_TRUE(reader.isInitialized());
     ASSERT_TRUE(writer.isInitialized());
@@ -178,7 +156,7 @@ TEST_P(DeadlineQos, KeyedTopicLongDeadline)
     for (auto data_sample : data)
     {
         // Send data
-        data_sample.key(count % 2 + 1);
+        data_sample.key(count % 2);
         writer.send_sample(data_sample);
         ++count;
         reader.block_for_at_least(count);
@@ -189,7 +167,7 @@ TEST_P(DeadlineQos, KeyedTopicLongDeadline)
     EXPECT_EQ(reader.missed_deadlines(), 0u);
 }
 
-TEST_P(DeadlineQos, KeyedTopicShortDeadline)
+TEST(DeadlineQos, KeyedTopicShortDeadline)
 {
     // This test sets a short deadline (short compared to the write rate),
     // makes the writer send a few samples and checks that the deadline was missed every time
@@ -198,15 +176,19 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
     PubSubReader<KeyedHelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
 
-    // Number of samples to send
+    // Only one sample sent by the writer
     uint32_t writer_samples = 4;
     // Time to wait before sending the sample
-    uint32_t writer_sleep_ms = 1000;
+    uint32_t writer_sleep_ms = 100;
     // Deadline period in ms
-    uint32_t deadline_period_ms = 10;
+    eprosima::fastrtps::Duration_t deadline_s(writer_sleep_ms * 0.1 * 1e-3);
 
-    reader.deadline_period(deadline_period_ms * 1e-3).init();
-    writer.deadline_period(deadline_period_ms * 1e-3).init();
+    reader.deadline_period(deadline_s);
+    writer.deadline_period(deadline_s);
+    reader.key(true);
+    writer.key(true);
+    reader.init();
+    writer.init();
 
     ASSERT_TRUE(reader.isInitialized());
     ASSERT_TRUE(writer.isInitialized());
@@ -223,7 +205,7 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
     for (auto data_sample : data)
     {
         // Send data
-        data_sample.key(count % 2 + 1);
+        data_sample.key(count % 2);
         writer.send_sample(data_sample);
         ++count;
         reader.block_for_at_least(count);
@@ -233,15 +215,3 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
     EXPECT_GE(writer.missed_deadlines(), writer_samples);
     EXPECT_GE(reader.missed_deadlines(), writer_samples);
 }
-
-
-INSTANTIATE_TEST_CASE_P(DeadlineQos,
-        DeadlineQos,
-        testing::Values(false, true),
-        [](const testing::TestParamInfo<DeadlineQos::ParamType>& info) {
-    if (info.param)
-    {
-        return "Intraprocess";
-    }
-    return "NonIntraprocess";
-});

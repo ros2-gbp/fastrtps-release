@@ -16,7 +16,6 @@
 #include <gtest/gtest.h>
 
 #include <fastrtps/rtps/writer/LivelinessManager.h>
-#include <fastrtps/rtps/resources/ResourceEvent.h>
 #include <fastrtps/rtps/common/Time_t.h>
 #include <asio.hpp>
 #include <thread>
@@ -27,11 +26,11 @@ class LivelinessManagerTests : public ::testing::Test
 {
     public:
 
-        LivelinessManagerTests() : service_() {}
+        LivelinessManagerTests() : work_(service_) {}
 
         void SetUp()
         {
-            service_.init_thread();
+            thread_ = new std::thread(&LivelinessManagerTests::run, this);
 
             writer_losing_liveliness = eprosima::fastrtps::rtps::GUID_t();
             writer_recovering_liveliness = eprosima::fastrtps::rtps::GUID_t();
@@ -41,13 +40,19 @@ class LivelinessManagerTests : public ::testing::Test
 
         void TearDown()
         {
+            service_.stop();
+            thread_->join();
+            delete thread_;
         }
 
         void run()
         {
+            service_.run();
         }
 
-        eprosima::fastrtps::rtps::ResourceEvent service_;
+        asio::io_service service_;
+        asio::io_service::work work_;
+        std::thread* thread_;
 
         // Callback to test the liveliness manager
 
@@ -108,7 +113,8 @@ TEST_F(LivelinessManagerTests, WriterCanAlwaysBeAdded)
 {
     LivelinessManager liveliness_manager(
                 nullptr,
-                service_);
+                service_,
+                *thread_);
 
     GuidPrefix_t guidP;
     guidP.value[0] = 1;
@@ -135,7 +141,8 @@ TEST_F(LivelinessManagerTests, WriterCannotBeRemovedTwice)
 {
     LivelinessManager liveliness_manager(
                 nullptr,
-                service_);
+                service_,
+                *thread_);
 
     GuidPrefix_t guidP;
     guidP.value[0] = 1;
@@ -160,7 +167,8 @@ TEST_F(LivelinessManagerTests, AssertLivelinessByKind)
 {
     LivelinessManager liveliness_manager(
                 nullptr,
-                service_);
+                service_,
+                *thread_);
 
     GuidPrefix_t guidP;
     guidP.value[0] = 1;
@@ -216,7 +224,8 @@ TEST_F(LivelinessManagerTests, AssertLivelinessByWriter)
 {
     LivelinessManager liveliness_manager(
                 nullptr,
-                service_);
+                service_,
+                *thread_);
 
     GuidPrefix_t guidP;
     guidP.value[0] = 1;
@@ -299,7 +308,8 @@ TEST_F(LivelinessManagerTests, TimerExpired_Automatic)
                           std::placeholders::_3,
                           std::placeholders::_4,
                           std::placeholders::_5),
-                service_);
+                service_,
+                *thread_);
 
     GuidPrefix_t guidP;
     guidP.value[0] = 1;
@@ -337,7 +347,8 @@ TEST_F(LivelinessManagerTests, TimerExpired_ManualByParticipant)
                           std::placeholders::_3,
                           std::placeholders::_4,
                           std::placeholders::_5),
-                service_);
+                service_,
+                *thread_);
 
 
     GuidPrefix_t guidP;
@@ -378,7 +389,8 @@ TEST_F(LivelinessManagerTests, TimerExpired_ManualByTopic)
                           std::placeholders::_3,
                           std::placeholders::_4,
                           std::placeholders::_5),
-                service_);
+                service_,
+                *thread_);
 
 
     GuidPrefix_t guidP;
@@ -424,7 +436,8 @@ TEST_F(LivelinessManagerTests, TimerOwnerCalculation)
                           std::placeholders::_3,
                           std::placeholders::_4,
                           std::placeholders::_5),
-                service_);
+                service_,
+                *thread_);
 
 
     GuidPrefix_t guidP;
@@ -461,7 +474,8 @@ TEST_F(LivelinessManagerTests, TimerOwnerRemoved)
                           std::placeholders::_3,
                           std::placeholders::_4,
                           std::placeholders::_5),
-                service_);
+                service_,
+                *thread_);
 
 
     GuidPrefix_t guidP;

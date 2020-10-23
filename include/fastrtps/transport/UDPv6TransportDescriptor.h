@@ -15,15 +15,35 @@
 #ifndef UDPV6_TRANSPORT_DESCRIPTOR
 #define UDPV6_TRANSPORT_DESCRIPTOR
 
-#include <fastrtps/transport/UDPTransportDescriptor.h>
-
-#include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
+#include "./UDPTransportDescriptor.h"
 
 namespace eprosima{
 namespace fastrtps{
 namespace rtps{
 
-using UDPv6TransportDescriptor = fastdds::rtps::UDPv6TransportDescriptor;
+class TransportInterface;
+
+/**
+ * Transport configuration
+ *
+ * - bufferSize:    length of the buffers used for transmission. Passing
+ *                  a buffer of different size will cause transmission to
+ *                  fail.
+ *
+ * - interfaceWhiteList: Lists the allowed interfaces.
+ * @ingroup TRANSPORT_MODULE
+ */
+typedef struct UDPv6TransportDescriptor : public UDPTransportDescriptor
+{
+    virtual ~UDPv6TransportDescriptor() {}
+
+    virtual TransportInterface* create_transport() const override;
+
+    RTPS_DllAPI UDPv6TransportDescriptor();
+
+    RTPS_DllAPI UDPv6TransportDescriptor(const UDPv6TransportDescriptor& t);
+
+} UDPv6TransportDescriptor;
 
 } // namespace rtps
 } // namespace fastrtps

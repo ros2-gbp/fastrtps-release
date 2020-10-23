@@ -28,20 +28,18 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/FlowController.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputController.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/ReaderLocator.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp)
 
         add_executable(ThroughputControllerTests ${THROUGHPUTCONTROLLERTESTS_SOURCE})
         target_compile_definitions(ThroughputControllerTests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(ThroughputControllerTests PRIVATE ${GTEST_INCLUDE_DIRS}
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/AsyncWriterThread
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSWriter
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSReader
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(ThroughputControllerTests ${GTEST_LIBRARIES} ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES})
+        target_link_libraries(ThroughputControllerTests ${GTEST_LIBRARIES} ${MOCKS})
         if(MSVC OR MSVC_IDE)
             target_link_libraries(ThroughputControllerTests ${PRIVACY}
                 iphlpapi Shlwapi

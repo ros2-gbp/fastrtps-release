@@ -12,33 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <fastdds/rtps/network/ReceiverResource.h>
-#include <fastdds/rtps/messages/MessageReceiver.h>
+#include <fastrtps/rtps/network/ReceiverResource.h>
+#include <fastrtps/rtps/messages/MessageReceiver.h>
 #include <cassert>
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/log/Log.h>
 
 #define IDSTRING "(ID:" << std::this_thread::get_id() <<") "<<
 
 using namespace std;
-using namespace eprosima::fastdds::rtps;
 
 namespace eprosima{
 namespace fastrtps{
 namespace rtps{
 
-ReceiverResource::ReceiverResource(
-			TransportInterface& transport,
-			const Locator_t& locator,
-			uint32_t max_recv_buffer_size)
+ReceiverResource::ReceiverResource(TransportInterface& transport, const Locator_t& locator, uint32_t max_size)
         : Cleanup(nullptr)
         , LocatorMapsToManagedChannel(nullptr)
         , mValid(false)
         , mtx()
         , receiver(nullptr)
-        , max_message_size_(max_recv_buffer_size)
+        , msg(0)
 {
     // Internal channel is opened and assigned to this resource.
-    mValid = transport.OpenInputChannel(locator, this, max_message_size_);
+    mValid = transport.OpenInputChannel(locator, this, max_size);
     if (!mValid)
     {
         return; // Invalid resource to be discarded by the factory.
@@ -58,7 +54,7 @@ ReceiverResource::ReceiverResource(ReceiverResource&& rValueResource)
     rValueResource.receiver = nullptr;
     mValid = rValueResource.mValid;
     rValueResource.mValid = false;
-    max_message_size_ = rValueResource.max_message_size_;
+    msg = std::move(rValueResource.msg);
 }
 
 bool ReceiverResource::SupportsLocator(const Locator_t& localLocator)
@@ -94,12 +90,10 @@ void ReceiverResource::OnDataReceived(const octet * data, const uint32_t size,
 
     if (rcv != nullptr)
     {
-        CDRMessage_t msg(0);
         msg.wraps = true;
         msg.buffer = const_cast<octet*>(data);
         msg.length = size;
         msg.max_size = size;
-        msg.reserved_size = size;
 
         // TODO: Should we unlock in case UnregisterReceiver is called from callback ?
         rcv->processCDRMsg(remoteLocator, &msg);

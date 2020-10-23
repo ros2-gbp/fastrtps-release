@@ -14,139 +14,46 @@
 
 #include <mutex>
 
-#include <fastdds/rtps/resources/AsyncInterestTree.h>
+#include <fastrtps/rtps/resources/AsyncInterestTree.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 using namespace eprosima::fastrtps::rtps;
 
-bool AsyncInterestTree::register_interest(
-        RTPSWriter* writer)
+AsyncInterestTree::AsyncInterestTree():
+   mActiveInterest(&mInterestAlpha),
+   mHiddenInterest(&mInterestBeta)
 {
-    std::unique_lock<std::timed_mutex> guard(mMutexHidden);
-    return register_interest_nts(writer);
 }
 
-bool AsyncInterestTree::register_interest(
-        RTPSWriter* writer,
-        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
+void AsyncInterestTree::RegisterInterest(const RTPSWriter* writer)
 {
-    bool ret_value = false;
-    std::unique_lock<std::timed_mutex> guard(mMutexHidden, std::defer_lock);
-
-    if(guard.try_lock_until(max_blocking_time))
-    {
-        ret_value = register_interest_nts(writer);
-    }
-
-    return ret_value;
+   std::unique_lock<std::mutex> guard(mMutexHidden);
+   mHiddenInterest->insert(writer); 
 }
 
-bool AsyncInterestTree::register_interest_nts(
-        RTPSWriter* writer)
+void AsyncInterestTree::RegisterInterest(const RTPSParticipantImpl* participant)
 {
-    RTPSWriter *curr = hidden_front_, *prev = nullptr;
+   std::lock_guard<std::recursive_mutex> guard_participant(*participant->getParticipantMutex());
+   std::unique_lock<std::mutex> guard(mMutexHidden);
+   auto writers = participant->getAllWriters();
 
-    while (curr)
-    {
-        if (writer == curr)
-        {
-            return false;
-        }
-
-        prev = curr;
-        curr = curr->next_[hidden_pos_];
-    }
-
-    if (!prev)
-    {
-        hidden_front_ = writer;
-    }
-    else
-    {
-        prev->next_[hidden_pos_] = writer;
-    }
-
-    return true;
+   for (auto writer : writers)
+      mHiddenInterest->insert(writer); 
 }
 
-bool AsyncInterestTree::unregister_interest(
-        RTPSWriter* writer)
+void AsyncInterestTree::Swap()
 {
-    std::unique_lock<std::timed_mutex> activeGuard(mMutexActive);
-    std::unique_lock<std::timed_mutex> hiddenGuard(mMutexHidden);
+   std::unique_lock<std::mutex> activeGuard(mMutexActive);
+   std::unique_lock<std::mutex> hiddenGuard(mMutexHidden);
 
-    RTPSWriter *curr = active_front_, *prev = nullptr;
-
-    while (curr)
-    {
-        if (curr == writer)
-        {
-            if (prev)
-            {
-                prev->next_[active_pos_] = curr->next_[active_pos_];
-            }
-            else
-            {
-                active_front_ = curr->next_[active_pos_];
-            }
-
-            curr->next_[active_pos_] = nullptr;
-            break;
-        }
-        else
-        {
-            prev = curr;
-            curr = curr->next_[active_pos_];
-        }
-    }
-
-    curr = hidden_front_;
-    prev = nullptr;
-
-    while (curr)
-    {
-        if (curr == writer)
-        {
-            if (prev)
-            {
-                prev->next_[hidden_pos_] = curr->next_[hidden_pos_];
-            }
-            else
-            {
-                hidden_front_ = curr->next_[hidden_pos_];
-            }
-
-            curr->next_[hidden_pos_] = nullptr;
-            break;
-        }
-        else
-        {
-            prev = curr;
-            curr = curr->next_[hidden_pos_];
-        }
-    }
-
-    return (active_front_ == nullptr && hidden_front_ == nullptr);
+   mActiveInterest->clear();
+   auto swap = mActiveInterest;
+   mActiveInterest = mHiddenInterest;
+   mHiddenInterest = swap;
 }
 
-void AsyncInterestTree::swap()
+std::set<const RTPSWriter*> AsyncInterestTree::GetInterestedWriters() const
 {
-    std::unique_lock<std::timed_mutex> activeGuard(mMutexActive);
-    std::unique_lock<std::timed_mutex> hiddenGuard(mMutexHidden);
-
-    active_front_ = hidden_front_;
-    hidden_front_ = nullptr;
-    active_pos_ = (active_pos_ + 1) & 0x1;
-    hidden_pos_ = (hidden_pos_ + 1) & 0x1;
-}
-
-RTPSWriter* AsyncInterestTree::next_active_nts()
-{
-    RTPSWriter* ret_writer = active_front_;
-    if (active_front_)
-    {
-        active_front_ = active_front_->next_[active_pos_];
-        ret_writer->next_[active_pos_] = nullptr;
-    }
-    return ret_writer;
+   std::unique_lock<std::mutex> activeGuard(mMutexActive);
+   return *mActiveInterest;
 }

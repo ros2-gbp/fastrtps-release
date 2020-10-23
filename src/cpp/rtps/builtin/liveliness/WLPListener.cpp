@@ -17,17 +17,17 @@
  *
  */
 
-#include <fastdds/rtps/builtin/liveliness/WLPListener.h>
-#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastrtps/rtps/builtin/liveliness/WLPListener.h>
+#include <fastrtps/rtps/builtin/liveliness/WLP.h>
 
-#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastrtps/rtps/history/ReaderHistory.h>
 
-#include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
-#include <fastdds/rtps/builtin/BuiltinProtocols.h>
+#include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
+#include <fastrtps/rtps/builtin/BuiltinProtocols.h>
 
-#include <fastdds/rtps/reader/StatefulReader.h>
-#include <fastdds/rtps/writer/LivelinessManager.h>
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/rtps/reader/StatefulReader.h>
+#include <fastrtps/rtps/writer/LivelinessManager.h>
+#include <fastrtps/log/Log.h>
 
 #include <mutex>
 
@@ -53,7 +53,8 @@ void WLPListener::onNewCacheChangeAdded(
         RTPSReader* reader,
         const CacheChange_t* const changeIN)
 {
-    std::lock_guard<std::recursive_mutex> guard2(*mp_WLP->mp_builtinProtocols->mp_PDP->getMutex());
+
+    std::lock_guard<std::recursive_mutex> guard2(*mp_WLP->getBuiltinProtocols()->mp_PDP->getMutex());
 
     GuidPrefix_t guidP;
     LivelinessQosPolicyKind livelinessKind;
@@ -109,7 +110,6 @@ void WLPListener::onNewCacheChangeAdded(
         return;
     }
 
-    history->getMutex()->unlock();
     if (mp_WLP->automatic_readers_)
     {
         mp_WLP->sub_liveliness_manager_->assert_liveliness(AUTOMATIC_LIVELINESS_QOS);
@@ -118,9 +118,6 @@ void WLPListener::onNewCacheChangeAdded(
     {
         mp_WLP->sub_liveliness_manager_->assert_liveliness(MANUAL_BY_PARTICIPANT_LIVELINESS_QOS);
     }
-    mp_WLP->mp_builtinProtocols->mp_PDP->getMutex()->unlock();
-    history->getMutex()->lock();
-    mp_WLP->mp_builtinProtocols->mp_PDP->getMutex()->lock();
     return;
 }
 

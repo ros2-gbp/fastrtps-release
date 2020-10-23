@@ -14,9 +14,6 @@
 
 #include "../BlackboxTests.hpp"
 
-#include <functional>
-#include <iostream>
-
 const std::function<void(const HelloWorld&)>  default_helloworld_print = [](const HelloWorld& hello)
 {
     std::cout << hello.index() << " ";

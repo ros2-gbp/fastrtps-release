@@ -17,13 +17,10 @@
  *
  */
 
-#include <rtps/persistence/PersistenceService.h>
+#include "PersistenceService.h"
+#include "SQLite3PersistenceService.h"
 
-#if HAVE_SQLITE3
-#include <rtps/persistence/SQLite3PersistenceService.h>
-#endif
-
-#include <fastdds/rtps/attributes/PropertyPolicy.h>
+#include <fastrtps/rtps/attributes/PropertyPolicy.h>
 
 namespace eprosima {
 namespace fastrtps{
@@ -36,7 +33,6 @@ IPersistenceService* PersistenceFactory::create_persistence_service(const Proper
 
     if (plugin_property != nullptr)
     {
-#if HAVE_SQLITE3
         if (plugin_property->compare("builtin.SQLITE3") == 0)
         {
             const std::string* filename_property = PropertyPolicyHelper::find_property(property_policy, "dds.persistence.sqlite3.filename");
@@ -44,7 +40,6 @@ IPersistenceService* PersistenceFactory::create_persistence_service(const Proper
                 "persistence.db" : filename_property->c_str();
             ret_val = create_SQLite3_persistence_service(filename);
         }
-#endif
     }
 
     return ret_val;

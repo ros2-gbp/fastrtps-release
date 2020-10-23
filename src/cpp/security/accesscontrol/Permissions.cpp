@@ -16,18 +16,18 @@
  * @file Permissions.cpp
  */
 
-#include <security/accesscontrol/Permissions.h>
-#include <security/accesscontrol/AccessPermissionsHandle.h>
-#include <security/accesscontrol/GovernanceParser.h>
-#include <security/accesscontrol/PermissionsParser.h>
-#include <security/authentication/PKIIdentityHandle.h>
-#include <security/logging/LogTopic.h>
-#include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
-#include <fastdds/rtps/security/exceptions/SecurityException.h>
-#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
+#include "Permissions.h"
+#include "AccessPermissionsHandle.h"
+#include "GovernanceParser.h"
+#include "PermissionsParser.h"
+#include "../authentication/PKIIdentityHandle.h"
+#include <fastrtps/log/Log.h>
+#include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
+#include <fastrtps/rtps/security/exceptions/SecurityException.h>
+#include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastrtps/utils/StringMatching.h>
-#include <fastdds/rtps/builtin/data/WriterProxyData.h>
-#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
+#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
+#include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 
 #include <openssl/opensslv.h>
 
@@ -760,7 +760,6 @@ PermissionsHandle* Permissions::validate_local_permissions(Authentication&,
     if(PropertyPolicyHelper::length(access_properties) == 0)
     {
         exception = _SecurityException_("Not found any dds.sec.access.builtin.Access-Permissions property");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return nullptr;
     }
 
@@ -769,7 +768,6 @@ PermissionsHandle* Permissions::validate_local_permissions(Authentication&,
     if(permissions_ca == nullptr)
     {
         exception = _SecurityException_("Not found dds.sec.access.builtin.Access-Permissions.permissions_ca property");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return nullptr;
     }
 
@@ -778,7 +776,6 @@ PermissionsHandle* Permissions::validate_local_permissions(Authentication&,
     if(governance == nullptr)
     {
         exception = _SecurityException_("Not found dds.sec.access.builtin.Access-Permissions.governance property");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return nullptr;
     }
 
@@ -787,7 +784,6 @@ PermissionsHandle* Permissions::validate_local_permissions(Authentication&,
     if(permissions == nullptr)
     {
         exception = _SecurityException_("Not found dds.sec.access.builtin.Access-Permissions.permissions property");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return nullptr;
     }
 
@@ -837,7 +833,6 @@ bool Permissions::get_permissions_token(PermissionsToken** permissions_token,
     else
     {
         exception = _SecurityException_("Invalid permissions handle");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return false;
@@ -863,7 +858,6 @@ bool Permissions::get_permissions_credential_token(PermissionsCredentialToken** 
     else
     {
         exception = _SecurityException_("Invalid permissions handle");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return false;
@@ -905,7 +899,6 @@ PermissionsHandle* Permissions::validate_remote_permissions(Authentication&,
     if(lih.nil() || lph.nil() || rih.nil())
     {
         exception = _SecurityException_("Bad precondition");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return nullptr;
     }
 
@@ -918,7 +911,6 @@ PermissionsHandle* Permissions::validate_remote_permissions(Authentication&,
         if(sn->compare(lph->sn) != 0)
         {
             exception = _SecurityException_("Remote participant PermissionsCA differs from local");
-            EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
             return nullptr;
         }
     }
@@ -930,7 +922,6 @@ PermissionsHandle* Permissions::validate_remote_permissions(Authentication&,
         if(algo->compare(lph->algo) != 0)
         {
             exception = _SecurityException_("Remote participant PermissionsCA algorithm differs from local");
-            EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
             return nullptr;
         }
     }
@@ -941,7 +932,6 @@ PermissionsHandle* Permissions::validate_remote_permissions(Authentication&,
     if(permissions_file == nullptr)
     {
         exception = _SecurityException_("Remote participant doesn't sent the signed permissions file");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return nullptr;
     }
 
@@ -968,7 +958,6 @@ PermissionsHandle* Permissions::validate_remote_permissions(Authentication&,
     if(remote_grant.subject_name.empty())
     {
         exception = _SecurityException_("Remote participant doesn't found in its permissions file");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return nullptr;
     }
 
@@ -990,7 +979,6 @@ bool Permissions::check_create_participant(const PermissionsHandle& local_handle
     if(lah.nil())
     {
         exception = _SecurityException_("Bad precondition");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1007,7 +995,6 @@ bool Permissions::check_create_participant(const PermissionsHandle& local_handle
     if(!returned_value)
     {
         exception = _SecurityException_("Not found a rule allowing to use the domain_id");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return returned_value;
@@ -1022,7 +1009,6 @@ bool Permissions::check_remote_participant(const PermissionsHandle& remote_handl
     if(rah.nil())
     {
         exception = _SecurityException_("Bad precondition");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1047,7 +1033,6 @@ bool Permissions::check_remote_participant(const PermissionsHandle& remote_handl
     if(!returned_value)
     {
         exception = _SecurityException_("Not found a rule allowing to use the domain_id");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return returned_value;
@@ -1063,7 +1048,6 @@ bool Permissions::check_create_datawriter(const PermissionsHandle& local_handle,
     if(lah.nil())
     {
         exception = _SecurityException_("Bad precondition");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1079,7 +1063,6 @@ bool Permissions::check_create_datawriter(const PermissionsHandle& local_handle,
     else
     {
         exception = _SecurityException_("Not found topic access rule for topic " + topic_name);
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1098,7 +1081,6 @@ bool Permissions::check_create_datawriter(const PermissionsHandle& local_handle,
                     {
                         returned_value = false;
                         exception = _SecurityException_(std::string("<empty> partition not found in rule."));
-                        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
                     }
                 }
                 else
@@ -1111,7 +1093,6 @@ bool Permissions::check_create_datawriter(const PermissionsHandle& local_handle,
                         {
                             returned_value = false;
                             exception = _SecurityException_(*partition_it + std::string(" partition not found in rule."));
-                            EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
                         }
                     }
                 }
@@ -1119,7 +1100,6 @@ bool Permissions::check_create_datawriter(const PermissionsHandle& local_handle,
             else
             {
                 exception = _SecurityException_(topic_name + std::string(" topic denied by deny rule."));
-                EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
             }
 
             break;
@@ -1129,7 +1109,6 @@ bool Permissions::check_create_datawriter(const PermissionsHandle& local_handle,
     if(!returned_value && strlen(exception.what()) == 0)
     {
         exception = _SecurityException_(topic_name + std::string(" topic not found in allow rule."));
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return returned_value;
@@ -1145,7 +1124,6 @@ bool Permissions::check_create_datareader(const PermissionsHandle& local_handle,
     if(lah.nil())
     {
         exception = _SecurityException_("Bad precondition");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1161,7 +1139,6 @@ bool Permissions::check_create_datareader(const PermissionsHandle& local_handle,
     else
     {
         exception = _SecurityException_("Not found topic access rule for topic " + topic_name);
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1179,7 +1156,6 @@ bool Permissions::check_create_datareader(const PermissionsHandle& local_handle,
                     {
                         returned_value = false;
                         exception = _SecurityException_(std::string("<empty> partition not found in rule."));
-                        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
                     }
                 }
                 else
@@ -1192,7 +1168,6 @@ bool Permissions::check_create_datareader(const PermissionsHandle& local_handle,
                         {
                             returned_value = false;
                             exception = _SecurityException_(*partition_it + std::string(" partition not found in rule."));
-                            EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
                         }
                     }
                 }
@@ -1200,7 +1175,6 @@ bool Permissions::check_create_datareader(const PermissionsHandle& local_handle,
             else
             {
                 exception = _SecurityException_(topic_name + std::string(" topic denied by deny rule."));
-                EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
             }
 
             break;
@@ -1210,7 +1184,6 @@ bool Permissions::check_create_datareader(const PermissionsHandle& local_handle,
     if(!returned_value && strlen(exception.what()) == 0)
     {
         exception = _SecurityException_(topic_name + std::string(" topic not found in allow rule."));
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return returned_value;
@@ -1226,7 +1199,6 @@ bool Permissions::check_remote_datawriter(const PermissionsHandle& remote_handle
     if(rah.nil())
     {
         exception = _SecurityException_("Bad precondition");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1243,7 +1215,6 @@ bool Permissions::check_remote_datawriter(const PermissionsHandle& remote_handle
     else
     {
         exception = _SecurityException_("Not found topic access rule for topic " + publication_data.topicName().to_string());
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1261,7 +1232,6 @@ bool Permissions::check_remote_datawriter(const PermissionsHandle& remote_handle
                 {
                     exception = _SecurityException_(publication_data.topicName().to_string() +
                             std::string(" topic denied by deny rule."));
-                    EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
                 }
 
                 break;
@@ -1273,7 +1243,6 @@ bool Permissions::check_remote_datawriter(const PermissionsHandle& remote_handle
     {
         exception = _SecurityException_(publication_data.topicName().to_string() +
                 std::string(" topic not found in allow rule."));
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return returned_value;
@@ -1291,7 +1260,6 @@ bool Permissions::check_remote_datareader(const PermissionsHandle& remote_handle
     if(rah.nil())
     {
         exception = _SecurityException_("Bad precondition");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1308,7 +1276,6 @@ bool Permissions::check_remote_datareader(const PermissionsHandle& remote_handle
     else
     {
         exception = _SecurityException_("Not found topic access rule for topic " + subscription_data.topicName().to_string());
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1326,7 +1293,6 @@ bool Permissions::check_remote_datareader(const PermissionsHandle& remote_handle
                 {
                     exception = _SecurityException_(subscription_data.topicName().to_string() +
                             std::string(" topic denied by deny rule."));
-                    EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
                 }
 
                 break;
@@ -1349,7 +1315,6 @@ bool Permissions::check_remote_datareader(const PermissionsHandle& remote_handle
     {
         exception = _SecurityException_(subscription_data.topicName().to_string() +
                 std::string(" topic not found in allow rule."));
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return returned_value;
@@ -1363,7 +1328,6 @@ bool Permissions::get_participant_sec_attributes(const PermissionsHandle& local_
     if(lah.nil())
     {
         exception = _SecurityException_("Bad precondition");
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
         return false;
     }
 
@@ -1388,7 +1352,6 @@ bool Permissions::get_datawriter_sec_attributes(const PermissionsHandle& permiss
     else
     {
         exception = _SecurityException_("Not found topic access rule for topic " + topic_name);
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return false;
@@ -1410,7 +1373,6 @@ bool Permissions::get_datareader_sec_attributes(const PermissionsHandle& permiss
     else
     {
         exception = _SecurityException_("Not found topic access rule for topic " + topic_name);
-        EMERGENCY_SECURITY_LOGGING("Permissions", exception.what());
     }
 
     return false;

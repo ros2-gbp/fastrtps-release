@@ -19,64 +19,34 @@
 #include "ReqRepAsReliableHelloWorldRequester.hpp"
 #include "ReqRepAsReliableHelloWorldReplier.hpp"
 
-#include <gtest/gtest.h>
-
 #include <fastrtps/utils/TimeConversion.h>
-#include <fastrtps/xmlparser//XMLProfileManager.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-class LifespanQos : public testing::TestWithParam<bool>
-{
-public:
-
-    void SetUp() override
-    {
-        LibrarySettingsAttributes library_settings;
-        if (GetParam())
-        {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
-        }
-
-    }
-
-    void TearDown() override
-    {
-        LibrarySettingsAttributes library_settings;
-        if (GetParam())
-        {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
-        }
-    }
-
-};
-
-
-TEST_P(LifespanQos, LongLifespan)
+TEST(LifespanQos, LongLifespan)
 {
     // This test sets a long lifespan, makes the writer send a few samples
     // and checks that those changes can be removed from the history
     // as they should not have been removed due to lifespan QoS
 
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME, false);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 1;
     // Number of samples written by writer
     uint32_t writer_samples = 3;
-    // Lifespan period in milliseconds
-    uint32_t lifespan_ms = 10000;
+    // Lifespan period in seconds
+    eprosima::fastrtps::Duration_t lifespan_s(writer_sleep_ms * 1000 * 1e-3);
 
-    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-    .lifespan_period(lifespan_ms * 1e-3)
-    .init();
-    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-    .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-    .init();
+    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS);
+    writer.lifespan_period(lifespan_s);
+    writer.init();
+
+    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS);
+    reader.lifespan_period(lifespan_s);
+    reader.init();
 
     ASSERT_TRUE(reader.isInitialized());
     ASSERT_TRUE(writer.isInitialized());
@@ -86,12 +56,8 @@ TEST_P(LifespanQos, LongLifespan)
     reader.wait_discovery();
 
     auto data = default_helloworld_data_generator(writer_samples);
-    auto expected_data = data;
     writer.send(data, writer_sleep_ms);
     ASSERT_TRUE(data.empty());
-
-    reader.startReception(expected_data);
-    reader.block_for_at_least(writer_samples);
 
     // Changes should not have been removed due to lifespan
     // therefore they should still exist in the history and
@@ -102,12 +68,13 @@ TEST_P(LifespanQos, LongLifespan)
 
     // On the reader side we should be able to take the data
     HelloWorldType::type msg;
-    EXPECT_EQ(reader.takeNextData(&msg), true);
-    EXPECT_EQ(reader.takeNextData(&msg), true);
-    EXPECT_EQ(reader.takeNextData(&msg), true);
+    eprosima::fastrtps::SampleInfo_t info;
+    EXPECT_EQ(reader.takeNextData(&msg, &info), true);
+    EXPECT_EQ(reader.takeNextData(&msg, &info), true);
+    EXPECT_EQ(reader.takeNextData(&msg, &info), true);
 }
 
-TEST_P(LifespanQos, ShortLifespan)
+TEST(LifespanQos, ShortLifespan)
 {
     // This test sets a short lifespan, makes the writer send a few samples
     // and checks that those samples cannot be removed from the history as
@@ -117,18 +84,19 @@ TEST_P(LifespanQos, ShortLifespan)
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
-    uint32_t writer_sleep_ms = 200;
+    uint32_t writer_sleep_ms = 100;
     // Number of samples written by writer
     uint32_t writer_samples = 3;
-    // Lifespan period in milliseconds
-    uint32_t lifespan_ms = 1;
+    // Lifespan period in seconds
+    eprosima::fastrtps::Duration_t lifespan_s(writer_sleep_ms * 0.1 * 1e-3);
 
-    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-    .lifespan_period(lifespan_ms * 1e-3)
-    .init();
-    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-    .lifespan_period(lifespan_ms * 1e-3)
-    .init();
+    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS);
+    writer.lifespan_period(lifespan_s);
+    writer.init();
+
+    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS);
+    reader.lifespan_period(lifespan_s);
+    reader.init();
 
     ASSERT_TRUE(reader.isInitialized());
     ASSERT_TRUE(writer.isInitialized());
@@ -149,19 +117,8 @@ TEST_P(LifespanQos, ShortLifespan)
 
     // On the reader side we should not be able to take the data
     HelloWorldType::type msg;
-    EXPECT_EQ(reader.takeNextData(&msg), false);
-    EXPECT_EQ(reader.takeNextData(&msg), false);
-    EXPECT_EQ(reader.takeNextData(&msg), false);
+    eprosima::fastrtps::SampleInfo_t info;
+    EXPECT_EQ(reader.takeNextData(&msg, &info), false);
+    EXPECT_EQ(reader.takeNextData(&msg, &info), false);
+    EXPECT_EQ(reader.takeNextData(&msg, &info), false);
 }
-
-INSTANTIATE_TEST_CASE_P(LifespanQos,
-        LifespanQos,
-        testing::Values(false, true),
-        [](const testing::TestParamInfo<LifespanQos::ParamType>& info) {
-    if (info.param)
-    {
-        return "Intraprocess";
-    }
-    return "NonIntraprocess";
-});
-

@@ -33,31 +33,23 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-OwnershipStrengthSubscriber::OwnershipStrengthSubscriber()
-    : mp_participant(nullptr)
-    , mp_subscriber(nullptr)
-{
-}
+OwnershipStrengthSubscriber::OwnershipStrengthSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr) {}
 
-OwnershipStrengthSubscriber::~OwnershipStrengthSubscriber()
-{
-    Domain::removeParticipant(mp_participant);
-}
+OwnershipStrengthSubscriber::~OwnershipStrengthSubscriber() {	Domain::removeParticipant(mp_participant);}
 
 bool OwnershipStrengthSubscriber::init()
 {
     ParticipantAttributes PParam;
-    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.domainId = 0; //MUST BE THE SAME AS IN THE PUBLISHER
+    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_subscriber"); //You can put the name you want
     mp_participant = Domain::createParticipant(PParam);
-    if (mp_participant == nullptr)
-    {
+    if(mp_participant == nullptr)
         return false;
-    }
 
     //Register the type
 
-    Domain::registerType(mp_participant, (TopicDataType*) &myType);
+    Domain::registerType(mp_participant,(TopicDataType*) &myType);		
 
     // Create Subscriber
 
@@ -66,17 +58,13 @@ bool OwnershipStrengthSubscriber::init()
     Rparam.topic.topicDataType = myType.getName(); //Must be registered before the creation of the subscriber
     Rparam.topic.topicName = "OwnershipStrengthPubSubTopic";
     Rparam.qos.m_reliability.kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
-    mp_subscriber = Domain::createSubscriber(mp_participant, Rparam, (SubscriberListener*)&m_listener);
-    if (mp_subscriber == nullptr)
-    {
+    mp_subscriber = Domain::createSubscriber(mp_participant,Rparam,(SubscriberListener*)&m_listener);
+    if(mp_subscriber == nullptr)
         return false;
-    }
     return true;
 }
 
-void OwnershipStrengthSubscriber::SubListener::onSubscriptionMatched(
-        Subscriber* /*sub*/,
-        MatchingInfo& info)
+void OwnershipStrengthSubscriber::SubListener::onSubscriptionMatched(Subscriber* /*sub*/,MatchingInfo& info)
 {
     if (info.status == MATCHED_MATCHING)
     {
@@ -94,9 +82,7 @@ void OwnershipStrengthSubscriber::SubListener::onSubscriptionMatched(
     }
 }
 
-bool OwnershipStrengthSubscriber::StrengthHierarchy::IsMessageStrong(
-        const ExampleMessage& st,
-        const SampleInfo_t& info)
+bool OwnershipStrengthSubscriber::StrengthHierarchy::IsMessageStrong(const ExampleMessage& st, const SampleInfo_t& info)
 {
     unsigned int ownershipStrength = st.ownershipStrength();
     GUID_t guid = info.sample_identity.writer_guid();
@@ -116,47 +102,41 @@ bool OwnershipStrengthSubscriber::StrengthHierarchy::IsMessageStrong(
     mapMutex.unlock();
 
     if (!strong)
-    {
         std::cout << "Weak message received and discarded (strength " << ownershipStrength << ")" << std::endl;
-    }
 
     return strong;
 }
 
-void OwnershipStrengthSubscriber::StrengthHierarchy::DeregisterPublisher(
-        GUID_t guid)
+void OwnershipStrengthSubscriber::StrengthHierarchy::DeregisterPublisher(GUID_t guid)
 {
     mapMutex.lock();
 
     // We walk through the hierarchy and remove the publisher GUID
-    for (auto& guidSet : strengthMap)
-    {
+    for (auto &guidSet : strengthMap)
         guidSet.second.erase(guid);
-    }
 
     mapMutex.unlock();
 }
 
-void OwnershipStrengthSubscriber::SubListener::onNewDataMessage(
-        Subscriber* sub)
+void OwnershipStrengthSubscriber::SubListener::onNewDataMessage(Subscriber* sub)
 {
     // Take data
     ExampleMessage st;
 
-    if (sub->takeNextData(&st, &m_info) &&
-            m_info.sampleKind == ALIVE &&
+    if(sub->takeNextData(&st, &m_info) &&
+            m_info.sampleKind == ALIVE && 
             m_hierarchy.IsMessageStrong(st, m_info))
     {
         // User message handling here, for a strong message
         ++n_msg;
         std::cout << "Message received with index " << n_msg << ", and strength " << st.ownershipStrength() \
-                  << ", reading \"" << st.message() << "\"" << std::endl;
+            << ", reading \"" << st.message() << "\"" << std::endl;
     }
 }
 
 void OwnershipStrengthSubscriber::run()
 {
-    std::cout << "Waiting for Data, press Enter to stop the Subscriber. " << std::endl;
+    std::cout << "Waiting for Data, press Enter to stop the Subscriber. "<<std::endl;
     std::cin.ignore();
     std::cout << "Shutting down the Subscriber." << std::endl;
 }

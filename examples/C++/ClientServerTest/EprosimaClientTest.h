@@ -21,19 +21,17 @@
 #define EPROSIMACLIENTTEST_H_
 
 #include "EprosimaClient.h"
-#include <chrono>
+#include "fastrtps/utils/eClock.h"
 
 class EprosimaClientTest {
-
 public:
-    EprosimaClientTest();
-    virtual ~EprosimaClientTest();
-    double run(int samples);
-
-private:
-    EprosimaClient m_client;
-    std::chrono::time_point<std::chrono::steady_clock> m_t1, m_t2;
-    double m_overhead;
+	EprosimaClientTest();
+	virtual ~EprosimaClientTest();
+	EprosimaClient m_client;
+	double run(int samples);
+	eprosima::fastrtps::eClock m_clock;
+	eprosima::fastrtps::rtps::Time_t m_t1,m_t2;
+	double m_overhead;
 };
 
 #endif /* EPROSIMACLIENTTEST_H_ */

@@ -16,14 +16,14 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
     include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
     check_gtest()
 
-    if(GTEST_FOUND AND SQLITE3_SUPPORT)
+    if(GTEST_FOUND)
         set(PERSISTENCETESTS_SOURCE
             PersistenceTests.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/persistence/PersistenceFactory.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/persistence/SQLite3PersistenceService.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/persistence/sqlite3.c
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/log/StdoutConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/history/CacheChangePool.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp)
@@ -34,7 +34,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(PersistenceTests foonathan_memory ${GTEST_LIBRARIES} ${CMAKE_DL_LIBS})
+        target_link_libraries(PersistenceTests ${GTEST_LIBRARIES} ${CMAKE_DL_LIBS})
         if(MSVC OR MSVC_IDE)
             target_link_libraries(PersistenceTests ${PRIVACY}
                 iphlpapi Shlwapi

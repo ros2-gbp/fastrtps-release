@@ -16,11 +16,10 @@
  * @file SecurityPluginFactory.cpp
  */
 
-#include <rtps/security/SecurityPluginFactory.h>
-#include <security/authentication/PKIDH.h>
-#include <security/accesscontrol/Permissions.h>
-#include <security/cryptography/AESGCMGMAC.h>
-#include <security/logging/LogTopic.h>
+#include "SecurityPluginFactory.h"
+#include "../../security/authentication/PKIDH.h"
+#include "../../security/accesscontrol/Permissions.h"
+#include "../../security/cryptography/AESGCMGMAC.h"
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::rtps::security;
@@ -71,23 +70,6 @@ Cryptography* SecurityPluginFactory::create_cryptography_plugin(const PropertyPo
         if(crypto_plugin_property->compare("builtin.AES-GCM-GMAC") == 0)
         {
             plugin = new AESGCMGMAC();
-        }
-    }
-
-    return plugin;
-}
-
-Logging* SecurityPluginFactory::create_logging_plugin(const PropertyPolicy& property_policy)
-{
-    Logging* plugin = nullptr;
-    const std::string* logging_plugin_property = PropertyPolicyHelper::find_property(property_policy,
-                    "dds.sec.log.plugin");
-
-    if(logging_plugin_property != nullptr)
-    {
-        if(logging_plugin_property->compare("builtin.DDS_LogTopic") == 0)
-        {
-            plugin = new LogTopic();
         }
     }
 

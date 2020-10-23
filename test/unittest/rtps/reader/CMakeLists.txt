@@ -21,9 +21,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         find_package(Threads REQUIRED)
 
         set(WRITERPROXYTESTS_SOURCE WriterProxyTests.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/publisher/qos/WriterQos.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/reader/WriterProxy.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/log/StdoutConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
             )
 
@@ -35,21 +35,14 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         target_compile_definitions(WriterProxyTests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(WriterProxyTests PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
-            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/reader
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSReader
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSWriter
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSDomainImpl
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/TimedEvent
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/StatefulReader
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/WriterProxyData
-            ${PROJECT_SOURCE_DIR}/test/mock/dds/QosPolicies
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/ResourceEvent
-            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
-            ${PROJECT_SOURCE_DIR}/src/cpp
-            )
-        target_link_libraries(WriterProxyTests foonathan_memory
+            ${PROJECT_SOURCE_DIR}/test/mock/rtps/HeartbeatResponseDelay
+            ${PROJECT_SOURCE_DIR}/test/mock/rtps/WriterProxyLiveliness
+            ${PROJECT_SOURCE_DIR}/test/mock/rtps/InitialAckNack
+            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
+        target_link_libraries(WriterProxyTests
             ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
             ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
         add_gtest(WriterProxyTests SOURCES ${WRITERPROXYTESTS_SOURCE})

@@ -19,10 +19,10 @@
 #ifndef _SECURITY_AUTHENTICATION_AESGCMGMAC_KEYEXCHANGE_H_
 #define _SECURITY_AUTHENTICATION_AESGCMGMAC_KEYEXCHANGE_H_
 
-#include <fastdds/rtps/security/cryptography/CryptoKeyExchange.h>
-#include <fastdds/rtps/attributes/PropertyPolicy.h>
+#include <fastrtps/rtps/security/cryptography/CryptoKeyExchange.h>
+#include <fastrtps/rtps/attributes/PropertyPolicy.h>
 
-#include <security/cryptography/AESGCMGMAC_Types.h>
+#include "AESGCMGMAC_Types.h"
 
 namespace eprosima {
 namespace fastrtps {

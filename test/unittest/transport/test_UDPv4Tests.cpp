@@ -17,8 +17,8 @@
 #include <thread>
 #include <fastrtps/rtps/common/CDRMessage_t.h>
 #include <fastrtps/rtps/messages/RTPSMessageCreator.h>
-#include <fastrtps/qos/ParameterTypes.h>
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/qos/ParameterList.h>
+#include <fastrtps/log/Log.h>
 #include <fastrtps/utils/IPLocator.h>
 
 #include <memory>
@@ -59,7 +59,7 @@ class test_UDPv4Tests: public ::testing::Test
 
     ~test_UDPv4Tests()
     {
-        eprosima::fastdds::dds::Log::KillThread();
+        Log::KillThread();
     }
 
    void HELPER_SetDescriptorDefaults();

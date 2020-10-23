@@ -72,7 +72,7 @@ public:
     using iterator = typename collection_type::iterator;
     using const_iterator = typename collection_type::const_iterator;
     using reverse_iterator = typename collection_type::reverse_iterator;
-    using const_reverse_iterator = typename collection_type::const_reverse_iterator;
+    using const_reverse_iterator = typename collection_type::reverse_iterator;
 
     /**
      * Construct a ResourceLimitedVector.
@@ -95,6 +95,13 @@ public:
         collection_.reserve(cfg.initial);
     }
 
+    /**
+     * Copy constructor.
+     *
+     * Constructs a ResourceLimitedVector from another ResourceLimitedVector.
+     *
+     * @param other ResourceLimitedVector to be copied.
+     */
     ResourceLimitedVector(
             const ResourceLimitedVector& other)
         : configuration_(other.configuration_)
@@ -104,10 +111,17 @@ public:
         collection_.assign(other.collection_.begin(), other.collection_.end());
     }
 
-    virtual ~ResourceLimitedVector () = default;
-
-    ResourceLimitedVector& operator = (
-            const ResourceLimitedVector& other)
+    /**
+     * Assignment operator.
+     *
+     * Makes the contents of the ResourceLimitedVector the same as the ones in other
+     * ResourceLimitedVector.
+     *
+     * @param other ResourceLimitedVector from where contents are copied.
+     *
+     * @return a reference to this ResourceLimitedVector.
+     */
+    ResourceLimitedVector& operator = (const ResourceLimitedVector& other)
     {
         clear();
         for (const_reference item : other)
@@ -129,8 +143,7 @@ public:
      *
      * @return pointer to the new element, nullptr if resource limit is reached.
      */
-    pointer push_back(
-            const value_type& val)
+    pointer push_back(const value_type& val)
     {
         return emplace_back(val);
     }
@@ -145,8 +158,7 @@ public:
      *
      * @return pointer to the new element, nullptr if resource limit is reached.
      */
-    pointer push_back(
-            value_type&& val)
+    pointer push_back(value_type&& val)
     {
         return emplace_back(std::move(val));
     }
@@ -162,8 +174,7 @@ public:
      * @return pointer to the new element, nullptr if resource limit is reached.
      */
     template<typename ... Args>
-    pointer emplace_back(
-            Args&& ... args)
+    pointer emplace_back(Args&& ... args)
     {
         if (!ensure_capacity())
         {
@@ -172,7 +183,7 @@ public:
         }
 
         // Construct new element at the end of the collection
-        collection_.emplace_back(args ...);
+        collection_.emplace_back(args...);
 
         // Return pointer to newly created element
         return &collection_.back();
@@ -188,8 +199,7 @@ public:
      *
      * @return true if an element was removed, false otherwise.
      */
-    bool remove(
-            const value_type& val)
+    bool remove(const value_type& val)
     {
         iterator it = std::find(collection_.begin(), collection_.end(), val);
         if (it != collection_.end())
@@ -216,8 +226,7 @@ public:
      * @return true if an element was removed, false otherwise.
      */
     template<class UnaryPredicate>
-    bool remove_if(
-            UnaryPredicate pred)
+    bool remove_if(UnaryPredicate pred)
     {
         iterator it = std::find_if(collection_.begin(), collection_.end(), pred);
         if (it != collection_.end())
@@ -243,15 +252,11 @@ public:
      *                      discarded.
      */
     template <class InputIterator>
-    void assign(
-            InputIterator first,
-            InputIterator last)
+    void assign(InputIterator first, InputIterator last)
     {
-        size_type n = static_cast<size_type>(std::distance(first, last));
+        size_type n = std::distance(first, last);
         n = std::min(n, configuration_.maximum);
-        InputIterator value = first;
-        std::advance(value, n);
-        collection_.assign(first, value);
+        collection_.assign(first, first + n);
     }
 
     /**
@@ -264,9 +269,7 @@ public:
      * @param val   Value to fill the container with.
      *              Each of the n elements in the container will be initialized to a copy of this value.
      */
-    void assign(
-            size_type n,
-            const value_type& val)
+    void assign(size_type n, const value_type& val)
     {
         n = std::min(n, configuration_.maximum);
         collection_.assign(n, val);
@@ -283,8 +286,7 @@ public:
      *             If the size of this list is greater than the maximum number of elements allowed on the
      *             resource limits configuration, the elements exceeding that maximum will be silently discarded.
      */
-    void assign(
-            std::initializer_list<value_type> il)
+    void assign(std::initializer_list<value_type> il)
     {
         size_type n = std::min(il.size(), configuration_.maximum);
         collection_.assign(il.begin(), il.begin() + n);
@@ -295,163 +297,41 @@ public:
      * Please refer to https://en.cppreference.com/w/cpp/container/vector
      */
     ///@{
-    reference at(
-            size_type pos)
-    {
-        return collection_.at(pos);
-    }
+    reference at(size_type pos) { return collection_.at(pos); }
+    const_reference at(size_type pos) const { return collection_.at(pos); }
+    reference operator[](size_type pos) { return collection_[pos]; }
+    const_reference operator[](size_type pos) const { return collection_[pos]; }
 
-    const_reference at(
-            size_type pos) const
-    {
-        return collection_.at(pos);
-    }
+    reference front() { return collection_.front(); }
+    const_reference front() const { return collection_.front(); }
+    reference back() { return collection_.back(); }
+    const_reference back() const { return collection_.back(); }
 
-    reference operator [](
-            size_type pos)
-    {
-        return collection_[pos];
-    }
+    iterator begin() noexcept { return collection_.begin(); }
+    const_iterator begin() const noexcept { return collection_.begin(); }
+    const_iterator cbegin() const noexcept { return collection_.cbegin(); }
 
-    const_reference operator [](
-            size_type pos) const
-    {
-        return collection_[pos];
-    }
+    iterator end() noexcept { return collection_.end(); }
+    const_iterator end() const noexcept { return collection_.end(); }
+    const_iterator cend() const noexcept { return collection_.cend(); }
 
-    reference front()
-    {
-        return collection_.front();
-    }
+    reverse_iterator rbegin() noexcept { return collection_.rbegin(); }
+    const_reverse_iterator rbegin() const noexcept { return collection_.rbegin(); }
+    const_reverse_iterator crbegin() const noexcept { return collection_.crbegin(); }
 
-    const_reference front() const
-    {
-        return collection_.front();
-    }
+    reverse_iterator rend() noexcept { return collection_.rend(); }
+    const_reverse_iterator rend() const noexcept { return collection_.rend(); }
+    const_reverse_iterator crend() const noexcept { return collection_.crend(); }
 
-    reference back()
-    {
-        return collection_.back();
-    }
+    bool empty() const noexcept { return collection_.empty(); }
+    size_type size() const noexcept { return collection_.size(); }
+    size_type capacity() const noexcept { return collection_.capacity(); }
+    size_type max_size() const noexcept { return std::min(configuration_.maximum, collection_.max_size()); }
 
-    const_reference back() const
-    {
-        return collection_.back();
-    }
-
-    iterator begin() noexcept
-    {
-        return collection_.begin();
-    }
-
-    const_iterator begin() const noexcept
-    {
-        return collection_.begin();
-    }
-
-    const_iterator cbegin() const noexcept
-    {
-        return collection_.cbegin();
-    }
-
-    iterator end() noexcept
-    {
-        return collection_.end();
-    }
-
-    const_iterator end() const noexcept
-    {
-        return collection_.end();
-    }
-
-    const_iterator cend() const noexcept
-    {
-        return collection_.cend();
-    }
-
-    reverse_iterator rbegin() noexcept
-    {
-        return collection_.rbegin();
-    }
-
-    const_reverse_iterator rbegin() const noexcept
-    {
-        return collection_.rbegin();
-    }
-
-    const_reverse_iterator crbegin() const noexcept
-    {
-        return collection_.crbegin();
-    }
-
-    reverse_iterator rend() noexcept
-    {
-        return collection_.rend();
-    }
-
-    const_reverse_iterator rend() const noexcept
-    {
-        return collection_.rend();
-    }
-
-    const_reverse_iterator crend() const noexcept
-    {
-        return collection_.crend();
-    }
-
-    bool empty() const noexcept
-    {
-        return collection_.empty();
-    }
-
-    size_type size() const noexcept
-    {
-        return collection_.size();
-    }
-
-    size_type capacity() const noexcept
-    {
-        return collection_.capacity();
-    }
-
-    size_type max_size() const noexcept
-    {
-        return std::min(configuration_.maximum, collection_.max_size());
-    }
-
-    void clear()
-    {
-        collection_.clear();
-    }
-
-    iterator erase(
-            const_iterator pos)
-    {
-        return collection_.erase(pos);
-    }
-
-    iterator erase(
-            const_iterator first,
-            const_iterator last)
-    {
-        return collection_.erase(first, last);
-    }
-
-    void pop_back()
-    {
-        collection_.pop_back();
-    }
-
-    value_type* data()
-    {
-        return collection_.data();
-    }
-
-    const value_type* data() const
-    {
-        return collection_.data();
-    }
-
+    void clear() { collection_.clear(); }
+    iterator erase(const_iterator pos) { return collection_.erase(pos); }
+    iterator erase(const_iterator first, const_iterator last) { return collection_.erase(first, last); }
+    void pop_back() { collection_.pop_back(); }
     ///@}
 
     /**
@@ -463,8 +343,7 @@ public:
      */
     operator const collection_type& () const noexcept { return collection_; }
 
-protected:
-
+private:
     configuration_type configuration_;
     collection_type collection_;
 
@@ -509,8 +388,7 @@ protected:
      * @param it   Iterator pointing to the item to be removed.
      */
     template <typename Enabler = _KeepOrderEnabler>
-    typename std::enable_if<!Enabler::value, void>::type do_remove(
-            iterator it)
+    typename std::enable_if<!Enabler::value, void>::type do_remove(iterator it)
     {
         // Copy last element into the element being removed
         if (it != --collection_.end())
@@ -533,12 +411,10 @@ protected:
      * @param it   Iterator pointing to the item to be removed.
      */
     template <typename Enabler = _KeepOrderEnabler>
-    typename std::enable_if<Enabler::value, void>::type do_remove(
-            iterator it)
+    typename std::enable_if<Enabler::value, void>::type do_remove(iterator it)
     {
         collection_.erase(it);
     }
-
 };
 
 }  // namespace fastrtps

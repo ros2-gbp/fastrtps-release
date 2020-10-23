@@ -17,10 +17,10 @@
  *
  */
 
-#include <fastdds/rtps/writer/PersistentWriter.h>
-#include <fastdds/rtps/history/WriterHistory.h>
-#include <rtps/persistence/PersistenceService.h>
-#include <fastrtps_deprecated/participant/ParticipantImpl.h>
+#include <fastrtps/rtps/writer/PersistentWriter.h>
+#include <fastrtps/rtps/history/WriterHistory.h>
+#include "../persistence/PersistenceService.h"
+#include "../participant/RTPSParticipantImpl.h"
 
 namespace eprosima {
 namespace fastrtps{
@@ -39,6 +39,7 @@ PersistentWriter::PersistentWriter(GUID_t& guid,WriterAttributes& att,WriterHist
 
      if (persistence_->load_writer_from_storage(persistence_guid_, guid, hist->m_changes, &(hist->m_changePool)))
      {
+         hist->updateMaxMinSeqNum();
          CacheChange_t* max_change;
          if (hist->get_max_change(&max_change))
          {

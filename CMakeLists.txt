@@ -15,8 +15,7 @@
 ###############################################################################
 # CMake build rules for FastRTPS
 ###############################################################################
-cmake_minimum_required(VERSION 3.5)
-cmake_policy(VERSION 3.5...3.13)
+cmake_minimum_required(VERSION 2.8.12)
 
 set(IS_TOP_LEVEL TRUE)
 if(PROJECT_SOURCE_DIR)
@@ -133,8 +132,7 @@ if(MSVC OR MSVC_IDE)
         string(REPLACE "/DNDEBUG" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
     endif()
 else()
-    set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-unknown-pragmas -Wno-error=deprecated-declarations")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-unknown-pragmas")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -194,6 +192,7 @@ endif()
 # Internal debug messages
 ###############################################################################
 
+option(INTERNAL_DEBUG "Activate developer debug messages" OFF)
 if(EPROSIMA_BUILD AND NOT EPROSIMA_INSTALLER_MINION)
     set(INTERNAL_DEBUG ON)
 endif()
@@ -219,8 +218,6 @@ include(${PROJECT_SOURCE_DIR}/cmake/common/eprosima_libraries.cmake)
 eprosima_find_package(fastcdr REQUIRED)
 eprosima_find_thirdparty(Asio asio)
 eprosima_find_thirdparty(TinyXML2 tinyxml2)
-find_package(foonathan_memory REQUIRED)
-find_package(ThirdpartyBoost REQUIRED)
 
 if(ANDROID)
     eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
@@ -237,12 +234,8 @@ else()
     find_package(OpenSSL)
 endif()
 
-if(OPENSSL_FOUND)
-    message(STATUS "OpenSSL library ${OPENSSL_VERSION} found...")
-endif()
-
 option(NO_TLS "Disables TLS Support" OFF)
-if(OPENSSL_FOUND AND NOT NO_TLS)
+if(OpenSSL_FOUND AND NOT NO_TLS)
     set(TLS_FOUND 1)
 else()
     set(TLS_FOUND 0)
@@ -252,17 +245,6 @@ if(SECURITY OR TLS_FOUND)
     set(LINK_SSL 1)
 else()
     set(LINK_SSL 0)
-endif()
-
-option(SQLITE3_SUPPORT "Activate SQLITE3 support" ON)
-
-###############################################################################
-# SHM as Default transport
-###############################################################################
-option(SHM_TRANSPORT_DEFAULT "Adds SHM transport to the default transports" OFF)
-
-if(EPROSIMA_BUILD)
-    set(SHM_TRANSPORT_DEFAULT ON)
 endif()
 
 ###############################################################################
@@ -321,7 +303,7 @@ if(BUILD_DOCUMENTATION)
     elseif(WIN32)
         set(DOXYFILE_MAKE make.bat)
     endif()
-
+    
     if(NOT CHECK_DOCUMENTATION)
         find_program(WGET_EXE wget)
         if(WGET_EXE)
@@ -380,7 +362,7 @@ if(BUILD_DOCUMENTATION)
             COMMAND ${CMAKE_COMMAND} -E rename "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual"
             COMMAND ${CMAKE_COMMAND} -E remove "eprosima-fast-rtps.zip"
             )
-
+    
         add_dependencies(readthedocs docdirs)
     endif()
 

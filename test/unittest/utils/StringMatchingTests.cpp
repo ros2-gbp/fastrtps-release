@@ -14,7 +14,7 @@
 
 #include <fastrtps/utils/StringMatching.h>
 #include <gtest/gtest.h>
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/log/Log.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -58,7 +58,7 @@ TEST_F(StringMatchingTests, patterns_with_wildcards)
 
 int main(int argc, char **argv)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Info);
+    Log::SetVerbosity(Log::Info);
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

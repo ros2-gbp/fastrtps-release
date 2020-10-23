@@ -16,7 +16,7 @@
  * @file Token.cpp
  */
 
-#include <fastdds/rtps/common/Token.h>
+#include <fastrtps/rtps/common/Token.h>
 
 using namespace eprosima::fastrtps::rtps;
 

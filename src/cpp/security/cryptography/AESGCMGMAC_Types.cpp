@@ -17,7 +17,7 @@
  */
 
 
-#include <security/cryptography/AESGCMGMAC_Types.h>
+#include "AESGCMGMAC_Types.h"
 
 using namespace eprosima::fastrtps::rtps::security;
 

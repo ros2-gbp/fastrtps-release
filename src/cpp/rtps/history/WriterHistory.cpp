@@ -16,19 +16,17 @@
  *
  */
 
-#include <fastdds/rtps/history/WriterHistory.h>
+#include <fastrtps/rtps/history/WriterHistory.h>
 
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/writer/RTPSWriter.h>
-#include <fastdds/rtps/common/WriteParams.h>
+#include <fastrtps/log/Log.h>
+#include <fastrtps/rtps/writer/RTPSWriter.h>
+#include <fastrtps/rtps/common/WriteParams.h>
 
 #include <mutex>
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
-
-WriteParams WriteParams::WRITE_PARAM_DEFAULT;
 
 WriterHistory::WriterHistory(const HistoryAttributes& att):
     History(att),
@@ -62,7 +60,7 @@ bool WriterHistory::add_change_(CacheChange_t* a_change, WriteParams &wparams,
         return false;
     }
 
-    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
     if(a_change->writerGUID != mp_writer->getGuid())
     {
         logError(RTPS_HISTORY,"Change writerGUID "<< a_change->writerGUID << " different than Writer GUID "<< mp_writer->getGuid());
@@ -85,7 +83,8 @@ bool WriterHistory::add_change_(CacheChange_t* a_change, WriteParams &wparams,
 
     ++m_lastCacheChangeSeqNum;
     a_change->sequenceNumber = m_lastCacheChangeSeqNum;
-    Time_t::now(a_change->sourceTimestamp);
+    a_change->sourceTimestamp = Time_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                           std::chrono::system_clock::now().time_since_epoch()).count() * 1e-9);
 
     a_change->write_params = wparams;
     // Updated sample identity
@@ -101,6 +100,7 @@ bool WriterHistory::add_change_(CacheChange_t* a_change, WriteParams &wparams,
 
     logInfo(RTPS_HISTORY,"Change "<< a_change->sequenceNumber << " added with "<<a_change->serializedPayload.length<< " bytes");
 
+    updateMaxMinSeqNum();
     mp_writer->unsent_change_added_to_history(a_change, max_blocking_time);
 
     return true;
@@ -114,7 +114,7 @@ bool WriterHistory::remove_change(CacheChange_t* a_change)
         return false;
     }
 
-    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
     if(a_change == nullptr)
     {
         logError(RTPS_HISTORY,"Pointer is not valid")
@@ -137,6 +137,7 @@ bool WriterHistory::remove_change(CacheChange_t* a_change)
             mp_writer->change_removed_by_history(a_change);
             m_changePool.release_Cache(a_change);
             m_changes.erase(chit);
+            updateMaxMinSeqNum();
             m_isHistoryFull = false;
             return true;
         }
@@ -158,7 +159,7 @@ bool WriterHistory::remove_change(const SequenceNumber_t& sequence_number)
         return false;
     }
 
-    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
 
     for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin();
             chit!=m_changes.end();++chit)
@@ -168,6 +169,7 @@ bool WriterHistory::remove_change(const SequenceNumber_t& sequence_number)
             mp_writer->change_removed_by_history(*chit);
             m_changePool.release_Cache(*chit);
             m_changes.erase(chit);
+            updateMaxMinSeqNum();
             m_isHistoryFull = false;
             return true;
         }
@@ -185,7 +187,7 @@ CacheChange_t* WriterHistory::remove_change_and_reuse(const SequenceNumber_t& se
         return nullptr;
     }
 
-    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
 
     for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin();
             chit!=m_changes.end();++chit)
@@ -195,6 +197,7 @@ CacheChange_t* WriterHistory::remove_change_and_reuse(const SequenceNumber_t& se
             CacheChange_t* change = *chit;
             mp_writer->change_removed_by_history(change);
             m_changes.erase(chit);
+            updateMaxMinSeqNum();
             m_isHistoryFull = false;
             return change;
         }
@@ -203,6 +206,21 @@ CacheChange_t* WriterHistory::remove_change_and_reuse(const SequenceNumber_t& se
     logWarning(RTPS_HISTORY,"SequenceNumber " <<  sequence_number << " not found");
     return nullptr;
 }
+
+void WriterHistory::updateMaxMinSeqNum()
+{
+    if(m_changes.size()==0)
+    {
+        mp_minSeqCacheChange = mp_invalidCache;
+        mp_maxSeqCacheChange = mp_invalidCache;
+    }
+    else
+    {
+        mp_minSeqCacheChange = m_changes.front();
+        mp_maxSeqCacheChange = m_changes.back();
+    }
+}
+
 
 bool WriterHistory::remove_min_change()
 {
@@ -213,9 +231,10 @@ bool WriterHistory::remove_min_change()
         return false;
     }
 
-    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
-    if(m_changes.size() > 0 && remove_change_g(m_changes.front()))
+    std::lock_guard<std::recursive_timed_mutex> guard(*mp_mutex);
+    if(m_changes.size() > 0 && remove_change_g(mp_minSeqCacheChange))
     {
+        updateMaxMinSeqNum();
         return true;
     }
     else

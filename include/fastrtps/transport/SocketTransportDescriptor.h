@@ -15,17 +15,60 @@
 #ifndef SOCKET_TRANSPORT_DESCRIPTOR_H
 #define SOCKET_TRANSPORT_DESCRIPTOR_H
 
-#include <fastdds/rtps/transport/SocketTransportDescriptor.h>
+#include "./TransportDescriptorInterface.h"
+
+#ifdef _WIN32
+#include <cstdint>
+#endif
+#include <vector>
+#include <string>
 
 namespace eprosima{
 namespace fastrtps{
 namespace rtps{
 
-using TransportInterface = fastdds::rtps::TransportInterface;
-using SocketTransportDescriptor = fastdds::rtps::SocketTransportDescriptor;
+class TransportInterface;
+
+static const uint8_t s_defaultTTL = 1;
+
+/**
+ * Virtual base class for the data type used to define configuration of transports using sockets.
+ * @ingroup RTPS_MODULE
+ * */
+struct SocketTransportDescriptor : public TransportDescriptorInterface
+{
+    SocketTransportDescriptor(
+            uint32_t maximumMessageSize,
+            uint32_t maximumInitialPeersRange)
+        : TransportDescriptorInterface(maximumMessageSize, maximumInitialPeersRange)
+        , sendBufferSize(0)
+        , receiveBufferSize(0)
+        , TTL(s_defaultTTL)
+    {}
+
+    SocketTransportDescriptor(const SocketTransportDescriptor& t)
+        : TransportDescriptorInterface(t)
+        , sendBufferSize(t.sendBufferSize)
+        , receiveBufferSize(t.receiveBufferSize)
+        , TTL(t.TTL)
+    {}
+
+    virtual ~SocketTransportDescriptor(){}
+
+    virtual uint32_t min_send_buffer_size() const override { return sendBufferSize; }
+
+    //! Length of the send buffer.
+    uint32_t sendBufferSize;
+    //! Length of the receive buffer.
+    uint32_t receiveBufferSize;
+    //! Allowed interfaces in an IP string format.
+    std::vector<std::string> interfaceWhiteList;
+    //! Specified time to live (8bit - 255 max TTL)
+    uint8_t TTL;
+};
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // SOCKET_TRANSPORT_DESCRIPTOR_H
+#endif //SOCKET_TRANSPORT_DESCRIPTOR_H
