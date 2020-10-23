@@ -36,6 +36,7 @@ import com.eprosima.idl.parser.typecode.AnyTypeCode;
 import com.eprosima.idl.util.Pair;
 import com.eprosima.idl.util.Util;
 import java.io.File;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,6 +46,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.Stack;
 import org.antlr.v4.runtime.Token;
@@ -855,10 +857,6 @@ public class Context
             return id + " is a keyword, use escape character if you want to use it as identifier (_" + id + ")";
         }
 
-        if (id.startsWith("_")) // Escaped identifier?
-        {
-            id = id.substring(1);
-        }
         String scopedname = (scope == null || scope.isEmpty()) ? id : scope + "::" + id;
 
         // Check definitions
@@ -867,7 +865,10 @@ public class Context
             if (def instanceof TreeNode)
             {
                 TreeNode tn = (TreeNode)def;
-                if (tn.getScopedname().equalsIgnoreCase(scopedname))
+                if (m_ignore_case
+                        ? tn.getScopedname().equalsIgnoreCase(scopedname)
+                        : tn.getScopedname().equals(scopedname)
+                        )
                 {
                     boolean error = true;
 
@@ -893,7 +894,10 @@ public class Context
         // Check modules
         for (String type : m_modules.keySet())
         {
-            if (type.equalsIgnoreCase(scopedname))
+            if (m_ignore_case
+                    ? type.equalsIgnoreCase(scopedname)
+                    : type.equals(scopedname)
+                    )
             {
                 if(kind != Definition.Kind.MODULE)
                 {
@@ -905,7 +909,10 @@ public class Context
         // Check interfaces
         for (String type : m_interfaces.keySet())
         {
-            if (type.equalsIgnoreCase(scopedname))
+            if (m_ignore_case
+                    ? type.equalsIgnoreCase(scopedname)
+                    : type.equals(scopedname)
+                    )
             {
                 return scopedname + " is already defined (Interface: " + type + ")";
             }
@@ -914,7 +921,10 @@ public class Context
         // Check Exceptions
         for (String type : m_exceptions.keySet())
         {
-            if (type.equalsIgnoreCase(scopedname))
+            if (m_ignore_case
+                    ? type.equalsIgnoreCase(scopedname)
+                    : type.equals(scopedname)
+                    )
             {
                 return scopedname + " is already defined (Exception: " + type + ")";
             }
@@ -923,7 +933,10 @@ public class Context
         // Check TypeDeclarations
         for (Map.Entry<String, TypeDeclaration> type : m_types.entrySet())
         {
-            if (type.getKey().equalsIgnoreCase(scopedname))
+            if (m_ignore_case
+                    ? type.getKey().equalsIgnoreCase(scopedname)
+                    : type.getKey().equals(scopedname)
+                    )
             {
                 if(type.getValue().getTypeCode().isDefined())
                 {
@@ -932,16 +945,32 @@ public class Context
             }
         }
 
-        // Check Annotations
-        for (String anno : m_annotations.keySet())
+        // Check Annotations, only check annotations against other annotations
+        if (kind == Definition.Kind.ANNOTATION)
         {
-            if (anno.equalsIgnoreCase(scopedname))
+            for (String anno : m_annotations.keySet())
             {
-                return scopedname + " is already defined (Annotation: " + anno + ")";
+                if (m_ignore_case
+                        ? anno.equalsIgnoreCase(scopedname)
+                        : anno.equals(scopedname)
+                        )
+                {
+                    return scopedname + " is already defined (Annotation: " + anno + ")";
+                }
             }
         }
 
+        if (id.startsWith("_")) // Escaped identifier?
+        {
+            id = id.substring(1);
+        }
+
         return null;
+    }
+
+    public void ignore_case(boolean ignore_case)
+    {
+        m_ignore_case = ignore_case;
     }
 
     protected void fillKeywords()
@@ -1019,7 +1048,45 @@ public class Context
 
     protected boolean checkKeyword(String id)
     {
-        return m_keywords.contains(id.toLowerCase());
+        boolean return_value = false;
+
+        for(String keyword : m_keywords)
+        {
+            if (m_ignore_case
+                    ? keyword.equalsIgnoreCase(id)
+                    : keyword.equals(id)
+                    )
+            {
+                return_value = true;
+                break;
+            }
+        }
+
+        return return_value;
+    }
+
+    public String concatStringLiterals(String literal)
+    {
+        // Split into separated strings
+        String[] substrings = literal.split("\"([ \r\t\u000C\n])*\"");
+
+        String result = "";
+        boolean escapeHex = false;
+        for (String str : substrings)
+        {
+            if (escapeHex)
+            {
+                str = "\"" + str;
+            }
+            escapeHex = false;
+            if (str.matches("\\\\x[a-fA-F0-9]+$"))
+            {
+                escapeHex = true;
+            }
+            result += str + (escapeHex ? "\"" : "");
+        }
+
+        return result;
     }
 
     /*** End ***/
@@ -1072,4 +1139,6 @@ public class Context
 
     // All grammar keywords
     private HashSet<String> m_keywords = null;
+
+    private boolean m_ignore_case = true;
 }
