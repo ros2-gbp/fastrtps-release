@@ -89,8 +89,8 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc} --os-name rhel
     devel_branch: master
-    last_release: v1.8.2
-    last_version: 1.8.2
+    last_release: v1.8.4
+    last_version: 1.8.4
     name: fastrtps
     patches: dashing
     release_inc: '1'
