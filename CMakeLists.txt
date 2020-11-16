@@ -259,10 +259,16 @@ option(SQLITE3_SUPPORT "Activate SQLITE3 support" ON)
 ###############################################################################
 # SHM as Default transport
 ###############################################################################
-option(SHM_TRANSPORT_DEFAULT "Adds SHM transport to the default transports" OFF)
+option(SHM_TRANSPORT_DEFAULT "Adds SHM transport to the default transports" ON)
 
-if(EPROSIMA_BUILD)
-    set(SHM_TRANSPORT_DEFAULT ON)
+
+###############################################################################
+# Tools default setup 
+###############################################################################
+option(COMPILE_TOOLS "Build tools" ON)
+
+if(EPROSIMA_BUILD AND IS_TOP_LEVEL)
+    set(COMPILE_TOOLS ON)
 endif()
 
 ###############################################################################
@@ -288,6 +294,14 @@ endif()
 
 if(COMPILE_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+###############################################################################
+# Tools 
+###############################################################################
+
+if(COMPILE_TOOLS)
+    add_subdirectory(tools)
 endif()
 
 ###############################################################################
@@ -408,6 +422,7 @@ set(CPACK_COMPONENTS_ALL headers licenses)
 option(INSTALL_EXAMPLES "Install example" OFF)
 if(EPROSIMA_INSTALLER)
     set(INSTALL_EXAMPLES ON)
+    set(INSTALL_TOOLS ON)
 endif()
 
 if(INSTALL_EXAMPLES)
@@ -422,6 +437,25 @@ if(INSTALL_EXAMPLES)
   set(CPACK_COMPONENT_EXAMPLES_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} examples")
 
   set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} examples)
+endif()
+
+option(INSTALL_TOOLS "Install tools" OFF)
+if(EPROSIMA_INSTALLER)
+    set(INSTALL_TOOLS ON)
+endif()
+
+if(INSTALL_TOOLS)
+  # Install tools 
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/tools
+      DESTINATION tools/
+      COMPONENT tools 
+      PATTERN "tools/CMakeLists.txt" EXCLUDE
+      )
+
+  set(CPACK_COMPONENT_TOOLS_DISPLAY_NAME "Tools")
+  set(CPACK_COMPONENT_TOOLS_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} tools")
+
+  set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} tools)
 endif()
 
 if(BUILD_DOCUMENTATION)
