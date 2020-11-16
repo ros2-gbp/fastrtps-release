@@ -430,7 +430,7 @@ bool StatefulReader::processDataFragMsg(
                 {
                     change_to_add->copy_not_memcpy(incomingChange);
                     if (!getRTPSParticipant()->security_manager().decode_serialized_payload(incomingChange->
-                            serializedPayload,
+                                    serializedPayload,
                             change_to_add->serializedPayload, m_guid, incomingChange->writerGUID))
                     {
                         releaseCache(change_to_add);
@@ -586,7 +586,8 @@ bool StatefulReader::processGapMsg(
                 auto ret_iterator = findCacheInFragmentedProcess(auxSN, pWP->guid(), &to_remove, history_iterator);
                 if (to_remove != nullptr)
                 {
-                    history_iterator = mp_history->remove_change_nts(to_remove, ret_iterator);
+                    // we called the History version to avoid callbacks
+                    history_iterator = mp_history->History::remove_change_nts(ret_iterator);
                 }
                 else if (ret_iterator != mp_history->changesEnd())
                 {
@@ -605,7 +606,8 @@ bool StatefulReader::processGapMsg(
                     findCacheInFragmentedProcess(auxSN, pWP->guid(), &to_remove, history_iterator);
                     if (to_remove != nullptr)
                     {
-                        history_iterator = mp_history->remove_change_nts(to_remove, ret_iterator);
+                        // we called the History version to avoid callbacks
+                        history_iterator = mp_history->History::remove_change_nts(ret_iterator);
                     }
                     else if (ret_iterator != mp_history->changesEnd())
                     {
@@ -710,7 +712,13 @@ bool StatefulReader::change_received(
                     if (mp_history->received_change(a_change, 0))
                     {
                         Time_t::now(a_change->receptionTimestamp);
-                        update_last_notified(a_change->writerGUID, a_change->sequenceNumber);
+
+                        // If we use the real a_change->sequenceNumber no DATA(p) with a lower one will ever be received.
+                        // That happens because the WriterProxy created when the listener matches the PDP endpoints is
+                        // initialized using this SequenceNumber_t. Note that on a SERVER the own DATA(p) may be in any
+                        // position within the WriterHistory preventing effective data exchange.
+                        update_last_notified(a_change->writerGUID, SequenceNumber_t(0, 1));
+
                         if (getListener() != nullptr)
                         {
                             getListener()->onNewCacheChangeAdded((RTPSReader*)this, a_change);
