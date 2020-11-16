@@ -198,7 +198,7 @@ bool SecurityManager::init(
             }
 
             if (!( logging_plugin_->set_log_options(log_options, exception) &&
-                    logging_plugin_->enable_logging(exception) ))
+                    logging_plugin_->enable_logging(exception)))
             {
                 return init_logging_fail(exception);
             }
@@ -1376,19 +1376,14 @@ void SecurityManager::process_participant_stateless_message(
 
         mutex_.lock();
         auto dp_it = discovered_participants_.find(remote_participant_key);
-
         if (dp_it != discovered_participants_.end())
         {
             remote_participant_info = dp_it->second.get_auth();
             participant_data = &(dp_it->second.participant_data());
         }
-        else
-        {
-            logInfo(SECURITY, "Received Authentication message but not found related remote_participant_key");
-        }
         mutex_.unlock();
 
-        if (remote_participant_info)
+        if (remote_participant_info && participant_data)
         {
             if (remote_participant_info->auth_status_ == AUTHENTICATION_WAITING_REQUEST)
             {
@@ -1521,6 +1516,10 @@ void SecurityManager::process_participant_stateless_message(
                     std::move(message.message_identity()), std::move(message.message_data().at(0)));
 
             restore_discovered_participant_info(remote_participant_key, remote_participant_info);
+        }
+        else
+        {
+            logInfo(SECURITY, "Received Authentication message but not found related remote_participant_key");
         }
     }
     else
@@ -1681,7 +1680,8 @@ void SecurityManager::process_participant_volatile_message_secure(
             }
             else
             {
-                remote_reader_pending_messages_.emplace(message.source_endpoint_key(),
+                remote_reader_pending_messages_.emplace(std::make_pair(message.source_endpoint_key(),
+                        message.destination_endpoint_key()),
                         std::move(message.message_data()));
             }
         }
@@ -1753,7 +1753,8 @@ void SecurityManager::process_participant_volatile_message_secure(
             }
             else
             {
-                remote_writer_pending_messages_.emplace(message.source_endpoint_key(),
+                remote_writer_pending_messages_.emplace(std::make_pair(message.source_endpoint_key(),
+                        message.destination_endpoint_key()),
                         std::move(message.message_data()));
             }
         }
@@ -2692,7 +2693,8 @@ bool SecurityManager::discovered_reader(
                     else
                     {
                         // Check pending reader crypto messages.
-                        auto pending = remote_reader_pending_messages_.find(remote_reader_data.guid());
+                        auto pending = remote_reader_pending_messages_.find(
+                            std::make_pair(remote_reader_data.guid(), writer_guid));
                         bool pairing_cause_pending_message = false;
 
                         if (pending != remote_reader_pending_messages_.end())
@@ -2760,7 +2762,7 @@ bool SecurityManager::discovered_reader(
                                     {
                                         // Store in pendings.
                                         remote_writer_pending_messages_.emplace(
-                                            writer_guid,
+                                            std::make_pair(writer_guid, local_reader->first),
                                             std::move(local_writer_crypto_tokens));
                                     }
                                 }
@@ -3029,7 +3031,8 @@ bool SecurityManager::discovered_writer(
                     else
                     {
                         // Check pending writer crypto messages.
-                        auto pending = remote_writer_pending_messages_.find(remote_writer_data.guid());
+                        auto pending = remote_writer_pending_messages_.find(
+                            std::make_pair(remote_writer_data.guid(), reader_guid));
                         bool pairing_cause_pending_message = false;
 
                         if (pending != remote_writer_pending_messages_.end())
@@ -3098,7 +3101,8 @@ bool SecurityManager::discovered_writer(
                                     {
                                         // Store in pendings.
                                         remote_reader_pending_messages_.emplace(
-                                            reader_guid, std::move(local_reader_crypto_tokens));
+                                            std::make_pair(reader_guid, local_writer->first),
+                                            std::move(local_reader_crypto_tokens));
                                     }
                                 }
                                 else
@@ -3649,8 +3653,8 @@ bool SecurityManager::participant_authorized(
     if (access_plugin_ == nullptr || remote_permissions != nullptr)
     {
 
-        std::list<std::pair<ReaderProxyData, GUID_t> > temp_readers;
-        std::list<std::pair<WriterProxyData, GUID_t> > temp_writers;
+        std::list<std::pair<ReaderProxyData, GUID_t>> temp_readers;
+        std::list<std::pair<WriterProxyData, GUID_t>> temp_writers;
 
         if (crypto_plugin_ != nullptr)
         {

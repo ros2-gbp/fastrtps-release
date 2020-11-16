@@ -50,41 +50,6 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-GUID_t RemoteServerAttributes::GetParticipant() const
-{
-    return GUID_t(guidPrefix, c_EntityId_RTPSParticipant);
-}
-
-GUID_t RemoteServerAttributes::GetPDPReader() const
-{
-    return GUID_t(guidPrefix, c_EntityId_SPDPReader);
-}
-
-GUID_t RemoteServerAttributes::GetPDPWriter() const
-{
-    return GUID_t(guidPrefix, c_EntityId_SPDPWriter);
-}
-
-GUID_t RemoteServerAttributes::GetEDPPublicationsReader() const
-{
-    return GUID_t(guidPrefix, c_EntityId_SEDPPubReader);
-}
-
-GUID_t RemoteServerAttributes::GetEDPSubscriptionsWriter() const
-{
-    return GUID_t(guidPrefix, c_EntityId_SEDPSubWriter);
-}
-
-GUID_t RemoteServerAttributes::GetEDPPublicationsWriter() const
-{
-    return GUID_t(guidPrefix, c_EntityId_SEDPPubWriter);
-}
-
-GUID_t RemoteServerAttributes::GetEDPSubscriptionsReader() const
-{
-    return GUID_t(guidPrefix, c_EntityId_SEDPSubReader);
-}
-
 PDPClient::PDPClient(
         BuiltinProtocols* builtin,
         const RTPSParticipantAllocationAttributes& allocation)
@@ -113,18 +78,25 @@ void PDPClient::initializeParticipantProxyData(
     }
 
     if (getRTPSParticipant()->getAttributes().builtin.discovery_config.m_simpleEDP.
-            use_PublicationWriterANDSubscriptionReader)
+                    use_PublicationWriterANDSubscriptionReader)
     {
         participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_ANNOUNCER;
         participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_DETECTOR;
     }
 
     if (getRTPSParticipant()->getAttributes().builtin.discovery_config.m_simpleEDP.
-            use_PublicationReaderANDSubscriptionWriter)
+                    use_PublicationReaderANDSubscriptionWriter)
     {
         participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_DETECTOR;
         participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_ANNOUNCER;
     }
+
+    // Set participant type and discovery server version properties
+    participant_data->m_properties.push_back(std::pair<std::string,
+            std::string>({fastdds::dds::parameter_property_participant_type, fastdds::rtps::ParticipantType::CLIENT}));
+    participant_data->m_properties.push_back(std::pair<std::string,
+            std::string>({fastdds::dds::parameter_property_ds_version,
+                          fastdds::dds::parameter_property_current_ds_version}));
 
     //#if HAVE_SECURITY
     //    if (getRTPSParticipant()->getAttributes().builtin.discovery_config.m_simpleEDP
@@ -237,7 +209,7 @@ bool PDPClient::createPDPEndpoints()
         //        mp_RTPSParticipant->set_endpoint_rtps_protection_supports(rout, false);
         //#endif
         // Initial peer list doesn't make sense in server scenario. Client should match its server list
-        for (const RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
+        for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
             std::lock_guard<std::mutex> data_guard(temp_data_lock_);
             temp_writer_data_.clear();
@@ -289,7 +261,7 @@ bool PDPClient::createPDPEndpoints()
         //#if HAVE_SECURITY
         //        mp_RTPSParticipant->set_endpoint_rtps_protection_supports(wout, false);
         //#endif
-        for (const RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
+        for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
             std::lock_guard<std::mutex> data_guard(temp_data_lock_);
             temp_reader_data_.clear();
@@ -481,11 +453,11 @@ void PDPClient::announceParticipantState(
         CacheChange_t* change = nullptr;
 
         if ((change = pW->new_change(
-            [this]() -> uint32_t
-            {
-                return mp_builtin->m_att.writerPayloadSize;
-            },
-            NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key)))
+                    [this]() -> uint32_t
+                    {
+                        return mp_builtin->m_att.writerPayloadSize;
+                    },
+                    NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key)))
         {
             // update the sequence number
             change->sequenceNumber = mp_PDPWriterHistory->next_sequence_number();
@@ -593,6 +565,9 @@ bool PDPClient::match_servers_EDP_endpoints()
 
         if (svr.proxy && !mp_EDP->areRemoteEndpointsMatched(svr.proxy))
         {
+            logInfo(RTPS_PDP, "Client "
+                    << mp_EDP->mp_PDP->getRTPSParticipant()->getGuid()
+                    << " matching servers EDP endpoints");
             mp_EDP->assignRemoteEndpoints(*svr.proxy);
         }
     }
