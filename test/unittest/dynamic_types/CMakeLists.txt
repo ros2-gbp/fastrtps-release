@@ -27,34 +27,34 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         include_directories(${ASIO_INCLUDE_DIR})
 
         set(DYNAMIC_TYPES_SOURCE
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/AnnotationDescriptor.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicData.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicDataFactory.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicType.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicPubSubType.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicTypePtr.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicDataPtr.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicTypeBuilder.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicTypeBuilderPtr.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicTypeBuilderFactory.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/DynamicTypeMember.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/TypeDescriptor.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/MemberDescriptor.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/AnnotationParameterValue.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/TypeIdentifier.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/TypeIdentifierTypes.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/TypeObject.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/TypeObjectFactory.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/TypeObjectHashId.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/TypeNamesGenerator.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/TypesBase.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/types/BuiltinAnnotationsTypeObject.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/AnnotationDescriptor.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicData.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicDataFactory.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicType.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicPubSubType.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypePtr.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicDataPtr.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilder.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilderPtr.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilderFactory.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeMember.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeDescriptor.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/MemberDescriptor.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/AnnotationParameterValue.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeIdentifier.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeIdentifierTypes.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeObject.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeObjectFactory.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeObjectHashId.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeNamesGenerator.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypesBase.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/BuiltinAnnotationsTypeObject.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/log/Log.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/log/StdoutConsumer.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/log/FileConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/FileConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
         )
 
@@ -72,14 +72,12 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             idl/BasicTypeObject.cxx
             ${DYNAMIC_TYPES_SOURCE}
 
-            ${PROJECT_SOURCE_DIR}/src/cpp/xmlparser/XMLProfileManager.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/xmlparser/XMLParser.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/xmlparser/XMLElementParser.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/xmlparser/XMLParserCommon.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/qos/QosPolicies.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/qos/ParameterTypes.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/qos/WriterQos.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/qos/ReaderQos.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLProfileManager.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLParser.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLElementParser.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLParserCommon.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/publisher/qos/WriterQos.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/qos/ReaderQos.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
         )
 
@@ -111,6 +109,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPTransportDescriptor
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPv4TransportDescriptor
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPv6TransportDescriptor
+            ${PROJECT_SOURCE_DIR}/test/mock/rtps/SharedMemTransportDescriptor
             ${TINYXML2_INCLUDE_DIR}
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             )

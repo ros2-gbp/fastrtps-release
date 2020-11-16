@@ -18,9 +18,6 @@
 #include <fastrtps/attributes/PublisherAttributes.h>
 
 #include <fastrtps/Domain.h>
-
-#include <fastrtps/utils/eClock.h>
-
 #include "deadlinepayloadPublisher.h"
 
 using namespace eprosima::fastrtps;
@@ -38,21 +35,23 @@ deadlinepayloadPublisher::~deadlinepayloadPublisher()
     Domain::removeParticipant(mp_participant);
 }
 
-bool deadlinepayloadPublisher::init(double deadline_period_ms)
+bool deadlinepayloadPublisher::init(
+        double deadline_period_ms)
 {
     // Create RTPSParticipant
 
     ParticipantAttributes PParam;
-    PParam.rtps.builtin.domainId = 0;
-    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_publisher");  //You can put here the name you want
-    mp_participant = Domain::createParticipant(PParam);	
-    if(mp_participant == nullptr)
+    mp_participant = Domain::createParticipant(PParam);
+    if (mp_participant == nullptr)
+    {
         return false;
+    }
 
     //Register the type
 
-    Domain::registerType(mp_participant,(TopicDataType*) &myType);
+    Domain::registerType(mp_participant, (TopicDataType*) &myType);
 
     // Create Publisher
 
@@ -60,17 +59,21 @@ bool deadlinepayloadPublisher::init(double deadline_period_ms)
     Wparam.topic.topicKind = WITH_KEY;
     Wparam.topic.topicDataType = myType.getName();
     Wparam.topic.topicName = "deadlinepayloadPubSubTopic";
-    Wparam.qos.m_reliability.kind= RELIABLE_RELIABILITY_QOS;
+    Wparam.qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
     Wparam.qos.m_deadline.period = deadline_period_ms * 1e-3;
-    mp_publisher = Domain::createPublisher(mp_participant,Wparam,(PublisherListener*)&m_listener);
-    if(mp_publisher == nullptr)
+    mp_publisher = Domain::createPublisher(mp_participant, Wparam, (PublisherListener*)&m_listener);
+    if (mp_publisher == nullptr)
+    {
         return false;
+    }
 
     std::cout << "Publisher created, waiting for Subscribers." << std::endl;
     return true;
 }
 
-void deadlinepayloadPublisher::PubListener::onPublicationMatched(Publisher* /*pub*/,MatchingInfo& info)
+void deadlinepayloadPublisher::PubListener::onPublicationMatched(
+        Publisher* /*pub*/,
+        MatchingInfo& info)
 {
     if (info.status == MATCHED_MATCHING)
     {
@@ -86,17 +89,19 @@ void deadlinepayloadPublisher::PubListener::onPublicationMatched(Publisher* /*pu
 
 void deadlinepayloadPublisher::PubListener::on_offered_deadline_missed(
         Publisher* pub,
-        const OfferedDeadlineMissedStatus &status)
+        const OfferedDeadlineMissedStatus& status)
 {
     (void)pub;
     std::cout << "Deadline missed for instance: " << status.last_instance_handle << std::endl;
 }
 
-void deadlinepayloadPublisher::run(uint32_t sleep_ms, int samples)
+void deadlinepayloadPublisher::run(
+        uint32_t sleep_ms,
+        int samples)
 {
-    while(m_listener.n_matched == 0)
+    while (m_listener.n_matched == 0)
     {
-        eClock::my_sleep(250); // Sleep 250 ms
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
 
     // Publication code
@@ -108,9 +113,9 @@ void deadlinepayloadPublisher::run(uint32_t sleep_ms, int samples)
     st.payload(stream.str());
 
     int sample = 0;
-    while(true)
+    while (true)
     {
-        eClock::my_sleep(sleep_ms);
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
 
         if (samples > 0)
         {
@@ -123,15 +128,15 @@ void deadlinepayloadPublisher::run(uint32_t sleep_ms, int samples)
         }
 
         // Send messages
-        for(unsigned short i=0;i<3;i++)
+        for (unsigned short i = 0; i < 3; i++)
         {
             // Set key
             st.deadlinekey(i);
-            if(i==2)
+            if (i == 2)
             {
                 //Force key 2 message to be sent half of the times
                 double_time = !double_time;
-                if(double_time)
+                if (double_time)
                 {
                     if (mp_publisher->write(&st))
                     {

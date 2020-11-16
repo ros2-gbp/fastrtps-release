@@ -19,7 +19,8 @@ namespace eprosima {
 namespace fastrtps {
 namespace xmlparser {
 
-#define draw(ident, text, ...) for (uint8_t i = ident + 1; i > 0; --i) (i == 1)? printf(text, ## __VA_ARGS__): printf("\t")
+#define draw(ident, text, ...) for (uint8_t i = ident + 1; i > 0; --i) (i == 1) ? printf(text, ## __VA_ARGS__) : printf( \
+            "\t")
 
 /**
  * Enum class XMLP_ret, used to provide a strongly typed result from the operations within this module.
@@ -38,6 +39,7 @@ extern const char* DEFAULT_FASTRTPS_PROFILES;
 
 extern const char* ROOT;
 extern const char* PROFILES;
+extern const char* LIBRARY_SETTINGS;
 extern const char* TRANSPORT_DESCRIPTORS;
 extern const char* PROFILE_NAME;
 extern const char* DEFAULT_PROF;
@@ -71,6 +73,19 @@ extern const char* METADATA_LOGICAL_PORT;
 extern const char* LISTENING_PORTS;
 extern const char* CALCULATE_CRC;
 extern const char* CHECK_CRC;
+extern const char* SEGMENT_SIZE;
+extern const char* PORT_QUEUE_CAPACITY;
+extern const char* PORT_OVERFLOW_POLICY;
+extern const char* SEGMENT_OVERFLOW_POLICY;
+extern const char* HEALTHY_CHECK_TIMEOUT_MS;
+extern const char* DISCARD;
+extern const char* FAIL;
+extern const char* RTPS_DUMP_FILE;
+
+// IntraprocessDeliveryType
+extern const char* OFF;
+extern const char* USER_DATA_ONLY;
+extern const char* FULL;
 
 extern const char* QOS_PROFILE;
 extern const char* APPLICATION;
@@ -79,7 +94,12 @@ extern const char* TYPE;
 extern const char* DATA_WRITER;
 extern const char* DATA_READER;
 
+/// LibrarySettings attributes
+extern const char* INTRAPROCESS_DELIVERY;
+
 /// RTPS Participant attributes
+extern const char* ALLOCATION;
+extern const char* PREFIX;
 extern const char* DEF_UNI_LOC_LIST;
 extern const char* DEF_MULTI_LOC_LIST;
 extern const char* SEND_SOCK_BUF_SIZE;
@@ -98,6 +118,18 @@ extern const char* USER_TRANS;
 extern const char* USE_BUILTIN_TRANS;
 extern const char* PROPERTIES_POLICY;
 extern const char* NAME;
+extern const char* REMOTE_LOCATORS;
+extern const char* MAX_UNICAST_LOCATORS;
+extern const char* MAX_MULTICAST_LOCATORS;
+extern const char* TOTAL_PARTICIPANTS;
+extern const char* TOTAL_READERS;
+extern const char* TOTAL_WRITERS;
+extern const char* SEND_BUFFERS;
+extern const char* PREALLOCATED_NUMBER;
+extern const char* DYNAMIC_LC;
+extern const char* MAX_PROPERTIES;
+extern const char* MAX_USER_DATA;
+extern const char* MAX_PARTITIONS;
 
 /// Publisher-subscriber attributes
 extern const char* TOPIC;
@@ -113,6 +145,7 @@ extern const char* HIST_MEM_POLICY;
 extern const char* USER_DEF_ID;
 extern const char* ENTITY_ID;
 extern const char* MATCHED_SUBSCRIBERS_ALLOCATION;
+extern const char* MATCHED_PUBLISHERS_ALLOCATION;
 
 ///
 extern const char* PROPERTIES;
@@ -123,6 +156,7 @@ extern const char* PROPAGATE;
 extern const char* PREALLOCATED;
 extern const char* PREALLOCATED_WITH_REALLOC;
 extern const char* DYNAMIC;
+extern const char* DYNAMIC_REUSABLE;
 extern const char* LOCATOR;
 extern const char* UDPv4_LOCATOR;
 extern const char* UDPv6_LOCATOR;
@@ -137,6 +171,7 @@ extern const char* UDPv4;
 extern const char* UDPv6;
 extern const char* TCPv4;
 extern const char* TCPv6;
+extern const char* SHM;
 extern const char* INIT_ACKNACK_DELAY;
 extern const char* HEARTB_RESP_DELAY;
 extern const char* INIT_HEARTB_DELAY;
@@ -221,8 +256,17 @@ extern const char* OFFSETD0;
 extern const char* OFFSETD1;
 extern const char* OFFSETD2;
 extern const char* OFFSETD3;
-extern const char* SIMPLE_RTPS_PDP;
+extern const char* RTPS_PDP_TYPE;
+extern const char* NONE;
+extern const char* CLIENT;
+extern const char* SERVER;
+extern const char* BACKUP;
+extern const char* IGNORE_PARTICIPANT_FLAGS;
+extern const char* FILTER_DIFFERENT_HOST;
+extern const char* FILTER_DIFFERENT_PROCESS;
+extern const char* FILTER_SAME_PROCESS;
 extern const char* WRITER_LVESS_PROTOCOL;
+extern const char* DISCOVERY_SETTINGS;
 extern const char* _EDP;
 extern const char* DOMAIN_ID;
 extern const char* LEASEDURATION;
@@ -233,6 +277,9 @@ extern const char* SIMPLE_EDP;
 extern const char* META_UNI_LOC_LIST;
 extern const char* META_MULTI_LOC_LIST;
 extern const char* INIT_PEERS_LIST;
+extern const char* CLIENTANNOUNCEMENTPERIOD;
+extern const char* SERVER_LIST;
+extern const char* RSERVER;
 extern const char* SIMPLE;
 extern const char* STATIC;
 extern const char* PUBWRITER_SUBREADER;
@@ -240,6 +287,8 @@ extern const char* PUBREADER_SUBWRITER;
 extern const char* STATIC_ENDPOINT_XML;
 extern const char* READER_HIST_MEM_POLICY;
 extern const char* WRITER_HIST_MEM_POLICY;
+extern const char* READER_PAYLOAD_SIZE;
+extern const char* WRITER_PAYLOAD_SIZE;
 extern const char* MUTATION_TRIES;
 extern const char* ACCESS_SCOPE;
 extern const char* ENABLED;
@@ -283,6 +332,9 @@ extern const char* BOOLEAN;
 extern const char* CHAR;
 extern const char* WCHAR;
 extern const char* TBYTE;
+extern const char* OCTET;
+extern const char* UINT8;
+extern const char* INT8;
 extern const char* SHORT;
 extern const char* LONG;
 extern const char* USHORT;

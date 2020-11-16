@@ -43,9 +43,12 @@ public:
     PubListener()
         : n_matched(0)
         , firstConnected(false)
-    {}
+    {
+    }
 
-    ~PubListener() {}
+    ~PubListener()
+    {
+    }
 
     void onPublicationMatched(
             eprosima::fastrtps::Publisher* /*pub*/,
@@ -75,9 +78,12 @@ public:
     SubListener()
         : n_matched(0)
         , n_samples(0)
-    {}
+    {
+    }
 
-    ~SubListener() {}
+    ~SubListener()
+    {
+    }
 
     void onSubscriptionMatched(
             eprosima::fastrtps::Subscriber* /*sub*/,
@@ -149,15 +155,15 @@ int main(
 
     switch (iMode)
     {
-    case 1:
-        publisherKeys();
-        break;
-    case 2:
-        subscriberKeys();
-        break;
-    default:
-        keys();
-        break;
+        case 1:
+            publisherKeys();
+            break;
+        case 2:
+            subscriberKeys();
+            break;
+        default:
+            keys();
+            break;
     }
     return 0;
 }
@@ -167,8 +173,7 @@ Publisher* initPublisher(
         PubListener& listener)
 {
     ParticipantAttributes PparamPub;
-    PparamPub.rtps.builtin.domainId = 0;
-    PparamPub.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PparamPub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PparamPub.rtps.setName("PublisherParticipant");
 
     Participant* PubParticipant = Domain::createParticipant(PparamPub);
@@ -208,8 +213,7 @@ Subscriber* initSubscriber(
         SubListener* listener)
 {
     ParticipantAttributes PparamSub;
-    PparamSub.rtps.builtin.domainId = 0;
-    PparamSub.rtps.builtin.leaseDuration = c_TimeInfinite;
+    PparamSub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
     PparamSub.rtps.setName("SubscriberParticipant");
 
     Participant* SubParticipant = Domain::createParticipant(PparamSub);
@@ -260,6 +264,13 @@ void keys()
     {
         return pubListener.n_matched > 0;
     });
+
+    // Registering 5 instances.
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        my_sample.key_value(i + 1);
+        myPub->register_instance(&my_sample);
+    }
 
     //Send 10 samples
     std::cout << "Publishing 5 keys, 10 samples per key..." << std::endl;
@@ -326,6 +337,13 @@ void publisherKeys()
         return pubListener.n_matched > 0;
     });
 
+    // Registering 5 instances.
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        my_sample.key_value(i + 1);
+        myPub->register_instance(&my_sample);
+    }
+
     //Send 10 samples
     std::cout << "Publishing 5 keys, 10 samples per key..." << std::endl;
     for (uint8_t i = 0; i < 5; i++)
@@ -365,8 +383,8 @@ void subscriberKeys()
     std::unique_lock<std::mutex> lock(subListener.mutex_);
     subListener.cv_.wait(lock, [&subListener]()
     {
-         return subListener.n_matched > 0;
-     });
+        return subListener.n_matched > 0;
+    });
 
     std::cin.ignore();
 

@@ -20,47 +20,6 @@
 #ifndef __RTPS_READER_READERDISCOVERYINFO_H__
 #define __RTPS_READER_READERDISCOVERYINFO_H__
 
-#include "../../fastrtps_dll.h"
-#include "../builtin/data/ReaderProxyData.h"
-
-namespace eprosima {
-namespace fastrtps {
-namespace rtps {
-
-/**
-* Class ReaderDiscoveryInfo with discovery information of the reader.
-* @ingroup RTPS_MODULE
-*/
-struct ReaderDiscoveryInfo
-{
-    public:
-
-        //!Enum DISCOVERY_STATUS, four different status for discovered readers.
-        //!@ingroup RTPS_MODULE
-#if defined(_WIN32)
-        enum RTPS_DllAPI DISCOVERY_STATUS
-#else
-        enum DISCOVERY_STATUS
-#endif
-        {
-            DISCOVERED_READER,
-            CHANGED_QOS_READER,
-            REMOVED_READER
-        };
-
-        ReaderDiscoveryInfo(): status(DISCOVERED_READER) {}
-
-        virtual ~ReaderDiscoveryInfo() {}
-
-        //! Status
-        DISCOVERY_STATUS status;
-
-        //! Participant discovery info
-        ReaderProxyData info;
-};
-
-}
-}
-}
+#include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
 
 #endif // __RTPS_READER_READERDISCOVERYINFO_H__

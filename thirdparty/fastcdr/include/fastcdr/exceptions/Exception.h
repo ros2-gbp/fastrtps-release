@@ -34,7 +34,7 @@ namespace eprosima
                 public:
 
                     //! \brief Default destructor.
-                    virtual Cdr_DllAPI ~Exception() noexcept;
+                    virtual Cdr_DllAPI ~Exception() throw();
 
                     //! \brief This function throws the object as exception.
                     virtual Cdr_DllAPI void raise() const = 0;
@@ -44,23 +44,23 @@ namespace eprosima
                      *
                      * @return The error message.
                      */
-                    virtual Cdr_DllAPI const char* what() const noexcept ;
+                    virtual Cdr_DllAPI const char* what() const throw() ;
 
                 protected:
 
                     /*!
                      * @brief Default constructor.
                      *
-                     * @param message A error message. This message pointer is copied.
+                     * @param message A error message. This message is copied.
                      */
-                    Cdr_DllAPI Exception(const char* const &message) noexcept;
+                    Cdr_DllAPI Exception(const char* const &message);
 
                     /*!
                      * @brief Default copy constructor.
                      *
                      * @param ex Exception that will be copied.
                      */
-                    Cdr_DllAPI Exception(const Exception &ex) noexcept;
+                    Cdr_DllAPI Exception(const Exception &ex);
 
 #if HAVE_CXX0X
                     /*!
@@ -68,7 +68,7 @@ namespace eprosima
                      *
                      * @param ex Exception that will be moved.
                      */
-                    Cdr_DllAPI Exception(Exception&& ex) noexcept;
+                    Cdr_DllAPI Exception(Exception&& ex);
 #endif
 
                     /*!
@@ -76,7 +76,7 @@ namespace eprosima
                      *
                      * @param ex Exception that will be copied.
                      */
-                    Cdr_DllAPI Exception& operator=(const Exception &ex) noexcept;
+                    Cdr_DllAPI Exception& operator=(const Exception &ex);
 
 #if HAVE_CXX0X
                     /*!
@@ -84,12 +84,12 @@ namespace eprosima
                      *
                      * @param ex Exception that will be moved.
                      */
-                    Cdr_DllAPI Exception& operator=(Exception&&) noexcept;
+                    Cdr_DllAPI Exception& operator=(Exception&&);
 #endif
 
                 private:
 
-                    const char* m_message;
+                    std::string m_message;
             };
         } //namespace exception
     } //namespace fastcdr

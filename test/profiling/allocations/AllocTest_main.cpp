@@ -21,13 +21,12 @@
 #include "AllocTestSubscriber.h"
 
 #include <fastrtps/Domain.h>
-
-#include <fastrtps/utils/eClock.h>
-#include <fastrtps/log/Log.h>
+#include <fastdds/dds/log/Log.hpp>
 
 using namespace eprosima;
 using namespace fastrtps;
 using namespace rtps;
+
 int main(int argc, char** argv)
 {
     std::cout << "Starting "<< std::endl;
@@ -67,7 +66,7 @@ int main(int argc, char** argv)
             << "        tl_re: transient-local reliable" << std::endl
             << "        vo_be: volatile best-effort" << std::endl
             << "        vo_re: volatile reliable" << std::endl;
-        Log::Reset();
+        eprosima::fastdds::dds::Log::Reset();
         return 0;
     }
 
@@ -93,7 +92,9 @@ int main(int argc, char** argv)
                 break;
             }
     }
+
     Domain::stopAll();
-    Log::Reset();
+    eprosima::fastdds::dds::Log::Reset();
+
     return 0;
 }

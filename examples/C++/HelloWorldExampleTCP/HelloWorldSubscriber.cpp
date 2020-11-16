@@ -24,7 +24,6 @@
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/Domain.h>
-#include <fastrtps/utils/eClock.h>
 #include <fastrtps/utils/IPLocator.h>
 
 using namespace eprosima::fastrtps;
@@ -37,7 +36,7 @@ HelloWorldSubscriber::HelloWorldSubscriber()
 }
 
 bool HelloWorldSubscriber::init(
-        const std::string &wan_ip,
+        const std::string& wan_ip,
         unsigned short port,
         bool use_tls,
         const std::vector<std::string>& whitelist)
@@ -68,9 +67,8 @@ bool HelloWorldSubscriber::init(
     initial_peer_locator.port = port;
     pparam.rtps.builtin.initialPeersList.push_back(initial_peer_locator); // Publisher's meta channel
 
-    pparam.rtps.builtin.domainId = 0;
-    pparam.rtps.builtin.leaseDuration = c_TimeInfinite;
-    pparam.rtps.builtin.leaseDuration_announcementperiod = Duration_t(5, 0);
+    pparam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    pparam.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(5, 0);
     pparam.rtps.setName("Participant_sub");
 
     pparam.rtps.useBuiltinTransports = false;
@@ -140,7 +138,8 @@ void HelloWorldSubscriber::SubListener::onSubscriptionMatched(
     }
 }
 
-void HelloWorldSubscriber::SubListener::onNewDataMessage(Subscriber* sub)
+void HelloWorldSubscriber::SubListener::onNewDataMessage(
+        Subscriber* sub)
 {
     if (sub->takeNextData((void*)&hello, &info))
     {
@@ -154,18 +153,18 @@ void HelloWorldSubscriber::SubListener::onNewDataMessage(Subscriber* sub)
     }
 }
 
-
 void HelloWorldSubscriber::run()
 {
     std::cout << "[RTCP] Subscriber running. Please press enter to stop the Subscriber" << std::endl;
     std::cin.ignore();
 }
 
-void HelloWorldSubscriber::run(uint32_t number)
+void HelloWorldSubscriber::run(
+        uint32_t number)
 {
     std::cout << "[RTCP] Subscriber running until " << number << "samples have been received" << std::endl;
     while (number < this->listener.n_samples)
     {
-        eClock::my_sleep(500);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 }

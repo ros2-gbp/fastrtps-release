@@ -15,8 +15,8 @@
 #ifndef FLOW_CONTROLLER_H
 #define FLOW_CONTROLLER_H
 
-#include <fastrtps/rtps/common/CacheChange.h>
-#include "../writer/RTPSWriterCollector.h"
+#include <fastdds/rtps/common/CacheChange.h>
+#include <rtps/writer/RTPSWriterCollector.h>
 
 #include <vector>
 #include <mutex>
@@ -47,6 +47,8 @@ class FlowController
         //! Controller operator. Transforms the vector of changes in place.
         virtual void operator()(RTPSWriterCollector<ReaderLocator*>& changesToSend) = 0;
         virtual void operator()(RTPSWriterCollector<ReaderProxy*>& changesToSend) = 0;
+
+        virtual void disable() = 0;
 
         virtual ~FlowController();
         FlowController();

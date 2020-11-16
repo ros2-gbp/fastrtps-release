@@ -75,7 +75,19 @@ class MockTransport : public TransportInterface
 
         virtual LocatorList_t NormalizeLocator(const Locator_t& locator) override;
 
-        virtual LocatorList_t ShrinkLocatorLists(const std::vector<LocatorList_t>& locatorLists) override;
+        /**
+         * Performs the locator selection algorithm for this transport.
+         *
+         * It basically consists of the following steps
+         *   - selector.transport_starts is called
+         *   - transport handles the selection state of each locator
+         *   - if a locator from an entry is selected, selector.select is called for that entry
+         *
+         * In the case of the mock transport all unicast locators are selected.
+         *
+         * @param [in, out] selector Locator selector.
+         */
+        virtual void select_locators(LocatorSelector& selector) const override;
 
         virtual bool is_local_locator(const Locator_t&) const override { return false; }
 
@@ -113,6 +125,11 @@ class MockTransport : public TransportInterface
             Locator_t &,
             uint32_t) const override { return true; }
 
+        virtual uint32_t max_recv_buffer_size() const override
+        {
+            return 0x8FFF;
+        }
+
         //Helpers and message record
         typedef struct
         {
@@ -125,7 +142,6 @@ class MockTransport : public TransportInterface
         std::vector<MockMessage> mockMessagesSent;
 
         // For the mock, port + direction tuples will have a 1:1 relatonship with channels
-
         typedef uint32_t Port;
         std::vector<Port> mockOpenInputChannels;
 

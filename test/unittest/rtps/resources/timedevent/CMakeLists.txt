@@ -22,10 +22,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         include_directories(${ASIO_INCLUDE_DIR})
 
         set(TIMEDEVENTTESTS_SOURCE mock/MockEvent.cpp
-            mock/MockParentEvent.cpp
             TimedEventTests.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEventImpl.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEvent.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/ResourceEvent.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
             )
 
@@ -35,8 +36,12 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
 
         add_executable(TimedEventTests ${TIMEDEVENTTESTS_SOURCE})
         target_compile_definitions(TimedEventTests PRIVATE FASTRTPS_NO_LIB)
-        target_include_directories(TimedEventTests PRIVATE ${GTEST_INCLUDE_DIRS}
-            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
+        target_include_directories(TimedEventTests PRIVATE
+            ${GTEST_INCLUDE_DIRS}
+            ${PROJECT_SOURCE_DIR}/include
+            ${PROJECT_BINARY_DIR}/include
+            ${PROJECT_SOURCE_DIR}/src/cpp
+            )
         target_link_libraries(TimedEventTests ${GTEST_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
         add_gtest(TimedEventTests SOURCES ${TIMEDEVENTTESTS_SOURCE})
     endif()

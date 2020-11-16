@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "GovernanceParser.h"
-#include <fastrtps/log/Log.h>
+#include <security/accesscontrol/GovernanceParser.h>
+#include <fastdds/dds/log/Log.hpp>
 
 #include <cstring>
 #include <cassert>

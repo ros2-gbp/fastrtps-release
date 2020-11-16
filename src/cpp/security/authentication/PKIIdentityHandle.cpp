@@ -16,7 +16,7 @@
  * @file PKIIdentityHandle.cpp
  */
 
-#include "PKIIdentityHandle.h"
+#include <security/authentication/PKIIdentityHandle.h>
 
 using namespace eprosima::fastrtps::rtps::security;
 

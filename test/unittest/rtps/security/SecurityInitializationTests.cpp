@@ -22,15 +22,14 @@ const char* const MockParticipantCrypto::class_id_ = "MockParticipantCryptoHandl
 TEST_F(SecurityTest, initialization_auth_nullptr)
 {
     SecurityPluginFactory::release_auth_plugin();
-    DefaultValue<const RTPSParticipantAttributes&>::Set(pattr);
     DefaultValue<const GUID_t&>::Set(guid);
 
     ASSERT_TRUE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(!security_activated_ || manager_.create_entities());
 }
 
 TEST_F(SecurityTest, initialization_auth_failed)
 {
-    DefaultValue<const RTPSParticipantAttributes&>::Set(pattr);
     DefaultValue<const GUID_t&>::Set(guid);
 
     EXPECT_CALL(*auth_plugin_, validate_local_identity(_,_,_,_,_,_)).Times(1).
@@ -41,7 +40,6 @@ TEST_F(SecurityTest, initialization_auth_failed)
 
 TEST_F(SecurityTest, initialization_register_local_participant_error)
 {
-    DefaultValue<const RTPSParticipantAttributes&>::Set(pattr);
     DefaultValue<const GUID_t&>::Set(guid);
     DefaultValue<const ParticipantSecurityAttributes&>::Set(security_attributes_);
 
@@ -55,7 +53,6 @@ TEST_F(SecurityTest, initialization_register_local_participant_error)
 
 TEST_F(SecurityTest, initialization_fail_participant_stateless_message_writer)
 {
-    DefaultValue<const RTPSParticipantAttributes&>::Set(pattr);
     DefaultValue<const GUID_t&>::Set(guid);
     DefaultValue<const ParticipantSecurityAttributes&>::Set(security_attributes_);
     MockParticipantCryptoHandle local_participant_crypto_handle;
@@ -69,12 +66,13 @@ TEST_F(SecurityTest, initialization_fail_participant_stateless_message_writer)
     EXPECT_CALL(participant_, createWriter_mock(_,_,_,_,_,_)).Times(1).
         WillOnce(Return(false));
 
-    ASSERT_FALSE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(security_activated_);
+    ASSERT_FALSE(manager_.create_entities());
 }
 
 TEST_F(SecurityTest, initialization_fail_participant_stateless_message_reader)
 {
-    DefaultValue<const RTPSParticipantAttributes&>::Set(pattr);
     DefaultValue<const GUID_t&>::Set(guid);
     DefaultValue<const ParticipantSecurityAttributes&>::Set(security_attributes_);
     MockParticipantCryptoHandle local_participant_crypto_handle;
@@ -91,12 +89,13 @@ TEST_F(SecurityTest, initialization_fail_participant_stateless_message_reader)
     EXPECT_CALL(participant_, createReader_mock(_,_,_,_,_,_,_)).Times(1).
         WillOnce(Return(false));
 
-    ASSERT_FALSE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(security_activated_);
+    ASSERT_FALSE(manager_.create_entities());
 }
 
 TEST_F(SecurityTest, initialization_fail_participant_volatile_message_writer)
 {
-    DefaultValue<const RTPSParticipantAttributes&>::Set(pattr);
     DefaultValue<const GUID_t&>::Set(guid);
     DefaultValue<const ParticipantSecurityAttributes&>::Set(security_attributes_);
     MockParticipantCryptoHandle local_participant_crypto_handle;
@@ -115,12 +114,13 @@ TEST_F(SecurityTest, initialization_fail_participant_volatile_message_writer)
     EXPECT_CALL(participant_, createReader_mock(_,_,_,_,_,_,_)).Times(1).
         WillOnce(DoAll(SetArgPointee<0>(stateless_reader), Return(true)));
 
-    ASSERT_FALSE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(security_activated_);
+    ASSERT_FALSE(manager_.create_entities());
 }
 
 TEST_F(SecurityTest, initialization_fail_participant_volatile_message_reader)
 {
-    DefaultValue<const RTPSParticipantAttributes&>::Set(pattr);
     DefaultValue<const GUID_t&>::Set(guid);
     DefaultValue<const ParticipantSecurityAttributes&>::Set(security_attributes_);
     MockParticipantCryptoHandle local_participant_crypto_handle;
@@ -141,12 +141,13 @@ TEST_F(SecurityTest, initialization_fail_participant_volatile_message_reader)
         WillOnce(DoAll(SetArgPointee<0>(stateless_reader), Return(true))).
         WillOnce(Return(false));
 
-    ASSERT_FALSE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(security_activated_);
+    ASSERT_FALSE(manager_.create_entities());
 }
 
 TEST_F(SecurityTest, initialization_auth_retry)
 {
-    DefaultValue<const RTPSParticipantAttributes&>::Set(pattr);
     DefaultValue<const GUID_t&>::Set(guid);
     DefaultValue<const ParticipantSecurityAttributes&>::Set(security_attributes_);
     MockParticipantCryptoHandle local_participant_crypto_handle;
@@ -172,6 +173,7 @@ TEST_F(SecurityTest, initialization_auth_retry)
         WillOnce(Return(true));
 
     ASSERT_TRUE(manager_.init(security_attributes_, participant_properties_, security_activated_));
+    ASSERT_TRUE(!security_activated_ || manager_.create_entities());
 }
 
 

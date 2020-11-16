@@ -34,16 +34,16 @@ namespace eprosima
                     /*!
                      * @brief Default constructor.
                      *
-                     * @param message A error message. This message pointer is copied.
+                     * @param message A error message. This message is copied.
                      */
-                    Cdr_DllAPI NotEnoughMemoryException(const char* const &message) noexcept;
+                    Cdr_DllAPI NotEnoughMemoryException(const char* const &message);
 
                     /*!
                      * @brief Default copy constructor.
                      *
                      * @param ex NotEnoughMemoryException that will be copied.
                      */
-                    Cdr_DllAPI NotEnoughMemoryException(const NotEnoughMemoryException &ex) noexcept;
+                    Cdr_DllAPI NotEnoughMemoryException(const NotEnoughMemoryException &ex);
 
 #if HAVE_CXX0X
                     /*!
@@ -51,7 +51,7 @@ namespace eprosima
                      *
                      * @param ex NotEnoughMemoryException that will be moved.
                      */
-                    Cdr_DllAPI NotEnoughMemoryException(NotEnoughMemoryException&& ex) noexcept;
+                    Cdr_DllAPI NotEnoughMemoryException(NotEnoughMemoryException&& ex);
 #endif
 
                     /*!
@@ -59,7 +59,7 @@ namespace eprosima
                      *
                      * @param ex NotEnoughMemoryException that will be copied.
                      */
-                    Cdr_DllAPI NotEnoughMemoryException& operator=(const NotEnoughMemoryException &ex) noexcept;
+                    Cdr_DllAPI NotEnoughMemoryException& operator=(const NotEnoughMemoryException &ex);
 
 #if HAVE_CXX0X
                     /*!
@@ -67,11 +67,11 @@ namespace eprosima
                      *
                      * @param ex NotEnoughMemoryException that will be moved.
                      */
-                    Cdr_DllAPI NotEnoughMemoryException& operator=(NotEnoughMemoryException&& ex) noexcept;
+                    Cdr_DllAPI NotEnoughMemoryException& operator=(NotEnoughMemoryException&& ex);
 #endif
 
                     //! @brief Default constructor
-                    virtual Cdr_DllAPI ~NotEnoughMemoryException() noexcept;
+                    virtual Cdr_DllAPI ~NotEnoughMemoryException() throw();
 
                     //! @brief This function throws the object as exception.
                     virtual Cdr_DllAPI void raise() const;

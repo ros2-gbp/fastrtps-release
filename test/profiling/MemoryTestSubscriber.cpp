@@ -18,12 +18,17 @@
  */
 
 #include "MemoryTestSubscriber.h"
-#include "fastrtps/log/Log.h"
+#include <fastdds/dds/log/Log.hpp>
 #include "fastrtps/log/Colors.h"
+
+#include <dds/core/LengthUnlimited.hpp>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::types;
+
+using std::cout;
+using std::endl;
 
 MemoryTestSubscriber::MemoryTestSubscriber()
     : mp_participant(nullptr)
@@ -74,7 +79,7 @@ bool MemoryTestSubscriber::init(bool echo, int nsam, bool reliable, uint32_t pid
         struct_type_builder->add_member(0, "seqnum", DynamicTypeBuilderFactory::get_instance()->create_uint32_type());
         struct_type_builder->add_member(1, "data",
             DynamicTypeBuilderFactory::get_instance()->create_sequence_builder(
-                DynamicTypeBuilderFactory::get_instance()->create_byte_type(), LENGTH_UNLIMITED
+                DynamicTypeBuilderFactory::get_instance()->create_byte_type(), ::dds::core::LENGTH_UNLIMITED
             ));
         struct_type_builder->set_name("MemoryType");
 
@@ -85,7 +90,7 @@ bool MemoryTestSubscriber::init(bool echo, int nsam, bool reliable, uint32_t pid
     // Create RTPSParticipant
     std::string participant_profile_name = "participant_profile";
     ParticipantAttributes PParam;
-    PParam.rtps.builtin.domainId = pid % 230;
+    PParam.domainId = pid % 230;
     PParam.rtps.setName("Participant_sub");
     PParam.rtps.properties = part_property_policy;
 
@@ -294,7 +299,6 @@ void MemoryTestSubscriber::CommandSubListener::onNewDataMessage(Subscriber* subs
             std::cout << "Something is wrong" << std::endl;
         }
     }
-    //cout << "SAMPLE INFO: "<< mp_up->m_sampleinfo.writerGUID << mp_up->m_sampleinfo.sampleKind << endl;
 }
 
 void MemoryTestSubscriber::DataSubListener::onNewDataMessage(Subscriber* subscriber)
@@ -312,9 +316,6 @@ void MemoryTestSubscriber::DataSubListener::onNewDataMessage(Subscriber* subscri
     else
     {
         subscriber->takeNextData((void*)mp_up->mp_memory,&mp_up->m_sampleinfo);
-        //	cout << "R: "<< mp_up->mp_memory->seqnum << "|"<<mp_up->m_echo<<std::flush;
-        //	//	eClock::my_sleep(50);
-        //		cout << "NSAMPLES: " << (uint32_t)mp_up->n_samples<< endl;
         ++mp_up->n_received;
         if (mp_up->m_echo)
         {
@@ -402,8 +403,7 @@ bool MemoryTestSubscriber::test(uint32_t datasize)
     lock.unlock();
 
     cout << "TEST OF SIZE: " << datasize + 4 << " ENDS" << endl;
-    eClock::my_sleep(50);
-    //cout << "REMOVED: "<< removed<<endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
     if (dynamic_data)
     {
         DynamicTypeBuilderFactory::delete_instance();

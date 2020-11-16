@@ -17,138 +17,162 @@
  *
  */
 
+#ifndef _RTPS_RESOURCES_TIMEDEVENTIMPL_H_
+#define _RTPS_RESOURCES_TIMEDEVENTIMPL_H_
 
-
-#ifndef TIMEDEVENTIMPL_H_
-#define TIMEDEVENTIMPL_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <fastrtps/rtps/common/Time_t.h>
-#include <fastrtps/rtps/resources/TimedEvent.h>
+#include <fastdds/rtps/common/Time_t.h>
+#include <fastdds/rtps/resources/TimedEvent.h>
 
-#include <memory>
-
-#include <asio/io_service.hpp>
-#include <asio/steady_timer.hpp>
-#include <asio/placeholders.hpp>
-#include <asio/io_service.hpp>
-
-#include <fastrtps/utils/Semaphore.h>
-
+#include <atomic>
 #include <thread>
+#include <memory>
 #include <functional>
 #include <mutex>
 #include <condition_variable>
-#include <system_error>
 
+namespace eprosima {
+namespace fastrtps {
+namespace rtps {
 
-
-namespace eprosima
+/*!
+ * This class encapsulates a timer.
+ * It also manages the state of the event (INACTIVE, READY, WAITING..).
+ * @ingroup MANAGEMENT_MODULE
+ */
+class TimedEventImpl
 {
-    namespace fastrtps
+    using Callback = std::function<bool ()>;
+
+public:
+
+    enum StateCode
     {
-        namespace rtps
-        {
-            class TimerState;
+        INACTIVE = 0, //! The event is inactive. The event service is not waiting for it.
+        READY, //! The event is ready for being processed by ResourceEvent and added to the event service.
+        WAITING, //! The event is waiting for the event service to be triggered.
+    };
 
-            /**
-             * Timed Event class used to define any timed events.
-             * All timedEvents must be a specification of this class, implementing the event method.
-             *@ingroup MANAGEMENT_MODULE
-             */
-            class TimedEventImpl
-            {
-                public:
+    /*!
+     * @brief Default constructor.
+     * @param callback Callback called when the timer is triggered.
+     * @param interval Expiration time in microseconds of the event.
+     */
+    TimedEventImpl(
+            Callback callback,
+            std::chrono::microseconds interval);
 
-                    ~TimedEventImpl();
+    /*!
+     * @brief Updates the expiration time of the event.
+     *
+     * When updating the interval, the timer is NOT restarted and the new interval will only be used the next time
+     * update() or trigger() are called.
+     * @param interval New expiration time.
+     * @return true on success
+     */
+    bool update_interval(
+            const Duration_t& interval);
 
-                    /**
-                     * @param serv IO service
-                     * @param milliseconds Interval of the timedEvent.
-                     */
-                    TimedEventImpl(TimedEvent* ev, asio::io_service &service, const std::thread& event_thread, std::chrono::microseconds interval, TimedEvent::AUTODESTRUCTION_MODE autodestruction);
+    /*!
+     * @brief Updates the expiration time of the event.
+     *
+     * When updating the interval, the timer is NOT restarted and the new interval will only be used the next time
+     * update() or trigger() are called.
+     * @param interval New expiration time in milliseconds.
+     * @return true on success
+     */
+    bool update_interval_millisec(
+            double interval);
 
-                    /**
-                     * Method invoked when the event occurs. Abstract method.
-                     *
-                     * @param code Code representing the status of the event
-                     * @param msg Message associated to the event
-                     */
-                    void event(const std::error_code& ec, const std::shared_ptr<TimerState>& state);
-
-
-                protected:
-                    //!Pointer to the timer.
-                    asio::steady_timer timer_;
-                    //!Interval to be used in the timed Event.
-                    std::chrono::microseconds m_interval_microsec;
-                    //!TimedEvent pointer
-                    TimedEvent* mp_event;
-
-                public:
-                    //!Method to restart the timer.
-                    void restart_timer();
-
-                    /**
-                     * Update event interval.
-                     * When updating the interval, the timer is not restarted and the new interval will only be used the next time you call restart_timer().
-                     *
-                     * @param inter New interval for the timedEvent
-                     * @return true on success
-                     */
-                    bool update_interval(const Duration_t& time);
-
-                    /**
-                     * Update event interval.
-                     * When updating the interval, the timer is not restarted and the new interval will only be used the next time you call restart_timer().
-                     *
-                     * @param time_millisec New interval for the timedEvent
-                     * @return true on success
-                     */
-                    bool update_interval_millisec(double time_millisec);
-
-                    void cancel_timer();
-
-                    void destroy();
-
-                    void mark_for_destruction();
-
-                    /**
-                     * Get interval in milliseconds
-                     * @return Event interval in milliseconds
-                     */
-                    double getIntervalMsec()
-                    {
-                        auto total_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(m_interval_microsec);
-                        return static_cast<double>(total_milliseconds.count());
-                    }
-
-                    /**
-                     * Get the remaining milliseconds for the timer to expire
-                     * @return Remaining milliseconds for the timer to expire
-                     */
-                    double getRemainingTimeMilliSec()
-                    {
-                        std::unique_lock<std::mutex> lock(mutex_);
-                        return static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(timer_.expires_from_now()).count());
-                    }
-
-                private:
-
-                    TimedEvent::AUTODESTRUCTION_MODE autodestruction_;
-                    //Duration_t m_timeInfinite;
-                    std::mutex mutex_;
-                    std::condition_variable cond_;
-
-                    std::shared_ptr<TimerState> state_;
-
-                    std::thread::id event_thread_id_;
-            };
-
-
-
-        }
+    /*!
+     * @brief Returns current expiration time in milliseconds
+     * @return Event expiration time in milliseconds
+     */
+    double getIntervalMsec()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        auto total_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(interval_microsec_);
+        return static_cast<double>(total_milliseconds.count());
     }
-} /* namespace eprosima */
-#endif
-#endif /* PERIODICEVENT_H_ */
+
+    /*!
+     * @brief Returns the remaining milliseconds for the timer to expire
+     * @return Remaining milliseconds for the timer to expire
+     */
+    double getRemainingTimeMilliSec()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return static_cast<double>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                next_trigger_time_ - std::chrono::steady_clock::now()).
+            count());
+    }
+
+    /*!
+     * @brief Returns next trigger time as a time point
+     * @return Event's next trigger time as a time point
+     */
+    std::chrono::steady_clock::time_point next_trigger_time()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return next_trigger_time_;
+    }
+
+    /*!
+     * @brief Tries to set the event as READY.
+     * To achieve it, the event has to be INACTIVE.
+     * @return true on success.
+     */
+    bool go_ready();
+
+    /*!
+     * @brief Tries to cancel the event and set it as INACTIVE.
+     * To achieve it, the event has to be WAITING.
+     * @return true on success.
+     */
+    bool go_cancel();
+
+    /*!
+     * @brief It updates the timer depending on the state of the TimedEventImpl object.
+     * @warning This method has to be called from ResourceEvent's internal thread.
+     * @return false if the event was canceled, true otherwise.
+     */
+    bool update(
+            std::chrono::steady_clock::time_point current_time,
+            std::chrono::steady_clock::time_point cancel_time);
+
+    /*!
+     * @brief Triggers the callback action.
+     * Also updates next trigger time.
+     * @warning This method has to be called from ResourceEvent's internal thread when the timer expires.
+     */
+    void trigger(
+            std::chrono::steady_clock::time_point current_time,
+            std::chrono::steady_clock::time_point cancel_time);
+
+private:
+
+    //! Expiration time in microseconds of the event.
+    std::chrono::microseconds interval_microsec_;
+
+    //! Next time this event should be triggered
+    std::chrono::steady_clock::time_point next_trigger_time_;
+
+    //! User function to be called when this event is triggered
+    Callback callback_;
+
+    //! Current state of this event
+    std::atomic<StateCode> state_;
+
+    //! Protects interval_microsec_ and next_trigger_time_
+    std::mutex mutex_;
+};
+
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
+
+#endif //DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
+#endif //_RTPS_RESOURCES_TIMEDEVENTIMPL_H_

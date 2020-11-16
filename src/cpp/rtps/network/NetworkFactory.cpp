@@ -12,23 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <fastrtps/rtps/network/NetworkFactory.h>
-#include <fastrtps/transport/TransportDescriptorInterface.h>
-#include <fastrtps/rtps/participant/RTPSParticipant.h>
-#include <fastrtps/rtps/common/Guid.h>
+#include <fastdds/rtps/network/NetworkFactory.h>
+#include <fastdds/rtps/transport/TransportDescriptorInterface.h>
+#include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <fastdds/rtps/common/Guid.h>
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <utility>
 #include <limits>
 
 using namespace std;
+using namespace eprosima::fastdds::rtps;
 
-namespace eprosima{
-namespace fastrtps{
-namespace rtps{
+namespace eprosima {
+namespace fastrtps {
+namespace rtps {
 
-NetworkFactory::NetworkFactory() : maxMessageSizeBetweenTransports_(0),
-    minSendBufferSize_(std::numeric_limits<uint32_t>::max())
+using SendResourceList = fastdds::rtps::SendResourceList;
+
+NetworkFactory::NetworkFactory()
+    : maxMessageSizeBetweenTransports_(std::numeric_limits<uint32_t>::max())
+    , minSendBufferSize_(std::numeric_limits<uint32_t>::max())
 {
 }
 
@@ -46,8 +50,10 @@ bool NetworkFactory::build_send_resources(
     return returned_value;
 }
 
-bool NetworkFactory::BuildReceiverResources(Locator_t& local, uint32_t maxMsgSize,
-    std::vector<std::shared_ptr<ReceiverResource>>& returned_resources_list)
+bool NetworkFactory::BuildReceiverResources(
+        Locator_t& local,
+        std::vector<std::shared_ptr<ReceiverResource> >& returned_resources_list,
+        uint32_t receiver_max_message_size)
 {
     bool returnedValue = false;
     for (auto& transport : mRegisteredTransports)
@@ -56,8 +62,12 @@ bool NetworkFactory::BuildReceiverResources(Locator_t& local, uint32_t maxMsgSiz
         {
             if (!transport->IsInputChannelOpen(local))
             {
+                uint32_t max_recv_buffer_size = (std::min)(
+                    transport->max_recv_buffer_size(),
+                    receiver_max_message_size);
+
                 std::shared_ptr<ReceiverResource> newReceiverResource = std::shared_ptr<ReceiverResource>(
-                    new ReceiverResource(*transport, local, maxMsgSize));
+                    new ReceiverResource(*transport, local, max_recv_buffer_size));
 
                 if (newReceiverResource->mValid)
                 {
@@ -66,97 +76,117 @@ bool NetworkFactory::BuildReceiverResources(Locator_t& local, uint32_t maxMsgSiz
                 }
             }
             else
+            {
                 returnedValue = true;
+            }
         }
     }
     return returnedValue;
 }
 
-bool NetworkFactory::RegisterTransport(const TransportDescriptorInterface* descriptor)
+bool NetworkFactory::RegisterTransport(
+        const TransportDescriptorInterface* descriptor)
 {
     bool wasRegistered = false;
     uint32_t minSendBufferSize = std::numeric_limits<uint32_t>::max();
 
     std::unique_ptr<TransportInterface> transport(descriptor->create_transport());
-    if(transport->init())
+
+    if (transport)
     {
-        minSendBufferSize = transport->get_configuration()->min_send_buffer_size();
-        mRegisteredTransports.emplace_back(std::move(transport));
-        wasRegistered = true;
+        if (transport->init())
+        {
+            minSendBufferSize = transport->get_configuration()->min_send_buffer_size();
+            mRegisteredTransports.emplace_back(std::move(transport));
+            wasRegistered = true;
+        }
+
+        if (wasRegistered)
+        {
+            if (descriptor->max_message_size() < maxMessageSizeBetweenTransports_)
+            {
+                maxMessageSizeBetweenTransports_ = descriptor->max_message_size();
+            }
+
+            if (minSendBufferSize < minSendBufferSize_)
+            {
+                minSendBufferSize_ = minSendBufferSize;
+            }
+        }
     }
 
-    if(wasRegistered)
-    {
-        if(descriptor->max_message_size() > maxMessageSizeBetweenTransports_)
-            maxMessageSizeBetweenTransports_ = descriptor->max_message_size();
-
-        if(minSendBufferSize < minSendBufferSize_)
-            minSendBufferSize_ = minSendBufferSize;
-    }
     return wasRegistered;
 }
 
-void NetworkFactory::NormalizeLocators(LocatorList_t& locators)
+void NetworkFactory::NormalizeLocators(
+        LocatorList_t& locators)
 {
     LocatorList_t normalizedLocators;
 
     std::for_each(locators.begin(), locators.end(), [&](Locator_t& loc) {
-        bool normalized = false;
-        for (auto& transport : mRegisteredTransports)
-        {
-            // Check if the locator is supported and filter unicast locators.
-            if (transport->IsLocatorSupported(loc) &&
-                (IPLocator::isMulticast(loc) ||
-                transport->is_locator_allowed(loc)))
-            {
-                // First found transport that supports it, this will normalize the locator.
-                normalizedLocators.push_back(transport->NormalizeLocator(loc));
-                normalized = true;
-            }
-        }
+                    bool normalized = false;
+                    for (auto& transport : mRegisteredTransports)
+                    {
+                        // Check if the locator is supported and filter unicast locators.
+                        if (transport->IsLocatorSupported(loc) &&
+                        (IPLocator::isMulticast(loc) ||
+                        transport->is_locator_allowed(loc)))
+                        {
+                            // First found transport that supports it, this will normalize the locator.
+                            normalizedLocators.push_back(transport->NormalizeLocator(loc));
+                            normalized = true;
+                        }
+                    }
 
-        if (!normalized)
-        {
-            normalizedLocators.push_back(loc);
-        }
-    });
+                    if (!normalized)
+                    {
+                        normalizedLocators.push_back(loc);
+                    }
+                });
 
     locators.swap(normalizedLocators);
 }
 
-LocatorList_t NetworkFactory::ShrinkLocatorLists(const std::vector<LocatorList_t>& locatorLists)
+bool NetworkFactory::transform_remote_locator(
+        const Locator_t& remote_locator,
+        Locator_t& result_locator) const
 {
-    LocatorList_t returnedList;
-
-    for(auto& transport : mRegisteredTransports)
+    for (auto& transport : mRegisteredTransports)
     {
-        std::vector<LocatorList_t> transportLocatorLists;
-
-        for(auto& locatorList : locatorLists)
+        if (transport->transform_remote_locator(remote_locator, result_locator))
         {
-            LocatorList_t resultList;
-
-            for(auto it = locatorList.begin(); it != locatorList.end(); ++it)
-            {
-                if(transport->IsLocatorSupported(*it))
-                {
-                    resultList.push_back(*it);
-                }
-            }
-            transportLocatorLists.push_back(resultList);
+            return true;
         }
-        returnedList.push_back(transport->ShrinkLocatorLists(transportLocatorLists));
     }
 
-    return returnedList;
+    return false;
 }
 
-bool NetworkFactory::is_local_locator(const Locator_t& locator) const
+void NetworkFactory::select_locators(
+        LocatorSelector& selector) const
 {
-    for(auto& transport : mRegisteredTransports)
+    selector.selection_start();
+
+    /* - for each transport:
+     *   - transport_starts is called
+     *   - transport handles the selection state of each entry
+     *   - select may be called
+     */
+    for (auto& transport : mRegisteredTransports)
     {
-        if(transport->IsLocatorSupported(locator))
+        transport->select_locators(selector);
+    }
+}
+
+bool NetworkFactory::is_local_locator(
+        const Locator_t& locator) const
+{
+    for (auto& transport : mRegisteredTransports)
+    {
+        if (transport->IsLocatorSupported(locator))
+        {
             return transport->is_local_locator(locator);
+        }
     }
 
     return false;
@@ -167,8 +197,10 @@ size_t NetworkFactory::numberOfRegisteredTransports() const
     return mRegisteredTransports.size();
 }
 
-bool NetworkFactory::generate_locators(uint16_t physical_port, int locator_kind,
-        LocatorList_t &ret_locators)
+bool NetworkFactory::generate_locators(
+        uint16_t physical_port,
+        int locator_kind,
+        LocatorList_t& ret_locators)
 {
     ret_locators.clear();
     if (locator_kind == LOCATOR_KIND_TCPv4 || locator_kind == LOCATOR_KIND_UDPv4)
@@ -179,7 +211,7 @@ bool NetworkFactory::generate_locators(uint16_t physical_port, int locator_kind,
     {
         IPFinder::getIP6Address(&ret_locators);
     }
-    for (Locator_t &loc : ret_locators)
+    for (Locator_t& loc : ret_locators)
     {
         loc.kind = locator_kind;
         loc.port = physical_port;
@@ -187,30 +219,52 @@ bool NetworkFactory::generate_locators(uint16_t physical_port, int locator_kind,
     return !ret_locators.empty();
 }
 
-void NetworkFactory::GetDefaultOutputLocators(LocatorList_t &defaultLocators)
+void NetworkFactory::GetDefaultOutputLocators(
+        LocatorList_t& defaultLocators)
 {
     defaultLocators.clear();
-    for(auto& transport : mRegisteredTransports)
+    for (auto& transport : mRegisteredTransports)
     {
         transport->AddDefaultOutputLocator(defaultLocators);
     }
 }
 
-bool NetworkFactory::getDefaultMetatrafficMulticastLocators(LocatorList_t &locators,
+bool NetworkFactory::getDefaultMetatrafficMulticastLocators(
+        LocatorList_t& locators,
+        uint32_t metatraffic_multicast_port) const
+{
+    bool result = false;
+
+    TransportInterface* shm_transport = nullptr;
+
+    for (auto& transport : mRegisteredTransports)
+    {
+        // For better fault-tolerance reasons, SHM multicast metatraffic is avoided if it is already provided 
+        // by another transport
+        if (transport->kind() != LOCATOR_KIND_SHM)
+        {
+            result |= transport->getDefaultMetatrafficMulticastLocators(locators, metatraffic_multicast_port);
+        }
+        else
+        {
+            shm_transport = transport.get();
+        }
+    }
+
+    if(locators.size() == 0 && shm_transport)
+    {
+        result |= shm_transport->getDefaultMetatrafficMulticastLocators(locators, metatraffic_multicast_port);
+    }
+
+    return result;
+}
+
+bool NetworkFactory::fillMetatrafficMulticastLocator(
+        Locator_t& locator,
         uint32_t metatraffic_multicast_port) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
-    {
-        result |= transport->getDefaultMetatrafficMulticastLocators(locators, metatraffic_multicast_port);
-    }
-    return result;
-}
-
-bool NetworkFactory::fillMetatrafficMulticastLocator(Locator_t &locator, uint32_t metatraffic_multicast_port) const
-{
-    bool result = false;
-    for(auto& transport : mRegisteredTransports)
     {
         if (transport->IsLocatorSupported(locator))
         {
@@ -220,7 +274,9 @@ bool NetworkFactory::fillMetatrafficMulticastLocator(Locator_t &locator, uint32_
     return result;
 }
 
-bool NetworkFactory::getDefaultMetatrafficUnicastLocators(LocatorList_t &locators, uint32_t metatraffic_unicast_port) const
+bool NetworkFactory::getDefaultMetatrafficUnicastLocators(
+        LocatorList_t& locators,
+        uint32_t metatraffic_unicast_port) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
@@ -230,10 +286,12 @@ bool NetworkFactory::getDefaultMetatrafficUnicastLocators(LocatorList_t &locator
     return result;
 }
 
-bool NetworkFactory::fillMetatrafficUnicastLocator(Locator_t &locator, uint32_t metatraffic_unicast_port) const
+bool NetworkFactory::fillMetatrafficUnicastLocator(
+        Locator_t& locator,
+        uint32_t metatraffic_unicast_port) const
 {
     bool result = false;
-    for(auto& transport : mRegisteredTransports)
+    for (auto& transport : mRegisteredTransports)
     {
         if (transport->IsLocatorSupported(locator))
         {
@@ -243,38 +301,47 @@ bool NetworkFactory::fillMetatrafficUnicastLocator(Locator_t &locator, uint32_t 
     return result;
 }
 
-bool NetworkFactory::configureInitialPeerLocator(Locator_t &locator, RTPSParticipantAttributes& m_att) const
+bool NetworkFactory::configureInitialPeerLocator(
+        uint32_t domain_id,
+        Locator_t& locator,
+        RTPSParticipantAttributes& m_att) const
 {
     bool result = false;
-    for(auto& transport : mRegisteredTransports)
+    for (auto& transport : mRegisteredTransports)
     {
         if (transport->IsLocatorSupported(locator))
         {
-            result |= transport->configureInitialPeerLocator(locator, m_att.port, m_att.builtin.domainId,
-                                                        m_att.builtin.initialPeersList);
+            result |= transport->configureInitialPeerLocator(locator, m_att.port, domain_id,
+                            m_att.builtin.initialPeersList);
         }
     }
     return result;
 }
 
-bool NetworkFactory::getDefaultUnicastLocators(LocatorList_t &locators, const RTPSParticipantAttributes& m_att) const
+bool NetworkFactory::getDefaultUnicastLocators(
+        uint32_t domain_id,
+        LocatorList_t& locators,
+        const RTPSParticipantAttributes& m_att) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
     {
-        result |= transport->getDefaultUnicastLocators(locators, calculateWellKnownPort(m_att));
+        result |= transport->getDefaultUnicastLocators(locators, calculateWellKnownPort(domain_id, m_att));
     }
     return result;
 }
 
-bool NetworkFactory::fillDefaultUnicastLocator(Locator_t &locator, const RTPSParticipantAttributes& m_att) const
+bool NetworkFactory::fillDefaultUnicastLocator(
+        uint32_t domain_id,
+        Locator_t& locator,
+        const RTPSParticipantAttributes& m_att) const
 {
     bool result = false;
-    for(auto& transport : mRegisteredTransports)
+    for (auto& transport : mRegisteredTransports)
     {
         if (transport->IsLocatorSupported(locator))
         {
-            result |= transport->fillUnicastLocator(locator, calculateWellKnownPort(m_att));
+            result |= transport->fillUnicastLocator(locator, calculateWellKnownPort(domain_id, m_att));
         }
     }
     return result;
@@ -288,20 +355,22 @@ void NetworkFactory::Shutdown()
     }
 }
 
-uint16_t NetworkFactory::calculateWellKnownPort(const RTPSParticipantAttributes& att) const
+uint16_t NetworkFactory::calculateWellKnownPort(
+        uint32_t domain_id,
+        const RTPSParticipantAttributes& att) const
 {
 
     uint32_t port = att.port.portBase +
-        att.port.domainIDGain * att.builtin.domainId +
-        att.port.offsetd3 +
-        att.port.participantIDGain * att.participantID;
+            att.port.domainIDGain * domain_id +
+            att.port.offsetd3 +
+            att.port.participantIDGain * att.participantID;
 
     if (port > 65535)
     {
         logError(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
-            << "too much participants created or portBase is too high.");
+                << "too much participants created or portBase is too high.");
         std::cout << "Calculated port number is too high. Probably the domainId is over 232, there are "
-            << "too much participants created or portBase is too high." << std::endl;
+                  << "too much participants created or portBase is too high." << std::endl;
         std::cout.flush();
         exit(EXIT_FAILURE);
     }

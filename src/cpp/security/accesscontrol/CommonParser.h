@@ -15,7 +15,7 @@
 #ifndef __SECURITY_ACCESSCONTROL_COMMON_H__
 #define __SECURITY_ACCESSCONTROL_COMMON_H__
 
-#include "PermissionsTypes.h"
+#include <security/accesscontrol/PermissionsTypes.h>
 
 #include <tinyxml2.h>
 

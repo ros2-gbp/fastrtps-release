@@ -19,9 +19,9 @@
 #ifndef _RTPS_WRITER_RTPSWRITERCOLLECTOR_H_
 #define _RTPS_WRITER_RTPSWRITERCOLLECTOR_H_
 
-#include <fastrtps/rtps/common/SequenceNumber.h>
-#include <fastrtps/rtps/common/FragmentNumber.h>
-#include <fastrtps/rtps/common/CacheChange.h>
+#include <fastdds/rtps/common/SequenceNumber.h>
+#include <fastdds/rtps/common/FragmentNumber.h>
+#include <fastdds/rtps/common/CacheChange.h>
 
 #include <vector>
 #include <cassert>
@@ -80,7 +80,7 @@ class RTPSWriterCollector
             {
                 optionalFragmentsNotSent.for_each([this, change, remoteReader](FragmentNumber_t sn)
                 {
-                    assert(sn <= change->getDataFragments()->size());
+                    assert(sn <= change->getFragmentCount());
                     auto it = mItems_.emplace(change->sequenceNumber, sn, change);
                     it.first->remoteReaders.push_back(remoteReader);
                 });
