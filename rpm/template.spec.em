@@ -51,6 +51,8 @@ mkdir -p .obj-%{_target_platform} && cd .obj-%{_target_platform}
 %if !0%{?with_tests}
     -DBUILD_TESTING=OFF \
 %endif
+    -DINSTALL_EXAMPLES=OFF \
+    -DSECURITY=ON \
     ..
 
 %make_build
