@@ -1,4 +1,4 @@
-From af9015fab2a8ea02aa532bb1b37d358a85eeae3d Mon Sep 17 00:00:00 2001
+From 1318307bcf6ada532d9b3c8f45f344afa383c61e Mon Sep 17 00:00:00 2001
 From: Chris Lalancette <clalancette@openrobotics.org>
 Date: Fri, 26 Feb 2021 11:00:51 -0500
 Subject: [PATCH] Reenable SECURITY for Dashing Fast-RTPS. (#13)
@@ -9,10 +9,10 @@ Signed-off-by: Chris Lalancette <clalancette@openrobotics.org>
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/debian/rules.em b/debian/rules.em
-index 12ccb14..ef05e4f 100755
+index 3342408..d56bb29 100755
 --- a/debian/rules.em
 +++ b/debian/rules.em
-@@ -28,7 +28,9 @@ override_dh_auto_configure:
+@@ -31,7 +31,9 @@ override_dh_auto_configure:
  	if [ -f "@(InstallationPrefix)/setup.sh" ]; then . "@(InstallationPrefix)/setup.sh"; fi && \
  	dh_auto_configure -- \
  		-DCMAKE_INSTALL_PREFIX="@(InstallationPrefix)" \
