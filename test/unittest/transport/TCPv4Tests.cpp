@@ -17,9 +17,9 @@
 #include "mock/MockTCPv4Transport.h"
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/IPLocator.h>
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/log/Log.h>
 #include <MockReceiverResource.h>
-#include "../../../src/cpp/rtps/transport/TCPSenderResource.hpp"
+#include "../../../src/cpp/transport/TCPSenderResource.hpp"
 
 #include <memory>
 #include <asio.hpp>
@@ -52,18 +52,31 @@ uint16_t get_port(uint16_t offset)
     return port;
 }
 
+static void GetIP4s(std::vector<IPFinder::info_IP>& locNames, bool return_loopback = false)
+{
+    IPFinder::getIPs(&locNames, return_loopback);
+    auto new_end = remove_if(locNames.begin(),
+        locNames.end(),
+        [](IPFinder::info_IP ip) {return ip.type != IPFinder::IP4 && ip.type != IPFinder::IP4_LOCAL; });
+    locNames.erase(new_end, locNames.end());
+    std::for_each(locNames.begin(), locNames.end(), [](IPFinder::info_IP& loc)
+    {
+        loc.locator.kind = LOCATOR_KIND_TCPv4;
+    });
+}
+
 class TCPv4Tests: public ::testing::Test
 {
     public:
         TCPv4Tests()
         {
-            eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+            Log::SetVerbosity(Log::Kind::Info);
             HELPER_SetDescriptorDefaults();
         }
 
         ~TCPv4Tests()
         {
-            eprosima::fastdds::dds::Log::KillThread();
+            Log::KillThread();
         }
 
         void HELPER_SetDescriptorDefaults();
@@ -161,9 +174,9 @@ TEST_F(TCPv4Tests, opening_and_closing_input_channel)
 #ifndef __APPLE__
 TEST_F(TCPv4Tests, send_and_receive_between_ports)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
     std::regex filter("RTCP(?!_SEQ)");
-    eprosima::fastdds::dds::Log::SetCategoryFilter(filter);
+    Log::SetCategoryFilter(filter);
     TCPv4TransportDescriptor recvDescriptor;
     recvDescriptor.add_listener_port(g_default_port);
     recvDescriptor.wait_for_tcp_negotiation = true;
@@ -180,9 +193,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_ports)
     inputLocator.port = g_default_port;
     IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
     IPLocator::setLogicalPort(inputLocator, 7410);
-
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
 
     Locator_t outputLocator;
     outputLocator.kind = LOCATOR_KIND_TCPv4;
@@ -210,13 +220,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_ports)
 
     auto sendThreadFunction = [&]()
     {
-        bool sent = false;
+        bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
         while (!sent)
         {
-            Locators input_begin(locator_list.begin());
-            Locators input_end(locator_list.end());
-
-            sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+            sent = send_resource_list.at(0)->send(message, 5, inputLocator);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         EXPECT_TRUE(sent);
@@ -248,15 +255,10 @@ TEST_F(TCPv4Tests, send_is_rejected_if_buffer_size_is_bigger_to_size_specified_i
     destinationLocator.port = g_output_port + 1;
     IPLocator::setLogicalPort(destinationLocator, 7400);
 
-    LocatorList_t locator_list;
-    locator_list.push_back(destinationLocator);
-    Locators destination_begin(locator_list.begin());
-    Locators destination_end(locator_list.end());
-
     // Then
     std::vector<octet> receiveBufferWrongSize(descriptor.sendBufferSize + 1);
     ASSERT_FALSE(send_resource_list.at(0)->send(receiveBufferWrongSize.data(), (uint32_t)receiveBufferWrongSize.size(),
-            &destination_begin, &destination_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100))));
+            destinationLocator));
 }
 
 TEST_F(TCPv4Tests, RemoteToMainLocal_simply_strips_out_address_leaving_IP_ANY)
@@ -314,15 +316,8 @@ TEST_F(TCPv4Tests, send_to_wrong_interface)
     //Sending through a different IP will NOT work, except 0.0.0.0
     Locator_t wrongLocator(outputChannelLocator);
     IPLocator::setIPv4(wrongLocator, 111,111,111,111);
-
-    LocatorList_t locator_list;
-    locator_list.push_back(wrongLocator);
-    Locators wrong_begin(locator_list.begin());
-    Locators wrong_end(locator_list.end());
-
     std::vector<octet> message = { 'H','e','l','l','o' };
-    ASSERT_FALSE(send_resource_list.at(0)->send(message.data(), (uint32_t)message.size(), &wrong_begin, &wrong_end,
-                (std::chrono::steady_clock::now()+ std::chrono::microseconds(100))));
+    ASSERT_FALSE(send_resource_list.at(0)->send(message.data(), (uint32_t)message.size(), wrongLocator));
 }
 
 TEST_F(TCPv4Tests, send_to_blocked_interface)
@@ -342,17 +337,9 @@ TEST_F(TCPv4Tests, send_to_blocked_interface)
 
     //Sending through a different IP will NOT work, except 0.0.0.0
     Locator_t wrongLocator(outputChannelLocator);
-    IPLocator::setIPv4(wrongLocator, 111, 111
-    , 111, 111);
-
-    LocatorList_t locator_list;
-    locator_list.push_back(wrongLocator);
-    Locators wrong_begin(locator_list.begin());
-    Locators wrong_end(locator_list.end());
-
+    IPLocator::setIPv4(wrongLocator, 111, 111, 111, 111);
     std::vector<octet> message = { 'H','e','l','l','o' };
-    ASSERT_FALSE(send_resource_list.at(0)->send(message.data(), (uint32_t)message.size(), &wrong_begin, &wrong_end,
-                (std::chrono::steady_clock::now()+ std::chrono::microseconds(100))));
+    ASSERT_FALSE(send_resource_list.at(0)->send(message.data(), (uint32_t)message.size(), wrongLocator));
 }
 
 #ifndef __APPLE__
@@ -373,9 +360,9 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_interfaces_ports)
 
         if (IsAddressDefined(locator))
         {
-            eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+            Log::SetVerbosity(Log::Kind::Info);
             std::regex filter("RTCP(?!_SEQ)");
-            eprosima::fastdds::dds::Log::SetCategoryFilter(filter);
+            Log::SetCategoryFilter(filter);
             TCPv4TransportDescriptor recvDescriptor;
             recvDescriptor.interfaceWhiteList.emplace_back(IPLocator::toIPv4string(locator));
             recvDescriptor.add_listener_port(g_default_port);
@@ -395,9 +382,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_interfaces_ports)
             inputLocator.set_address(locator);
             IPLocator::setLogicalPort(inputLocator, 7410);
 
-            LocatorList_t locator_list;
-            locator_list.push_back(inputLocator);
-            
             Locator_t outputLocator;
             outputLocator.kind = LOCATOR_KIND_TCPv4;
             outputLocator.set_address(locator);
@@ -425,16 +409,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_interfaces_ports)
                 bool bFinish(false);
                 auto sendThreadFunction = [&]()
                 {
-                    Locators input_begin(locator_list.begin());
-                    Locators input_end(locator_list.end());
-
-                    bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                    bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                     while (!bFinish && !sent)
                     {
-                        Locators input_begin2(locator_list.begin());
-                        Locators input_end2(locator_list.end());
-
-                        sent = send_resource_list.at(0)->send(message, 5, &input_begin2, &input_end2, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                        sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     }
                     EXPECT_TRUE(sent);
@@ -454,7 +432,7 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_interfaces_ports)
 #if TLS_FOUND
 TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_client_verifies)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
 
     using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
@@ -488,9 +466,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_client_verifies)
     IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
     IPLocator::setLogicalPort(inputLocator, 7410);
 
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
-    
     Locator_t outputLocator;
     outputLocator.kind = LOCATOR_KIND_TCPv4;
     IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
@@ -518,16 +493,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_client_verifies)
 
         auto sendThreadFunction = [&]()
         {
-            Locators input_begin(locator_list.begin());
-            Locators input_end(locator_list.end());
-
-            bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+            bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
             while (!sent)
             {
-                Locators input_begin(locator_list.begin());
-                Locators input_end(locator_list.end());
-
-                sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             EXPECT_TRUE(sent);
@@ -543,7 +512,7 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_client_verifies)
 
 TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_server_verifies)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
 
     using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
@@ -584,9 +553,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_server_verifies)
     IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
     IPLocator::setLogicalPort(inputLocator, 7410);
 
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
-    
     Locator_t outputLocator;
     outputLocator.kind = LOCATOR_KIND_TCPv4;
     IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
@@ -614,16 +580,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_server_verifies)
 
         auto sendThreadFunction = [&]()
         {
-            Locators input_begin(locator_list.begin());
-            Locators input_end(locator_list.end());
-
-            bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+            bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
             while (!sent)
             {
-                Locators input_begin(locator_list.begin());
-                Locators input_end(locator_list.end());
-
-                sent = send_resource_list.at(0)->send(message, 5,  &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                sent = send_resource_list.at(0)->send(message, 5,  inputLocator);
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             EXPECT_TRUE(sent);
@@ -639,7 +599,7 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_server_verifies)
 
 TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
 
     using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
@@ -682,9 +642,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports)
     IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
     IPLocator::setLogicalPort(inputLocator, 7410);
 
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
-
     Locator_t outputLocator;
     outputLocator.kind = LOCATOR_KIND_TCPv4;
     IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
@@ -712,16 +669,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports)
 
         auto sendThreadFunction = [&]()
         {
-            Locators input_begin(locator_list.begin());
-            Locators input_end(locator_list.end());
-
-            bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+            bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
             while (!sent)
             {
-                Locators input_begin(locator_list.begin());
-                Locators input_end(locator_list.end());
-
-                sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             EXPECT_TRUE(sent);
@@ -737,7 +688,7 @@ TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports)
 
 TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports_untrusted)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
 
     using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
@@ -780,9 +731,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports_untrusted)
     IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
     IPLocator::setLogicalPort(inputLocator, 7410);
 
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
-    
     Locator_t outputLocator;
     outputLocator.kind = LOCATOR_KIND_TCPv4;
     IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
@@ -811,17 +759,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports_untrusted)
 
         auto sendThreadFunction = [&]()
         {
-            Locators input_begin(locator_list.begin());
-            Locators input_end(locator_list.end());
-
-            bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+            bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
             int count = 0;
             while (!sent && count < 30)
             {
-                Locators input_begin(locator_list.begin());
-                Locators input_end(locator_list.end());
-
-                sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 ++count;
             }
@@ -839,7 +781,7 @@ TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports_untrusted)
 
 TEST_F(TCPv4Tests, send_and_receive_between_secure_clients_1)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
 
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
     using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
@@ -882,9 +824,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_clients_1)
     IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
     IPLocator::setLogicalPort(inputLocator, 7410);
 
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
-    
     Locator_t outputLocator;
     outputLocator.kind = LOCATOR_KIND_TCPv4;
     IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
@@ -912,16 +851,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_clients_1)
 
         auto sendThreadFunction = [&]()
         {
-            Locators input_begin(locator_list.begin());
-            Locators input_end(locator_list.end());
-
-            bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+            bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
             while (!sent)
             {
-                Locators input_begin(locator_list.begin());
-                Locators input_end(locator_list.end());
-
-                sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             EXPECT_TRUE(sent);
@@ -936,7 +869,7 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_clients_1)
 /*
 TEST_F(TCPv4Tests, send_and_receive_between_secure_clients_2)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
 
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
     using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
@@ -1026,7 +959,7 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_clients_2)
 
 TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_untrusted_server)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
 
     using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
@@ -1065,9 +998,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_untrusted_server)
     IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
     IPLocator::setLogicalPort(inputLocator, 7410);
 
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
-    
     Locator_t outputLocator;
     outputLocator.kind = LOCATOR_KIND_TCPv4;
     IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
@@ -1096,16 +1026,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_untrusted_server)
 
         auto sendThreadFunction = [&]()
         {
-            Locators input_begin(locator_list.begin());
-            Locators input_end(locator_list.end());
-
-            bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+            bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
             int count = 0;
             while (!sent && count < 30)
             {
-                Locators input_begin(locator_list.begin());
-                Locators input_end(locator_list.end());
-                sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 ++count;
             }
@@ -1124,9 +1049,9 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_untrusted_server)
 
 TEST_F(TCPv4Tests, send_and_receive_between_allowed_localhost_interfaces_ports)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    Log::SetVerbosity(Log::Kind::Info);
     std::regex filter("RTCP(?!_SEQ)");
-    eprosima::fastdds::dds::Log::SetCategoryFilter(filter);
+    Log::SetCategoryFilter(filter);
     TCPv4TransportDescriptor recvDescriptor;
     recvDescriptor.interfaceWhiteList.emplace_back("127.0.0.1");
     recvDescriptor.add_listener_port(g_default_port);
@@ -1146,9 +1071,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_localhost_interfaces_ports)
     IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
     IPLocator::setLogicalPort(inputLocator, 7410);
 
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
-    
     Locator_t outputLocator;
     outputLocator.kind = LOCATOR_KIND_TCPv4;
     IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
@@ -1176,16 +1098,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_localhost_interfaces_ports)
         bool bFinish(false);
         auto sendThreadFunction = [&]()
         {
-            Locators input_begin(locator_list.begin());
-            Locators input_end(locator_list.end());
-
-            bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+            bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
             while (!bFinish && !sent)
             {
-                Locators input_begin2(locator_list.begin());
-                Locators input_end2(locator_list.end());
-
-                sent = send_resource_list.at(0)->send(message, 5, &input_begin2, &input_end2, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             EXPECT_TRUE(sent);
@@ -1217,9 +1133,9 @@ TEST_F(TCPv4Tests, send_and_receive_between_blocked_interfaces_ports)
 
         if (IsAddressDefined(locator))
         {
-            eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+            Log::SetVerbosity(Log::Kind::Info);
             std::regex filter("RTCP(?!_SEQ)");
-            eprosima::fastdds::dds::Log::SetCategoryFilter(filter);
+            Log::SetCategoryFilter(filter);
             TCPv4TransportDescriptor recvDescriptor;
             recvDescriptor.interfaceWhiteList.emplace_back(IPLocator::toIPv4string(locator));
             recvDescriptor.add_listener_port(g_default_port);
@@ -1239,9 +1155,6 @@ TEST_F(TCPv4Tests, send_and_receive_between_blocked_interfaces_ports)
             IPLocator::setIPv4(inputLocator, 127, 0, 0, 1);
             IPLocator::setLogicalPort(inputLocator, 7410);
 
-            LocatorList_t locator_list;
-            locator_list.push_back(inputLocator);
-            
             Locator_t outputLocator;
             outputLocator.kind = LOCATOR_KIND_TCPv4;
             IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
@@ -1269,16 +1182,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_blocked_interfaces_ports)
                 bool bFinished(false);
                 auto sendThreadFunction = [&]()
                 {
-                    Locators input_begin(locator_list.begin());
-                    Locators input_end(locator_list.end());
-
-                    bool sent = send_resource_list.at(0)->send(message, 5, &input_begin, &input_end, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                    bool sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                     while (!bFinished && !sent)
                     {
-                        Locators input_begin2(locator_list.begin());
-                        Locators input_end2(locator_list.end());
-                        
-                        sent = send_resource_list.at(0)->send(message, 5, &input_begin2, &input_end2, (std::chrono::steady_clock::now()+ std::chrono::microseconds(100)));
+                        sent = send_resource_list.at(0)->send(message, 5, inputLocator);
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     }
                     EXPECT_FALSE(sent);
@@ -1297,6 +1204,245 @@ TEST_F(TCPv4Tests, send_and_receive_between_blocked_interfaces_ports)
 
 #endif
 
+TEST_F(TCPv4Tests, shrink_locator_lists)
+{
+    std::vector<IPFinder::info_IP> localInterfaces;
+    GetIP4s(localInterfaces, false);
+
+    MockTCPv4Transport transportUnderTest(descriptor);
+    transportUnderTest.init();
+
+    LocatorList_t result, list1;
+    Locator_t locator, locator2, locator3;
+    Locator_t openConn1, openConn2;
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    locator2.kind = LOCATOR_KIND_TCPv4;
+    locator2.port = g_default_port;
+    locator3.kind = LOCATOR_KIND_TCPv4;
+    locator3.port = g_default_port;
+
+    // Check shrink of only one locator list unicast.
+    IPLocator::setIPv4(locator, 192,168,1,4);
+    IPLocator::setIPv4(locator2, 192,168,1,4);
+    list1.push_back(locator);
+    IPLocator::setIPv4(locator, 192,168,2,5);
+    IPLocator::setIPv4(locator3, 192,168,2,5);
+    list1.push_back(locator);
+
+    // Open connections (fake)
+    openConn1 = locator2;
+    openConn2 = locator3;
+    SendResourceList send_resource_list;
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn1);
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn2);
+
+    result = transportUnderTest.ShrinkLocatorLists({list1});
+    ASSERT_EQ(result.size(), 2u);
+    for (auto it = result.begin(); it != result.end(); ++it)
+    {
+        ASSERT_TRUE(*it == locator2 || *it == locator3);
+    }
+    list1.clear();
+
+    // Shrink Two Localhosts and return localhost.
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    IPLocator::setIPv4(locator, 127, 0, 0, 1);
+    list1.push_back(locator);
+    locator2.kind = LOCATOR_KIND_TCPv4;
+    locator2.port = g_default_port;
+    IPLocator::setIPv4(locator2, 127, 0, 0, 1);
+    list1.push_back(locator2);
+    result = transportUnderTest.ShrinkLocatorLists({ list1 });
+    ASSERT_EQ(result.size(), 1u);
+    ASSERT_TRUE(*result.begin() == locator);
+    list1.clear();
+    send_resource_list.clear();
+
+    // Shrink Several Local addresses and return localhost.
+    if (localInterfaces.size() > 0)
+    {
+        locator.kind = LOCATOR_KIND_TCPv4;
+        locator.port = g_default_port;
+        IPLocator::setIPv4(locator, 127, 0, 0, 1);
+        locator2.kind = LOCATOR_KIND_TCPv4;
+        locator2.port = g_default_port;
+        IPLocator::setIPv4(locator2, localInterfaces.begin()->locator);
+        list1.push_back(locator2);
+        if (localInterfaces.size() > 1)
+        {
+            IPLocator::setIPv4(locator2, localInterfaces[1].locator);
+            list1.push_back(locator2);
+        }
+
+        result = transportUnderTest.ShrinkLocatorLists({ list1 });
+        ASSERT_EQ(result.size(), 1u);
+        ASSERT_TRUE(*result.begin() == locator);
+        list1.clear();
+    }
+
+    // Shrink two WAN Adresses ( Same as mine ) With same LAN Address and same Logical Port and Same Physical Port and return only one.
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    IPLocator::setIPv4(locator, 192, 168, 0, 1);
+    IPLocator::setWan(locator, g_test_wan_address);
+    list1.push_back(locator);
+    locator2.kind = LOCATOR_KIND_TCPv4;
+    locator2.port = g_default_port;
+    IPLocator::setIPv4(locator2, 192, 168, 0, 1);
+    IPLocator::setWan(locator2, g_test_wan_address);
+    list1.push_back(locator2);
+
+    // Open connections (fake)
+    openConn1.port = g_default_port;
+    IPLocator::setIPv4(openConn1, g_test_wan_address);
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn1);
+
+    result = transportUnderTest.ShrinkLocatorLists({ list1 });
+    ASSERT_EQ(result.size(), 1u);
+    ASSERT_TRUE(*result.begin() == locator);
+
+    list1.clear();
+    send_resource_list.clear();
+
+    // Shrink two WAN Adresses ( Same as mine ) With same LAN Address and same Logical Port and Different Physical Port and return both.
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    IPLocator::setIPv4(locator, 192, 168, 0, 1);
+    IPLocator::setWan(locator, g_test_wan_address);
+    list1.push_back(locator);
+    locator2.kind = LOCATOR_KIND_TCPv4;
+    locator2.port = g_default_port + 1;
+    IPLocator::setIPv4(locator2, 192, 168, 0, 1);
+    IPLocator::setWan(locator2, g_test_wan_address);
+    list1.push_back(locator2);
+
+    // Open connections (fake)
+    openConn1.port = g_default_port;
+    openConn2.port = g_default_port + 1;
+    IPLocator::setIPv4(openConn1, g_test_wan_address);
+    IPLocator::setIPv4(openConn2, g_test_wan_address);
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn1);
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn2);
+
+    result = transportUnderTest.ShrinkLocatorLists({ list1 });
+    ASSERT_EQ(result.size(), 2u);
+    for (auto it = result.begin(); it != result.end(); ++it)
+    {
+        ASSERT_TRUE(*it == locator || *it == locator2);
+    }
+
+    list1.clear();
+
+    //Shrink two WAN Adresses ( Same as mine ) With different LAN Address and same Logical Port and same Physical Port and return both.
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    IPLocator::setIPv4(locator, 192, 168, 0, 1);
+    IPLocator::setWan(locator, g_test_wan_address);
+    list1.push_back(locator);
+    locator2.kind = LOCATOR_KIND_TCPv4;
+    locator2.port = g_default_port;
+    IPLocator::setIPv4(locator2, 192, 168, 0, 2);
+    IPLocator::setWan(locator2, g_test_wan_address);
+    list1.push_back(locator2);
+
+    // Open connections (fake)
+    openConn1.port = g_default_port;
+    IPLocator::setIPv4(openConn1, g_test_wan_address);
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn1);
+
+    result = transportUnderTest.ShrinkLocatorLists({ list1 });
+    ASSERT_EQ(result.size(), 2u);
+    for (auto it = result.begin(); it != result.end(); ++it)
+    {
+        ASSERT_TRUE(*it == locator || *it == locator2);
+    }
+
+    list1.clear();
+    send_resource_list.clear();
+
+    //Shrink two WAN Adresses ( different than mine ) With different LAN Address and same Logical Port and same Physical Port and return both.
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    IPLocator::setIPv4(locator, 192, 168, 0, 1);
+    IPLocator::setWan(locator, "88.88.88.90");
+    list1.push_back(locator);
+    locator2.kind = LOCATOR_KIND_TCPv4;
+    locator2.port = g_default_port;
+    IPLocator::setIPv4(locator2, 192, 168, 0, 2);
+    IPLocator::setWan(locator2, "88.88.88.90");
+    list1.push_back(locator2);
+
+    // Open connections (fake)
+    openConn1.port = g_default_port;
+    IPLocator::setIPv4(openConn1, "88.88.88.90");
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn1);
+
+    result = transportUnderTest.ShrinkLocatorLists({ list1 });
+    ASSERT_EQ(result.size(), 2u);
+    for (auto it = result.begin(); it != result.end(); ++it)
+    {
+        ASSERT_TRUE(*it == locator || *it == locator2);
+    }
+
+    list1.clear();
+    send_resource_list.clear();
+
+    //Shrink two WAN Adresses ( different than mine ) With same LAN Address and same Logical Port and same Physical Port and return only one.
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    IPLocator::setIPv4(locator, 192, 168, 0, 1);
+    IPLocator::setWan(locator, "88.88.88.90");
+    list1.push_back(locator);
+    locator2.kind = LOCATOR_KIND_TCPv4;
+    locator2.port = g_default_port;
+    IPLocator::setIPv4(locator2, 192, 168, 0, 1);
+    IPLocator::setWan(locator2, "88.88.88.90");
+    list1.push_back(locator2);
+
+    // Open connections (fake)
+    openConn1.port = g_default_port;
+    IPLocator::setIPv4(openConn1, "88.88.88.90");
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn1);
+
+    result = transportUnderTest.ShrinkLocatorLists({ list1 });
+    ASSERT_EQ(result.size(), 1u);
+    ASSERT_TRUE(*result.begin() == locator);
+
+    list1.clear();
+    send_resource_list.empty();
+
+    //Shrink two WAN Adresses ( different than mine ) With same LAN Address and different Logical Port and same Physical Port and return both.
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    IPLocator::setIPv4(locator, 192, 168, 0, 1);
+    IPLocator::setWan(locator, "88.88.88.90");
+    IPLocator::setLogicalPort(locator, 3333);
+    list1.push_back(locator);
+    locator2.kind = LOCATOR_KIND_TCPv4;
+    locator2.port = g_default_port;
+    IPLocator::setIPv4(locator2, 192, 168, 0, 1);
+    IPLocator::setWan(locator2, "88.88.88.90");
+    IPLocator::setLogicalPort(locator2, 4444);
+    list1.push_back(locator2);
+
+    // Open connections (fake)
+    openConn1.port = g_default_port;
+    IPLocator::setIPv4(openConn1, "88.88.88.90");
+    transportUnderTest.OpenOutputChannel(send_resource_list, openConn1);
+
+    result = transportUnderTest.ShrinkLocatorLists({ list1 });
+    ASSERT_EQ(result.size(), 2u);
+    for (auto it = result.begin(); it != result.end(); ++it)
+    {
+        ASSERT_TRUE(*it == locator || *it == locator2);
+    }
+
+    list1.clear();
+    send_resource_list.clear();
+}
+
 void TCPv4Tests::HELPER_SetDescriptorDefaults()
 {
     descriptor.add_listener_port(g_default_port);
@@ -1305,7 +1451,7 @@ void TCPv4Tests::HELPER_SetDescriptorDefaults()
 
 int main(int argc, char **argv)
 {
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Info);
+    Log::SetVerbosity(Log::Info);
     g_default_port = get_port(4000);
     g_output_port = get_port(5000);
     g_input_port = get_port(5010);

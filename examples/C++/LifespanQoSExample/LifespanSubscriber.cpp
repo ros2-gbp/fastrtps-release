@@ -23,6 +23,7 @@
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -33,19 +34,19 @@ LifespanSubscriber::LifespanSubscriber()
 {
 }
 
-bool LifespanSubscriber::init(
-        uint32_t lifespan_ms)
+bool LifespanSubscriber::init(uint32_t lifespan_ms)
 {
     ParticipantAttributes PParam;
-    PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PParam.rtps.builtin.domainId = 0;
+    PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
     PParam.rtps.setName("Participant_sub");
     participant_ = Domain::createParticipant(PParam);
-    if ( participant_ == nullptr )
+    if( participant_ == nullptr )
     {
         return false;
     }
 
-    Domain::registerType(participant_, &type_);
+    Domain::registerType(participant_,&type_);
 
     SubscriberAttributes Rparam;
     Rparam.topic.topicKind = NO_KEY;
@@ -57,7 +58,7 @@ bool LifespanSubscriber::init(
     Rparam.qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
     Rparam.qos.m_lifespan.duration = lifespan_ms * 1e-3;
     subscriber_ = Domain::createSubscriber(participant_, Rparam, (SubscriberListener*) &listener);
-    if ( subscriber_ == nullptr )
+    if( subscriber_ == nullptr )
     {
         return false;
     }
@@ -74,24 +75,23 @@ void LifespanSubscriber::SubListener::onSubscriptionMatched(
         Subscriber* /*sub*/,
         MatchingInfo& matching_info)
 {
-    if (matching_info.status == MATCHED_MATCHING)
+    if(matching_info.status == MATCHED_MATCHING)
     {
         n_matched++;
-        std::cout << "Subscriber matched" << std::endl;
+        std::cout << "Subscriber matched"<<std::endl;
     }
     else
     {
         n_matched--;
-        std::cout << "Subscriber unmatched" << std::endl;
+        std::cout << "Subscriber unmatched"<<std::endl;
     }
 }
 
-void LifespanSubscriber::SubListener::onNewDataMessage(
-        Subscriber* sub)
+void LifespanSubscriber::SubListener::onNewDataMessage(Subscriber* sub)
 {
-    if ( sub->readNextData((void*) &hello, &info) )
+    if( sub->readNextData((void*) &hello, &info) )
     {
-        if ( info.sampleKind == ALIVE )
+        if( info.sampleKind == ALIVE )
         {
             this->n_samples++;
 
@@ -100,26 +100,24 @@ void LifespanSubscriber::SubListener::onNewDataMessage(
     }
 }
 
-void LifespanSubscriber::run(
-        uint32_t number,
-        uint32_t sleep_ms)
+void LifespanSubscriber::run(uint32_t number, uint32_t sleep_ms)
 {
-    std::cout << "Subscriber running until " << number << " samples have been received" << std::endl;
-    while ( number > this->listener.n_samples )
+    std::cout << "Subscriber running until "<< number << " samples have been received"<<std::endl;
+    while( number > this->listener.n_samples )
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        eClock::my_sleep(500);
     }
 
     // Now wait and try to remove from history
     std::cout << std::endl << "Subscriber waiting for " << sleep_ms << " milliseconds" << std::endl << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+    eClock::my_sleep(sleep_ms);
 
     LifespanType::type data;
     SampleInfo_t info;
 
-    for ( uint32_t i = 0; i < listener.n_samples; i++ )
+    for( uint32_t i = 0; i < listener.n_samples; i++ )
     {
-        if ( subscriber_->takeNextData((void*) &data, &info) )
+        if( subscriber_->takeNextData((void*) &data, &info) )
         {
             std::cout << "Message " << data.message() << " " << data.index() << " read from history" << std::endl;
         }

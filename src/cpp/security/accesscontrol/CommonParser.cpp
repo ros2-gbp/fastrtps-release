@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <security/accesscontrol/CommonParser.h>
+#include "CommonParser.h"
 
-#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/log/Log.h>
 
 #include <cassert>
 

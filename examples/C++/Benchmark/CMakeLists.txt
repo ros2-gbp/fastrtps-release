@@ -25,10 +25,6 @@ if(NOT fastcdr_FOUND)
     find_package(fastcdr REQUIRED)
 endif()
 
-if(NOT foonathan_memory_FOUND)
-    find_package(foonathan_memory REQUIRED)
-endif()
-
 if(NOT fastrtps_FOUND)
     find_package(fastrtps REQUIRED)
 endif()
@@ -54,7 +50,7 @@ file(GLOB BENCHMARK_SOURCES_CPP "*.cpp")
 # configure_file("BenchmarkPublisher.xml" "BenchmarkPublisher.xml" COPYONLY)
 
 add_executable(Benchmark ${BENCHMARK_SOURCES_CXX} ${BENCHMARK_SOURCES_CPP})
-target_link_libraries(Benchmark fastrtps fastcdr foonathan_memory)
+target_link_libraries(Benchmark fastrtps fastcdr)
 install(TARGETS Benchmark
     RUNTIME DESTINATION examples/C++/Benchmark/${BIN_INSTALL_DIR})
 

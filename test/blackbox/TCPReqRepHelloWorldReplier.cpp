@@ -36,14 +36,9 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-TCPReqRepHelloWorldReplier::TCPReqRepHelloWorldReplier()
-    : request_listener_(*this)
-    , reply_listener_(*this)
-    , participant_(nullptr)
-    , request_subscriber_(nullptr)
-    , reply_publisher_(nullptr)
-    , initialized_(false)
-    , matched_(0)
+TCPReqRepHelloWorldReplier::TCPReqRepHelloWorldReplier(): request_listener_(*this), reply_listener_(*this),
+    participant_(nullptr), request_subscriber_(nullptr), reply_publisher_(nullptr),
+    initialized_(false), matched_(0)
 {
     // By default, memory mode is preallocated (the most restritive)
     sattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
@@ -52,26 +47,20 @@ TCPReqRepHelloWorldReplier::TCPReqRepHelloWorldReplier()
 
 TCPReqRepHelloWorldReplier::~TCPReqRepHelloWorldReplier()
 {
-    if (participant_ != nullptr)
-    {
+    if(participant_ != nullptr)
         Domain::removeParticipant(participant_);
-    }
 }
 
-void TCPReqRepHelloWorldReplier::init(
-        int participantId,
-        int domainId,
-        uint16_t listeningPort,
-        uint32_t maxInitialPeer,
-        const char* certs_path)
+void TCPReqRepHelloWorldReplier::init(int participantId, int domainId, uint16_t listeningPort,
+        uint32_t maxInitialPeer, const char* certs_path)
 {
     ParticipantAttributes pattr;
-    pattr.domainId = domainId;
+    pattr.rtps.builtin.domainId = domainId;
     pattr.rtps.participantID = participantId;
-    pattr.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
-    //pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(1, 0);
-    //pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(0, 2147483648);
-    pattr.rtps.builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(1, 0);
+    pattr.rtps.builtin.leaseDuration = c_TimeInfinite;
+    //pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(1, 0);
+    //pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(0, 2147483648);
+    pattr.rtps.builtin.leaseDuration_announcementperiod = Duration_t(1, 0);
 
     // TCP CONNECTION PEER.
     //uint32_t kind = LOCATOR_KIND_TCPv4;
@@ -110,7 +99,7 @@ void TCPReqRepHelloWorldReplier::init(
     ASSERT_NE(participant_, nullptr);
 
     // Register type
-    ASSERT_EQ(Domain::registerType(participant_, &type_), true);
+    ASSERT_EQ(Domain::registerType(participant_,&type_), true);
 
     //Create subscriber
     sattr.topic.topicKind = NO_KEY;
@@ -130,9 +119,7 @@ void TCPReqRepHelloWorldReplier::init(
     initialized_ = true;
 }
 
-void TCPReqRepHelloWorldReplier::newNumber(
-        SampleIdentity sample_identity,
-        uint16_t number)
+void TCPReqRepHelloWorldReplier::newNumber(SampleIdentity sample_identity, uint16_t number)
 {
     WriteParams wparams;
     HelloWorld hello;
@@ -142,24 +129,19 @@ void TCPReqRepHelloWorldReplier::newNumber(
     ASSERT_EQ(reply_publisher_->write((void*)&hello, wparams), true);
 }
 
-void TCPReqRepHelloWorldReplier::wait_discovery(
-        std::chrono::seconds timeout)
+void TCPReqRepHelloWorldReplier::wait_discovery(std::chrono::seconds timeout)
 {
     std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
     std::cout << "Replier waiting for discovery..." << std::endl;
 
-    if (timeout == std::chrono::seconds::zero())
+    if(timeout == std::chrono::seconds::zero())
     {
-        cvDiscovery_.wait(lock, [&](){
-            return matched_ > 1;
-        });
+        cvDiscovery_.wait(lock, [&](){return matched_ > 1;});
     }
     else
     {
-        cvDiscovery_.wait_for(lock, timeout, [&](){
-            return matched_ > 1;
-        });
+        cvDiscovery_.wait_for(lock, timeout, [&](){return matched_ > 1;});
     }
 
     std::cout << "Replier discovery phase finished" << std::endl;
@@ -169,10 +151,8 @@ void TCPReqRepHelloWorldReplier::matched()
 {
     std::unique_lock<std::mutex> lock(mutexDiscovery_);
     ++matched_;
-    if (matched_ > 1)
-    {
+    if(matched_ > 1)
         cvDiscovery_.notify_one();
-    }
 }
 
 bool TCPReqRepHelloWorldReplier::is_matched()
@@ -180,17 +160,16 @@ bool TCPReqRepHelloWorldReplier::is_matched()
     return matched_ > 1;
 }
 
-void TCPReqRepHelloWorldReplier::ReplyListener::onNewDataMessage(
-        Subscriber* sub)
+void TCPReqRepHelloWorldReplier::ReplyListener::onNewDataMessage(Subscriber *sub)
 {
     ASSERT_NE(sub, nullptr);
 
     HelloWorld hello;
     SampleInfo_t info;
 
-    if (sub->takeNextData((void*)&hello, &info))
+    if(sub->takeNextData((void*)&hello, &info))
     {
-        if (info.sampleKind == ALIVE)
+        if(info.sampleKind == ALIVE)
         {
             ASSERT_EQ(hello.message().compare("HelloWorld"), 0);
             replier_.newNumber(info.sample_identity, hello.index());

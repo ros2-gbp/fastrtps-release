@@ -25,7 +25,7 @@
 #include <vector>
 #include <string>
 
-#include <fastdds/rtps/common/Locator.h>
+#include "../rtps/common/Locator.h"
 
 namespace eprosima {
 namespace fastrtps {
@@ -54,6 +54,7 @@ class IPFinder
         typedef struct info_IP
         {
             IPTYPE type;
+            uint32_t scope_id;
             std::string name;
             std::string dev;
             Locator_t locator;

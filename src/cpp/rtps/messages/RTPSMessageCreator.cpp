@@ -17,19 +17,31 @@
  *
  */
 
-#include <fastdds/rtps/messages/RTPSMessageCreator.h>
+#include <fastrtps/rtps/messages/RTPSMessageCreator.h>
+#include <fastrtps/rtps/messages/CDRMessage.h>
+#include <fastrtps/qos/ParameterList.h>
+#include <fastrtps/utils/eClock.h>
 
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/messages/CDRMessage.h>
-
-#include <fastdds/core/policy/ParameterList.hpp>
+#include <fastrtps/log/Log.h>
 
 using namespace eprosima::fastrtps;
-using ParameterList = eprosima::fastdds::dds::ParameterList;
 
 namespace eprosima {
-namespace fastrtps {
-namespace rtps {
+namespace fastrtps{
+namespace rtps{
+
+// Auxiliary message to avoid creation of new messages each time.
+eClock g_clock;
+
+
+RTPSMessageCreator::RTPSMessageCreator() {
+
+}
+
+RTPSMessageCreator::~RTPSMessageCreator() {
+    logInfo(RTPS_CDR_MSG,"RTPSMessageCreator destructor");
+}
+
 
 bool RTPSMessageCreator::addHeader(CDRMessage_t*msg, const GuidPrefix_t& guidPrefix,
         const ProtocolVersion_t& version,const VendorId_t& vendorId)
@@ -161,7 +173,7 @@ bool RTPSMessageCreator::addSubmessageInfoDST(CDRMessage_t* msg, const GuidPrefi
 bool RTPSMessageCreator::addSubmessageInfoTS_Now(CDRMessage_t* msg,bool invalidateFlag)
 {
     Time_t time_now;
-    Time_t::now(time_now);
+    g_clock.setTimeNow(&time_now);
     return RTPSMessageCreator::addSubmessageInfoTS(msg,time_now,invalidateFlag);
 }
 }
@@ -169,7 +181,7 @@ bool RTPSMessageCreator::addSubmessageInfoTS_Now(CDRMessage_t* msg,bool invalida
 } /* namespace eprosima */
 
 
-#include <rtps/messages/submessages/DataMsg.hpp>
-#include <rtps/messages/submessages/HeartbeatMsg.hpp>
-#include <rtps/messages/submessages/AckNackMsg.hpp>
-#include <rtps/messages/submessages/GapMsg.hpp>
+#include "submessages/DataMsg.hpp"
+#include "submessages/HeartbeatMsg.hpp"
+#include "submessages/AckNackMsg.hpp"
+#include "submessages/GapMsg.hpp"

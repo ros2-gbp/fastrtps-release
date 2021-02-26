@@ -10,6 +10,8 @@
 #include <fastrtps/Domain.h>
 #include <fastrtps/subscriber/SampleInfo.h>
 
+#include <fastrtps/utils/eClock.h>
+
 #include "samplePubSubTypes.h"
 
 using namespace eprosima::fastrtps;
@@ -21,8 +23,7 @@ enum Durability_type { Transient_Local, Volatile };
 enum HistoryKind_type { Keep_Last, Keep_All };
 enum Key_type { No_Key, With_Key};
 
-typedef struct
-{
+typedef struct{
     Reliability_type reliability;
     Durability_type durability;
     HistoryKind_type historykind;
@@ -30,37 +31,35 @@ typedef struct
     uint16_t history_size;
     uint8_t depth;
     uint8_t no_keys;
-    uint16_t max_samples_per_key;
+    uint16_t max_samples_per_key; 
 } example_configuration;
 
 void pastsamples();
 
-int main()
-{
+int main(){
     pastsamples();
     return 0;
 }
 
-void pastsamples()
-{
-
+void pastsamples(){
+    
     samplePubSubType sampleType;
     sample my_sample;
     SampleInfo_t sample_info;
 
     ParticipantAttributes PparamPub;
-    PparamPub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PparamPub.rtps.builtin.domainId = 0;
+    PparamPub.rtps.builtin.leaseDuration = c_TimeInfinite;
     PparamPub.rtps.setName("PublisherParticipant");
 
-    Participant* PubParticipant = Domain::createParticipant(PparamPub);
-    if (PubParticipant == nullptr)
-    {
+    Participant *PubParticipant = Domain::createParticipant(PparamPub);
+    if(PubParticipant == nullptr){
         std::cout << " Something went wrong while creating the Publisher Participant..." << std::endl;
-        return;
+        return; 
     }
-    Domain::registerType(PubParticipant, (TopicDataType*) &sampleType);
+    Domain::registerType(PubParticipant,(TopicDataType*) &sampleType);
 
-
+    
     //Publisher config
     PublisherAttributes Pparam;
     Pparam.topic.topicDataType = sampleType.getName();
@@ -76,26 +75,25 @@ void pastsamples()
     Pparam.topic.resourceLimitsQos.max_instances = 1;
     Pparam.topic.resourceLimitsQos.max_samples_per_instance = 100;
 
-    std::cout << "Creating Publisher..." << std::endl;
-    Publisher* myPub = Domain::createPublisher(PubParticipant, Pparam, nullptr);
-    if (myPub == nullptr)
-    {
+    std::cout << "Creating Publisher..." << std::endl; 
+    Publisher *myPub= Domain::createPublisher(PubParticipant, Pparam, nullptr);
+    if(myPub == nullptr){
         std::cout << "Something went wrong while creating the Publisher..." << std::endl;
         return;
     }
-
+  
 
     ParticipantAttributes PparamSub;
-    PparamSub.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
+    PparamSub.rtps.builtin.domainId = 0;
+    PparamSub.rtps.builtin.leaseDuration = c_TimeInfinite;
     PparamSub.rtps.setName("SubscriberParticipant");
 
-    Participant* SubParticipant = Domain::createParticipant(PparamSub);
-    if (SubParticipant == nullptr)
-    {
+    Participant *SubParticipant = Domain::createParticipant(PparamSub);
+    if(SubParticipant == nullptr){
         std::cout << " Something went wrong while creating the Subscriber Participant..." << std::endl;
         return;
     }
-    Domain::registerType(SubParticipant, (TopicDataType*) &sampleType);
+    Domain::registerType(SubParticipant,(TopicDataType*) &sampleType);
 
     //Keep All Sub
     SubscriberAttributes Rparam;
@@ -113,9 +111,8 @@ void pastsamples()
     Rparam.topic.resourceLimitsQos.max_samples_per_instance = 100;
 
     std::cout << "Creating Keep All Subscriber..." << std::endl;
-    Subscriber* mySub1 = Domain::createSubscriber(PubParticipant, Rparam, nullptr);
-    if (myPub == nullptr)
-    {
+    Subscriber *mySub1= Domain::createSubscriber(PubParticipant, Rparam, nullptr);
+    if(myPub == nullptr){
         std::cout << "something went wrong while creating the Transient Local Subscriber..." << std::endl;
         return;
     }
@@ -136,34 +133,30 @@ void pastsamples()
     Rparam2.topic.resourceLimitsQos.max_samples_per_instance = 100;
 
     std::cout << "Creating Keep Last Subscriber with depth 10..." << std::endl;
-    Subscriber* mySub2 = Domain::createSubscriber(PubParticipant, Rparam2, nullptr);
-    if (myPub == nullptr)
-    {
+    Subscriber *mySub2= Domain::createSubscriber(PubParticipant, Rparam2, nullptr);
+    if(myPub == nullptr){
         std::cout << "something went wrong while creating the Volatile Subscriber..." << std::endl;
         return;
     }
-
+    
     //Send 20 samples
     std::cout << "Publishing 20 samples on the topic..." << std::endl;
-    for (uint8_t j = 0; j < 20; j++)
-    {
-        my_sample.index(j + 1);
+    for(uint8_t j=0; j < 20; j++){
+        my_sample.index(j+1); 
         my_sample.key_value(1);
         myPub->write(&my_sample);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    eClock::my_sleep(1500);
 
     //Read the contents of both histories:
-    std::cout << "The Keep All Subscriber holds: " << std::endl;
-    while (mySub1->readNextData(&my_sample, &sample_info))
-    {
+        std::cout << "The Keep All Subscriber holds: " << std::endl;
+    while(mySub1->readNextData(&my_sample, &sample_info)){
         std::cout << std::to_string(my_sample.index()) << " ";
     }
     std::cout << std::endl;
     std::cout << "The Keep Last (Depth 10) Subscriber holds: " << std::endl;
-    while (mySub2->readNextData(&my_sample, &sample_info))
-    {
+    while(mySub2->readNextData(&my_sample, &sample_info)){
         std::cout << std::to_string(my_sample.index()) << " ";
     }
     std::cout << std::endl;
@@ -171,3 +164,5 @@ void pastsamples()
     Domain::removeParticipant(PubParticipant);
     Domain::removeParticipant(SubParticipant);
 }
+
+

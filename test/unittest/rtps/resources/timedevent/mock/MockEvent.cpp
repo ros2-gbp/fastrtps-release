@@ -14,70 +14,72 @@
 
 #include "MockEvent.h"
 
-using namespace eprosima::fastrtps::rtps;
+int MockEvent::destructed_ = 0;
+std::mutex MockEvent::destruction_mutex_;
+std::condition_variable MockEvent::destruction_cond_;
 
-MockEvent::MockEvent(
-        eprosima::fastrtps::rtps::ResourceEvent& service,
-        double milliseconds,
-        bool autorestart)
-    : successed_(0)
-    , sem_count_(0)
-    , autorestart_(autorestart)
-    , event_(service, std::bind(&MockEvent::callback, this), milliseconds)
+MockEvent::MockEvent(asio::io_service& service, const std::thread& event_thread, double milliseconds, bool autorestart, TimedEvent::AUTODESTRUCTION_MODE autodestruction) :
+    TimedEvent(service, event_thread, milliseconds, autodestruction), successed_(0), cancelled_(0), sem_count_(0), autorestart_(autorestart)
 {
 }
 
 MockEvent::~MockEvent()
 {
+    destroy();
+
+    destruction_mutex_.lock();
+    ++destructed_;
+    destruction_mutex_.unlock();
+    destruction_cond_.notify_one();
 }
 
-bool MockEvent::callback()
+void MockEvent::event(EventCode code, const char* msg)
 {
-    bool restart = false;
+    (void)msg;
 
-    successed_.fetch_add(1, std::memory_order_relaxed);
-
-    if(autorestart_)
+    if(code == EventCode::EVENT_SUCCESS)
     {
-        restart = true;
+        successed_.fetch_add(1, std::memory_order_relaxed);
+
+        if(autorestart_)
+        {
+            restart_timer();
+        }
+    }
+    else if(code == EventCode::EVENT_ABORT)
+    {
+        cancelled_.fetch_add(1, std::memory_order_relaxed);
     }
 
     sem_mutex_.lock();
     ++sem_count_;
     sem_mutex_.unlock();
     sem_cond_.notify_one();
-
-    return restart;
 }
 
 void MockEvent::wait()
 {
     std::unique_lock<std::mutex> lock(sem_mutex_);
 
-    sem_cond_.wait(lock, [&]() -> bool { return sem_count_ != 0; } );
-
-    --sem_count_;
-}
-
-void MockEvent::wait_success()
-{
-    std::unique_lock<std::mutex> lock(sem_mutex_);
-
-    while (successed_.load(std::memory_order_relaxed) == 0)
+    if(sem_count_ == 0)
     {
         sem_cond_.wait(lock, [&]() -> bool { return sem_count_ != 0; } );
-        --sem_count_;
     }
+
+    --sem_count_;
 }
 
 bool MockEvent::wait(unsigned int milliseconds)
 {
     std::unique_lock<std::mutex> lock(sem_mutex_);
 
-    if(!sem_cond_.wait_for(lock, std::chrono::milliseconds(milliseconds),
-                [&]() -> bool { return sem_count_ != 0; } ))
+    if(sem_count_ == 0)
     {
-        return false;
+        if(!sem_cond_.wait_for(lock, std::chrono::milliseconds(milliseconds),
+                    [&]() -> bool { return sem_count_ != 0; } ))
+        {
+            return false;
+        }
     }
 
     --sem_count_;

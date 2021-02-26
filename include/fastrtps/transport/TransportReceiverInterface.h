@@ -15,13 +15,32 @@
 #ifndef TRANSPORT_RECEIVER_INTERFACE_H
 #define TRANSPORT_RECEIVER_INTERFACE_H
 
-#include <fastdds/rtps/transport/TransportReceiverInterface.h>
+#include "../rtps/common/Locator.h"
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-using TransportReceiverInterface = fastdds::rtps::TransportReceiverInterface;
+/**
+ * Interface against which to implement a data receiver, decoupled from transport internals.
+ * @ingroup TRANSPORT_MODULE
+ * */
+class TransportReceiverInterface
+{
+public:
+
+    virtual ~TransportReceiverInterface() = default;
+
+    /**
+     * Method to be called by the transport when receiving data.
+     * @param data Pointer to the received data.
+     * @param size Number of bytes received.
+     * @param localLocator Locator identifying the local endpoint.
+     * @param remote_locator Locator identifying the remote endpoint.
+     */
+    virtual void OnDataReceived(const octet* data, const uint32_t size,
+        const Locator_t& localLocator, const Locator_t& remote_locator) = 0;
+};
 
 } // namespace rtps
 } // namespace fastrtps

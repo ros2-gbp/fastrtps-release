@@ -25,9 +25,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         include_directories(${ASIO_INCLUDE_DIR})
 
         set(SOURCES_SECURITY_TEST_SOURCE
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/security/logging/Logging.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/log/StdoutConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEvent.cpp
@@ -35,30 +34,20 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/ResourceEvent.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Token.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/qos/ReaderQos.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/publisher/qos/WriterQos.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/exceptions/Exception.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/security/SecurityManager.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/security/exceptions/SecurityException.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/security/timedevent/HandshakeMessageTokenResent.cpp
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/SecurityPluginFactory/rtps/security/SecurityPluginFactory.cpp
             )
 
         add_executable(SecurityAuthentication ${SOURCES_SECURITY_TEST_SOURCE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/SecurityTests.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/SecurityInitializationTests.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/SecurityValidationRemoteTests.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/SecurityHandshakeProcessTests.cpp)
-
-        if(WIN32)
-            set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/SecurityHandshakeProcessTests.cpp PROPERTIES COMPILE_OPTIONS /bigobj)
-            set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/SecurityValidationRemoteTests.cpp PROPERTIES COMPILE_OPTIONS /bigobj)
-        endif()
-
         target_compile_definitions(SecurityAuthentication PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(SecurityAuthentication PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
-            ${OPENSSL_INCLUDE_DIR}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/SecurityPluginFactory
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
@@ -75,16 +64,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReaderProxyData
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/WriterProxyData
-            ${PROJECT_SOURCE_DIR}/test/mock/dds/QosPolicies
-            ${PROJECT_SOURCE_DIR}/test/mock/rtps/NetworkFactory
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(SecurityAuthentication fastcdr
-            ${GTEST_LIBRARIES}
-            ${GMOCK_LIBRARIES}
-            ${OPENSSL_LIBRARIES}
-            )
+        target_link_libraries(SecurityAuthentication ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES})
         add_gtest(SecurityAuthentication
             SOURCES
             ${CMAKE_CURRENT_SOURCE_DIR}/SecurityInitializationTests.cpp

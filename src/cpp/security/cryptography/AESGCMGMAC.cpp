@@ -21,7 +21,7 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
-#include <security/cryptography/AESGCMGMAC.h>
+#include "AESGCMGMAC.h"
 
 using namespace eprosima::fastrtps::rtps::security;
 

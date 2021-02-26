@@ -17,10 +17,10 @@
  *
  */
 
-#include <fastdds/rtps/writer/StatelessPersistentWriter.h>
-#include <fastdds/rtps/history/WriterHistory.h>
-#include <rtps/persistence/PersistenceService.h>
-#include <fastrtps_deprecated/participant/ParticipantImpl.h>
+#include <fastrtps/rtps/writer/StatelessPersistentWriter.h>
+#include <fastrtps/rtps/history/WriterHistory.h>
+#include "../persistence/PersistenceService.h"
+#include "../participant/RTPSParticipantImpl.h"
 
 namespace eprosima {
 namespace fastrtps{
@@ -28,7 +28,7 @@ namespace rtps {
 
 
  StatelessPersistentWriter::StatelessPersistentWriter(RTPSParticipantImpl* pimpl,GUID_t& guid,
-        WriterAttributes& att,WriterHistory* hist,WriterListener* listen,
+        WriterAttributes& att,WriterHistory* hist,WriterListener* listen, 
      IPersistenceService* persistence):
      StatelessWriter(pimpl,guid,att,hist,listen),
      PersistentWriter(guid,att,hist,persistence)
@@ -45,7 +45,7 @@ namespace rtps {
 
 void StatelessPersistentWriter::unsent_change_added_to_history(
         CacheChange_t* cptr,
-        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
+        std::chrono::time_point<std::chrono::steady_clock> max_blocking_time)
 {
     add_persistent_change(cptr);
     StatelessWriter::unsent_change_added_to_history(cptr, max_blocking_time);

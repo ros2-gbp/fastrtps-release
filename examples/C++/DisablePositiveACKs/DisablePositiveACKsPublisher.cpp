@@ -23,6 +23,7 @@
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 
 #include <thread>
 
@@ -106,7 +107,7 @@ void DisablePositiveACKsPublisher::run(
         {
             std::cout << "Message with index: " << hello_.index() << " SENT" << std::endl;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(write_sleep_ms));
+        eClock::my_sleep(write_sleep_ms);
     }
 
     std::cout << "Please press enter to stop the Publisher" << std::endl;

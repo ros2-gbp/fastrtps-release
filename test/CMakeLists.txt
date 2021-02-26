@@ -17,13 +17,11 @@ check_gtest()
 check_gmock()
 
 option(PERFORMANCE_TESTS "Activate the building and execution of performance tests" OFF)
-option(SYSTEM_TESTS "Activate the building and execution of system tests" OFF)
 option(PROFILING_TESTS "Activate the building and execution of profiling tests" OFF)
 option(EPROSIMA_BUILD_TESTS "Activate the building and execution unit tests and integral tests" OFF)
 
 if(EPROSIMA_BUILD AND NOT EPROSIMA_INSTALLER AND NOT EPROSIMA_INSTALLER_MINION)
     set(EPROSIMA_BUILD_TESTS ON)
-    set(SYSTEM_TESTS ON)
 endif()
 
 file(TO_CMAKE_PATH "${PROJECT_SOURCE_DIR}/valgrind.supp" MEMORYCHECK_SUPPRESSIONS_FILE_TMP)
@@ -36,8 +34,6 @@ if(EPROSIMA_BUILD_TESTS AND IS_TOP_LEVEL AND NOT EPROSIMA_INSTALLER)
     add_subdirectory(blackbox)
     add_subdirectory(communication)
     add_subdirectory(unittest)
-    add_subdirectory(xtypes)
-    add_subdirectory(dds/communication)
 
     if(UNIX AND NOT APPLE AND STRICT_REALTIME)
         add_subdirectory(realtime)
@@ -59,11 +55,4 @@ endif()
 ###############################################################################
 if(PERFORMANCE_TESTS)
     add_subdirectory(performance)
-endif()
-
-###############################################################################
-# System tests
-###############################################################################
-if(SYSTEM_TESTS)
-    add_subdirectory(system/tools/fastdds)
 endif()

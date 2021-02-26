@@ -19,12 +19,12 @@
 #ifndef _SECURITY_AUTHENTICATION_AESGCMGMAC_TRANSFORM_H_
 #define _SECURITY_AUTHENTICATION_AESGCMGMAC_TRANSFORM_H_
 
-#include <fastdds/rtps/security/cryptography/CryptoTransform.h>
-#include <fastdds/rtps/attributes/PropertyPolicy.h>
+#include <fastrtps/rtps/security/cryptography/CryptoTransform.h>
+#include <fastrtps/rtps/attributes/PropertyPolicy.h>
 #include <fastcdr/Cdr.h>
 
 #include <map>
-#include <security/cryptography/AESGCMGMAC_Types.h>
+#include "AESGCMGMAC_Types.h"
 
 namespace eprosima {
 namespace fastrtps {
@@ -111,7 +111,7 @@ class AESGCMGMAC_Transform : public CryptoTransform
         const std::array<uint8_t, 32>& master_key, 
         const std::array<uint8_t, 32>& master_salt, 
         const uint32_t session_id, 
-        int key_len);
+        int key_len = 32);
 
     void compute_sessionkey(
         std::array<uint8_t, 32>& session_key, 
@@ -154,7 +154,7 @@ class AESGCMGMAC_Transform : public CryptoTransform
 
     bool deserialize_SecureDataBody(eprosima::fastcdr::Cdr& decoder,
             eprosima::fastcdr::Cdr::state& body_state, SecureDataTag& tag, uint32_t body_length,
-            const std::array<uint8_t, 4>& transformation_kind,
+            const std::array<uint8_t, 4> transformation_kind,
             const std::array<uint8_t,32>& session_key, const std::array<uint8_t, 12>& initialization_vector,
             octet* plain_buffer, uint32_t& plain_buffer_len);
 

@@ -25,8 +25,8 @@
 
 #include "BasicPubSubTypes.h"
 
-using SerializedPayload_t = eprosima::fastrtps::rtps::SerializedPayload_t;
-using InstanceHandle_t = eprosima::fastrtps::rtps::InstanceHandle_t;
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 
 

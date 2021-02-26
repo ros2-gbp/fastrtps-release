@@ -17,9 +17,64 @@
  *
  */
 
-#ifndef _RTPS_RESOURCES_RESOURCEEVENT_H_
-#define _RTPS_RESOURCES_RESOURCEEVENT_H_
+#ifndef RESOURCEEVENT_H_
+#define RESOURCEEVENT_H_
+#ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <fastdds/rtps/resources/ResourceEvent.h>
+#include <thread>
+#include <asio.hpp>
 
-#endif //_RTPS_RESOURCES_RESOURCEEVENT_H_
+namespace eprosima {
+namespace fastrtps{
+namespace rtps {
+
+class RTPSParticipantImpl;
+
+/**
+ * Class ResourceEvent used to manage the temporal events.
+ *@ingroup MANAGEMENT_MODULE
+ */
+class ResourceEvent {
+public:
+	ResourceEvent();
+	virtual ~ResourceEvent();
+
+    /**
+    * Method to initialize the thread.
+    * @param p
+    */
+    void init_thread(RTPSParticipantImpl*p);
+
+	/**
+	* Get the associated IO service
+	* @return Associated IO service
+	*/
+	asio::io_service& getIOService() { return *mp_io_service; }
+
+    std::thread& getThread() { return *mp_b_thread; }
+
+private:
+
+	//!Thread
+	std::thread* mp_b_thread;
+	//!IO service
+	asio::io_service* mp_io_service;
+	//!
+	void * mp_work;
+
+	/**
+	 * Task to announce the correctness of the thread.
+	 */
+	void announce_thread();
+
+	//!Method to run the tasks
+	void run_io_service();
+
+	//!Pointer to the RTPSParticipantImpl.
+	RTPSParticipantImpl* mp_RTPSParticipantImpl;
+};
+}
+}
+} /* namespace eprosima */
+#endif
+#endif /* RESOURCEEVENT_H_ */

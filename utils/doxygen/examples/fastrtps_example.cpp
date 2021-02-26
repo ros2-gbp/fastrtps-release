@@ -21,9 +21,6 @@
  *              grcanosa@gmail.com
  */
 
-using std::cout;
-using std::endl;
-
 using namespace eprosima::pubsub;
 using namespace eprosima::rtps;
 
@@ -243,3 +240,5 @@ MyListener listen;
 ParticipantAttributes patt;
 RTPSParticipant* p = RTPSDomain::createRTPSParticipant(patt,(RTPSParticipantListener*)&listen);
 //! [ex_RTPSParticipantCreation]
+
+

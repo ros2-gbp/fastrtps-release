@@ -38,10 +38,11 @@ LIBS = -lfastcdr -lfastrtps $(shell test -x "$$(which pkg-config)" && pkg-config
 
 DIRECTORIES= output.dir bin.dir
 
-all: $(DIRECTORIES) ConfigurabilityPub ConfigurabilitySub
+all: $(DIRECTORIES) ConfigurabilityPub ConfigurabilitySub ConfigurabilityLauncher
 
 CONFPUB_TARGET= bin/UseCasePublisher
 CONFSUB_TARGET= bin/UseCaseSubscriber
+CONFLAUNCHER_TARGET= bin/UseCaseLauncher
 
 CONFIGURABILITY_SRC_CXXFILES=
 
@@ -52,10 +53,12 @@ CONFIGURABILITY_SRCS= $(CONFIGURABILITY_SRC_CXXFILES) $(CONFIGURABILITY_SRC_CPPF
 
 PUB_SRC_CPPFILE= Configurability/UseCasePublisher.cpp
 SUB_SRC_CPPFILE= Configurability/UseCaseSubscriber.cpp
+LAUNCHER_SRC_CPPFILE= Configurability/UseCaseLauncher.cpp
 
 # Project sources are copied to the current directory
 CONFPUB_SRCS= $(CONFIGURABILITY_SRC_CPPFILES) $(PUB_SRC_CPPFILE)
 CONFSUB_SRCS= $(CONFIGURABILITY_SRC_CPPFILES) $(SUB_SRC_CPPFILE)
+LAUNCHER_SRCS= $(CONFIGURABILITY_SRC_CPPFILES) $(LAUNCHER_SRC_CPPFILE)
 
 # Source directories
 CONFPUB_SOURCES_DIRS_AUX= $(foreach srcdir, $(dir $(CONFPUB_SRCS)), $(srcdir))
@@ -70,13 +73,22 @@ CONFSUB_SOURCES_DIRS= $(shell echo $(CONFSUB_SOURCES_DIRS_AUX) | tr " " "\n" | s
 CONFSUB_OBJS = $(foreach obj,$(notdir $(addsuffix .o, $(CONFSUB_SRCS))), output/$(obj))
 CONFSUB_DEPS = $(foreach dep,$(notdir $(addsuffix .d, $(CONFSUB_SRCS))), output/$(dep))
 
-ALL_SOURCE_DIRS = $(CONFPUB_SOURCES_DIRS) $(CONFSUB_SOURCES_DIRS)
+LAUNCHER_SOURCES_DIRS_AUX= $(foreach srcdir, $(dir $(LAUNCHER_SRCS)), $(srcdir))
+LAUNCHER_SOURCES_DIRS= $(shell echo $(LAUNCHER_SOURCES_DIRS_AUX) | tr " " "\n" | sort | uniq | tr "\n" " ")
+
+LAUNCHER_OBJS = $(foreach obj,$(notdir $(addsuffix .o, $(LAUNCHER_SRCS))), output/$(obj))
+LAUNCHER_DEPS = $(foreach dep,$(notdir $(addsuffix .d, $(LAUNCHER_SRCS))), output/$(dep))
+
+ALL_SOURCE_DIRS = $(CONFPUB_SOURCES_DIRS) $(CONFSUB_SOURCES_DIRS) $(LAUNCHER_SOURCES_DIRS)
 
 OBJS+=  $(CONFPUB_OBJS)
 DEPS+=  $(CONFPUB_DEPS)
 
 OBJS+=  $(CONFSUB_OBJS)
 DEPS+=  $(CONFSUB_DEPS)
+
+OBJS+=  $(LAUNCHER_OBJS)
+DEPS+=  $(LAUNCHER_DEPS)
 
 ConfigurabilityPub: $(CONFPUB_TARGET)
 
@@ -87,6 +99,11 @@ ConfigurabilitySub: $(CONFSUB_TARGET)
 
 $(CONFSUB_TARGET): $(CONFSUB_OBJS)
 	$(LN) $(LDFLAGS) -o $(CONFSUB_TARGET) $(CONFSUB_OBJS) $(LIBS)
+
+ConfigurabilityLauncher: $(CONFLAUNCHER_TARGET)
+
+$(CONFLAUNCHER_TARGET): $(LAUNCHER_OBJS)
+	$(LN) $(LDFLAGS) -o $(CONFLAUNCHER_TARGET) $(LAUNCHER_OBJS) $(LIBS)
 
 
 vpath %.cxx $(ALL_SOURCE_DIRS)
@@ -104,7 +121,7 @@ output/%.cpp.o:%.cpp
 	@echo Compiling $<
 	@$(CPP) $(CFLAGS) $(INCLUDES) $< -o $@
 
-.PHONY: ConfigurabilityPub ConfigurabilitySub
+.PHONY: ConfigurabilityPub ConfigurabilitySub ConfigurabilityLauncher
 
 clean:
 	@rm -f $(OBJS)

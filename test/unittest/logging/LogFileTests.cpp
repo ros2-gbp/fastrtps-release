@@ -13,15 +13,15 @@
 // limitations under the License.
 //
 
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/dds/log/FileConsumer.hpp>
+#include <fastrtps/log/Log.h>
+#include <fastrtps/log/FileConsumer.h>
 #include <gtest/gtest.h>
 #include <memory>
 #include <thread>
 #include <chrono>
 #include <sstream>
 
-using namespace eprosima::fastdds::dds;
+using namespace eprosima::fastrtps;
 using namespace std;
 
 TEST(LogFileTests, file_consumer)

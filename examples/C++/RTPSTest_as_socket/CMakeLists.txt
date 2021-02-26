@@ -25,10 +25,6 @@ if(NOT fastcdr_FOUND)
     find_package(fastcdr REQUIRED)
 endif()
 
-if(NOT foonathan_memory_FOUND)
-    find_package(foonathan_memory REQUIRED)
-endif()
-
 if(NOT fastrtps_FOUND)
     find_package(fastrtps REQUIRED)
 endif()
@@ -49,7 +45,7 @@ message(STATUS "Configuring RTPSTest_as_socket...")
 file(GLOB RTPSTESTASSOCKET_SOURCES "*.cpp")
 
 add_executable(RTPSTest_as_socket ${RTPSTESTASSOCKET_SOURCES})
-target_link_libraries(RTPSTest_as_socket fastrtps fastcdr foonathan_memory)
+target_link_libraries(RTPSTest_as_socket fastrtps fastcdr)
 install(TARGETS RTPSTest_as_socket
     RUNTIME DESTINATION examples/C++/RTPSTest_as_socket/${BIN_INSTALL_DIR}
     )

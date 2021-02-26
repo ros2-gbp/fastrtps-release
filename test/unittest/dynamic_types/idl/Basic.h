@@ -63,7 +63,6 @@ namespace eprosima
     }
 }
 
-
 /*!
  * @brief This class represents the enumeration MyEnum defined by the user in the IDL file.
  * @ingroup BASIC
@@ -92,7 +91,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~EnumStruct();
+    eProsima_user_DllExport virtual ~EnumStruct();
 
     /*!
      * @brief Copy constructor.
@@ -135,7 +134,6 @@ public:
      * @return Reference to member my_enum
      */
     eProsima_user_DllExport MyEnum& my_enum();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -206,7 +204,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~AliasStruct();
+    eProsima_user_DllExport virtual ~AliasStruct();
 
     /*!
      * @brief Copy constructor.
@@ -249,7 +247,6 @@ public:
      * @return Reference to member my_alias
      */
     eProsima_user_DllExport MyAliasEnum& my_alias();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -320,7 +317,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~AliasAliasStruct();
+    eProsima_user_DllExport virtual ~AliasAliasStruct();
 
     /*!
      * @brief Copy constructor.
@@ -363,7 +360,6 @@ public:
      * @return Reference to member my_alias_alias
      */
     eProsima_user_DllExport MyAliasAliasEnum& my_alias_alias();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -434,7 +430,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~BoolStruct();
+    eProsima_user_DllExport virtual ~BoolStruct();
 
     /*!
      * @brief Copy constructor.
@@ -477,7 +473,6 @@ public:
      * @return Reference to member my_bool
      */
     eProsima_user_DllExport bool& my_bool();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -548,7 +543,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~OctetStruct();
+    eProsima_user_DllExport virtual ~OctetStruct();
 
     /*!
      * @brief Copy constructor.
@@ -591,7 +586,6 @@ public:
      * @return Reference to member my_octet
      */
     eProsima_user_DllExport uint8_t& my_octet();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -662,7 +656,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~ShortStruct();
+    eProsima_user_DllExport virtual ~ShortStruct();
 
     /*!
      * @brief Copy constructor.
@@ -705,7 +699,6 @@ public:
      * @return Reference to member my_int16
      */
     eProsima_user_DllExport int16_t& my_int16();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -776,7 +769,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~LongStruct();
+    eProsima_user_DllExport virtual ~LongStruct();
 
     /*!
      * @brief Copy constructor.
@@ -819,7 +812,6 @@ public:
      * @return Reference to member my_int32
      */
     eProsima_user_DllExport int32_t& my_int32();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -890,7 +882,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~LongLongStruct();
+    eProsima_user_DllExport virtual ~LongLongStruct();
 
     /*!
      * @brief Copy constructor.
@@ -933,7 +925,6 @@ public:
      * @return Reference to member my_int64
      */
     eProsima_user_DllExport int64_t& my_int64();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1004,7 +995,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~UShortStruct();
+    eProsima_user_DllExport virtual ~UShortStruct();
 
     /*!
      * @brief Copy constructor.
@@ -1047,7 +1038,6 @@ public:
      * @return Reference to member my_uint16
      */
     eProsima_user_DllExport uint16_t& my_uint16();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1118,7 +1108,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~ULongStruct();
+    eProsima_user_DllExport virtual ~ULongStruct();
 
     /*!
      * @brief Copy constructor.
@@ -1161,7 +1151,6 @@ public:
      * @return Reference to member my_uint32
      */
     eProsima_user_DllExport uint32_t& my_uint32();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1232,7 +1221,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~ULongLongStruct();
+    eProsima_user_DllExport virtual ~ULongLongStruct();
 
     /*!
      * @brief Copy constructor.
@@ -1275,7 +1264,6 @@ public:
      * @return Reference to member my_uint64
      */
     eProsima_user_DllExport uint64_t& my_uint64();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1346,7 +1334,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~FloatStruct();
+    eProsima_user_DllExport virtual ~FloatStruct();
 
     /*!
      * @brief Copy constructor.
@@ -1389,7 +1377,6 @@ public:
      * @return Reference to member my_float32
      */
     eProsima_user_DllExport float& my_float32();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1460,7 +1447,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~DoubleStruct();
+    eProsima_user_DllExport virtual ~DoubleStruct();
 
     /*!
      * @brief Copy constructor.
@@ -1503,7 +1490,6 @@ public:
      * @return Reference to member my_float64
      */
     eProsima_user_DllExport double& my_float64();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1574,7 +1560,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~LongDoubleStruct();
+    eProsima_user_DllExport virtual ~LongDoubleStruct();
 
     /*!
      * @brief Copy constructor.
@@ -1617,7 +1603,6 @@ public:
      * @return Reference to member my_float128
      */
     eProsima_user_DllExport long double& my_float128();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1688,7 +1673,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~CharStruct();
+    eProsima_user_DllExport virtual ~CharStruct();
 
     /*!
      * @brief Copy constructor.
@@ -1731,7 +1716,6 @@ public:
      * @return Reference to member my_char
      */
     eProsima_user_DllExport char& my_char();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1802,7 +1786,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~WCharStruct();
+    eProsima_user_DllExport virtual ~WCharStruct();
 
     /*!
      * @brief Copy constructor.
@@ -1845,7 +1829,6 @@ public:
      * @return Reference to member my_wchar
      */
     eProsima_user_DllExport wchar_t& my_wchar();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1916,7 +1899,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~StringStruct();
+    eProsima_user_DllExport virtual ~StringStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2035,7 +2018,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~WStringStruct();
+    eProsima_user_DllExport virtual ~WStringStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2154,7 +2137,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~LargeStringStruct();
+    eProsima_user_DllExport virtual ~LargeStringStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2273,7 +2256,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~LargeWStringStruct();
+    eProsima_user_DllExport virtual ~LargeWStringStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2392,7 +2375,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~ArraytStruct();
+    eProsima_user_DllExport virtual ~ArraytStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2512,7 +2495,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~ArrayArrayStruct();
+    eProsima_user_DllExport virtual ~ArrayArrayStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2631,7 +2614,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~SequenceStruct();
+    eProsima_user_DllExport virtual ~SequenceStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2750,7 +2733,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~SequenceSequenceStruct();
+    eProsima_user_DllExport virtual ~SequenceSequenceStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2869,7 +2852,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~MapStruct();
+    eProsima_user_DllExport virtual ~MapStruct();
 
     /*!
      * @brief Copy constructor.
@@ -2988,7 +2971,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~MapMapStruct();
+    eProsima_user_DllExport virtual ~MapMapStruct();
 
     /*!
      * @brief Copy constructor.
@@ -3146,6 +3129,12 @@ public:
     eProsima_user_DllExport char a() const;
 
     /*!
+     * @brief This function returns a reference to member a
+     * @return Reference to member a
+     */
+    //eProsima_user_DllExport char& a();
+
+    /*!
      * @brief This function sets a value in member b
      * @param _b New value for member b
      */
@@ -3156,6 +3145,12 @@ public:
      * @return Value of member b
      */
     eProsima_user_DllExport uint32_t b() const;
+
+    /*!
+     * @brief This function returns a reference to member b
+     * @return Reference to member b
+     */
+    //eProsima_user_DllExport uint32_t& b();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -3208,7 +3203,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~BitsetStruct();
+    eProsima_user_DllExport virtual ~BitsetStruct();
 
     /*!
      * @brief Copy constructor.
@@ -3327,7 +3322,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~StructStruct();
+    eProsima_user_DllExport virtual ~StructStruct();
 
     /*!
      * @brief Copy constructor.
@@ -3370,7 +3365,6 @@ public:
      * @return Reference to member a
      */
     eProsima_user_DllExport int32_t& a();
-
     /*!
      * @brief This function sets a value in member b
      * @param _b New value for member b
@@ -3388,7 +3382,6 @@ public:
      * @return Reference to member b
      */
     eProsima_user_DllExport int64_t& b();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -3460,7 +3453,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~StructStructStruct();
+    eProsima_user_DllExport virtual ~StructStructStruct();
 
     /*!
      * @brief Copy constructor.
@@ -3526,7 +3519,6 @@ public:
      * @return Reference to member child_int64
      */
     eProsima_user_DllExport int64_t& child_int64();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -3662,7 +3654,6 @@ public:
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
     eProsima_user_DllExport int32_t& first();
-
     /*!
      * @brief This function sets a value in member second
      * @param _second New value for member second
@@ -3682,7 +3673,6 @@ public:
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
     eProsima_user_DllExport int64_t& second();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -3715,6 +3705,24 @@ public:
 
 
 
+    /*!
+     * @brief This function returns the maximum serialized size of the Key of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
+    eProsima_user_DllExport static size_t getKeyMaxCdrSerializedSize(size_t current_alignment = 0);
+
+    /*!
+     * @brief This function tells you if the Key has been defined for this type
+     */
+    eProsima_user_DllExport static bool isKeyDefined();
+
+    /*!
+     * @brief This function serializes the key members of an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
 private:
     int32_t m__d;
@@ -3802,7 +3810,6 @@ public:
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
     eProsima_user_DllExport int32_t& first();
-
     /*!
      * @brief This function copies the value in member second
      * @param _second New value to be copied in member second
@@ -3860,6 +3867,24 @@ public:
 
 
 
+    /*!
+     * @brief This function returns the maximum serialized size of the Key of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
+    eProsima_user_DllExport static size_t getKeyMaxCdrSerializedSize(size_t current_alignment = 0);
+
+    /*!
+     * @brief This function tells you if the Key has been defined for this type
+     */
+    eProsima_user_DllExport static bool isKeyDefined();
+
+    /*!
+     * @brief This function serializes the key members of an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
 private:
     int32_t m__d;
@@ -3947,7 +3972,6 @@ public:
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
     eProsima_user_DllExport int32_t& first();
-
     /*!
      * @brief This function sets a value in member second
      * @param _second New value for member second
@@ -3967,7 +3991,6 @@ public:
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
     eProsima_user_DllExport int64_t& second();
-
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -4000,6 +4023,24 @@ public:
 
 
 
+    /*!
+     * @brief This function returns the maximum serialized size of the Key of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
+    eProsima_user_DllExport static size_t getKeyMaxCdrSerializedSize(size_t current_alignment = 0);
+
+    /*!
+     * @brief This function tells you if the Key has been defined for this type
+     */
+    eProsima_user_DllExport static bool isKeyDefined();
+
+    /*!
+     * @brief This function serializes the key members of an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
 private:
     wchar_t m__d;
@@ -4023,7 +4064,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~SimpleUnionStruct();
+    eProsima_user_DllExport virtual ~SimpleUnionStruct();
 
     /*!
      * @brief Copy constructor.
@@ -4142,7 +4183,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~UnionUnionUnionStruct();
+    eProsima_user_DllExport virtual ~UnionUnionUnionStruct();
 
     /*!
      * @brief Copy constructor.
@@ -4261,7 +4302,7 @@ public:
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~WCharUnionStruct();
+    eProsima_user_DllExport virtual ~WCharUnionStruct();
 
     /*!
      * @brief Copy constructor.

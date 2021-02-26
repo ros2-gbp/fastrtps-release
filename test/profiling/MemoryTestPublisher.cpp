@@ -18,11 +18,8 @@
  */
 
 #include "MemoryTestPublisher.h"
-#include <fastdds/dds/log/Log.hpp>
+#include "fastrtps/log/Log.h"
 #include "fastrtps/log/Colors.h"
-
-#include <dds/core/LengthUnlimited.hpp>
-
 #include <numeric>
 #include <cmath>
 #include <fstream>
@@ -39,8 +36,6 @@ using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::types;
 
-using std::cout;
-using std::endl;
 
 MemoryTestPublisher::MemoryTestPublisher()
     : mp_participant(nullptr)
@@ -96,7 +91,7 @@ bool MemoryTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pid
         struct_type_builder->add_member(0, "seqnum", DynamicTypeBuilderFactory::get_instance()->create_uint32_type());
         struct_type_builder->add_member(1, "data",
             DynamicTypeBuilderFactory::get_instance()->create_sequence_builder(
-                DynamicTypeBuilderFactory::get_instance()->create_byte_type(), ::dds::core::LENGTH_UNLIMITED
+                DynamicTypeBuilderFactory::get_instance()->create_byte_type(), LENGTH_UNLIMITED
             ));
         struct_type_builder->set_name("MemoryType");
 
@@ -107,7 +102,7 @@ bool MemoryTestPublisher::init(int n_sub, int n_sam, bool reliable, uint32_t pid
     // Create RTPSParticipant
     std::string participant_profile_name = "participant_profile";
     ParticipantAttributes PParam;
-    PParam.domainId = pid % 230;
+    PParam.rtps.builtin.domainId = pid % 230;
     PParam.rtps.properties = part_property_policy;
     PParam.rtps.setName("Participant_pub");
 
@@ -342,7 +337,7 @@ void MemoryTestPublisher::run(uint32_t test_time)
     disc_lock.unlock();
 
     test(test_time, m_data_size);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    eClock::my_sleep(100);
 
     cout << "REMOVING PUBLISHER"<<endl;
     Domain::removePublisher(this->mp_commandpub);

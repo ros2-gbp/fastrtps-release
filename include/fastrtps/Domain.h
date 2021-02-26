@@ -20,24 +20,12 @@
 #ifndef DOMAIN_H_
 #define DOMAIN_H_
 
-#include <fastdds/dds/topic/TopicDataType.hpp>
-#include <fastrtps/attributes/ParticipantAttributes.h>
+#include "attributes/ParticipantAttributes.h"
 #include <mutex>
-
-#ifdef USE_DEPRECATION
-#if defined(__GNUC__) || defined(__clang__)
-#define DEPRECATED __attribute__ ((deprecated))
-#elif defined(_MSC_VER)
-#define DEPRECATED __declspec(deprecated)
-#else
-#define DEPRECATED /** --Deprecated-- */
-#endif
-#else
-#define DEPRECATED
-#endif
 
 namespace eprosima{
 namespace fastrtps{
+
 
 class ParticipantListener;
 class Participant;
@@ -48,6 +36,7 @@ class PublisherListener;
 class Subscriber;
 class SubscriberAttributes;
 class SubscriberListener;
+class TopicDataType;
 
 namespace types{
 class DynamicPubSubType;
@@ -66,7 +55,7 @@ class Domain
          * @param listen ParticipantListener Pointer.
          * @return Participant pointer. (nullptr if not created.)
          */
-        RTPS_DllAPI DEPRECATED static Participant* createParticipant(
+        RTPS_DllAPI static Participant* createParticipant(
                 const std::string& participant_profile,
                 ParticipantListener* listen = nullptr);
 
@@ -76,7 +65,7 @@ class Domain
          * @param listen ParticipantListener Pointer.
          * @return Participant pointer. (nullptr if not created.)
          */
-        RTPS_DllAPI DEPRECATED static Participant* createParticipant(
+        RTPS_DllAPI static Participant* createParticipant(
                 const ParticipantAttributes& att,
                 ParticipantListener* listen = nullptr);
 
@@ -168,7 +157,7 @@ class Domain
         RTPS_DllAPI static bool getRegisteredType(
                 Participant* part,
                 const char* typeName,
-                fastdds::dds::TopicDataType** type);
+                TopicDataType** type);
 
         /**
          * Register a type in a participant.
@@ -178,7 +167,7 @@ class Domain
          */
         RTPS_DllAPI static bool registerType(
                 Participant* part,
-                fastdds::dds::TopicDataType * type);
+                TopicDataType * type);
 
         /**
          * Register a type in a participant.
@@ -213,7 +202,6 @@ class Domain
         RTPS_DllAPI static bool loadXMLProfilesFile(const std::string& xml_profile_file);
 
     private:
-
         typedef std::pair<Participant*,ParticipantImpl*> t_p_Participant;
 
         Domain();

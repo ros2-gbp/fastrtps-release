@@ -79,7 +79,7 @@ public:
 
     bool check_union_labels(const std::vector<uint64_t>& labels) const;
 
-    RTPS_DllAPI ReturnCode_t copy_from(const MemberDescriptor* other);
+    RTPS_DllAPI ResponseCode copy_from(const MemberDescriptor* other);
 
     RTPS_DllAPI bool equals(const MemberDescriptor* other) const;
 
@@ -117,11 +117,6 @@ public:
 
     RTPS_DllAPI void set_type(DynamicType_ptr type);
 
-    RTPS_DllAPI DynamicType_ptr get_type() const
-    {
-        return type_;
-    }
-
     RTPS_DllAPI void set_default_union_value(bool bDefault);
 
     RTPS_DllAPI void set_default_value(const std::string& value)
@@ -130,9 +125,9 @@ public:
     }
 
     // Annotations
-    ReturnCode_t apply_annotation(AnnotationDescriptor& descriptor);
+    ResponseCode apply_annotation(AnnotationDescriptor& descriptor);
 
-    ReturnCode_t apply_annotation(
+    ResponseCode apply_annotation(
             const std::string& annotation_name,
             const std::string& key,
             const std::string& value);

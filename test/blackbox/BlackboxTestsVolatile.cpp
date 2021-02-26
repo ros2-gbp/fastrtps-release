@@ -14,51 +14,20 @@
 
 #include "BlackboxTests.hpp"
 
+#include "RTPSAsSocketReader.hpp"
+#include "RTPSAsSocketWriter.hpp"
 #include "PubSubReader.hpp"
 #include "PubSubWriter.hpp"
 #include "ReqRepAsReliableHelloWorldRequester.hpp"
 #include "ReqRepAsReliableHelloWorldReplier.hpp"
 
-#include <gtest/gtest.h>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastrtps/transport/test_UDPv4Transport.h>
-#include <fastdds/rtps/common/CDRMessage_t.h>
-
-using namespace eprosima::fastrtps;
-
-class Volatile : public testing::TestWithParam<bool>
-{
-public:
-
-    void SetUp() override
-    {
-        LibrarySettingsAttributes library_settings;
-        if (GetParam())
-        {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
-        }
-    }
-
-    void TearDown() override
-    {
-        LibrarySettingsAttributes library_settings;
-        if (GetParam())
-        {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
-        }
-    }
-
-};
-
 // Test created to check bug #3020 (Github ros2/demos #238)
-TEST_P(Volatile, PubSubAsReliableVolatilePubRemoveWithoutSubs)
+TEST(BlackBox, PubSubAsReliableVolatilePubRemoveWithoutSubs)
 {
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.history_depth(10).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).init();
+        durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).init();
 
     ASSERT_TRUE(writer.isInitialized());
 
@@ -74,7 +43,7 @@ TEST_P(Volatile, PubSubAsReliableVolatilePubRemoveWithoutSubs)
 }
 
 // Test created to check bug #3087 (Github #230)
-TEST_P(Volatile, AsyncPubSubAsNonReliableVolatileHelloworld)
+TEST(BlackBox, AsyncPubSubAsNonReliableVolatileHelloworld)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -84,9 +53,9 @@ TEST_P(Volatile, AsyncPubSubAsNonReliableVolatileHelloworld)
     ASSERT_TRUE(reader.isInitialized());
 
     writer.history_depth(100).
-            reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).init();
+        reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
+        durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
+        asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).init();
 
     ASSERT_TRUE(writer.isInitialized());
 
@@ -105,15 +74,52 @@ TEST_P(Volatile, AsyncPubSubAsNonReliableVolatileHelloworld)
     reader.block_for_at_least(2);
 }
 
+// Test created to check a bug with writers that use BEST_EFFORT WITH VOLATILE that don't remove messages from history.
+TEST(BlackBox, AsyncPubSubAsNonReliableVolatileKeepAllHelloworld)
+{
+    RTPSAsSocketReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSAsSocketWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    std::string ip("239.255.1.4");
+
+    reader.reliability(eprosima::fastrtps::rtps::ReliabilityKind_t::BEST_EFFORT).
+        add_to_multicast_locator_list(ip, global_port).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.reliability(eprosima::fastrtps::rtps::ReliabilityKind_t::BEST_EFFORT).
+        durability(eprosima::fastrtps::rtps::DurabilityKind_t::VOLATILE).
+        add_to_multicast_locator_list(ip, global_port).
+        auto_remove_on_volatile().init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    auto data = default_helloworld_data_generator();
+
+    reader.expected_data(data);
+    reader.startReception();
+
+    // Send data
+    writer.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    reader.block_for_all();
+
+    // Wait for acks to be sent and check writer history is empty
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    ASSERT_TRUE(writer.is_history_empty());
+}
+
 // Test created to check bug #3290 (ROS2 #539)
-TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
+TEST(BlackBox, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
-            init();
+        reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
+        init();
 
     ASSERT_TRUE(reader.isInitialized());
 
@@ -123,13 +129,13 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
     uint32_t periodInMs = 50;
 
     writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            resource_limits_allocated_samples(9).
-            resource_limits_max_samples(9).
-            asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).
-            add_throughput_controller_descriptor_to_pparams(bytesPerPeriod, periodInMs).
-            init();
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
+        durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
+        resource_limits_allocated_samples(9).
+        resource_limits_max_samples(9).
+        asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).
+        add_throughput_controller_descriptor_to_pparams(bytesPerPeriod, periodInMs).
+        init();
 
     ASSERT_TRUE(writer.isInitialized());
 
@@ -141,7 +147,7 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
 
     reader.startReception(data);
     // Send data with some interval, to let async writer thread send samples
-    writer.send(data, 300);
+    writer.send(data,300);
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
@@ -149,23 +155,23 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
 }
 
 // Test created to check bug #3290 (ROS2 #539)
-TEST_P(Volatile, VolatileKeepAllPubReliableSubNonReliableHelloWorld)
+TEST(BlackBox, VolatileKeepAllPubReliableSubNonReliableHelloWorld)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
-            init();
+        reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
+        init();
 
     ASSERT_TRUE(reader.isInitialized());
 
     writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            resource_limits_allocated_samples(9).
-            resource_limits_max_samples(9).
-            init();
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
+        durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
+        resource_limits_allocated_samples(9).
+        resource_limits_max_samples(9).
+        init();
 
     ASSERT_TRUE(writer.isInitialized());
 
@@ -185,24 +191,24 @@ TEST_P(Volatile, VolatileKeepAllPubReliableSubNonReliableHelloWorld)
 }
 
 // Test created to check bug #3290 (ROS2 #539)
-TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliableHelloWorld)
+TEST(BlackBox, AsyncVolatileKeepAllPubReliableSubNonReliableHelloWorld)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
-            init();
+        reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
+        init();
 
     ASSERT_TRUE(reader.isInitialized());
 
     writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            resource_limits_allocated_samples(9).
-            resource_limits_max_samples(9).
-            asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).
-            init();
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
+        durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
+        resource_limits_allocated_samples(9).
+        resource_limits_max_samples(9).
+        asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).
+        init();
 
     ASSERT_TRUE(writer.isInitialized());
 
@@ -214,7 +220,7 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliableHelloWorld)
 
     reader.startReception(data);
     // Send data with some interval, to let async writer thread send samples
-    writer.send(data, 300);
+    writer.send(data,300);
     // In this test all data should be sent.
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
@@ -222,7 +228,7 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliableHelloWorld)
 }
 
 // Regression test of Refs #3376, github ros2/rmw_fastrtps #226
-TEST_P(Volatile, ReqRepVolatileHelloworldRequesterCheckWriteParams)
+TEST(BlackBox, ReqRepVolatileHelloworldRequesterCheckWriteParams)
 {
     ReqRepAsReliableHelloWorldRequester requester;
 
@@ -234,263 +240,45 @@ TEST_P(Volatile, ReqRepVolatileHelloworldRequesterCheckWriteParams)
 }
 
 // Test created to check bug #5423, github ros2/ros2 #703
-TEST_P(Volatile, AsyncVolatileSubBetweenPubs)
+TEST(BlackBox, AsyncVolatileSubBetweenPubs)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+	PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+	PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
-    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            resource_limits_allocated_samples(9).
-            resource_limits_max_samples(9).
-            asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).
-            heartbeat_period_seconds(3600).
-            init();
+	writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
+		reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
+		durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
+		resource_limits_allocated_samples(9).
+		resource_limits_max_samples(9).
+		asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).
+		heartbeat_period_seconds(3600).
+		init();
 
-    ASSERT_TRUE(writer.isInitialized());
+	ASSERT_TRUE(writer.isInitialized());
 
-    HelloWorld hello;
-    hello.index(1);
-    hello.message("HelloWorld 1");
+	HelloWorld hello;
+	hello.index(1);
+	hello.message("HelloWorld 1");
 
-    writer.send_sample(hello);
+	writer.send_sample(hello);
 
-    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            init();
+	reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
+		reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
+		durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
+		init();
 
-    ASSERT_TRUE(reader.isInitialized());
+	ASSERT_TRUE(reader.isInitialized());
 
-    writer.wait_discovery();
-    reader.wait_discovery();
+	writer.wait_discovery();
+	reader.wait_discovery();
 
-    auto data = default_helloworld_data_generator(1);
-    reader.startReception(data);
-    // Send data with some interval, to let async writer thread send samples
-    writer.send(data, 300);
-    // In this test all data should be sent.
-    ASSERT_TRUE(data.empty());
-    // Block reader until reception finished or timeout.
-    reader.block_for_all();
+	auto data = default_helloworld_data_generator(1);
+	reader.startReception(data);
+	// Send data with some interval, to let async writer thread send samples
+	writer.send(data, 300);
+	// In this test all data should be sent.
+	ASSERT_TRUE(data.empty());
+	// Block reader until reception finished or timeout.
+	reader.block_for_all();
 }
 
-TEST_P(Volatile, VolatileSubBetweenPubs)
-{
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-
-    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            resource_limits_allocated_samples(9).
-            resource_limits_max_samples(9).
-            asynchronously(eprosima::fastrtps::SYNCHRONOUS_PUBLISH_MODE).
-            heartbeat_period_seconds(3600).
-            init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    HelloWorld hello;
-    hello.index(1);
-    hello.message("HelloWorld 1");
-
-    writer.send_sample(hello);
-
-    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    auto data = default_helloworld_data_generator(1);
-    reader.startReception(data);
-    // Send all data
-    writer.send(data);
-    // In this test all data should be sent.
-    ASSERT_TRUE(data.empty());
-    // Block reader until reception finished or timeout.
-    reader.block_for_all();
-}
-
-TEST_P(Volatile, AsyncVolatileSubBetweenTransientPubs)
-{
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-
-    writer
-            .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .resource_limits_allocated_samples(9)
-            .resource_limits_max_samples(9)
-            .asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE)
-            .heartbeat_period_seconds(3600)
-            .init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    HelloWorld hello;
-    hello.index(1);
-    hello.message("HelloWorld 1");
-
-    writer.send_sample(hello);
-
-    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    auto data = default_helloworld_data_generator(1);
-    reader.startReception(data);
-    // Send data with some interval, to let async writer thread send samples
-    writer.send(data, 300);
-    // In this test all data should be sent.
-    ASSERT_TRUE(data.empty());
-    // Block reader until reception finished or timeout.
-    reader.block_for_all();
-}
-
-TEST_P(Volatile, VolatileSubBetweenTransientPubs)
-{
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-
-    writer
-            .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .resource_limits_allocated_samples(9)
-            .resource_limits_max_samples(9)
-            .asynchronously(eprosima::fastrtps::SYNCHRONOUS_PUBLISH_MODE)
-            .heartbeat_period_seconds(3600)
-            .init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    HelloWorld hello;
-    hello.index(1);
-    hello.message("HelloWorld 1");
-
-    writer.send_sample(hello);
-
-    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    auto data = default_helloworld_data_generator(1);
-    reader.startReception(data);
-    // Send all data
-    writer.send(data);
-    // In this test all data should be sent.
-    ASSERT_TRUE(data.empty());
-    // Block reader until reception finished or timeout.
-    reader.block_for_all();
-}
-
-TEST_P(Volatile, VolatileLateJoinerSubGapLost)
-{
-    PubSubReader<HelloWorldType> reader1(TEST_TOPIC_NAME);
-    PubSubReader<HelloWorldType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-
-
-    reader1.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            //heartbeatResponseDelay(5,0).
-            init();
-
-    ASSERT_TRUE(reader1.isInitialized());
-
-    // To simulate lossy conditions
-    int gaps_to_drop = 2;
-    auto testTransport = std::make_shared<rtps::test_UDPv4TransportDescriptor>();
-    testTransport->drop_gap_messages_filter_ = [&gaps_to_drop](rtps::CDRMessage_t& )
-            {
-                if (gaps_to_drop > 0)
-                {
-                    --gaps_to_drop;
-                    return true;
-                }
-                return false;
-            };
-    testTransport->dropLogLength = 1;
-
-    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            resource_limits_allocated_samples(9).
-            resource_limits_max_samples(9).
-            disable_builtin_transport().
-            add_user_transport_to_pparams(testTransport).
-            asynchronously(eprosima::fastrtps::SYNCHRONOUS_PUBLISH_MODE).
-            init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-
-    writer.wait_discovery();
-    reader1.wait_discovery();
-
-    auto data = default_helloworld_data_generator(5);
-
-    reader1.startReception(data);
-
-    writer.send_sample(data.front());
-    data.pop_front();
-
-    reader2.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            init();
-
-    ASSERT_TRUE(reader2.isInitialized());
-
-    reader2.wait_discovery();
-    writer.wait_discovery(2);
-
-    reader2.startReception(data);
-
-    // Send data with some interval, to let async writer thread send samples
-    writer.send(data, 300);
-    // In this test all data should be sent.
-    ASSERT_TRUE(data.empty());
-    // Block reader until reception finished or timeout.
-    reader1.block_for_all();
-    reader2.block_for_all();
-}
-
-#ifdef INSTANTIATE_TEST_SUITE_P
-#define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
-#else
-#define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_CASE_P(x, y, z, w)
-#endif // ifdef INSTANTIATE_TEST_SUITE_P
-
-GTEST_INSTANTIATE_TEST_MACRO(Volatile,
-        Volatile,
-        testing::Values(false, true),
-        [](const testing::TestParamInfo<Volatile::ParamType>& info)
-        {
-            if (info.param)
-            {
-                return "Intraprocess";
-            }
-            return "NonIntraprocess";
-        });

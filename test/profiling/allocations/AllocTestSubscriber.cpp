@@ -24,6 +24,7 @@
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
 using namespace eprosima::fastrtps;
@@ -45,7 +46,7 @@ bool AllocTestSubscriber::init(const char* profile, int domainId, const std::str
         eprosima::fastrtps::xmlparser::XMLProfileManager::fillParticipantAttributes("test_participant_profile",
             participant_att))
     {
-        participant_att.domainId = domainId;
+        participant_att.rtps.builtin.domainId = domainId;
         mp_participant = Domain::createParticipant(participant_att);
     }
 
@@ -160,7 +161,7 @@ void AllocTestSubscriber::run(uint32_t number, bool wait_unmatch)
     else
     {
         std::cout << "All messages received. Waiting a bit to let publisher receive acks." << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        eClock::my_sleep(500);
     }
 
     // Flush callgrind graph

@@ -17,12 +17,10 @@
 
 #include <fastrtps/rtps/history/ReaderHistory.h>
 #include <fastrtps/rtps/reader/StatefulReader.h>
-#include <fastrtps/utils/TimedMutex.hpp>
 
 #include <vector>
 
-using namespace eprosima::fastrtps;
-using namespace ::rtps;
+using namespace eprosima::fastrtps::rtps;
 using namespace ::testing;
 using namespace std;
 
@@ -32,7 +30,7 @@ protected:
     HistoryAttributes history_attr;
     ReaderHistory* history;
     StatefulReader* readerMock;
-    RecursiveTimedMutex mutex;
+    std::recursive_timed_mutex mutex;
 
     uint32_t num_writers = 2;
     uint32_t num_sequence_numbers = 2;
@@ -64,7 +62,7 @@ protected:
                 CacheChange_t* ch = new CacheChange_t();
                 ch->writerGUID = writer_guid;
                 ch->sequenceNumber = SequenceNumber_t(0,j);;
-                ch->sourceTimestamp = rtps::Time_t(0,t);
+                ch->sourceTimestamp = Time_t(0,t);
 
                 changes_list.push_back(ch);
 

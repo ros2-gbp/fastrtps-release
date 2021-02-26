@@ -14,13 +14,58 @@
 
 /**
  * @file ReaderLocator.h
- */
+*/
 
 
 
 #ifndef READERLOCATOR_H_
 #define READERLOCATOR_H_
+#ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <fastdds/rtps/writer/ReaderLocator.h>
+#include <vector>
+#include "../common/Locator.h"
+#include "../common/Guid.h"
+#include "../common/SequenceNumber.h"
+#include "../messages/RTPSMessageGroup.h"
 
+
+namespace eprosima {
+namespace fastrtps{
+namespace rtps {
+
+struct CacheChange_t;
+
+/**
+ * Class ReaderLocator, contains information about a locator, without saving its state.
+  * @ingroup WRITER_MODULE
+ */
+class ReaderLocator
+{
+    public:
+
+        ReaderLocator();
+
+        ReaderLocator(ReaderLocator&& readerLocator) : locator(std::move(readerLocator.locator)),
+            expectsInlineQos(readerLocator.expectsInlineQos),
+            unsent_changes(std::move(readerLocator.unsent_changes)) {}
+
+        ReaderLocator(const ReaderLocator& readerLocator) : locator(readerLocator.locator),
+            expectsInlineQos(readerLocator.expectsInlineQos),
+            unsent_changes(readerLocator.unsent_changes) {}
+
+        virtual ~ReaderLocator();
+
+        //!Address of this ReaderLocator.
+        Locator_t locator;
+
+        //!Whether the Reader expects inlineQos with its data messages.
+        bool expectsInlineQos;
+
+        std::vector<ChangeForReader_t> unsent_changes;
+};
+}
+} /* namespace rtps */
+} /* namespace eprosima */
+
+#endif
 #endif /* READERLOCATOR_H_ */

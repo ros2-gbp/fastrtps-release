@@ -17,81 +17,66 @@
  *
  */
 
-#include <fastdds/rtps/resources/TimedEvent.h>
-#include <fastdds/rtps/resources/ResourceEvent.h>
-
+#include <fastrtps/rtps/resources/TimedEvent.h>
 #include "TimedEventImpl.h"
 
+
+
 namespace eprosima {
-namespace fastrtps {
+namespace fastrtps{
 namespace rtps {
 
-TimedEvent::TimedEvent(
-        ResourceEvent& service,
-        std::function<bool()> callback,
-        double milliseconds)
-    : service_(service)
-    , impl_(nullptr)
+    TimedEvent::TimedEvent(asio::io_service &service, const std::thread& event_thread, double milliseconds, TimedEvent::AUTODESTRUCTION_MODE autodestruction)
 {
-    impl_ = new TimedEventImpl(
-        callback,
-        std::chrono::microseconds(static_cast<int64_t>(milliseconds * 1000)));
-    service_.register_timer(impl_);
+	mp_impl = new TimedEventImpl(this, service, event_thread, std::chrono::microseconds((int64_t)(milliseconds*1000)), autodestruction);
 }
 
 TimedEvent::~TimedEvent()
 {
-    service_.unregister_timer(impl_);
-    delete(impl_);
+	delete(mp_impl);
 }
 
 void TimedEvent::cancel_timer()
 {
-    if (impl_->go_cancel())
-    {
-        service_.notify(impl_);
-    }
+	mp_impl->cancel_timer();
 }
+
 
 void TimedEvent::restart_timer()
 {
-    if (impl_->go_ready())
-    {
-        service_.notify(impl_);
-    }
+	mp_impl->restart_timer();
 }
 
-void TimedEvent::restart_timer(
-        const std::chrono::steady_clock::time_point& timeout)
+bool TimedEvent::update_interval(const Duration_t& inter)
 {
-    if (impl_->go_ready())
-    {
-        service_.notify(impl_, timeout);
-    }
+	return mp_impl->update_interval(inter);
 }
 
-bool TimedEvent::update_interval(
-        const Duration_t& inter)
+bool TimedEvent::update_interval_millisec(double time_millisec)
 {
-    return impl_->update_interval(inter);
-}
-
-bool TimedEvent::update_interval_millisec(
-        double time_millisec)
-{
-    return impl_->update_interval_millisec(time_millisec);
+	return mp_impl->update_interval_millisec(time_millisec);
 }
 
 double TimedEvent::getIntervalMilliSec()
 {
-    return impl_->getIntervalMsec();
+	return mp_impl->getIntervalMsec();
 }
 
 double TimedEvent::getRemainingTimeMilliSec()
 {
-    return impl_->getRemainingTimeMilliSec();
+	return mp_impl->getRemainingTimeMilliSec();
 }
 
+void TimedEvent::destroy()
+{
+    mp_impl->destroy();
+}
+
+void TimedEvent::mark_for_destruction()
+{
+    mp_impl->mark_for_destruction();
+}
+
+}
 } /* namespace rtps */
-} /* namespace fastrtps */
 } /* namespace eprosima */

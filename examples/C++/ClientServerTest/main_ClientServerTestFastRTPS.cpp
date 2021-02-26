@@ -30,6 +30,11 @@
 #include "EprosimaServer.h"
 #include "EprosimaClientTest.h"
 
+
+#include "fastrtps/log/Log.h"
+
+#include "fastrtps/Domain.h"
+
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 using std::cout;
@@ -55,9 +60,9 @@ int main(int argc, char** argv){
 	if(argc > 1)
 	{
 		if(strcmp(argv[1],"client")==0)
-			side = E_SIDE::CLIENT;
+			side = CLIENT;
 		else if(strcmp(argv[1],"server")==0)
-			side = E_SIDE::SERVER;
+			side = SERVER;
 		else
 		{
 			cout << "Argument 1 needs to be client OR server"<<endl;
@@ -79,13 +84,13 @@ int main(int argc, char** argv){
 		return 0;
 	}
 
-	if(side == E_SIDE::SERVER)
+	if(side == SERVER)
 	{
 		EprosimaServer server;
 		server.init();
 		server.serve();
 	}
-	if(side == E_SIDE::CLIENT)
+	if(side == CLIENT)
 	{
 		EprosimaClientTest clienttest;
 		double result = clienttest.run(samples);
@@ -101,3 +106,7 @@ int main(int argc, char** argv){
 
 	return 0;
 }
+
+
+
+

@@ -32,14 +32,9 @@ class my_ReaderListener: public eprosima::fastrtps::rtps::ReaderListener
     public:
         int n_received;
         my_ReaderListener();
-        ~my_ReaderListener() override;
-        void onNewCacheChangeAdded(
-                eprosima::fastrtps::rtps::RTPSReader* reader,
-                const eprosima::fastrtps::rtps::CacheChange_t* const change) override;
-
-        void onReaderMatched(
-                eprosima::fastrtps::rtps::RTPSReader* reader,
-                eprosima::fastrtps::rtps::MatchingInfo& info) override;
+        ~my_ReaderListener();
+        void onNewDataMessage(eprosima::fastrtps::rtps::RTPSReader* reader, const eprosima::fastrtps::rtps::CacheChange_t* const change);
+        void onReaderMatched(eprosima::fastrtps::rtps::RTPSReader* reader, eprosima::fastrtps::rtps::MatchingInfo& info);
 };
 
 class UserDefinedTransportExampleReader
@@ -60,6 +55,6 @@ class UserDefinedTransportExampleReader
         eprosima::fastrtps::rtps::HistoryAttributes hattr;
         eprosima::fastrtps::ReaderQos rqos;
         eprosima::fastrtps::TopicAttributes tattr;
-        eprosima::fastrtps::rtps::ReaderHistory *my_history;
+		eprosima::fastrtps::rtps::ReaderHistory *my_history;
         bool initialized_;
 };

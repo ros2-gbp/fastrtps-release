@@ -19,14 +19,14 @@
 #ifndef SUBSCRIBERATTRIBUTES_H_
 #define SUBSCRIBERATTRIBUTES_H_
 
-#include <fastdds/rtps/resources/ResourceManagement.h>
+#include <fastrtps/rtps/resources/ResourceManagement.h>
 
-#include <fastdds/rtps/common/Time_t.h>
-#include <fastdds/rtps/common/Locator.h>
-#include <fastdds/rtps/attributes/ReaderAttributes.h>
-#include <fastrtps/attributes/TopicAttributes.h>
-#include <fastrtps/qos/ReaderQos.h>
-#include <fastdds/rtps/attributes/PropertyPolicy.h>
+#include "../rtps/common/Time_t.h"
+#include "../rtps/common/Locator.h"
+#include "../rtps/attributes/ReaderAttributes.h"
+#include "TopicAttributes.h"
+#include "../qos/ReaderQos.h"
+#include "../rtps/attributes/PropertyPolicy.h"
 
 
 
@@ -67,9 +67,6 @@ class SubscriberAttributes
         //!Properties
         rtps::PropertyPolicy properties;
 
-        //!Matched publishers allocation limits
-        ResourceLimitedContainerConfig matched_publisher_allocation;
-
         SubscriberAttributes()
             : expectsInlineQos(false)
             , historyMemoryPolicy(rtps::PREALLOCATED_MEMORY_MODE)
@@ -89,11 +86,6 @@ class SubscriberAttributes
                 (this->remoteLocatorList == b.remoteLocatorList) &&
                 (this->historyMemoryPolicy == b.historyMemoryPolicy) &&
                 (this->properties == b.properties);
-        }
-
-        bool operator!=(const SubscriberAttributes& b) const
-        {
-            return !(*this == b);
         }
 
         /**

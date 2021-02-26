@@ -23,6 +23,7 @@
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/utils/eClock.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -36,9 +37,9 @@ bool HelloWorldSubscriber::init()
 {
     ParticipantAttributes PParam;
    PParam.rtps.setName("HelloWorldSubscriber");
-    PParam.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
-    PParam.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-    PParam.rtps.builtin.discovery_config.setStaticEndpointXMLFilename("HelloWorldPublisher.xml");
+    PParam.rtps.builtin.use_SIMPLE_EndpointDiscoveryProtocol = false;
+    PParam.rtps.builtin.use_STATIC_EndpointDiscoveryProtocol = true;
+    PParam.rtps.builtin.setStaticEndpointXMLFilename("HelloWorldPublisher.xml");
     mp_participant = Domain::createParticipant(PParam);
     if(mp_participant==nullptr)
         return false;
@@ -107,7 +108,5 @@ void HelloWorldSubscriber::run(uint32_t number)
 {
     std::cout << "Subscriber running until "<< number << "samples have been received"<<std::endl;
     while(number < this->m_listener.n_samples)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
+        eClock::my_sleep(500);
 }
