@@ -18,7 +18,6 @@ Requires:       ros-rolling-fastcdr
 Requires:       ros-rolling-foonathan-memory-vendor
 Requires:       tinyxml2-devel
 Requires:       ros-rolling-ros-workspace
-BuildRequires:  asio-devel
 BuildRequires:  cmake3
 BuildRequires:  ros-rolling-fastcdr
 BuildRequires:  ros-rolling-foonathan-memory-vendor
@@ -51,6 +50,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
     -DSETUPTOOLS_DEB_LAYOUT=OFF \
     -DINSTALL_EXAMPLES=OFF \
     -DSECURITY=ON \
+    -DTHIRDPARTY_Asio=ON \
     ..
 
 %make_build
