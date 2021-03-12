@@ -7,6 +7,8 @@
   <maintainer email="stevenragnarok@osrfoundation.org">Steven! Ragnarök</maintainer>
   <license>Apache License 2.0</license>
 
+  <build_depend>asio</build_depend>
+
   <build_export_depend>libssl-dev</build_export_depend>
 
   <exec_depend>libssl-dev</exec_depend>
