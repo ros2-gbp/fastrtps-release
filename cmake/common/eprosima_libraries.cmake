@@ -39,7 +39,7 @@ macro(eprosima_find_package package)
             if(THIRDPARTY_UPDATE OR NOT EXISTS "${PROJECT_SOURCE_DIR}/thirdparty/${package}/CMakeLists.txt")
                 message(STATUS "${package} thirdparty is being updated...")
                 execute_process(
-                    COMMAND git submodule update --recursive --init "thirdparty/${package}"
+                    COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
                     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                     RESULT_VARIABLE EXECUTE_RESULT
                     )
@@ -80,7 +80,7 @@ macro(eprosima_find_thirdparty package thirdparty_name)
 
         if(THIRDPARTY OR THIRDPARTY_${package})
             execute_process(
-                COMMAND git submodule update --recursive --init "thirdparty/${thirdparty_name}"
+                COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                 RESULT_VARIABLE EXECUTE_RESULT
                 )
