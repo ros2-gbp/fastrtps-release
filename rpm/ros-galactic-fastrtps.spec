@@ -18,7 +18,6 @@ Requires:       ros-galactic-fastcdr
 Requires:       ros-galactic-foonathan-memory-vendor
 Requires:       tinyxml2-devel
 Requires:       ros-galactic-ros-workspace
-BuildRequires:  asio-devel
 BuildRequires:  cmake3
 BuildRequires:  openssl-devel
 BuildRequires:  ros-galactic-fastcdr
@@ -52,6 +51,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
     -DSETUPTOOLS_DEB_LAYOUT=OFF \
     -DINSTALL_EXAMPLES=OFF \
     -DSECURITY=ON \
+    -DTHIRDPARTY_Asio=ON \
     ..
 
 %make_build
