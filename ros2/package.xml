@@ -15,6 +15,7 @@
   <exec_depend>libssl-dev</exec_depend>
 
   <depend>fastcdr</depend>
+  <depend>foonathan_memory_vendor</depend>
   <depend>tinyxml2</depend>
 
   <buildtool_depend>cmake</buildtool_depend>
