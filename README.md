@@ -1,3 +1,26 @@
+## fastrtps (rolling) - 2.0.0-5
+
+The packages in the `fastrtps` repository were released into the `rolling` distro by running `/home/cottsay/.local/bin/bloom-release fastrtps -r rolling` on `Fri, 12 Mar 2021 01:22:56 -0000`
+
+The `fastrtps` package was released.
+
+Version of package(s) in repository `fastrtps`:
+
+- upstream repository: https://github.com/eProsima/Fast-DDS.git
+- release repository: https://github.com/ros2-gbp/fastrtps-release.git
+- rosdistro version: `2.0.0-4`
+- old version: `2.0.0-4`
+- new version: `2.0.0-5`
+
+Versions of tools used:
+
+- bloom version: `0.10.1`
+- catkin_pkg version: `0.4.23`
+- rosdep version: `0.20.0`
+- rosdistro version: `0.8.3`
+- vcstools version: `0.1.42`
+
+
 ## fastrtps (dashing) - 1.8.4-3
 
 The packages in the `fastrtps` repository were released into the `dashing` distro by running `/usr/bin/bloom-release --track dashing --rosdistro dashing fastrtps` on `Fri, 26 Feb 2021 16:11:45 -0000`
