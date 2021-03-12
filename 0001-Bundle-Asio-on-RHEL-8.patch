@@ -1,4 +1,4 @@
-From bb35dfc57b791ce97029081ecd227c2f60c7299d Mon Sep 17 00:00:00 2001
+From f148939a496d7761fbd2ccaca1161e6a3b2520a9 Mon Sep 17 00:00:00 2001
 From: Scott K Logan <logans@cottsay.net>
 Date: Thu, 11 Mar 2021 16:48:28 -0800
 Subject: [PATCH] Bundle Asio on RHEL 8
@@ -8,12 +8,42 @@ is able to bundle it. Rather than introduce an Asio package to the
 bootstrap repository just for this package, we can flip this flag to
 bundle it.
 
+The CMake logic in Fast-DDS expects the sources to be in a git
+repository, and uses submodules to download the bundled sources. When
+the package is bloomed, the submodules are initialized and included in
+the tarball, but the sources are no longer part of a git repository.
+Since we know that the directory has already been populated, we need to
+suppress the submodule initialization and update step.
+
 Signed-off-by: Scott K Logan <logans@cottsay.net>
 ---
- package.xml                   | 2 --
- rpm/ros-rolling-fastrtps.spec | 2 +-
- 2 files changed, 1 insertion(+), 3 deletions(-)
+ cmake/common/eprosima_libraries.cmake | 4 ++--
+ package.xml                           | 2 --
+ rpm/ros-rolling-fastrtps.spec         | 2 +-
+ 3 files changed, 3 insertions(+), 5 deletions(-)
 
+diff --git a/cmake/common/eprosima_libraries.cmake b/cmake/common/eprosima_libraries.cmake
+index d326e81b..01dd9132 100644
+--- a/cmake/common/eprosima_libraries.cmake
++++ b/cmake/common/eprosima_libraries.cmake
+@@ -39,7 +39,7 @@ macro(eprosima_find_package package)
+             if(THIRDPARTY_UPDATE OR NOT EXISTS "${PROJECT_SOURCE_DIR}/thirdparty/${package}/CMakeLists.txt")
+                 message(STATUS "${package} thirdparty is being updated...")
+                 execute_process(
+-                    COMMAND git submodule update --recursive --init "thirdparty/${package}"
++                    COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
+                     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                     RESULT_VARIABLE EXECUTE_RESULT
+                     )
+@@ -80,7 +80,7 @@ macro(eprosima_find_thirdparty package thirdparty_name)
+ 
+         if(THIRDPARTY OR THIRDPARTY_${package})
+             execute_process(
+-                COMMAND git submodule update --recursive --init "thirdparty/${thirdparty_name}"
++                COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
+                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                 RESULT_VARIABLE EXECUTE_RESULT
+                 )
 diff --git a/package.xml b/package.xml
 index 98502603..50a445ae 100644
 --- a/package.xml
@@ -28,7 +58,7 @@ index 98502603..50a445ae 100644
  
    <exec_depend>libssl-dev</exec_depend>
 diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
-index ea135d8d..413b6f12 100644
+index 01b09aa1..78e01a62 100644
 --- a/rpm/ros-rolling-fastrtps.spec
 +++ b/rpm/ros-rolling-fastrtps.spec
 @@ -18,7 +18,6 @@ Requires:       ros-rolling-fastcdr
