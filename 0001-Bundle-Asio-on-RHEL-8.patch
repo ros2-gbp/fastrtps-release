@@ -1,4 +1,4 @@
-From f148939a496d7761fbd2ccaca1161e6a3b2520a9 Mon Sep 17 00:00:00 2001
+From 8af8842077eaaa33aad3830e67de74ffe081de7e Mon Sep 17 00:00:00 2001
 From: Scott K Logan <logans@cottsay.net>
 Date: Thu, 11 Mar 2021 16:48:28 -0800
 Subject: [PATCH] Bundle Asio on RHEL 8
@@ -58,7 +58,7 @@ index 98502603..50a445ae 100644
  
    <exec_depend>libssl-dev</exec_depend>
 diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
-index 01b09aa1..78e01a62 100644
+index e616050f..58341cec 100644
 --- a/rpm/ros-rolling-fastrtps.spec
 +++ b/rpm/ros-rolling-fastrtps.spec
 @@ -18,7 +18,6 @@ Requires:       ros-rolling-fastcdr
