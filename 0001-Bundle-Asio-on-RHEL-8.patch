@@ -1,0 +1,52 @@
+From bb35dfc57b791ce97029081ecd227c2f60c7299d Mon Sep 17 00:00:00 2001
+From: Scott K Logan <logans@cottsay.net>
+Date: Thu, 11 Mar 2021 16:48:28 -0800
+Subject: [PATCH] Bundle Asio on RHEL 8
+
+Asio is not currently available for RHEL 8, but it appears that Fast-DDS
+is able to bundle it. Rather than introduce an Asio package to the
+bootstrap repository just for this package, we can flip this flag to
+bundle it.
+
+Signed-off-by: Scott K Logan <logans@cottsay.net>
+---
+ package.xml                   | 2 --
+ rpm/ros-rolling-fastrtps.spec | 2 +-
+ 2 files changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/package.xml b/package.xml
+index 98502603..50a445ae 100644
+--- a/package.xml
++++ b/package.xml
+@@ -7,8 +7,6 @@
+   <maintainer email="stevenragnarok@osrfoundation.org">Steven! Ragnarök</maintainer>
+   <license>Apache License 2.0</license>
+ 
+-  <build_depend>asio</build_depend>
+-
+   <build_export_depend>libssl-dev</build_export_depend>
+ 
+   <exec_depend>libssl-dev</exec_depend>
+diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
+index ea135d8d..413b6f12 100644
+--- a/rpm/ros-rolling-fastrtps.spec
++++ b/rpm/ros-rolling-fastrtps.spec
+@@ -18,7 +18,6 @@ Requires:       ros-rolling-fastcdr
+ Requires:       ros-rolling-foonathan-memory-vendor
+ Requires:       tinyxml2-devel
+ Requires:       ros-rolling-ros-workspace
+-BuildRequires:  asio-devel
+ BuildRequires:  cmake3
+ BuildRequires:  ros-rolling-fastcdr
+ BuildRequires:  ros-rolling-foonathan-memory-vendor
+@@ -51,6 +50,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
+     -DSETUPTOOLS_DEB_LAYOUT=OFF \
+     -DINSTALL_EXAMPLES=OFF \
+     -DSECURITY=ON \
++    -DTHIRDPARTY_Asio=ON \
+     ..
+ 
+ %make_build
+-- 
+2.29.2
+
