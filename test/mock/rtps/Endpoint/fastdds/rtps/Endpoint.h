@@ -19,19 +19,39 @@
 #ifndef _FASTDDS_RTPS_ENDPOINT_H_
 #define _FASTDDS_RTPS_ENDPOINT_H_
 
+#include <fastrtps/utils/TimedMutex.hpp>
+#include <fastdds/rtps/attributes/EndpointAttributes.h>
+
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+class RTPSParticipantImpl;
+
 class Endpoint
 {
-    public:
+public:
 
-        virtual ~Endpoint() = default;
+    virtual ~Endpoint() = default;
+
+    inline RecursiveTimedMutex& getMutex()
+    {
+        return mp_mutex;
+    }
+
+    EndpointAttributes& getAttributes()
+    {
+        return m_att;
+    }
 
 #if HAVE_SECURITY
-        bool supports_rtps_protection_;
-#endif
+    bool supports_rtps_protection_;
+#endif // HAVE_SECURITY
+
+    mutable RecursiveTimedMutex mp_mutex;
+    EndpointAttributes m_att;
+    RTPSParticipantImpl* mp_RTPSParticipant;
+
 };
 
 } // namespace rtps

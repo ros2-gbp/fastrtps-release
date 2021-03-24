@@ -30,7 +30,7 @@
 #if HAVE_SECURITY
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <fastdds/rtps/security/accesscontrol/EndpointSecurityAttributes.h>
-#endif
+#endif // if HAVE_SECURITY
 
 #include <string>
 #include <vector>
@@ -40,8 +40,8 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 struct CDRMessage_t;
-}
-}
+} // namespace rtps
+} // namespace fastrtps
 
 namespace fastdds {
 namespace dds {
@@ -900,9 +900,9 @@ public:
         uint32_t old_size = size();
 
         uint32_t first_size = (uint32_t)new_value.first.size() + 1;
-        uint32_t first_alignment = ((first_size + 3) & ~3) - first_size;
+        uint32_t first_alignment = ((first_size + 3u) & ~3u) - first_size;
         uint32_t second_size = (uint32_t)new_value.second.size() + 1;
-        uint32_t second_alignment = ((second_size + 3) & ~3) - second_size;
+        uint32_t second_alignment = ((second_size + 3u) & ~3u) - second_size;
         uint32_t new_size = first_size + first_alignment + second_size + second_alignment + 8;
 
         if (old_size != new_size)
@@ -971,10 +971,34 @@ private:
     {
         //Size of the element (with alignment)
         uint32_t size = *(uint32_t*)ptr;
-        return (4 + ((size + 3) & ~3));
+        return (4u + ((size + 3u) & ~3u));
     }
 
 };
+
+/**
+ * Parameter property ID for persistence GUID
+ * @ingroup PARAMETER_MODULE
+ */
+const std::string parameter_property_persistence_guid = "PID_PERSISTENCE_GUID";
+
+/**
+ * Parameter property ID for participant type
+ * @ingroup PARAMETER_MODULE
+ */
+const std::string parameter_property_participant_type = "PARTICIPANT_TYPE";
+
+/**
+ * Parameter property ID for Discovery Server version
+ * @ingroup PARAMETER_MODULE
+ */
+const std::string parameter_property_ds_version = "DS_VERSION";
+
+/**
+ * Parameter property value for Discovery Server version
+ * @ingroup PARAMETER_MODULE
+ */
+const std::string parameter_property_current_ds_version = "2.0";
 
 /**
  * @ingroup PARAMETER_MODULE
@@ -994,11 +1018,11 @@ public:
 
     class iterator
     {
-public:
+    public:
 
         typedef iterator self_type;
         typedef ParameterProperty_t value_type;
-        typedef ParameterProperty_t reference;
+        typedef ParameterProperty_t& reference;
         typedef ParameterProperty_t* pointer;
         typedef size_t difference_type;
         typedef std::forward_iterator_tag iterator_category;
@@ -1050,7 +1074,7 @@ public:
             return ptr_ != rhs.ptr_;
         }
 
-protected:
+    protected:
 
         /**
          * @brief Shift the pointer to the next value
@@ -1070,7 +1094,7 @@ protected:
             return ptr_;
         }
 
-private:
+    private:
 
         //!Pointer
         fastrtps::rtps::octet* ptr_;
@@ -1080,11 +1104,11 @@ private:
 
     class const_iterator
     {
-public:
+    public:
 
         typedef const_iterator self_type;
         typedef const ParameterProperty_t value_type;
-        typedef const ParameterProperty_t reference;
+        typedef const ParameterProperty_t& reference;
         typedef const ParameterProperty_t* pointer;
         typedef size_t difference_type;
         typedef std::forward_iterator_tag iterator_category;
@@ -1136,7 +1160,7 @@ public:
             return ptr_ != rhs.ptr_;
         }
 
-protected:
+    protected:
 
         /**
          * @brief Shift the pointer to the next value
@@ -1156,7 +1180,7 @@ protected:
             return ptr_;
         }
 
-private:
+    private:
 
         //!Pointer
         const fastrtps::rtps::octet* ptr_;
@@ -1278,10 +1302,10 @@ public:
     {
         //Realloc if needed;
         uint32_t size1 = (uint32_t) p.first.length() + 1;
-        uint32_t alignment1 = ((size1 + 3) & ~3) - size1;
+        uint32_t alignment1 = ((size1 + 3u) & ~3u) - size1;
 
         uint32_t size2 = (uint32_t) p.second.length() + 1;
-        uint32_t alignment2 = ((size2 + 3) & ~3) - size2;
+        uint32_t alignment2 = ((size2 + 3u) & ~3u) - size2;
 
         if (limit_size_ && (properties_.max_size < properties_.length +
                 size1 + alignment1 + 4 +
@@ -1314,8 +1338,8 @@ public:
             uint32_t str2_size)
     {
         //Realloc if needed;
-        uint32_t alignment1 = ((str1_size + 3) & ~3) - str1_size;
-        uint32_t alignment2 = ((str2_size + 3) & ~3) - str2_size;
+        uint32_t alignment1 = ((str1_size + 3u) & ~3u) - str1_size;
+        uint32_t alignment2 = ((str2_size + 3u) & ~3u) - str2_size;
 
         if (limit_size_ && (properties_.max_size < properties_.length +
                 str1_size + alignment1 + 4 +
@@ -1543,8 +1567,8 @@ class ParameterEndpointSecurityInfo_t : public Parameter_t
 {
 public:
 
-    fastrtps::rtps::security::EndpointSecurityAttributesMask security_attributes;
-    fastrtps::rtps::security::PluginEndpointSecurityAttributesMask plugin_security_attributes;
+    fastrtps::rtps::security::EndpointSecurityAttributesMask security_attributes = 0;
+    fastrtps::rtps::security::PluginEndpointSecurityAttributesMask plugin_security_attributes = 0;
 
     /**
      * @brief Constructor without parameters. <br>
@@ -1570,13 +1594,78 @@ public:
 
 };
 
-#endif
+#endif // if HAVE_SECURITY
 
 ///@}
+
+template<class T, class PL>
+void set_proxy_property(
+        const T& p,
+        const char* PID,
+        PL& properties)
+{
+    // only valid values
+    if (p == T::unknown())
+    {
+        return;
+    }
+
+    // generate pair
+    std::pair<std::string, std::string> pair;
+    pair.first = PID;
+
+    std::ostringstream data;
+    data << p;
+    pair.second = data.str();
+
+    // if exists replace
+    auto it = std::find_if(
+        properties.begin(),
+        properties.end(),
+        [&pair](const typename PL::const_iterator::reference p)
+        {
+            return pair.first == p.first();
+        });
+
+    if (it != properties.end())
+    {
+        // it->modify(pair);
+        properties.set_property(it, pair);
+    }
+    else
+    {
+        // if not exists add
+        properties.push_back(pair);
+    }
+}
+
+template<class T, class PL>
+T get_proxy_property(
+        const char* const PID,
+        PL& properties)
+{
+    T property;
+
+    auto it = std::find_if(
+        properties.begin(),
+        properties.end(),
+        [PID](const typename PL::const_iterator::reference p)
+        {
+            return PID == p.first();
+        });
+
+    if (it != properties.end())
+    {
+        std::istringstream in(it->second());
+        in >> property;
+    }
+
+    return property;
+}
 
 } //namespace dds
 } //namespace fastdds
 } //namespace eprosima
 
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif // _FASTDDS_DDS_QOS_PARAMETERTYPES_HPP_

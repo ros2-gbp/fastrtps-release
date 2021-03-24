@@ -42,7 +42,7 @@ ReaderProxyData::ReaderProxyData (
 #if HAVE_SECURITY
     , security_attributes_(0UL)
     , plugin_security_attributes_(0UL)
-#endif
+#endif // if HAVE_SECURITY
     , remote_locators_(max_unicast_locators, max_multicast_locators)
     , m_userDefinedId(0)
     , m_isAlive(true)
@@ -64,6 +64,7 @@ ReaderProxyData::ReaderProxyData (
 {
     m_qos.m_userData.set_max_size(static_cast<uint32_t>(data_limits.max_user_data));
     m_qos.m_partition.set_max_size(static_cast<uint32_t>(data_limits.max_partitions));
+    m_properties.set_max_size(static_cast<uint32_t>(data_limits.max_properties));
 }
 
 ReaderProxyData::~ReaderProxyData()
@@ -81,7 +82,7 @@ ReaderProxyData::ReaderProxyData(
 #if HAVE_SECURITY
     , security_attributes_(readerInfo.security_attributes_)
     , plugin_security_attributes_(readerInfo.plugin_security_attributes_)
-#endif
+#endif // if HAVE_SECURITY
     , m_guid(readerInfo.m_guid)
     , remote_locators_(readerInfo.remote_locators_)
     , m_key(readerInfo.m_key)
@@ -94,6 +95,7 @@ ReaderProxyData::ReaderProxyData(
     , m_type_id(nullptr)
     , m_type(nullptr)
     , m_type_information(nullptr)
+    , m_properties(readerInfo.m_properties)
 {
     if (readerInfo.m_type_id)
     {
@@ -120,7 +122,7 @@ ReaderProxyData& ReaderProxyData::operator =(
 #if HAVE_SECURITY
     security_attributes_ = readerInfo.security_attributes_;
     plugin_security_attributes_ = readerInfo.plugin_security_attributes_;
-#endif
+#endif // if HAVE_SECURITY
     m_guid = readerInfo.m_guid;
     remote_locators_ = readerInfo.remote_locators_;
     m_key = readerInfo.m_key;
@@ -132,6 +134,7 @@ ReaderProxyData& ReaderProxyData::operator =(
     m_expectsInlineQos = readerInfo.m_expectsInlineQos;
     m_topicKind = readerInfo.m_topicKind;
     m_qos.setQos(readerInfo.m_qos, true);
+    m_properties = readerInfo.m_properties;
 
     if (readerInfo.m_type_id)
     {
@@ -290,12 +293,18 @@ uint32_t ReaderProxyData::get_serialized_size(
             m_qos.type_consistency);
     }
 
+    if (m_properties.size() > 0)
+    {
+        // PID_PROPERTY_LIST
+        ret_val += fastdds::dds::ParameterSerializer<ParameterPropertyList_t>::cdr_serialized_size(m_properties);
+    }
+
 #if HAVE_SECURITY
     if ((this->security_attributes_ != 0UL) || (this->plugin_security_attributes_ != 0UL))
     {
         ret_val += 4 + PARAMETER_ENDPOINT_SECURITY_INFO_LENGTH;
     }
-#endif
+#endif // if HAVE_SECURITY
 
     // PID_SENTINEL
     return ret_val + 4;
@@ -520,6 +529,14 @@ bool ReaderProxyData::writeToCDRMessage(
         }
     }
 
+    if (m_properties.size() > 0)
+    {
+        if (!fastdds::dds::ParameterSerializer<ParameterPropertyList_t>::add_to_cdr_message(m_properties, msg))
+        {
+            return false;
+        }
+    }
+
 #if HAVE_SECURITY
     if ((security_attributes_ != 0UL) || (plugin_security_attributes_ != 0UL))
     {
@@ -531,7 +548,7 @@ bool ReaderProxyData::writeToCDRMessage(
             return false;
         }
     }
-#endif
+#endif // if HAVE_SECURITY
 
     /* TODO - Enable when implement XCDR, XCDR2 and/or XML
        if (m_qos.representation.send_always() || m_qos.representation.hasChanged)
@@ -911,7 +928,17 @@ bool ReaderProxyData::readFromCDRMessage(
                         plugin_security_attributes_ = p.plugin_security_attributes;
                         break;
                     }
-#endif
+#endif // if HAVE_SECURITY
+                    case fastdds::dds::PID_PROPERTY_LIST:
+                    {
+                        if (!fastdds::dds::ParameterSerializer<ParameterPropertyList_t>::read_from_cdr_message(
+                                    m_properties, msg, plength))
+                        {
+                            return false;
+                        }
+                        break;
+                    }
+
                     default:
                     {
                         break;
@@ -936,6 +963,18 @@ bool ReaderProxyData::readFromCDRMessage(
                 m_topicKind = WITH_KEY;
             }
 
+            /* Some vendors (i.e. CycloneDDS) do not follow DDSI-RTPS and omit PID_PARTICIPANT_GUID
+             * In that case we use a default value relying on the prefix from m_guid and the default
+             * participant entity id
+             */
+            if (!m_RTPSParticipantKey.isDefined())
+            {
+                GUID_t tmp_guid = m_guid;
+                tmp_guid.entityId = c_EntityId_RTPSParticipant;
+                memcpy(m_RTPSParticipantKey.value, tmp_guid.guidPrefix.value, 12);
+                memcpy(m_RTPSParticipantKey.value + 12, tmp_guid.entityId.value, 4);
+            }
+
             return true;
         }
     }
@@ -953,7 +992,7 @@ void ReaderProxyData::clear()
 #if HAVE_SECURITY
     security_attributes_ = 0UL;
     plugin_security_attributes_ = 0UL;
-#endif
+#endif // if HAVE_SECURITY
     m_guid = c_Guid_Unknown;
     remote_locators_.unicast.clear();
     remote_locators_.multicast.clear();
@@ -965,6 +1004,8 @@ void ReaderProxyData::clear()
     m_isAlive = true;
     m_topicKind = NO_KEY;
     m_qos.clear();
+    m_properties.clear();
+    m_properties.length = 0;
 
     if (m_type_id)
     {
@@ -987,7 +1028,7 @@ bool ReaderProxyData::is_update_allowed(
 #if HAVE_SECURITY
             (security_attributes_ != rdata.security_attributes_) ||
             (plugin_security_attributes_ != rdata.security_attributes_) ||
-#endif
+#endif // if HAVE_SECURITY
             (m_typeName != rdata.m_typeName) ||
             (m_topicName != rdata.m_topicName) )
     {
@@ -1020,6 +1061,7 @@ void ReaderProxyData::copy(
     m_expectsInlineQos = rdata->m_expectsInlineQos;
     m_isAlive = rdata->m_isAlive;
     m_topicKind = rdata->m_topicKind;
+    m_properties = rdata->m_properties;
 
     if (rdata->m_type_id)
     {

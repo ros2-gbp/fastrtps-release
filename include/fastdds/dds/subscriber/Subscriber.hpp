@@ -62,13 +62,14 @@ class TopicDescription;
  */
 class Subscriber : public DomainEntity
 {
+protected:
+
     friend class SubscriberImpl;
     friend class DomainParticipantImpl;
 
     /**
-     * Constructor from a SubscriberImpl pointer
-     * @param pimpl Actual implementation of the subscriber
-     * @param mask StatusMask (default: all)
+     * Create a subscriber, assigning its pointer to the associated implementation.
+     * Don't use directly, create Subscriber using create_subscriber from DomainParticipant.
      */
     RTPS_DllAPI Subscriber(
             SubscriberImpl* pimpl,
@@ -127,7 +128,7 @@ public:
     RTPS_DllAPI const SubscriberListener* get_listener() const;
 
     /**
-     * Modifies the SubscriberListener.
+     * Modifies the SubscriberListener, sets the mask to StatusMask::all()
      * @param listener new value for SubscriberListener
      * @return RETCODE_OK
      */
@@ -135,11 +136,20 @@ public:
             SubscriberListener* listener);
 
     /**
+     * Modifies the SubscriberListener.
+     * @param listener new value for the SubscriberListener
+     * @param mask StatusMask that holds statuses the listener responds to.
+     * @return RETCODE_OK
+     */
+    RTPS_DllAPI ReturnCode_t set_listener(
+            SubscriberListener* listener,
+            const StatusMask& mask);
+    /**
      * This operation creates a DataReader. The returned DataReader will be attached and belong to the Subscriber.
      * @param topic Topic the DataReader will be listening.
      * @param reader_qos QoS of the DataReader.
      * @param listener Pointer to the listener (default: nullptr)
-     * @param mask StatusMask (default: all)
+     * @param mask StatusMask that holds statuses the listener responds to (default: all).
      * @return Pointer to the created DataReader. nullptr if failed.
      */
     RTPS_DllAPI DataReader* create_datareader(
@@ -153,7 +163,7 @@ public:
      * @param topic Topic the DataReader will be listening.
      * @param profile_name DataReader profile name.
      * @param listener Pointer to the listener (default: nullptr)
-     * @param mask StatusMask (default: all)
+     * @param mask StatusMask that holds statuses the listener responds to (default: all).
      * @return Pointer to the created DataReader. nullptr if failed.
      */
     RTPS_DllAPI DataReader* create_datareader_with_profile(
@@ -275,6 +285,16 @@ public:
     RTPS_DllAPI ReturnCode_t get_default_datareader_qos(
             DataReaderQos& qos) const;
 
+    /**
+     * Fills the DataReaderQos with the values of the XML profile.
+     * @param profile_name DataReader profile name.
+     * @param qos DataReaderQos object where the qos is returned.
+     * @return RETCODE_OK if the profile exists. RETCODE_BAD_PARAMETER otherwise.
+     */
+    RTPS_DllAPI ReturnCode_t get_datareader_qos_from_profile(
+            const std::string& profile_name,
+            DataReaderQos& qos) const;
+
     /* TODO
        bool copy_from_topic_qos(
             DataReaderQos& reader_qos,
@@ -293,7 +313,7 @@ public:
      */
     RTPS_DllAPI const fastrtps::rtps::InstanceHandle_t& get_instance_handle() const;
 
-private:
+protected:
 
     SubscriberImpl* impl_;
 

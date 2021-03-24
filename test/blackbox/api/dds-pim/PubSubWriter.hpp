@@ -1,4 +1,4 @@
-// Copyright 2016 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+// Copyright 2016, 2020 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+#include <fastdds/dds/core/policy/QosPolicies.hpp>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
 #include <fastrtps/utils/IPLocator.h>
@@ -50,7 +51,7 @@ class PubSubWriter
 {
     class ParticipantListener : public eprosima::fastdds::dds::DomainParticipantListener
     {
-public:
+    public:
 
         ParticipantListener(
                 PubSubWriter& writer)
@@ -97,7 +98,7 @@ public:
             }
         }
 
-#endif
+#endif // if HAVE_SECURITY
 
         void on_subscriber_discovery(
                 eprosima::fastdds::dds::DomainParticipant*,
@@ -136,18 +137,19 @@ public:
             }
         }
 
-private:
+    private:
 
         ParticipantListener& operator =(
                 const ParticipantListener&) = delete;
 
         PubSubWriter& writer_;
 
-    } participant_listener_;
+    }
+    participant_listener_;
 
     class Listener : public eprosima::fastdds::dds::DataWriterListener
     {
-public:
+    public:
 
         Listener(
                 PubSubWriter& writer)
@@ -185,6 +187,14 @@ public:
             times_deadline_missed_ = status.total_count;
         }
 
+        void on_offered_incompatible_qos(
+                eprosima::fastdds::dds::DataWriter* datawriter,
+                const eprosima::fastdds::dds::OfferedIncompatibleQosStatus& status) override
+        {
+            (void)datawriter;
+            writer_.incompatible_qos(status);
+        }
+
         void on_liveliness_lost(
                 eprosima::fastdds::dds::DataWriter* datawriter,
                 const eprosima::fastrtps::LivelinessLostStatus& status) override
@@ -204,7 +214,7 @@ public:
             return times_liveliness_lost_;
         }
 
-private:
+    private:
 
         Listener& operator =(
                 const Listener&) = delete;
@@ -216,7 +226,8 @@ private:
         //! The number of times liveliness was lost
         unsigned int times_liveliness_lost_;
 
-    } listener_;
+    }
+    listener_;
 
 public:
 
@@ -231,16 +242,20 @@ public:
         , topic_(nullptr)
         , publisher_(nullptr)
         , datawriter_(nullptr)
+        , status_mask_(eprosima::fastdds::dds::StatusMask::all())
         , initialized_(false)
         , matched_(0)
         , participant_matched_(0)
         , discovery_result_(false)
         , onDiscovery_(nullptr)
         , times_liveliness_lost_(0)
+        , times_incompatible_qos_(0)
+        , last_incompatible_qos_(eprosima::fastdds::dds::INVALID_QOS_POLICY_ID)
+
 #if HAVE_SECURITY
         , authorized_(0)
         , unauthorized_(0)
-#endif
+#endif // if HAVE_SECURITY
     {
         // Generate topic name
         std::ostringstream t;
@@ -269,10 +284,28 @@ public:
 
     void init()
     {
-        participant_ = DomainParticipantFactory::get_instance()->create_participant(
-            (uint32_t)GET_PID() % 230,
-            participant_qos_,
-            &participant_listener_);
+        if (!xml_file_.empty())
+        {
+            DomainParticipantFactory::get_instance()->load_XML_profiles_file(xml_file_);
+            if (!participant_profile_.empty())
+            {
+                participant_ = DomainParticipantFactory::get_instance()->create_participant_with_profile(
+                    (uint32_t)GET_PID() % 230,
+                    participant_profile_,
+                    &participant_listener_,
+                    eprosima::fastdds::dds::StatusMask::none());
+                ASSERT_NE(participant_, nullptr);
+                ASSERT_TRUE(participant_->is_enabled());
+            }
+        }
+        if (participant_ == nullptr)
+        {
+            participant_ = DomainParticipantFactory::get_instance()->create_participant(
+                (uint32_t)GET_PID() % 230,
+                participant_qos_,
+                &participant_listener_,
+                eprosima::fastdds::dds::StatusMask::none());
+        }
 
         if (participant_ != nullptr)
         {
@@ -283,37 +316,42 @@ public:
             // Register type
             ASSERT_EQ(participant_->register_type(type_), ReturnCode_t::RETCODE_OK);
 
-            // Create subscriber
+            // Create publisher
             publisher_ = participant_->create_publisher(publisher_qos_);
+            ASSERT_NE(publisher_, nullptr);
+            ASSERT_TRUE(publisher_->is_enabled());
 
             // Create topic
             topic_ = participant_->create_topic(topic_name_, type_->getName(),
                             eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+            ASSERT_NE(topic_, nullptr);
+            ASSERT_TRUE(topic_->is_enabled());
 
-            if (publisher_ != nullptr && topic_ != nullptr)
+            if (!xml_file_.empty())
             {
-                datawriter_ = publisher_->create_datawriter(topic_, datawriter_qos_, &listener_);
-                if (datawriter_ != nullptr)
+                if (!datawriter_profile_.empty())
                 {
-                    std::cout << "Created datawriter " << datawriter_->guid() << " for topic " <<
-                        topic_name_ << std::endl;
-                    initialized_ = datawriter_->is_enabled();
-                    return;
+                    datawriter_ = publisher_->create_datawriter_with_profile(topic_, datawriter_profile_, &listener_,
+                                    status_mask_);
+                    ASSERT_NE(datawriter_, nullptr);
+                    ASSERT_TRUE(datawriter_->is_enabled());
                 }
             }
-            if (publisher_ != nullptr)
+            if (datawriter_ == nullptr)
             {
-                participant_->delete_publisher(publisher_);
-                publisher_ = nullptr;
+                datawriter_ = publisher_->create_datawriter(topic_, datawriter_qos_, &listener_, status_mask_);
             }
-            if (topic_ != nullptr)
+
+            if (datawriter_ != nullptr)
             {
-                participant_->delete_topic(topic_);
-                topic_ = nullptr;
+                datawriter_guid_ = datawriter_->guid();
+                std::cout << "Created datawriter " << datawriter_guid_ << " for topic " <<
+                    topic_name_ << std::endl;
+
+                initialized_ = datawriter_->is_enabled();
             }
-            DomainParticipantFactory::get_instance()->delete_participant(participant_);
-            participant_ = nullptr;
         }
+        return;
     }
 
     bool isInitialized() const
@@ -414,15 +452,17 @@ public:
 
         if (timeout == std::chrono::seconds::zero())
         {
-            cv_.wait(lock, [&](){
-                return matched_ != 0;
-            });
+            cv_.wait(lock, [&]()
+                    {
+                        return matched_ != 0;
+                    });
         }
         else
         {
-            cv_.wait_for(lock, timeout, [&](){
-                return matched_ != 0;
-            });
+            cv_.wait_for(lock, timeout, [&]()
+                    {
+                        return matched_ != 0;
+                    });
         }
 
         std::cout << "Writer discovery finished..." << std::endl;
@@ -438,15 +478,17 @@ public:
 
         if (timeout == std::chrono::seconds::zero())
         {
-            cv_.wait(lock, [&](){
-                return matched_ == expected_match;
-            });
+            cv_.wait(lock, [&]()
+                    {
+                        return matched_ == expected_match;
+                    });
         }
         else
         {
-            cv_.wait_for(lock, timeout, [&](){
-                return matched_ == expected_match;
-            });
+            cv_.wait_for(lock, timeout, [&]()
+                    {
+                        return matched_ == expected_match;
+                    });
         }
 
         std::cout << "Writer discovery finished..." << std::endl;
@@ -462,15 +504,17 @@ public:
 
         if (timeout == std::chrono::seconds::zero())
         {
-            cv_.wait(lock, [&](){
-                return participant_matched_ == 0;
-            });
+            cv_.wait(lock, [&]()
+                    {
+                        return participant_matched_ == 0;
+                    });
         }
         else
         {
-            if (!cv_.wait_for(lock, timeout, [&](){
-                return participant_matched_ == 0;
-            }))
+            if (!cv_.wait_for(lock, timeout, [&]()
+                    {
+                        return participant_matched_ == 0;
+                    }))
             {
                 ret_value = false;
             }
@@ -494,9 +538,10 @@ public:
 
         std::cout << "Writer is waiting removal..." << std::endl;
 
-        cv_.wait(lock, [&](){
-            return matched_ == 0;
-        });
+        cv_.wait(lock, [&]()
+                {
+                    return matched_ == 0;
+                });
 
         std::cout << "Writer removal finished..." << std::endl;
     }
@@ -505,9 +550,10 @@ public:
             unsigned int times = 1)
     {
         std::unique_lock<std::mutex> lock(liveliness_mutex_);
-        liveliness_cv_.wait(lock, [&](){
-            return times_liveliness_lost_ >= times;
-        });
+        liveliness_cv_.wait(lock, [&]()
+                {
+                    return times_liveliness_lost_ >= times;
+                });
     }
 
     void liveliness_lost()
@@ -517,6 +563,25 @@ public:
         liveliness_cv_.notify_one();
     }
 
+    void wait_incompatible_qos(
+            unsigned int times = 1)
+    {
+        std::unique_lock<std::mutex> lock(incompatible_qos_mutex_);
+        incompatible_qos_cv_.wait(lock, [&]()
+                {
+                    return times_incompatible_qos_ >= times;
+                });
+    }
+
+    void incompatible_qos(
+            eprosima::fastdds::dds::OfferedIncompatibleQosStatus status)
+    {
+        std::unique_lock<std::mutex> lock(incompatible_qos_mutex_);
+        times_incompatible_qos_ = status.total_count;
+        last_incompatible_qos_ = status.last_policy_id;
+        incompatible_qos_cv_.notify_one();
+    }
+
 #if HAVE_SECURITY
     void waitAuthorized()
     {
@@ -524,9 +589,10 @@ public:
 
         std::cout << "Writer is waiting authorization..." << std::endl;
 
-        cvAuthentication_.wait(lock, [&]() -> bool {
-            return authorized_ > 0;
-        });
+        cvAuthentication_.wait(lock, [&]() -> bool
+                {
+                    return authorized_ > 0;
+                });
 
         std::cout << "Writer authorization finished..." << std::endl;
     }
@@ -537,14 +603,15 @@ public:
 
         std::cout << "Writer is waiting unauthorization..." << std::endl;
 
-        cvAuthentication_.wait(lock, [&]() -> bool {
-            return unauthorized_ > 0;
-        });
+        cvAuthentication_.wait(lock, [&]() -> bool
+                {
+                    return unauthorized_ > 0;
+                });
 
         std::cout << "Writer unauthorization finished..." << std::endl;
     }
 
-#endif
+#endif // if HAVE_SECURITY
 
     template<class _Rep,
             class _Period
@@ -563,10 +630,10 @@ public:
         std::unique_lock<std::mutex> lock(mutexEntitiesInfoList_);
 
         cvEntitiesInfoList_.wait(lock, [&]()
-        {
-            int times = mapTopicCountList_.count(topicName) == 0 ? 0 : mapTopicCountList_[topicName];
-            return times == repeatedTimes;
-        });
+                {
+                    int times = mapTopicCountList_.count(topicName) == 0 ? 0 : mapTopicCountList_[topicName];
+                    return times == repeatedTimes;
+                });
     }
 
     void block_until_discover_partition(
@@ -576,10 +643,30 @@ public:
         std::unique_lock<std::mutex> lock(mutexEntitiesInfoList_);
 
         cvEntitiesInfoList_.wait(lock, [&]()
-        {
-            int times = mapPartitionCountList_.count(partition) == 0 ? 0 : mapPartitionCountList_[partition];
-            return times == repeatedTimes;
-        });
+                {
+                    int times = mapPartitionCountList_.count(partition) == 0 ? 0 : mapPartitionCountList_[partition];
+                    return times == repeatedTimes;
+                });
+    }
+
+    PubSubWriter& deactivate_status_listener(
+            eprosima::fastdds::dds::StatusMask mask)
+    {
+        status_mask_ &= ~mask;
+        return *this;
+    }
+
+    PubSubWriter& activate_status_listener(
+            eprosima::fastdds::dds::StatusMask mask)
+    {
+        status_mask_ |= mask;
+        return *this;
+    }
+
+    PubSubWriter& reset_status_listener()
+    {
+        status_mask_ = eprosima::fastdds::dds::StatusMask::all();
+        return *this;
     }
 
     /*** Function to change QoS ***/
@@ -913,6 +1000,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& endpoint_userData(
+            std::vector<eprosima::fastrtps::rtps::octet> user_data)
+    {
+        datawriter_qos_.user_data() = user_data;
+        return *this;
+    }
+
     PubSubWriter& user_data_max_size(
             uint32_t max_user_data)
     {
@@ -1001,6 +1095,11 @@ public:
         return participant_guid_;
     }
 
+    eprosima::fastrtps::rtps::GUID_t datawriter_guid()
+    {
+        return datawriter_guid_;
+    }
+
     bool update_partition(
             const std::string& partition)
     {
@@ -1029,6 +1128,56 @@ public:
     {
         return listener_.times_liveliness_lost();
     }
+
+    unsigned int times_incompatible_qos() const
+    {
+        return times_incompatible_qos_;
+    }
+
+    eprosima::fastdds::dds::QosPolicyId_t last_incompatible_qos() const
+    {
+        return last_incompatible_qos_;
+    }
+
+    eprosima::fastdds::dds::OfferedIncompatibleQosStatus get_incompatible_qos_status() const
+    {
+        eprosima::fastdds::dds::OfferedIncompatibleQosStatus status;
+        datawriter_->get_offered_incompatible_qos_status(status);
+        return status;
+    }
+
+    void set_xml_filename(
+            const std::string& name)
+    {
+        xml_file_ = name;
+    }
+
+    void set_participant_profile(
+            const std::string& profile)
+    {
+        participant_profile_ = profile;
+    }
+
+    void set_datawriter_profile(
+            const std::string& profile)
+    {
+        datawriter_profile_ = profile;
+    }
+
+#if HAVE_SQLITE3
+    PubSubWriter& make_persistent(
+            const std::string& filename,
+            const std::string& persistence_guid)
+    {
+        participant_qos_.properties().properties().emplace_back("dds.persistence.plugin", "builtin.SQLITE3");
+        participant_qos_.properties().properties().emplace_back("dds.persistence.sqlite3.filename", filename);
+        datawriter_qos_.durability().kind = eprosima::fastrtps::TRANSIENT_DURABILITY_QOS;
+        datawriter_qos_.properties().properties().emplace_back("dds.persistence.guid", persistence_guid);
+
+        return *this;
+    }
+
+#endif // if HAVE_SQLITE3
 
 private:
 
@@ -1077,7 +1226,7 @@ private:
         cvAuthentication_.notify_all();
     }
 
-#endif
+#endif // if HAVE_SECURITY
 
     void add_writer_info(
             const eprosima::fastrtps::rtps::WriterProxyData& writer_data)
@@ -1286,8 +1435,10 @@ private:
     eprosima::fastdds::dds::PublisherQos publisher_qos_;
     eprosima::fastdds::dds::DataWriter* datawriter_;
     eprosima::fastdds::dds::DataWriterQos datawriter_qos_;
+    eprosima::fastdds::dds::StatusMask status_mask_;
     std::string topic_name_;
     eprosima::fastrtps::rtps::GUID_t participant_guid_;
+    eprosima::fastrtps::rtps::GUID_t datawriter_guid_;
     bool initialized_;
     std::mutex mutexDiscovery_;
     std::condition_variable cv_;
@@ -1302,6 +1453,10 @@ private:
     std::map<std::string,  int> mapPartitionCountList_;
     bool discovery_result_;
 
+    std::string xml_file_ = "";
+    std::string participant_profile_ = "";
+    std::string datawriter_profile_ = "";
+
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
 
     //! A mutex for liveliness
@@ -1311,12 +1466,21 @@ private:
     //! The number of times liveliness was lost
     unsigned int times_liveliness_lost_;
 
+    //! A mutex for incompatible qos
+    std::mutex incompatible_qos_mutex_;
+    //! A condition variable for incompatible qos
+    std::condition_variable incompatible_qos_cv_;
+    //! Number of times incompatible_qos was received
+    unsigned int times_incompatible_qos_;
+    //! Latest conflicting PolicyId
+    eprosima::fastdds::dds::QosPolicyId_t last_incompatible_qos_;
+
 #if HAVE_SECURITY
     std::mutex mutexAuthentication_;
     std::condition_variable cvAuthentication_;
     unsigned int authorized_;
     unsigned int unauthorized_;
-#endif
+#endif // if HAVE_SECURITY
 };
 
 #endif // _TEST_BLACKBOX_PUBSUBWRITER_HPP_

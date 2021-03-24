@@ -32,40 +32,141 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+class ResourceEvent;
+
 class RTPSReader : public Endpoint
 {
-    public:
+public:
 
-        RTPSReader() {}
+    RTPSReader()
+    {
+    }
 
-        RTPSReader(ReaderHistory* history, RecursiveTimedMutex* mutex)
-        {
-            history->mp_reader = this;
-            history->mp_mutex = mutex;
-        }
+    RTPSReader(
+            ReaderHistory* history,
+            RecursiveTimedMutex* mutex)
+    {
+        history->mp_reader = this;
+        history->mp_mutex = mutex;
+    }
 
-        virtual ~RTPSReader() = default;
+    virtual ~RTPSReader() = default;
 
 
-        virtual bool matched_writer_add(const WriterProxyData& wdata) = 0;
+    virtual bool matched_writer_add(
+            const WriterProxyData& wdata) = 0;
 
-        virtual bool matched_writer_remove(const GUID_t& wdata) = 0;
+    virtual bool matched_writer_remove(
+            const GUID_t& wdata,
+            bool removed_by_lease = false) = 0;
 
-        MOCK_METHOD1(change_removed_by_history, bool(CacheChange_t* change));
+    virtual bool matched_writer_is_matched(
+            const GUID_t& wguid) = 0;
 
-        MOCK_METHOD0(getHistory_mock, ReaderHistory*());
+    const GUID_t& getGuid()
+    {
+        return m_guid;
+    }
 
-        MOCK_CONST_METHOD0(getGuid, const GUID_t&());
+    ReaderListener* getListener() const
+    {
+        return listener_;
+    }
 
-        ReaderHistory* getHistory()
-        {
-            getHistory_mock();
-            return history_;
-        }
+    bool setListener(
+            ReaderListener* listener)
+    {
+        listener_ = listener;
+        return true;
+    }
 
-        ReaderHistory* history_;
+    // *INDENT-OFF* Uncrustify makes a mess with MOCK_METHOD macros
+    MOCK_METHOD1(change_removed_by_history, bool(CacheChange_t* change));
 
-        ReaderListener* listener_;
+    MOCK_METHOD0(getHistory_mock, ReaderHistory* ());
+
+    MOCK_METHOD2(reserveCache, bool (CacheChange_t** a_change, uint32_t dataCdrSerializedSize));
+
+    MOCK_METHOD1(releaseCache, void (CacheChange_t* a_change));
+
+    MOCK_METHOD0(expectsInlineQos, bool());
+
+    MOCK_METHOD1(wait_for_unread_cache, bool (const eprosima::fastrtps::Duration_t& timeout));
+
+    // *INDENT-ON*
+
+
+    virtual bool processDataMsg(
+            CacheChange_t*)
+    {
+        return true;
+    }
+
+    virtual bool processDataFragMsg(
+            CacheChange_t*,
+            uint32_t,
+            uint32_t,
+            uint16_t)
+    {
+        return true;
+    }
+
+    virtual bool processHeartbeatMsg(
+            const GUID_t&,
+            uint32_t,
+            const SequenceNumber_t&,
+            const SequenceNumber_t&,
+            bool,
+            bool)
+    {
+        return true;
+    }
+
+    virtual bool processGapMsg(
+            const GUID_t&,
+            const SequenceNumber_t&,
+            const SequenceNumberSet_t&)
+    {
+        return true;
+    }
+
+    virtual bool change_removed_by_history(
+            CacheChange_t*,
+            WriterProxy*)
+    {
+        return true;
+    }
+
+    virtual bool nextUnreadCache(
+            CacheChange_t**,
+            WriterProxy**)
+    {
+        return true;
+    }
+
+    virtual bool nextUntakenCache(
+            CacheChange_t**,
+            WriterProxy**)
+    {
+        return true;
+    }
+
+    virtual bool isInCleanState()
+    {
+        return true;
+    }
+
+    ReaderHistory* getHistory()
+    {
+        getHistory_mock();
+        return history_;
+    }
+
+    ReaderHistory* history_;
+
+    ReaderListener* listener_;
+
+    const GUID_t m_guid;
 };
 
 } // namespace rtps

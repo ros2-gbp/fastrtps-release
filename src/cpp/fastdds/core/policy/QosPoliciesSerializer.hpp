@@ -487,7 +487,7 @@ inline bool QosPoliciesSerializer<PartitionQosPolicy>::read_content_from_cdr_mes
         }
 
         qos_policy.push_back ((const char*)&cdr_message->buffer[cdr_message->pos]);
-        alignment = ((partition_size + 3) & ~3) - partition_size;
+        alignment = ((partition_size + 3u) & ~3u) - partition_size;
         cdr_message->pos += (partition_size + alignment);
     }
     //qos_policy.Npartitions_ = num_partitions;
@@ -865,17 +865,17 @@ inline bool QosPoliciesSerializer<TypeIdV1>::read_content_from_cdr_message(
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
 
-    // Deserialize encapsulation.
-    deser.read_encapsulation();
-    payload.encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-
     try
     {
+        // Deserialize encapsulation.
+        deser.read_encapsulation();
+        payload.encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+
         qos_policy.m_type_identifier.deserialize(deser);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
+    catch (eprosima::fastcdr::exception::Exception& /*exception*/)
     {
-        return false;
+        qos_policy.clear();
     }
 
     return true;
@@ -927,17 +927,17 @@ inline bool QosPoliciesSerializer<TypeObjectV1>::read_content_from_cdr_message(
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
 
-    // Deserialize encapsulation.
-    deser.read_encapsulation();
-    payload.encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-
     try
     {
+        // Deserialize encapsulation.
+        deser.read_encapsulation();
+        payload.encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+
         qos_policy.m_type_object.deserialize(deser);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
+    catch (eprosima::fastcdr::exception::Exception& /*exception*/)
     {
-        return false;
+        qos_policy.clear();
     }
 
     return true;
@@ -990,20 +990,19 @@ inline bool QosPoliciesSerializer<xtypes::TypeInformation>::read_content_from_cd
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
 
-    // Deserialize encapsulation.
-    deser.read_encapsulation();
-    payload.encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-
     try
     {
-        qos_policy.type_information.deserialize(deser);
-    }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
-    {
-        return false;
-    }
+        // Deserialize encapsulation.
+        deser.read_encapsulation();
+        payload.encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
 
-    qos_policy.assigned(true);
+        qos_policy.type_information.deserialize(deser);
+        qos_policy.assigned(true);
+    }
+    catch (eprosima::fastcdr::exception::Exception& /*exception*/)
+    {
+        qos_policy.assigned(false);
+    }
 
     return true;
 }
@@ -1048,8 +1047,8 @@ inline bool QosPoliciesSerializer<GenericDataQosPolicy>::read_content_from_cdr_m
         return false;
     }
 
-    if ( (len + sizeof(uint32_t) > parameter_length)  // Exceeds parameter length
-            || (len > qos_policy.max_size()) )         // Exceeds size limit
+    if ((len + sizeof(uint32_t) > parameter_length)   // Exceeds parameter length
+            || (len > qos_policy.max_size()))         // Exceeds size limit
     {
         return false;
     }
@@ -1063,7 +1062,7 @@ inline bool QosPoliciesSerializer<GenericDataQosPolicy>::read_content_from_cdr_m
     }
 
     // Skip padding
-    cdr_message->pos += ( (len + 3) & ~3) - len;
+    cdr_message->pos += ((len + 3u) & ~3u) - len;
 
     // Should have consumed whole size
 

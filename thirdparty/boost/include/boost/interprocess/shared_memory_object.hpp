@@ -394,10 +394,24 @@ inline bool shared_memory_object::remove(const char *filename)
 
 inline void shared_memory_object::truncate(offset_t length)
 {
+   
+   // QNX correctly checks available size on ftruncate, so the patch is not necessary
+#if defined(BOOST_FASTDDS_PATCHES) && !defined(__QNXNTO__)
+
+   if (0 != posix_fallocate(m_handle, 0, length))
+   {
+       error_info err(system_error_code());
+       throw interprocess_exception(err);
+   }
+
+#else // Original BOOST code
+
    if(0 != ftruncate(m_handle, length)){
       error_info err(system_error_code());
       throw interprocess_exception(err);
    }
+
+#endif
 }
 
 inline void shared_memory_object::priv_close()
