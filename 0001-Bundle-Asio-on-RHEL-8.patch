@@ -1,4 +1,4 @@
-From 8af8842077eaaa33aad3830e67de74ffe081de7e Mon Sep 17 00:00:00 2001
+From 24cc80efe00cd7bcc167201c302d72d40518e47f Mon Sep 17 00:00:00 2001
 From: Scott K Logan <logans@cottsay.net>
 Date: Thu, 11 Mar 2021 16:48:28 -0800
 Subject: [PATCH] Bundle Asio on RHEL 8
@@ -18,9 +18,9 @@ suppress the submodule initialization and update step.
 Signed-off-by: Scott K Logan <logans@cottsay.net>
 ---
  cmake/common/eprosima_libraries.cmake | 4 ++--
- package.xml                           | 2 --
+ package.xml                           | 1 -
  rpm/ros-rolling-fastrtps.spec         | 2 +-
- 3 files changed, 3 insertions(+), 5 deletions(-)
+ 3 files changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/cmake/common/eprosima_libraries.cmake b/cmake/common/eprosima_libraries.cmake
 index d326e81b..01dd9132 100644
@@ -45,20 +45,19 @@ index d326e81b..01dd9132 100644
                  RESULT_VARIABLE EXECUTE_RESULT
                  )
 diff --git a/package.xml b/package.xml
-index 98502603..50a445ae 100644
+index dfc760a2..f6576165 100644
 --- a/package.xml
 +++ b/package.xml
-@@ -7,8 +7,6 @@
+@@ -7,7 +7,6 @@
    <maintainer email="stevenragnarok@osrfoundation.org">Steven! Ragnarök</maintainer>
    <license>Apache License 2.0</license>
  
 -  <build_depend>asio</build_depend>
--
-   <build_export_depend>libssl-dev</build_export_depend>
+   <build_depend>libssl-dev</build_depend>
  
-   <exec_depend>libssl-dev</exec_depend>
+   <build_export_depend>libssl-dev</build_export_depend>
 diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
-index e616050f..58341cec 100644
+index 65784c34..4bea0e1a 100644
 --- a/rpm/ros-rolling-fastrtps.spec
 +++ b/rpm/ros-rolling-fastrtps.spec
 @@ -18,7 +18,6 @@ Requires:       ros-rolling-fastcdr
@@ -67,9 +66,9 @@ index e616050f..58341cec 100644
  Requires:       ros-rolling-ros-workspace
 -BuildRequires:  asio-devel
  BuildRequires:  cmake3
+ BuildRequires:  openssl-devel
  BuildRequires:  ros-rolling-fastcdr
- BuildRequires:  ros-rolling-foonathan-memory-vendor
-@@ -51,6 +50,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
+@@ -52,6 +51,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
      -DSETUPTOOLS_DEB_LAYOUT=OFF \
      -DINSTALL_EXAMPLES=OFF \
      -DSECURITY=ON \
@@ -78,5 +77,5 @@ index e616050f..58341cec 100644
  
  %make_build
 -- 
-2.29.2
+2.25.1
 
