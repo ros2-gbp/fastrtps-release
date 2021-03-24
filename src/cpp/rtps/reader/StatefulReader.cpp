@@ -80,6 +80,54 @@ StatefulReader::StatefulReader(
     , disable_positive_acks_(att.disable_positive_acks)
     , is_alive_(true)
 {
+    init(pimpl, att);
+}
+
+StatefulReader::StatefulReader(
+        RTPSParticipantImpl* pimpl,
+        const GUID_t& guid,
+        const ReaderAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        ReaderHistory* hist,
+        ReaderListener* listen)
+    : RTPSReader(pimpl, guid, att, payload_pool, hist, listen)
+    , acknack_count_(0)
+    , nackfrag_count_(0)
+    , times_(att.times)
+    , matched_writers_(att.matched_writers_allocation)
+    , matched_writers_pool_(att.matched_writers_allocation)
+    , proxy_changes_config_(resource_limits_from_history(hist->m_att, 0))
+    , disable_positive_acks_(att.disable_positive_acks)
+    , is_alive_(true)
+{
+    init(pimpl, att);
+}
+
+StatefulReader::StatefulReader(
+        RTPSParticipantImpl* pimpl,
+        const GUID_t& guid,
+        const ReaderAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        ReaderHistory* hist,
+        ReaderListener* listen)
+    : RTPSReader(pimpl, guid, att, payload_pool, change_pool, hist, listen)
+    , acknack_count_(0)
+    , nackfrag_count_(0)
+    , times_(att.times)
+    , matched_writers_(att.matched_writers_allocation)
+    , matched_writers_pool_(att.matched_writers_allocation)
+    , proxy_changes_config_(resource_limits_from_history(hist->m_att, 0))
+    , disable_positive_acks_(att.disable_positive_acks)
+    , is_alive_(true)
+{
+    init(pimpl, att);
+}
+
+void StatefulReader::init(
+        RTPSParticipantImpl* pimpl,
+        const ReaderAttributes& att)
+{
     const RTPSParticipantAttributes& part_att = pimpl->getRTPSParticipantAttributes();
     for (size_t n = 0; n < att.matched_writers_allocation.initial; ++n)
     {
@@ -178,7 +226,8 @@ bool StatefulReader::matched_writer_add(
 }
 
 bool StatefulReader::matched_writer_remove(
-        const GUID_t& writer_guid)
+        const GUID_t& writer_guid,
+        bool removed_by_lease)
 {
     std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
     if (is_alive_)
@@ -214,7 +263,7 @@ bool StatefulReader::matched_writer_remove(
 
                 wproxy = *it;
                 matched_writers_.erase(it);
-                remove_persistence_guid(wproxy->guid(), wproxy->persistence_guid());
+                remove_persistence_guid(wproxy->guid(), wproxy->persistence_guid(), removed_by_lease);
                 break;
             }
         }
@@ -310,21 +359,17 @@ bool StatefulReader::processDataMsg(
     {
         if (liveliness_lease_duration_ < c_TimeInfinite)
         {
-            if (liveliness_kind_ == MANUAL_BY_TOPIC_LIVELINESS_QOS ||
-                    pWP->liveliness_kind() == MANUAL_BY_TOPIC_LIVELINESS_QOS)
+            auto wlp = this->mp_RTPSParticipant->wlp();
+            if (wlp != nullptr)
             {
-                auto wlp = this->mp_RTPSParticipant->wlp();
-                if (wlp != nullptr)
-                {
-                    wlp->sub_liveliness_manager_->assert_liveliness(
-                        change->writerGUID,
-                        liveliness_kind_,
-                        liveliness_lease_duration_);
-                }
-                else
-                {
-                    logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
-                }
+                wlp->sub_liveliness_manager_->assert_liveliness(
+                    change->writerGUID,
+                    liveliness_kind_,
+                    liveliness_lease_duration_);
+            }
+            else
+            {
+                logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
             }
         }
 
@@ -334,47 +379,39 @@ bool StatefulReader::processDataMsg(
             logInfo(RTPS_MSG_IN,
                     IDSTRING "Trying to add change " << change->sequenceNumber << " TO reader: " << getGuid().entityId);
 
-            CacheChange_t* change_to_add;
-
-            if (reserveCache(&change_to_add, change->serializedPayload.length)) //Reserve a new cache from the corresponding cache pool
+            // Ask the pool for a cache change
+            CacheChange_t* change_to_add = nullptr;
+            if (!change_pool_->reserve_cache(change_to_add))
             {
-#if HAVE_SECURITY
-                if (getAttributes().security_attributes().is_payload_protected)
-                {
-                    change_to_add->copy_not_memcpy(change);
-                    if (!getRTPSParticipant()->security_manager().decode_serialized_payload(change->serializedPayload,
-                            change_to_add->serializedPayload, m_guid, change->writerGUID))
-                    {
-                        releaseCache(change_to_add);
-                        logWarning(RTPS_MSG_IN, "Cannont decode serialized payload");
-                        return false;
-                    }
-                }
-                else
-                {
-#endif
-                if (!change_to_add->copy(change))
-                {
-                    logWarning(RTPS_MSG_IN, IDSTRING "Problem copying CacheChange, received data is: " << change->serializedPayload.length
-                                                                                                       << " bytes and max size in reader " << getGuid().entityId << " is " <<
-                            change_to_add->serializedPayload.max_size);
-                    releaseCache(change_to_add);
-                    return false;
-                }
-#if HAVE_SECURITY
-            }
-#endif
-            }
-            else
-            {
-                logError(RTPS_MSG_IN, IDSTRING "Problem reserving CacheChange in reader: " << getGuid().entityId);
+                logError(RTPS_MSG_IN, IDSTRING "Problem reserving CacheChange in reader: " << m_guid);
                 return false;
             }
 
+            // Copy metadata to reserved change
+            change_to_add->copy_not_memcpy(change);
+
+            // Ask payload pool to copy the payload
+            IPayloadPool* payload_owner = change->payload_owner();
+            if (payload_pool_->get_payload(change->serializedPayload, payload_owner, *change_to_add))
+            {
+                change->payload_owner(payload_owner);
+            }
+            else
+            {
+                logWarning(RTPS_MSG_IN, IDSTRING "Problem copying CacheChange, received data is: "
+                        << change->serializedPayload.length << " bytes and max size in reader "
+                        << m_guid << " is "
+                        << (fixed_payload_size_ > 0 ? fixed_payload_size_ : std::numeric_limits<uint32_t>::max()));
+                change_pool_->release_cache(change_to_add);
+                return false;
+            }
+
+            // Perform reception of cache change
             if (!change_received(change_to_add, pWP))
             {
                 logInfo(RTPS_MSG_IN, IDSTRING "MessageReceiver not add change " << change_to_add->sequenceNumber);
-                releaseCache(change_to_add);
+                payload_pool_->release_payload(*change_to_add);
+                change_pool_->release_cache(change_to_add);
             }
         }
         return true;
@@ -404,21 +441,17 @@ bool StatefulReader::processDataFragMsg(
     {
         if (liveliness_lease_duration_ < c_TimeInfinite)
         {
-            if (liveliness_kind_ == MANUAL_BY_TOPIC_LIVELINESS_QOS ||
-                    pWP->liveliness_kind() == MANUAL_BY_TOPIC_LIVELINESS_QOS)
+            auto wlp = this->mp_RTPSParticipant->wlp();
+            if ( wlp != nullptr)
             {
-                auto wlp = this->mp_RTPSParticipant->wlp();
-                if ( wlp != nullptr)
-                {
-                    wlp->sub_liveliness_manager_->assert_liveliness(
-                        incomingChange->writerGUID,
-                        liveliness_kind_,
-                        liveliness_lease_duration_);
-                }
-                else
-                {
-                    logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
-                }
+                wlp->sub_liveliness_manager_->assert_liveliness(
+                    incomingChange->writerGUID,
+                    liveliness_kind_,
+                    liveliness_lease_duration_);
+            }
+            else
+            {
+                logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
             }
         }
 
@@ -430,24 +463,6 @@ bool StatefulReader::processDataFragMsg(
                     getGuid().entityId);
 
             CacheChange_t* change_to_add = incomingChange;
-
-#if HAVE_SECURITY
-            if (getAttributes().security_attributes().is_payload_protected)
-            {
-                if (reserveCache(&change_to_add, incomingChange->serializedPayload.length)) //Reserve a new cache from the corresponding cache pool
-                {
-                    change_to_add->copy_not_memcpy(incomingChange);
-                    if (!getRTPSParticipant()->security_manager().decode_serialized_payload(incomingChange->
-                            serializedPayload,
-                            change_to_add->serializedPayload, m_guid, incomingChange->writerGUID))
-                    {
-                        releaseCache(change_to_add);
-                        logWarning(RTPS_MSG_IN, "Cannont decode serialized payload");
-                        return false;
-                    }
-                }
-            }
-#endif
 
             CacheChange_t* change_created = nullptr;
             CacheChange_t* work_change = nullptr;
@@ -476,13 +491,6 @@ bool StatefulReader::processDataFragMsg(
                 work_change->add_fragments(change_to_add->serializedPayload, fragmentStartingNum,
                         fragmentsInSubmessage);
             }
-
-#if HAVE_SECURITY
-            if (getAttributes().security_attributes().is_payload_protected)
-            {
-                releaseCache(change_to_add);
-            }
-#endif
 
             // If this is the first time we have received fragments for this change, add it to history
             if (change_created != nullptr)
@@ -594,7 +602,8 @@ bool StatefulReader::processGapMsg(
                 auto ret_iterator = findCacheInFragmentedProcess(auxSN, pWP->guid(), &to_remove, history_iterator);
                 if (to_remove != nullptr)
                 {
-                    history_iterator = mp_history->remove_change_nts(to_remove, ret_iterator);
+                    // we called the History version to avoid callbacks
+                    history_iterator = mp_history->History::remove_change_nts(ret_iterator);
                 }
                 else if (ret_iterator != mp_history->changesEnd())
                 {
@@ -603,22 +612,25 @@ bool StatefulReader::processGapMsg(
             }
         }
 
-        gapList.for_each([&](SequenceNumber_t it)
-        {
-            if (pWP->irrelevant_change_set(it))
+        gapList.for_each(
+            [&](SequenceNumber_t it)
             {
-                CacheChange_t* to_remove = nullptr;
-                auto ret_iterator = findCacheInFragmentedProcess(auxSN, pWP->guid(), &to_remove, history_iterator);
-                if (to_remove != nullptr)
+                if (pWP->irrelevant_change_set(it))
                 {
-                    history_iterator = mp_history->remove_change_nts(to_remove, ret_iterator);
+                    CacheChange_t* to_remove = nullptr;
+                    auto ret_iterator =
+                    findCacheInFragmentedProcess(auxSN, pWP->guid(), &to_remove, history_iterator);
+                    if (to_remove != nullptr)
+                    {
+                        // we called the History version to avoid callbacks
+                        history_iterator = mp_history->History::remove_change_nts(ret_iterator);
+                    }
+                    else if (ret_iterator != mp_history->changesEnd())
+                    {
+                        history_iterator = ret_iterator;
+                    }
                 }
-                else if (ret_iterator != mp_history->changesEnd())
-                {
-                    history_iterator = ret_iterator;
-                }
-            }
-        });
+            });
 
         // Maybe now we have to notify user from new CacheChanges.
         NotifyChanges(pWP);
@@ -716,7 +728,13 @@ bool StatefulReader::change_received(
                     if (mp_history->received_change(a_change, 0))
                     {
                         Time_t::now(a_change->receptionTimestamp);
-                        update_last_notified(a_change->writerGUID, a_change->sequenceNumber);
+
+                        // If we use the real a_change->sequenceNumber no DATA(p) with a lower one will ever be received.
+                        // That happens because the WriterProxy created when the listener matches the PDP endpoints is
+                        // initialized using this SequenceNumber_t. Note that on a SERVER the own DATA(p) may be in any
+                        // position within the WriterHistory preventing effective data exchange.
+                        update_last_notified(a_change->writerGUID, SequenceNumber_t(0, 1));
+
                         if (getListener() != nullptr)
                         {
                             getListener()->onNewCacheChangeAdded((RTPSReader*)this, a_change);
@@ -1026,34 +1044,35 @@ void StatefulReader::send_acknack(
 
             missing_changes.for_each(
                 [&](const SequenceNumber_t& seq)
-            {
-                // Check if the CacheChange_t is uncompleted.
-                CacheChange_t* uncomplete_change = nullptr;
-                auto ret_iterator = findCacheInFragmentedProcess(seq, guid, &uncomplete_change, history_iterator);
-                if (ret_iterator != mp_history->changesEnd())
                 {
-                    history_iterator = ret_iterator;
-                }
-                if (uncomplete_change == nullptr)
-                {
-                    if (!sns.add(seq))
+                    // Check if the CacheChange_t is uncompleted.
+                    CacheChange_t* uncomplete_change = nullptr;
+                    auto ret_iterator = findCacheInFragmentedProcess(seq, guid, &uncomplete_change, history_iterator);
+                    if (ret_iterator != mp_history->changesEnd())
                     {
-                        logInfo(RTPS_READER, "Sequence number " << seq
-                                                                << " exceeded bitmap limit of AckNack. SeqNumSet Base: "
-                                                                << sns.base());
+                        history_iterator = ret_iterator;
                     }
-                }
-                else
-                {
-                    FragmentNumberSet_t frag_sns;
-                    uncomplete_change->get_missing_fragments(frag_sns);
-                    ++nackfrag_count_;
-                    logInfo(RTPS_READER, "Sending NACKFRAG for sample" << seq << ": " << frag_sns; );
+                    if (uncomplete_change == nullptr)
+                    {
+                        if (!sns.add(seq))
+                        {
+                            logInfo(RTPS_READER, "Sequence number " << seq
+                                                                    <<
+                                " exceeded bitmap limit of AckNack. SeqNumSet Base: "
+                                                                    << sns.base());
+                        }
+                    }
+                    else
+                    {
+                        FragmentNumberSet_t frag_sns;
+                        uncomplete_change->get_missing_fragments(frag_sns);
+                        ++nackfrag_count_;
+                        logInfo(RTPS_READER, "Sending NACKFRAG for sample" << seq << ": " << frag_sns; );
 
-                    group.add_nackfrag(seq, frag_sns, nackfrag_count_);
-                }
+                        group.add_nackfrag(seq, frag_sns, nackfrag_count_);
+                    }
 
-            });
+                });
 
             acknack_count_++;
             logInfo(RTPS_READER, "Sending ACKNACK: " << sns; );

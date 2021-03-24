@@ -651,7 +651,7 @@ XMLP_ret XMLParser::getXMLPortParameters(
 
 XMLP_ret XMLParser::getXMLTransports(
         tinyxml2::XMLElement* elem,
-        std::vector<std::shared_ptr<TransportDescriptorInterface> >& transports,
+        std::vector<std::shared_ptr<TransportDescriptorInterface>>& transports,
         uint8_t /*ident*/)
 {
     /*
@@ -3149,6 +3149,10 @@ XMLP_ret XMLParser::getXMLEnum(
     {
         *e = DiscoveryProtocol_t::BACKUP;
     }
+    else if (strcmp(text, SUPER_CLIENT) == 0)
+    {
+        *e = DiscoveryProtocol_t::SUPER_CLIENT;
+    }
     else
     {
         logError(XMLPARSER, "Node '" << RTPS_PDP_TYPE << "' with bad content");
@@ -3223,7 +3227,7 @@ XMLP_ret XMLParser::getXMLEnum(
 
 XMLP_ret XMLParser::getXMLRemoteServer(
         tinyxml2::XMLElement* elem,
-        RemoteServerAttributes& server,
+        eprosima::fastdds::rtps::RemoteServerAttributes& server,
         uint8_t ident)
 {
     /*
@@ -3283,7 +3287,7 @@ XMLP_ret XMLParser::getXMLRemoteServer(
 
 XMLP_ret XMLParser::getXMLList(
         tinyxml2::XMLElement* elem,
-        RemoteServerList_t& list,
+        eprosima::fastdds::rtps::RemoteServerList_t& list,
         uint8_t ident)
 {
     /*
@@ -3309,7 +3313,7 @@ XMLP_ret XMLParser::getXMLList(
 
     while (pS)
     {
-        RemoteServerAttributes server;
+        eprosima::fastdds::rtps::RemoteServerAttributes server;
         if (XMLP_ret::XML_OK != getXMLRemoteServer(pS, server, ident))
         {
             logError(XMLPARSER, "getXMLList was given a misformatted RemoteServer XML_ERROR!");

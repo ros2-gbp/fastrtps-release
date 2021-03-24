@@ -65,6 +65,8 @@ class Topic;
  */
 class PublisherImpl
 {
+protected:
+
     friend class DomainParticipantImpl;
     friend class DataWriterImpl;
 
@@ -151,6 +153,10 @@ public:
 
     const DataWriterQos& get_default_datawriter_qos() const;
 
+    const ReturnCode_t get_datawriter_qos_from_profile(
+            const std::string& profile_name,
+            DataWriterQos& qos) const;
+
     /* TODO
        bool copy_from_topic_qos(
             WriterQos& writer_qos,
@@ -173,14 +179,21 @@ public:
     bool type_in_use(
             const std::string& type_name) const;
 
-private:
+    /**
+     * Returns the most appropriate listener to handle the callback for the given status,
+     * or nullptr if there is no appropriate listener.
+     */
+    PublisherListener* get_listener_for(
+            const StatusMask& status);
+
+protected:
 
     DomainParticipantImpl* participant_;
 
     PublisherQos qos_;
 
     //! Map of Pointers to the associated Data Writers. Topic name is the key.
-    std::map<std::string, std::vector<DataWriterImpl*> > writers_;
+    std::map<std::string, std::vector<DataWriterImpl*>> writers_;
 
     mutable std::mutex mtx_writers_;
 
@@ -190,7 +203,7 @@ private:
     //!Listener to capture the events of the Writer
     class PublisherWriterListener : public DataWriterListener
     {
-public:
+    public:
 
         PublisherWriterListener(
                 PublisherImpl* p)
@@ -215,7 +228,8 @@ public:
                 const LivelinessLostStatus& status) override;
 
         PublisherImpl* publisher_;
-    } publisher_listener_;
+    }
+    publisher_listener_;
 
     Publisher* user_publisher_;
 
@@ -242,5 +256,5 @@ public:
 } /* namespace dds */
 } /* namespace fastdds */
 } /* namespace eprosima */
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_PUBLISHER_HPP_ */

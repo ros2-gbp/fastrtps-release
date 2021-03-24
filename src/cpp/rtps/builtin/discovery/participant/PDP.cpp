@@ -58,10 +58,25 @@
 
 #include <fastdds/dds/log/Log.hpp>
 
+#include <rtps/history/TopicPayloadPoolRegistry.hpp>
+
 #include <mutex>
 #include <chrono>
 
 namespace eprosima {
+namespace fastdds {
+namespace rtps {
+
+// Values for participant type parameter property
+const char ParticipantType::SIMPLE[] = "SIMPLE";
+const char ParticipantType::SERVER[] = "SERVER";
+const char ParticipantType::CLIENT[] = "CLIENT";
+const char ParticipantType::BACKUP[] = "BACKUP";
+const char ParticipantType::SUPER_CLIENT[] = "SUPER_CLIENT";
+
+} // namespace rtps
+} // namespace fastdds
+
 namespace fastrtps {
 namespace rtps {
 
@@ -130,8 +145,29 @@ PDP::~PDP()
     delete mp_EDP;
     mp_RTPSParticipant->deleteUserEndpoint(mp_PDPWriter);
     mp_RTPSParticipant->deleteUserEndpoint(mp_PDPReader);
-    delete mp_PDPWriterHistory;
-    delete mp_PDPReaderHistory;
+
+    if (mp_PDPWriterHistory)
+    {
+        PoolConfig cfg = PoolConfig::from_history_attributes(mp_PDPWriterHistory->m_att);
+        delete mp_PDPWriterHistory;
+        if (writer_payload_pool_)
+        {
+            writer_payload_pool_->release_history(cfg, false);
+            TopicPayloadPoolRegistry::release(writer_payload_pool_);
+        }
+    }
+
+    if (mp_PDPReaderHistory)
+    {
+        PoolConfig cfg = PoolConfig::from_history_attributes(mp_PDPReaderHistory->m_att);
+        delete mp_PDPReaderHistory;
+        if (reader_payload_pool_)
+        {
+            reader_payload_pool_->release_history(cfg, true);
+            TopicPayloadPoolRegistry::release(reader_payload_pool_);
+        }
+    }
+
     delete mp_listener;
 
     for (ParticipantProxyData* it : participant_proxies_)
@@ -175,11 +211,11 @@ ParticipantProxyData* PDP::add_participant_proxy_data(
             if (participant_guid != mp_RTPSParticipant->getGuid())
             {
                 ret_val->lease_duration_event = new TimedEvent(mp_RTPSParticipant->getEventResource(),
-                        [this, ret_val]() -> bool
-                        {
-                            check_remote_participant_liveliness(ret_val);
-                            return false;
-                        }, 0.0);
+                                [this, ret_val]() -> bool
+                                {
+                                    check_remote_participant_liveliness(ret_val);
+                                    return false;
+                                }, 0.0);
             }
         }
         else
@@ -217,7 +253,7 @@ void PDP::initializeParticipantProxyData(
 #if HAVE_SECURITY
     participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_SECURE_ANNOUNCER;
     participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_SECURE_DETECTOR;
-#endif
+#endif // if HAVE_SECURITY
 
     if (mp_RTPSParticipant->getAttributes().builtin.use_WriterLivelinessProtocol)
     {
@@ -227,7 +263,7 @@ void PDP::initializeParticipantProxyData(
 #if HAVE_SECURITY
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_SECURE_DATA_WRITER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_SECURE_DATA_READER;
-#endif
+#endif // if HAVE_SECURITY
     }
 
     if (mp_RTPSParticipant->getAttributes().builtin.typelookup_config.use_server)
@@ -244,7 +280,7 @@ void PDP::initializeParticipantProxyData(
 
 #if HAVE_SECURITY
     participant_data->m_availableBuiltinEndpoints |= mp_RTPSParticipant->security_manager().builtin_endpoints();
-#endif
+#endif // if HAVE_SECURITY
 
     for (const Locator_t& loc : mp_RTPSParticipant->getAttributes().defaultUnicastLocatorList)
     {
@@ -318,7 +354,7 @@ void PDP::initializeParticipantProxyData(
         participant_data->security_attributes_ = 0UL;
         participant_data->plugin_security_attributes_ = 0UL;
     }
-#endif
+#endif // if HAVE_SECURITY
 }
 
 bool PDP::initPDP(
@@ -337,7 +373,7 @@ bool PDP::initPDP(
     mp_builtin->updateMetatrafficLocators(this->mp_PDPReader->getAttributes().unicastLocatorList);
 
     mp_mutex->lock();
-    ParticipantProxyData* pdata = add_participant_proxy_data(part->getGuid(), true);
+    ParticipantProxyData* pdata = add_participant_proxy_data(part->getGuid(), false);
     mp_mutex->unlock();
 
     if (pdata == nullptr)
@@ -350,21 +386,21 @@ bool PDP::initPDP(
     for (ParticipantProxyData* pool_item : participant_proxies_pool_)
     {
         pool_item->lease_duration_event = new TimedEvent(mp_RTPSParticipant->getEventResource(),
-                [this, pool_item]() -> bool
-                {
-                    check_remote_participant_liveliness(pool_item);
-                    return false;
-                }, 0.0);
+                        [this, pool_item]() -> bool
+                        {
+                            check_remote_participant_liveliness(pool_item);
+                            return false;
+                        }, 0.0);
     }
 
     resend_participant_info_event_ = new TimedEvent(mp_RTPSParticipant->getEventResource(),
-            [&]() -> bool
-            {
-                announceParticipantState(false);
-                set_next_announcement_interval();
-                return true;
-            },
-            0);
+                    [&]() -> bool
+                    {
+                        announceParticipantState(false);
+                        set_next_announcement_interval();
+                        return true;
+                    },
+                    0);
 
     set_initial_announcement_interval();
 
@@ -381,7 +417,7 @@ void PDP::announceParticipantState(
         bool dispose,
         WriteParams& wparams)
 {
-    logInfo(RTPS_PDP, "Announcing RTPSParticipant State (new change: " << new_change << ")");
+    // logInfo(RTPS_PDP, "Announcing RTPSParticipant State (new change: " << new_change << ")");
     CacheChange_t* change = nullptr;
 
     if (!dispose)
@@ -416,7 +452,7 @@ void PDP::announceParticipantState(
 #else
                 change->serializedPayload.encapsulation = (uint16_t)PL_CDR_LE;
                 aux_msg.msg_endian =  LITTLEEND;
-#endif
+#endif // if __BIG_ENDIAN__
 
                 if (proxy_data_copy.writeToCDRMessage(&aux_msg, true))
                 {
@@ -444,10 +480,10 @@ void PDP::announceParticipantState(
         }
         uint32_t cdr_size = proxy_data_copy.get_serialized_size(true);
         change = mp_PDPWriter->new_change([cdr_size]() -> uint32_t
-            {
-                return cdr_size;
-            },
-            NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key);
+                        {
+                            return cdr_size;
+                        },
+                        NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key);
 
         if (change != nullptr)
         {
@@ -459,7 +495,7 @@ void PDP::announceParticipantState(
 #else
             change->serializedPayload.encapsulation = (uint16_t)PL_CDR_LE;
             aux_msg.msg_endian =  LITTLEEND;
-#endif
+#endif // if __BIG_ENDIAN__
 
             if (proxy_data_copy.writeToCDRMessage(&aux_msg, true))
             {
@@ -546,7 +582,7 @@ bool PDP::lookupWriterProxyData(
         if (pit->m_guid.guidPrefix == writer.guidPrefix)
         {
             auto wit = pit->m_writers->find(writer.entityId);
-            if ( wit != pit->m_writers->end() )
+            if ( wit != pit->m_writers->end())
             {
                 wdata.copy(wit->second);
                 return true;
@@ -608,7 +644,7 @@ bool PDP::removeWriterProxyData(
             if (wit != pit->m_writers->end())
             {
                 WriterProxyData* pW = wit->second;
-                mp_EDP->unpairWriterProxy(pit->m_guid, writer_guid);
+                mp_EDP->unpairWriterProxy(pit->m_guid, writer_guid, false);
 
                 RTPSParticipantListener* listener = mp_RTPSParticipant->getListener();
                 if (listener)
@@ -852,7 +888,8 @@ bool PDP::remove_remote_participant(
         ParticipantDiscoveryInfo::DISCOVERY_STATUS reason)
 {
     if (partGUID == getLocalParticipantProxyData()->m_guid)
-    {   // avoid removing our own data
+    {
+        // avoid removing our own data
         return false;
     }
 
@@ -901,7 +938,8 @@ bool PDP::remove_remote_participant(
                 GUID_t writer_guid(wit->guid());
                 if (writer_guid != c_Guid_Unknown)
                 {
-                    mp_EDP->unpairWriterProxy(partGUID, writer_guid);
+                    mp_EDP->unpairWriterProxy(partGUID, writer_guid,
+                            reason == ParticipantDiscoveryInfo::DISCOVERY_STATUS::DROPPED_PARTICIPANT);
 
                     if (listener)
                     {
@@ -928,7 +966,7 @@ bool PDP::remove_remote_participant(
 
 #if HAVE_SECURITY
         mp_builtin->mp_participantImpl->security_manager().remove_participant(*pdata);
-#endif
+#endif // if HAVE_SECURITY
 
         this->mp_PDPReaderHistory->getMutex()->lock();
         for (std::vector<CacheChange_t*>::iterator it = this->mp_PDPReaderHistory->changesBegin();
@@ -1022,13 +1060,32 @@ CDRMessage_t PDP::get_participant_proxy_data_serialized(
     return cdr_msg;
 }
 
+ParticipantProxyData* PDP::get_participant_proxy_data(
+        const GuidPrefix_t& guid_prefix)
+{
+    for (auto pit = ParticipantProxiesBegin(); pit != ParticipantProxiesEnd(); ++pit)
+    {
+        if (guid_prefix == (*pit)->m_guid.guidPrefix)
+        {
+            return *(pit);
+        }
+    }
+    return nullptr;
+}
+
+std::list<eprosima::fastdds::rtps::RemoteServerAttributes>& PDP::remote_server_attributes()
+{
+    return mp_builtin->m_DiscoveryServers;
+}
+
 void PDP::check_remote_participant_liveliness(
         ParticipantProxyData* remote_participant)
 {
     std::unique_lock<std::recursive_mutex> guard(*this->mp_mutex);
 
-    if (GUID_t::unknown() != remote_participant->m_guid)
+    if (remote_participant->should_check_lease_duration)
     {
+        assert(GUID_t::unknown() != remote_participant->m_guid);
         // Check last received message's time_point plus lease duration time doesn't overcome now().
         // If overcame, remove participant.
         auto now = std::chrono::steady_clock::now();

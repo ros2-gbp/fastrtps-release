@@ -16,6 +16,7 @@
  * Publisher.cpp
  *
  */
+#include <fastrtps/config.h>
 
 #include <fastrtps_deprecated/publisher/PublisherImpl.h>
 #include <fastrtps_deprecated/participant/ParticipantImpl.h>
@@ -36,6 +37,8 @@
 #include <fastdds/rtps/resources/TimedEvent.h>
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
+
+#include <rtps/history/TopicPayloadPoolRegistry.hpp>
 
 using namespace eprosima::fastrtps;
 using namespace ::rtps;
@@ -59,7 +62,7 @@ PublisherImpl::PublisherImpl(
             // In future v2 changepool is in writer, and writer set this value to cachechagepool.
             + 20 /*SecureDataHeader*/ + 4 + ((2 * 16) /*EVP_MAX_IV_LENGTH max block size*/ - 1 ) /* SecureDataBodey*/
             + 16 + 4 /*SecureDataTag*/
-#endif
+#endif // if HAVE_SECURITY
             , att.historyMemoryPolicy)
     , mp_listener(listen)
 #pragma warning (disable : 4355 )
@@ -72,18 +75,23 @@ PublisherImpl::PublisherImpl(
     , deadline_missed_status_()
     , lifespan_duration_us_(m_att.qos.m_lifespan.duration.to_ns() * 1e-3)
 {
+    std::string topic_name = m_att.topic.getTopicName().to_string();
+    PoolConfig pool_cfg = PoolConfig::from_history_attributes(m_history.m_att);
+    payload_pool_ = TopicPayloadPoolRegistry::get(topic_name, pool_cfg);
+    payload_pool_->reserve_history(pool_cfg, false);
+
     deadline_timer_ = new TimedEvent(mp_participant->get_resource_event(),
                     [&]() -> bool
-    {
-        return deadline_missed();
-    },
+                    {
+                        return deadline_missed();
+                    },
                     att.qos.m_deadline.period.to_ns() * 1e-6);
 
     lifespan_timer_ = new TimedEvent(mp_participant->get_resource_event(),
                     [&]() -> bool
-    {
-        return lifespan_expired();
-    },
+                    {
+                        return lifespan_expired();
+                    },
                     m_att.qos.m_lifespan.duration.to_ns() * 1e-6);
 }
 
@@ -99,6 +107,11 @@ PublisherImpl::~PublisherImpl()
 
     RTPSDomain::removeRTPSWriter(mp_writer);
     delete(this->mp_userPublisher);
+
+    std::string topic_name = m_att.topic.getTopicName().to_string();
+    PoolConfig pool_cfg = PoolConfig::from_history_attributes(m_history.m_att);
+    payload_pool_->release_history(pool_cfg, false);
+    TopicPayloadPoolRegistry::release(payload_pool_);
 }
 
 bool PublisherImpl::create_new_change(
@@ -120,7 +133,7 @@ bool PublisherImpl::create_new_change_with_params(
         bool is_key_protected = false;
 #if HAVE_SECURITY
         is_key_protected = mp_writer->getAttributes().security_attributes().is_key_protected;
-#endif
+#endif // if HAVE_SECURITY
         mp_type->getKey(data, &handle, is_key_protected);
     }
 
@@ -159,7 +172,7 @@ bool PublisherImpl::create_new_change_with_params(
     if (lock.try_lock_until(max_blocking_time))
 #else
     std::unique_lock<RecursiveTimedMutex> lock(mp_writer->getMutex());
-#endif
+#endif // if HAVE_STRICT_REALTIME
     {
         CacheChange_t* ch = mp_writer->new_change(mp_type->getSerializedSizeProvider(data), changeKind, handle);
         if (ch != nullptr)
@@ -170,7 +183,7 @@ bool PublisherImpl::create_new_change_with_params(
                 if (!mp_type->serialize(data, &ch->serializedPayload))
                 {
                     logWarning(RTPS_WRITER, "RTPSWriter:Serialization returns false"; );
-                    m_history.release_Cache(ch);
+                    mp_writer->release_change(ch);
                     return false;
                 }
             }
@@ -214,7 +227,7 @@ bool PublisherImpl::create_new_change_with_params(
             InstanceHandle_t change_handle = ch->instanceHandle;
             if (!this->m_history.add_pub_change(ch, wparams, lock, max_blocking_time))
             {
-                m_history.release_Cache(ch);
+                mp_writer->release_change(ch);
                 return false;
             }
 
@@ -241,7 +254,7 @@ bool PublisherImpl::create_new_change_with_params(
 
             if (m_att.qos.m_lifespan.duration != c_TimeInfinite)
             {
-                lifespan_duration_us_ = duration<double, std::ratio<1, 1000000> >(
+                lifespan_duration_us_ = duration<double, std::ratio<1, 1000000>>(
                     m_att.qos.m_lifespan.duration.to_ns() * 1e-3);
                 lifespan_timer_->update_interval_millisec(m_att.qos.m_lifespan.duration.to_ns() * 1e-6);
                 lifespan_timer_->restart_timer();
@@ -274,7 +287,7 @@ InstanceHandle_t PublisherImpl::register_instance(
     bool is_key_protected = false;
 #if HAVE_SECURITY
     is_key_protected = mp_writer->getAttributes().security_attributes().is_key_protected;
-#endif
+#endif // if HAVE_SECURITY
     mp_type->getKey(instance, &instance_handle, is_key_protected);
 
     // Block lowlevel writer
@@ -286,7 +299,7 @@ InstanceHandle_t PublisherImpl::register_instance(
     if (lock.try_lock_until(max_blocking_time))
 #else
     std::unique_lock<RecursiveTimedMutex> lock(mp_writer->getMutex());
-#endif
+#endif // if HAVE_STRICT_REALTIME
     {
         if (m_history.register_instance(instance_handle, lock, max_blocking_time))
         {
@@ -320,12 +333,12 @@ bool PublisherImpl::unregister_instance(
 
 #if !defined(NDEBUG)
     if (c_InstanceHandle_Unknown == ih)
-#endif
+#endif // if !defined(NDEBUG)
     {
         bool is_key_protected = false;
 #if HAVE_SECURITY
         is_key_protected = mp_writer->getAttributes().security_attributes().is_key_protected;
-#endif
+#endif // if HAVE_SECURITY
         mp_type->getKey(instance, &ih, is_key_protected);
     }
 
@@ -335,7 +348,7 @@ bool PublisherImpl::unregister_instance(
         logError(PUBLISHER, "handle differs from data's key.");
         return false;
     }
-#endif
+#endif // if !defined(NDEBUG)
 
     if (m_history.is_key_registered(ih))
     {
@@ -451,7 +464,7 @@ bool PublisherImpl::updateAttributes(
         if (m_att.qos.m_deadline.period != c_TimeInfinite)
         {
             deadline_duration_us_ =
-                    duration<double, std::ratio<1, 1000000> >(m_att.qos.m_deadline.period.to_ns() * 1e-3);
+                    duration<double, std::ratio<1, 1000000>>(m_att.qos.m_deadline.period.to_ns() * 1e-3);
             deadline_timer_->update_interval_millisec(m_att.qos.m_deadline.period.to_ns() * 1e-6);
         }
         else
@@ -464,7 +477,7 @@ bool PublisherImpl::updateAttributes(
         if (m_att.qos.m_lifespan.duration != c_TimeInfinite)
         {
             lifespan_duration_us_ =
-                    duration<double, std::ratio<1, 1000000> >(m_att.qos.m_lifespan.duration.to_ns() * 1e-3);
+                    duration<double, std::ratio<1, 1000000>>(m_att.qos.m_lifespan.duration.to_ns() * 1e-3);
             lifespan_timer_->update_interval_millisec(m_att.qos.m_lifespan.duration.to_ns() * 1e-6);
         }
         else
@@ -647,4 +660,9 @@ void PublisherImpl::assert_liveliness()
             stateful_writer->send_periodic_heartbeat(true, true);
         }
     }
+}
+
+std::shared_ptr<rtps::IPayloadPool> PublisherImpl::payload_pool()
+{
+    return payload_pool_;
 }

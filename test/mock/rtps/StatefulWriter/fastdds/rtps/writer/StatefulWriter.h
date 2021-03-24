@@ -20,6 +20,7 @@
 #define _FASTDDS_RTPS_STATEFULWRITER_H_
 
 #include <fastrtps/rtps/writer/RTPSWriter.h>
+#include <fastdds/rtps/writer/IReaderDataFilter.hpp>
 #include <fastrtps/rtps/history/WriterHistory.h>
 
 namespace eprosima {
@@ -51,19 +52,31 @@ public:
         delete mp_history;
     }
 
-    MOCK_METHOD1(matched_reader_add, bool(const ReaderProxyData &));
+    MOCK_METHOD1(matched_reader_add, bool(const ReaderProxyData&));
 
-    MOCK_METHOD1(matched_reader_remove, bool(const GUID_t &));
+    MOCK_METHOD1(matched_reader_remove, bool(const GUID_t&));
 
-    MOCK_METHOD0(getGuid, const GUID_t &());
+    MOCK_METHOD1 (matched_reader_is_matched, bool(const GUID_t& reader_guid));
+
+    MOCK_METHOD0(getGuid, const GUID_t& ());
 
     MOCK_METHOD1(unsent_change_added_to_history_mock, void(CacheChange_t*));
 
-    MOCK_METHOD1(perform_nack_supression, void(const GUID_t &));
+    MOCK_METHOD1(perform_nack_supression, void(const GUID_t&));
 
     MOCK_METHOD1(intraprocess_heartbeat, void(const ReaderProxy*));
 
     MOCK_METHOD2(intraprocess_gap, void(const ReaderProxy*, const SequenceNumber_t&));
+
+    MOCK_METHOD2(send_periodic_heartbeat, bool(
+                bool final,
+                bool liveliness));
+
+    MOCK_METHOD1(send_periodic_heartbeat, bool(
+                bool final));
+
+    MOCK_METHOD0(send_periodic_heartbeat, bool());
+
 
     RTPSParticipantImpl* getRTPSParticipant()
     {
@@ -80,6 +93,17 @@ public:
         return mp_history->next_sequence_number();
     }
 
+    void reader_data_filter(
+            fastdds::rtps::IReaderDataFilter* reader_data_filter)
+    {
+        reader_data_filter_ = reader_data_filter;
+    }
+
+    const fastdds::rtps::IReaderDataFilter* reader_data_filter() const
+    {
+        return reader_data_filter_;
+    }
+
 private:
 
     friend class ReaderProxy;
@@ -87,6 +111,9 @@ private:
     RTPSParticipantImpl* participant_;
 
     WriterHistory* mp_history;
+
+    fastdds::rtps::IReaderDataFilter* reader_data_filter_;
+
 };
 
 } // namespace rtps

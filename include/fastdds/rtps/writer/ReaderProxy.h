@@ -20,22 +20,26 @@
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <algorithm>
-#include <mutex>
-#include <set>
-#include <atomic>
+#include <fastdds/rtps/attributes/WriterAttributes.h>
+#include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
-#include <fastdds/rtps/writer/ReaderLocator.h>
 
 #include <fastdds/rtps/common/Types.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/SequenceNumber.h>
 #include <fastdds/rtps/common/CacheChange.h>
 #include <fastdds/rtps/common/FragmentNumber.h>
-#include <fastdds/rtps/attributes/WriterAttributes.h>
-#include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
+
+#include <fastdds/rtps/writer/ChangeForReader.h>
+#include <fastdds/rtps/writer/ReaderLocator.h>
+
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
+
+#include <algorithm>
+#include <mutex>
+#include <set>
+#include <atomic>
 
 namespace eprosima {
 namespace fastrtps {
@@ -345,15 +349,12 @@ public:
             const FragmentNumberSet_t& fragments_state);
 
     /**
-     * Filter a CacheChange_t, in this version always returns true.
+     * Filter a CacheChange_t using the StatefulWriter's IReaderDataFilter.
      * @param change
      * @return true if the change is relevant, false otherwise.
      */
-    inline bool rtps_is_relevant(
-            CacheChange_t* change)
-    {
-        (void)change; return true;
-    }
+    bool rtps_is_relevant(
+            CacheChange_t* change) const;
 
     /**
      * Get the highest fully acknowledged sequence number.
@@ -363,6 +364,12 @@ public:
     {
         return changes_low_mark_;
     }
+
+    /**
+     * Get the first relevant sequence number of the changes for this reader.
+     * @return the first relevant sequence number of the changes for this reader.
+     */
+    SequenceNumber_t first_relevant_sequence_number() const;
 
     /**
      * Change the interval of nack-supression event.
@@ -376,6 +383,16 @@ public:
      * @return True if there are gaps, else false.
      */
     bool are_there_gaps();
+
+    /**
+     * Adds gaps to message group if there are holes / irrelevant changes on this proxy.
+
+     * @param group Message group where gaps will be added.
+     * @param next_seq Sequence number of next sample to be added to history.
+     */
+    void send_gaps(
+            RTPSMessageGroup& group,
+            SequenceNumber_t next_seq);
 
     LocatorSelectorEntry* locator_selector_entry()
     {
@@ -469,5 +486,5 @@ private:
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_RTPS_WRITER_READERPROXY_H_ */

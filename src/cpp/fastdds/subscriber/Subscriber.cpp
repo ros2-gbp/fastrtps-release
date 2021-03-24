@@ -86,7 +86,20 @@ const SubscriberListener* Subscriber::get_listener() const
 ReturnCode_t Subscriber::set_listener(
         SubscriberListener* listener)
 {
-    return impl_->set_listener(listener);
+    return set_listener(listener, StatusMask::all());
+}
+
+ReturnCode_t Subscriber::set_listener(
+        SubscriberListener* listener,
+        const StatusMask& mask)
+{
+    ReturnCode_t ret_val = impl_->set_listener(listener);
+    if (ret_val == ReturnCode_t::RETCODE_OK)
+    {
+        status_mask_ = mask;
+    }
+
+    return ret_val;
 }
 
 DataReader* Subscriber::create_datareader(
@@ -131,18 +144,18 @@ bool Subscriber::has_datareaders() const
 }
 
 /* TODO
-bool Subscriber::begin_access()
-{
+   bool Subscriber::begin_access()
+   {
     return impl_->begin_access();
-}
-*/
+   }
+ */
 
 /* TODO
-bool Subscriber::end_access()
-{
+   bool Subscriber::end_access()
+   {
     return impl_->end_access();
-}
-*/
+   }
+ */
 
 ReturnCode_t Subscriber::notify_datareaders() const
 {
@@ -150,11 +163,11 @@ ReturnCode_t Subscriber::notify_datareaders() const
 }
 
 /* TODO
-bool Subscriber::delete_contained_entities()
-{
+   bool Subscriber::delete_contained_entities()
+   {
     return impl_->delete_contained_entities();
-}
-*/
+   }
+ */
 
 ReturnCode_t Subscriber::set_default_datareader_qos(
         const DataReaderQos& qos)
@@ -179,14 +192,21 @@ ReturnCode_t Subscriber::get_default_datareader_qos(
     return ReturnCode_t::RETCODE_OK;
 }
 
+ReturnCode_t Subscriber::get_datareader_qos_from_profile(
+        const std::string& profile_name,
+        DataReaderQos& qos) const
+{
+    return impl_->get_datareader_qos_from_profile(profile_name, qos);
+}
+
 /* TODO
-bool Subscriber::copy_from_topic_qos(
+   bool Subscriber::copy_from_topic_qos(
         DataReaderQos& reader_qos,
         const fastrtps::TopicAttributes& topic_qos) const
-{
+   {
     return impl_->copy_from_topic_qos(reader_qos, topic_qos);
-}
-*/
+   }
+ */
 
 const DomainParticipant* Subscriber::get_participant() const
 {

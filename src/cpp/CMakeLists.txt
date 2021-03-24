@@ -14,6 +14,7 @@
 
 include(${PROJECT_SOURCE_DIR}/cmake/dev/set_sources.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/dev/generate_msvc_libraries.cmake)
+include(CheckLibatomic)
 
 # Set source files
 
@@ -34,6 +35,8 @@ set(${PROJECT_NAME}_source_files
     ${ALL_HEADERS}
 
     fastdds/log/Log.cpp
+    fastdds/log/OStreamConsumer.cpp
+    fastdds/log/StdoutErrConsumer.cpp
     fastdds/log/StdoutConsumer.cpp
     fastdds/log/FileConsumer.cpp
 
@@ -53,6 +56,8 @@ set(${PROJECT_NAME}_source_files
     rtps/history/History.cpp
     rtps/history/WriterHistory.cpp
     rtps/history/ReaderHistory.cpp
+    rtps/history/TopicPayloadPool.cpp
+    rtps/history/TopicPayloadPoolRegistry.cpp
     rtps/reader/WriterProxy.cpp
     rtps/reader/StatefulReader.cpp
     rtps/reader/StatelessReader.cpp
@@ -159,17 +164,9 @@ set(${PROJECT_NAME}_source_files
     rtps/builtin/discovery/participant/PDP.cpp
     rtps/builtin/discovery/participant/PDPSimple.cpp
     rtps/builtin/discovery/participant/PDPListener.cpp
-    rtps/builtin/discovery/participant/PDPServerListener.cpp
-    rtps/builtin/discovery/participant/PDPClient.cpp
-    rtps/builtin/discovery/participant/PDPServer.cpp
-    rtps/builtin/discovery/participant/timedevent/DSClientEvent.cpp
-    rtps/builtin/discovery/participant/timedevent/DServerEvent.cpp
     rtps/builtin/discovery/endpoint/EDP.cpp
     rtps/builtin/discovery/endpoint/EDPSimple.cpp
-    rtps/builtin/discovery/endpoint/EDPClient.cpp
-    rtps/builtin/discovery/endpoint/EDPServer.cpp
     rtps/builtin/discovery/endpoint/EDPSimpleListeners.cpp
-    rtps/builtin/discovery/endpoint/EDPServerListeners.cpp
     rtps/builtin/discovery/endpoint/EDPStatic.cpp
     rtps/builtin/liveliness/WLP.cpp
     rtps/builtin/liveliness/WLPListener.cpp
@@ -193,13 +190,57 @@ set(${PROJECT_NAME}_source_files
     rtps/reader/StatelessPersistentReader.cpp
     rtps/reader/StatefulPersistentReader.cpp
     rtps/persistence/PersistenceFactory.cpp
-    
+
+    # old discovery-server sources
+
+    rtps/builtin/discovery/participant/timedevent/DSClientEvent.cpp
+    rtps/builtin/discovery/participant/timedevent/DServerEvent.cpp
+    rtps/builtin/discovery/participant/PDPClient.cpp
+    rtps/builtin/discovery/participant/PDPServer.cpp
+    rtps/builtin/discovery/participant/PDPServerListener.cpp
+    rtps/builtin/discovery/endpoint/EDPClient.cpp
+    rtps/builtin/discovery/endpoint/EDPServer.cpp
+    rtps/builtin/discovery/endpoint/EDPServerListeners.cpp
+
+    # new discovery-server sources
+
+#   rtps/builtin/discovery/database/DiscoveryDataFilter.hpp
+#   rtps/builtin/discovery/database/DiscoveryDataBase.hpp
+    rtps/builtin/discovery/database/DiscoveryDataBase.cpp
+#   rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.hpp
+    rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.cpp
+#   rtps/builtin/discovery/database/DiscoveryParticipantInfo.hpp
+    rtps/builtin/discovery/database/DiscoveryParticipantInfo.cpp
+#   rtps/builtin/discovery/database/DiscoverySharedInfo.hpp
+    rtps/builtin/discovery/database/DiscoverySharedInfo.cpp
+#   rtps/builtin/discovery/database/DiscoveryDataQueueInfo.hpp
+#   rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp
+    rtps/builtin/discovery/database/backup/SharedBackupFunctions.cpp
+
+#   rtps/builtin/discovery/participant/DSClientEvent2.hpp
+    rtps/builtin/discovery/participant/DSClientEvent2.cpp
+#   rtps/builtin/discovery/participant/DServerEvent2.hpp
+    rtps/builtin/discovery/participant/DServerEvent2.cpp
+#   rtps/builtin/discovery/participant/PDPClient2.hpp
+    rtps/builtin/discovery/participant/PDPClient2.cpp
+#   rtps/builtin/discovery/participant/PDPServer2.hpp
+    rtps/builtin/discovery/participant/PDPServer2.cpp
+#   rtps/builtin/discovery/participant/PDPServerListener2.hpp
+    rtps/builtin/discovery/participant/PDPServerListener2.cpp
+#   rtps/builtin/discovery/endpoint/EDPClient2.hpp
+    rtps/builtin/discovery/endpoint/EDPClient2.cpp
+#   rtps/builtin/discovery/endpoint/EDPServer2.hpp
+    rtps/builtin/discovery/endpoint/EDPServer2.cpp
+#   rtps/builtin/discovery/endpoint/EDPServerListeners2.hpp
+    rtps/builtin/discovery/endpoint/EDPServerListeners2.cpp
+
     utils/IPFinder.cpp
     utils/md5.cpp
     utils/StringMatching.cpp
     utils/IPLocator.cpp
     utils/System.cpp
     utils/TimedConditionVariable.cpp
+    utils/string_convert.cpp
 
     dds/core/types.cpp
     dds/core/Exception.cpp
@@ -239,7 +280,6 @@ set(${PROJECT_NAME}_security_source_files
     rtps/security/logging/Logging.cpp
     rtps/security/SecurityManager.cpp
     rtps/security/SecurityPluginFactory.cpp
-    security/OpenSSLInit.cpp
     security/authentication/PKIDH.cpp
     security/accesscontrol/Permissions.cpp
     security/cryptography/AESGCMGMAC.cpp
@@ -355,11 +395,19 @@ elseif(NOT EPROSIMA_INSTALLER)
     set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 
     option(INTERNAL_DEBUG "Activate developer debug messages" OFF)
-    
+
+    # make visual studio more clang like
+    if(MSVC)
+        # C4101 'identifier' : unreferenced local variable
+        # C4555 expression has no effect; expected expression with side-effect
+        target_compile_options(${PROJECT_NAME} PRIVATE /w34101 /w34555 )
+    endif(MSVC)
+
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         ${PROJECT_NAME_UPPER}_SOURCE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
+        SQLITE_WIN32_GETVERSIONEX=0
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
         $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
         $<$<AND:$<BOOL:${WIN32}>,$<STREQUAL:"${CMAKE_SYSTEM_NAME}","WindowsStore">>:_WIN32_WINNT=0x0603>
@@ -369,6 +417,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
         $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
         $<$<BOOL:${SHM_TRANSPORT_DEFAULT}>:SHM_TRANSPORT_BUILTIN> # Enable SHM as built-in transport
+        $<$<BOOL:${STDOUTERR_LOG_CONSUMER}>:STDOUTERR_LOG_CONSUMER> # Enable StdoutErrConsumer as default LogConsumer
         )
 
     # Define public headers
@@ -402,6 +451,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
         $<$<BOOL:${WIN32}>:iphlpapi$<SEMICOLON>Shlwapi>
         ${THIRDPARTY_BOOST_LINK_LIBS}
+        $<$<BOOL:${LINK_LIBATOMIC}>:atomic>
         )
 
     if(MSVC OR MSVC_IDE)
@@ -583,6 +633,10 @@ elseif(NOT EPROSIMA_INSTALLER)
         set(FASTRTPS_PACKAGE_OPT_BIN_DIR_CONDITION "if(MSVC OR MSVC_IDE)")
     else()
         set(FASTRTPS_PACKAGE_OPT_BIN_DIR_CONDITION "if(0)")
+    endif()
+
+    if(COMPILE_TOOLS)
+        set(INCLUDE_FASTDS_TARGETS "include(\${CMAKE_CURRENT_LIST_DIR}/fast-discovery-server-targets.cmake)")
     endif()
 
     # Add fastrtps dependencies in its CMake config file.
