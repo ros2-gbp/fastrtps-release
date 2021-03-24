@@ -1,4 +1,4 @@
-// Copyright 2019 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+// Copyright 2019, 2020 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
  * DataWriterImpl.cpp
  *
  */
+#include <fastrtps/config.h>
 
 #include <fastdds/publisher/DataWriterImpl.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
@@ -23,6 +24,7 @@
 #include <fastrtps/attributes/TopicAttributes.h>
 #include <fastdds/publisher/PublisherImpl.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
+#include <fastdds/dds/publisher/PublisherListener.hpp>
 
 #include <fastdds/rtps/writer/RTPSWriter.h>
 #include <fastdds/rtps/writer/StatefulWriter.h>
@@ -36,6 +38,9 @@
 #include <fastdds/rtps/resources/ResourceEvent.h>
 #include <fastdds/rtps/resources/TimedEvent.h>
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/core/policy/ParameterSerializer.hpp>
+
+#include <rtps/history/TopicPayloadPoolRegistry.hpp>
 
 #include <functional>
 #include <iostream>
@@ -63,7 +68,7 @@ DataWriterImpl::DataWriterImpl(
             // In future v2 changepool is in writer, and writer set this value to cachechagepool.
             + 20 /*SecureDataHeader*/ + 4 + ((2 * 16) /*EVP_MAX_IV_LENGTH max block size*/ - 1 ) /* SecureDataBodey*/
             + 16 + 4 /*SecureDataTag*/
-#endif
+#endif // if HAVE_SECURITY
             , qos_.endpoint().history_memory_policy)
     , listener_(listen)
 #pragma warning (disable : 4355 )
@@ -117,9 +122,11 @@ ReturnCode_t DataWriterImpl::enable()
     {
         property.name("partitions");
         std::string partitions;
+        bool is_first_partition = true;
         for (auto partition : publisher_->get_qos().partition().names())
         {
-            partitions += partition + ";";
+            partitions += (is_first_partition ? "" : ";") + partition;
+            is_first_partition = false;
         }
         property.value(std::move(partitions));
         w_att.endpoint.properties.properties().push_back(std::move(property));
@@ -132,33 +139,64 @@ ReturnCode_t DataWriterImpl::enable()
         w_att.keep_duration = qos_.reliable_writer_qos().disable_positive_acks.duration;
     }
 
+    auto pool = get_payload_pool();
     RTPSWriter* writer = RTPSDomain::createRTPSWriter(
         publisher_->rtps_participant(),
-        w_att,
+        w_att, pool,
         static_cast<WriterHistory*>(&history_),
         static_cast<WriterListener*>(&writer_listener_));
 
     if (writer == nullptr)
     {
+        release_payload_pool();
         logError(DATA_WRITER, "Problem creating associated Writer");
         return ReturnCode_t::RETCODE_ERROR;
     }
 
     writer_ = writer;
 
+    // In case it has been loaded from the persistence DB, rebuild instances on history
+    history_.rebuild_instances();
+
+    //TODO(Ricardo) This logic in a class. Then a user of rtps layer can use it.
+    if (high_mark_for_frag_ == 0)
+    {
+        RTPSParticipant* part = publisher_->rtps_participant();
+        uint32_t max_data_size = writer_->getMaxDataSize();
+        uint32_t writer_throughput_controller_bytes =
+                writer_->calculateMaxDataSize(qos_.throughput_controller().bytesPerPeriod);
+        uint32_t participant_throughput_controller_bytes =
+                writer_->calculateMaxDataSize(
+            part->getRTPSParticipantAttributes().throughputController.bytesPerPeriod);
+
+        high_mark_for_frag_ =
+                max_data_size > writer_throughput_controller_bytes ?
+                writer_throughput_controller_bytes :
+                (max_data_size > participant_throughput_controller_bytes ?
+                participant_throughput_controller_bytes :
+                max_data_size);
+        high_mark_for_frag_ &= ~3;
+    }
+
+    for (PublisherHistory::iterator it = history_.changesBegin(); it != history_.changesEnd(); it++)
+    {
+        WriteParams wparams;
+        set_fragment_size_on_change(wparams, *it, high_mark_for_frag_);
+    }
+
     deadline_timer_ = new TimedEvent(publisher_->get_participant()->get_resource_event(),
-        [&]() -> bool
-        {
-            return deadline_missed();
-        },
-        qos_.deadline().period.to_ns() * 1e-6);
+                    [&]() -> bool
+                    {
+                        return deadline_missed();
+                    },
+                    qos_.deadline().period.to_ns() * 1e-6);
 
     lifespan_timer_ = new TimedEvent(publisher_->get_participant()->get_resource_event(),
-        [&]() -> bool
-        {
-            return lifespan_expired();
-        },
-        qos_.lifespan().duration.to_ns() * 1e-6);
+                    [&]() -> bool
+                    {
+                        return lifespan_expired();
+                    },
+                    qos_.lifespan().duration.to_ns() * 1e-6);
 
     // REGISTER THE WRITER
     WriterQos wqos = qos_.get_writerqos(get_publisher()->get_qos(), topic_->get_qos());
@@ -185,6 +223,7 @@ DataWriterImpl::~DataWriterImpl()
     {
         logInfo(PUBLISHER, guid().entityId << " in topic: " << type_->getName());
         RTPSDomain::removeRTPSWriter(writer_);
+        release_payload_pool();
     }
 
     delete user_datawriter_;
@@ -230,7 +269,7 @@ ReturnCode_t DataWriterImpl::write(
         bool is_key_protected = false;
 #if HAVE_SECURITY
         is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif
+#endif // if HAVE_SECURITY
         type_.get()->getKey(data, &instance_handle, is_key_protected);
     }
 
@@ -274,7 +313,7 @@ fastrtps::rtps::InstanceHandle_t DataWriterImpl::register_instance(
     bool is_key_protected = false;
 #if HAVE_SECURITY
     is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif
+#endif // if HAVE_SECURITY
     type_->getKey(key, &instance_handle, is_key_protected);
 
     // Block lowlevel writer
@@ -286,7 +325,7 @@ fastrtps::rtps::InstanceHandle_t DataWriterImpl::register_instance(
     if (lock.try_lock_until(max_blocking_time))
 #else
     std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex());
-#endif
+#endif // if HAVE_STRICT_REALTIME
     {
         if (history_.register_instance(instance_handle, lock, max_blocking_time))
         {
@@ -325,12 +364,12 @@ ReturnCode_t DataWriterImpl::unregister_instance(
 
 #if !defined(NDEBUG)
     if (c_InstanceHandle_Unknown == ih)
-#endif
+#endif // if !defined(NDEBUG)
     {
         bool is_key_protected = false;
 #if HAVE_SECURITY
         is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif
+#endif // if HAVE_SECURITY
         type_->getKey(instance, &ih, is_key_protected);
     }
 
@@ -340,17 +379,19 @@ ReturnCode_t DataWriterImpl::unregister_instance(
         logError(PUBLISHER, "handle differs from data's key.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
-#endif
+#endif // if !defined(NDEBUG)
 
     if (history_.is_key_registered(ih))
     {
         WriteParams wparams;
-        ChangeKind_t change_kind = 
-            dispose ?  NOT_ALIVE_DISPOSED : (
-                qos_.writer_data_lifecycle().autodispose_unregistered_instances ?
-                NOT_ALIVE_DISPOSED_UNREGISTERED :
-                NOT_ALIVE_UNREGISTERED
-                );
+        ChangeKind_t change_kind = NOT_ALIVE_DISPOSED;
+        if (!dispose)
+        {
+            change_kind = qos_.writer_data_lifecycle().autodispose_unregistered_instances ?
+                    NOT_ALIVE_DISPOSED_UNREGISTERED :
+                    NOT_ALIVE_UNREGISTERED;
+        }
+
         if (create_new_change_with_params(change_kind, instance, wparams, ih))
         {
             returned_value = ReturnCode_t::RETCODE_OK;
@@ -412,7 +453,7 @@ bool DataWriterImpl::perform_create_new_change(
     if (lock.try_lock_until(max_blocking_time))
 #else
     std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex());
-#endif
+#endif // if HAVE_STRICT_REALTIME
     {
         CacheChange_t* ch = writer_->new_change(type_->getSerializedSizeProvider(data), change_kind, handle);
         if (ch != nullptr)
@@ -423,51 +464,16 @@ bool DataWriterImpl::perform_create_new_change(
                 if (!type_->serialize(data, &ch->serializedPayload))
                 {
                     logWarning(RTPS_WRITER, "RTPSWriter:Serialization returns false"; );
-                    history_.release_Cache(ch);
+                    writer_->release_change(ch);
                     return false;
                 }
             }
 
-            //TODO(Ricardo) This logic in a class. Then a user of rtps layer can use it.
-            if (high_mark_for_frag_ == 0)
-            {
-                RTPSParticipant* part = publisher_->rtps_participant();
-                uint32_t max_data_size = writer_->getMaxDataSize();
-                uint32_t writer_throughput_controller_bytes =
-                        writer_->calculateMaxDataSize(qos_.throughput_controller().bytesPerPeriod);
-                uint32_t participant_throughput_controller_bytes =
-                        writer_->calculateMaxDataSize(
-                    part->getRTPSParticipantAttributes().throughputController.bytesPerPeriod);
-
-                high_mark_for_frag_ =
-                        max_data_size > writer_throughput_controller_bytes ?
-                        writer_throughput_controller_bytes :
-                        (max_data_size > participant_throughput_controller_bytes ?
-                        participant_throughput_controller_bytes :
-                        max_data_size);
-                high_mark_for_frag_ &= ~3;
-            }
-
-            uint32_t final_high_mark_for_frag = high_mark_for_frag_;
-
-            // If needed inlineqos for related_sample_identity, then remove the inlinqos size from final fragment size.
-            if (wparams.related_sample_identity() != SampleIdentity::unknown())
-            {
-                final_high_mark_for_frag -= 32;
-            }
-
-            // If it is big data, fragment it.
-            if (ch->serializedPayload.length > final_high_mark_for_frag)
-            {
-                // Fragment the data.
-                // Set the fragment size to the cachechange.
-                ch->setFragmentSize(static_cast<uint16_t>(
-                            (std::min)(final_high_mark_for_frag, RTPSMessageGroup::get_max_fragment_payload_size())));
-            }
+            set_fragment_size_on_change(wparams, ch, high_mark_for_frag_);
 
             if (!this->history_.add_pub_change(ch, wparams, lock, max_blocking_time))
             {
-                history_.release_Cache(ch);
+                writer_->release_change(ch);
                 return false;
             }
 
@@ -494,7 +500,7 @@ bool DataWriterImpl::perform_create_new_change(
 
             if (qos_.lifespan().duration != c_TimeInfinite)
             {
-                lifespan_duration_us_ = duration<double, std::ratio<1, 1000000> >(
+                lifespan_duration_us_ = duration<double, std::ratio<1, 1000000>>(
                     qos_.lifespan().duration.to_ns() * 1e-3);
                 lifespan_timer_->update_interval_millisec(qos_.lifespan().duration.to_ns() * 1e-6);
                 lifespan_timer_->restart_timer();
@@ -523,7 +529,7 @@ bool DataWriterImpl::create_new_change_with_params(
         bool is_key_protected = false;
 #if HAVE_SECURITY
         is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif
+#endif // if HAVE_SECURITY
         type_->getKey(data, &handle, is_key_protected);
     }
 
@@ -580,7 +586,7 @@ ReturnCode_t DataWriterImpl::set_qos(
 {
     bool enabled = writer_ != nullptr;
     const DataWriterQos& qos_to_set = (&qos == &DATAWRITER_QOS_DEFAULT) ?
-        publisher_->get_default_datawriter_qos() : qos;
+            publisher_->get_default_datawriter_qos() : qos;
 
     // Default qos is always considered consistent
     if (&qos != &DATAWRITER_QOS_DEFAULT)
@@ -592,8 +598,8 @@ ReturnCode_t DataWriterImpl::set_qos(
         }
 
         if (publisher_->get_participant()->get_qos().allocation().data_limits.max_user_data != 0 &&
-            publisher_->get_participant()->get_qos().allocation().data_limits.max_user_data <
-            qos_to_set.user_data().getValue().size())
+                publisher_->get_participant()->get_qos().allocation().data_limits.max_user_data <
+                qos_to_set.user_data().getValue().size())
         {
             return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
         }
@@ -616,7 +622,7 @@ ReturnCode_t DataWriterImpl::set_qos(
         if (qos_.deadline().period != c_TimeInfinite)
         {
             deadline_duration_us_ =
-                duration<double, std::ratio<1, 1000000> >(qos_.deadline().period.to_ns() * 1e-3);
+                    duration<double, std::ratio<1, 1000000>>(qos_.deadline().period.to_ns() * 1e-3);
             deadline_timer_->update_interval_millisec(qos_.deadline().period.to_ns() * 1e-6);
         }
         else
@@ -628,7 +634,7 @@ ReturnCode_t DataWriterImpl::set_qos(
         if (qos_.lifespan().duration != c_TimeInfinite)
         {
             lifespan_duration_us_ =
-                duration<double, std::ratio<1, 1000000> >(qos_.lifespan().duration.to_ns() * 1e-3);
+                    duration<double, std::ratio<1, 1000000>>(qos_.lifespan().duration.to_ns() * 1e-3);
             lifespan_timer_->update_interval_millisec(qos_.lifespan().duration.to_ns() * 1e-6);
         }
         else
@@ -671,13 +677,27 @@ void DataWriterImpl::InnerDataWriterListener::onWriterMatched(
         RTPSWriter* /*writer*/,
         const PublicationMatchedStatus& info)
 {
-    if (data_writer_->listener_ != nullptr)
+    DataWriterListener* listener = data_writer_->get_listener_for(StatusMask::publication_matched());
+    if (listener != nullptr)
     {
-        data_writer_->listener_->on_publication_matched(
-            data_writer_->user_datawriter_, info);
+        listener->on_publication_matched(data_writer_->user_datawriter_, info);
     }
+}
 
-    data_writer_->publisher_->publisher_listener_.on_publication_matched(data_writer_->user_datawriter_, info);
+void DataWriterImpl::InnerDataWriterListener::on_offered_incompatible_qos(
+        RTPSWriter* /*writer*/,
+        fastdds::dds::PolicyMask qos)
+{
+    data_writer_->update_offered_incompatible_qos(qos);
+    DataWriterListener* listener = data_writer_->get_listener_for(StatusMask::offered_incompatible_qos());
+    if (listener != nullptr)
+    {
+        OfferedIncompatibleQosStatus callback_status;
+        if (data_writer_->get_offered_incompatible_qos_status(callback_status) == ReturnCode_t::RETCODE_OK)
+        {
+            listener->on_offered_incompatible_qos(data_writer_->user_datawriter_, callback_status);
+        }
+    }
 }
 
 void DataWriterImpl::InnerDataWriterListener::onWriterChangeReceivedByAll(
@@ -700,12 +720,12 @@ void DataWriterImpl::InnerDataWriterListener::on_liveliness_lost(
         fastrtps::rtps::RTPSWriter* /*writer*/,
         const fastrtps::LivelinessLostStatus& status)
 {
-    if (data_writer_->listener_ != nullptr)
+    DataWriterListener* listener = data_writer_->get_listener_for(StatusMask::liveliness_lost());
+    if (listener != nullptr)
     {
-        data_writer_->listener_->on_liveliness_lost(data_writer_->user_datawriter_, status);
+        listener->on_liveliness_lost(
+            data_writer_->user_datawriter_, status);
     }
-
-    data_writer_->publisher_->publisher_listener_.on_liveliness_lost(data_writer_->user_datawriter_, status);
 }
 
 ReturnCode_t DataWriterImpl::wait_for_acknowledgments(
@@ -779,6 +799,21 @@ ReturnCode_t DataWriterImpl::get_offered_deadline_missed_status(
 
     status = deadline_missed_status_;
     deadline_missed_status_.total_count_change = 0;
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataWriterImpl::get_offered_incompatible_qos_status(
+        OfferedIncompatibleQosStatus& status)
+{
+    if (writer_ == nullptr)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
+    std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex());
+
+    status = offered_incompatible_qos_status_;
+    offered_incompatible_qos_status_.total_count_change = 0u;
     return ReturnCode_t::RETCODE_OK;
 }
 
@@ -899,6 +934,22 @@ fastrtps::TopicAttributes DataWriterImpl::get_topic_attributes(
         topic_att.type_information = *type->type_information();
     }
     return topic_att;
+}
+
+OfferedIncompatibleQosStatus& DataWriterImpl::update_offered_incompatible_qos(
+        PolicyMask incompatible_policies)
+{
+    ++offered_incompatible_qos_status_.total_count;
+    ++offered_incompatible_qos_status_.total_count_change;
+    for (uint32_t id = 1; id < NEXT_QOS_POLICY_ID; ++id)
+    {
+        if (incompatible_policies.test(id))
+        {
+            ++offered_incompatible_qos_status_.policies[static_cast<QosPolicyId_t>(id)].count;
+            offered_incompatible_qos_status_.last_policy_id = static_cast<QosPolicyId_t>(id);
+        }
+    }
+    return offered_incompatible_qos_status_;
 }
 
 void DataWriterImpl::set_qos(
@@ -1087,6 +1138,65 @@ bool DataWriterImpl::can_qos_be_updated(
         logWarning(RTPS_QOS_CHECK, "Destination order Kind cannot be changed after the creation of a DataWriter.");
     }
     return updatable;
+}
+
+DataWriterListener* DataWriterImpl::get_listener_for(
+        const StatusMask& status)
+{
+    if (listener_ != nullptr &&
+            user_datawriter_->get_status_mask().is_active(status))
+    {
+        return listener_;
+    }
+    return publisher_->get_listener_for(status);
+}
+
+void DataWriterImpl::set_fragment_size_on_change(
+        WriteParams& wparams,
+        CacheChange_t* ch,
+        const uint32_t& high_mark_for_frag)
+{
+    uint32_t final_high_mark_for_frag = high_mark_for_frag;
+
+    // If needed inlineqos for related_sample_identity, then remove the inlinqos size from final fragment size.
+    if (wparams.related_sample_identity() != SampleIdentity::unknown())
+    {
+        final_high_mark_for_frag -= (
+            ParameterSerializer<Parameter_t>::PARAMETER_SENTINEL_SIZE +
+            ParameterSerializer<Parameter_t>::PARAMETER_SAMPLE_IDENTITY_SIZE);
+    }
+
+    // If it is big data, fragment it.
+    if (ch->serializedPayload.length > final_high_mark_for_frag)
+    {
+        // Fragment the data.
+        // Set the fragment size to the cachechange.
+        ch->setFragmentSize(static_cast<uint16_t>(
+                    (std::min)(final_high_mark_for_frag, RTPSMessageGroup::get_max_fragment_payload_size())));
+    }
+}
+
+std::shared_ptr<IPayloadPool> DataWriterImpl::get_payload_pool()
+{
+    PoolConfig config = PoolConfig::from_history_attributes(history_.m_att);
+
+    if (!payload_pool_)
+    {
+        payload_pool_ = TopicPayloadPoolRegistry::get(topic_->get_name(), config);
+    }
+
+    payload_pool_->reserve_history(config, false);
+    return payload_pool_;
+}
+
+void DataWriterImpl::release_payload_pool()
+{
+    assert(payload_pool_);
+
+    PoolConfig config = PoolConfig::from_history_attributes(history_.m_att);
+    payload_pool_->release_history(config, false);
+
+    TopicPayloadPoolRegistry::release(payload_pool_);
 }
 
 } // namespace dds

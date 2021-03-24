@@ -19,8 +19,12 @@
 #ifndef _FASTDDS_RTPS_WRITERHISTORY_H_
 #define _FASTDDS_RTPS_WRITERHISTORY_H_
 
+#include <condition_variable>
+
 #include <fastrtps/rtps/common/CacheChange.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
+#include <fastrtps/utils/TimedMutex.hpp>
+#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 
 #include <gmock/gmock.h>
 
@@ -28,68 +32,134 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+class ReaderProxy;
+class RTPSWriter;
+
 class WriterHistory
 {
-    public:
+public:
 
+    WriterHistory(
+            const HistoryAttributes& /*att*/)
+        : samples_number_(0)
+    {
+    }
 
-        WriterHistory(const HistoryAttributes& /*att*/) : samples_number_(0) {}
+    WriterHistory()
+        : samples_number_(0)
+    {
+    }
 
-        WriterHistory() : samples_number_(0) {}
+    using iterator = std::vector<CacheChange_t*>::iterator;
 
-        MOCK_METHOD1(release_Cache, bool (CacheChange_t* change));
+    // *INDENT-OFF* Uncrustify makes a mess with MOCK_METHOD macros
+    MOCK_METHOD1(add_change_mock, bool(CacheChange_t*));
+    // *INDENT-ON*
 
-        MOCK_METHOD1(add_change_mock, bool(CacheChange_t*));
+    bool add_change(
+            CacheChange_t* change)
+    {
+        bool ret = add_change_mock(change);
+        samples_number_mutex_.lock();
+        ++samples_number_;
+        change->sequenceNumber = ++last_sequence_number_;
+        samples_number_mutex_.unlock();
+        samples_number_cond_.notify_all();
+        return ret;
+    }
 
-        bool add_change(CacheChange_t* change)
+    // *INDENT-OFF* Uncrustify makes a mess with MOCK_METHOD macros
+    MOCK_METHOD3(get_change, bool(
+            const SequenceNumber_t& seq,
+            const GUID_t& guid,
+            CacheChange_t** change));
+
+    MOCK_METHOD1(get_earliest_change, bool(
+            CacheChange_t** change));
+
+    MOCK_METHOD1(remove_change, bool(const SequenceNumber_t&));
+
+    MOCK_METHOD1(remove_change_and_reuse, CacheChange_t*(const SequenceNumber_t&));
+
+    MOCK_METHOD1(remove_change_mock, bool(CacheChange_t*));
+
+    MOCK_METHOD0(getHistorySize, size_t());
+
+    MOCK_METHOD0(remove_min_change, bool());
+
+    MOCK_METHOD3(add_change_, bool(
+            CacheChange_t* a_change,
+            WriteParams &wparams,
+            std::chrono::time_point<std::chrono::steady_clock> max_blocking_time));
+
+    MOCK_METHOD2(add_change_, bool(
+            CacheChange_t* a_change,
+            WriteParams &wparams));
+    // *INDENT-ON*
+
+    bool remove_change(
+            CacheChange_t* change)
+    {
+        bool ret = remove_change_mock(change);
+        delete change;
+        return ret;
+    }
+
+    void wait_for_more_samples_than(
+            unsigned int minimum)
+    {
+        std::unique_lock<std::mutex> lock(samples_number_mutex_);
+
+        if (samples_number_ <= minimum)
         {
-            bool ret = add_change_mock(change);
-            samples_number_mutex_.lock();
-            ++samples_number_;
-            change->sequenceNumber = ++last_sequence_number_;
-            samples_number_mutex_.unlock();
-            samples_number_cond_.notify_all();
-            return ret;
+            samples_number_cond_.wait(lock, [&]()
+                    {
+                        return samples_number_ > minimum;
+                    });
         }
+    }
 
-        MOCK_METHOD3(get_change, bool(const SequenceNumber_t& seq, const GUID_t& guid, CacheChange_t** change));
+    SequenceNumber_t next_sequence_number() const
+    {
+        return last_sequence_number_ + 1;
+    }
 
-        MOCK_METHOD1(remove_change, bool (const SequenceNumber_t&));
+    std::vector<CacheChange_t*>::iterator changesBegin()
+    {
+        return m_changes.begin();
+    }
 
-        MOCK_METHOD1(remove_change_and_reuse, CacheChange_t* (const SequenceNumber_t&));
+    std::vector<CacheChange_t*>::reverse_iterator changesRbegin()
+    {
+        return m_changes.rbegin();
+    }
 
-        MOCK_METHOD1(remove_change_mock, bool (CacheChange_t*));
+    std::vector<CacheChange_t*>::iterator changesEnd()
+    {
+        return m_changes.end();
+    }
 
-        bool remove_change(CacheChange_t* change)
-        {
-            bool ret = remove_change_mock(change);
-            delete change;
-            return ret;
-        }
+    std::vector<CacheChange_t*>::reverse_iterator changesRend()
+    {
+        return m_changes.rend();
+    }
 
-        void wait_for_more_samples_than(unsigned int minimum)
-        {
-            std::unique_lock<std::mutex> lock(samples_number_mutex_);
+    inline RecursiveTimedMutex* getMutex()
+    {
+        return mp_mutex;
+    }
 
-            if(samples_number_ <= minimum)
-            {
-                samples_number_cond_.wait(lock, [&]() {return samples_number_ > minimum;});
-            }
-        }
+    HistoryAttributes m_att;
+    std::vector<CacheChange_t*> m_changes;
 
-        SequenceNumber_t next_sequence_number() const
-        {
-            return last_sequence_number_ + 1;
-        }
+    std::condition_variable samples_number_cond_;
+    std::mutex samples_number_mutex_;
+    unsigned int samples_number_;
+    SequenceNumber_t last_sequence_number_;
+    RecursiveTimedMutex* mp_mutex;
+    bool m_isHistoryFull;
+    RTPSWriter* mp_writer;
 
-        HistoryAttributes m_att;
-
-    private:
-
-        std::condition_variable samples_number_cond_;
-        std::mutex samples_number_mutex_;
-        unsigned int samples_number_;
-        SequenceNumber_t last_sequence_number_;
 };
 
 } // namespace rtps
@@ -97,3 +167,4 @@ class WriterHistory
 } // namespace eprosima
 
 #endif // _FASTDDS_RTPS_WRITERHISTORY_H_
+

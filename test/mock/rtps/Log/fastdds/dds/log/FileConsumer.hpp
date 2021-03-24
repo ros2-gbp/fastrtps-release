@@ -17,26 +17,31 @@
  *
  */
 
-#ifndef _FASTDDS_FILE_CONSUMER_HPP_
-#define _FASTDDS_FILE_CONSUMER_HPP_
+#ifndef _FASTDDS_DDS_LOG_FILECONSUMER_HPP_
+#define _FASTDDS_DDS_LOG_FILECONSUMER_HPP_
 
 #include <gmock/gmock.h>
 
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/dds/log/OStreamConsumer.hpp>
 
 namespace eprosima {
 namespace fastdds {
 namespace dds {
 
-class FileConsumer : public LogConsumer
+class FileConsumer : public OStreamConsumer
 {
-    public:
+public:
 
-        FileConsumer() = default;
+    FileConsumer() = default;
 
-        FileConsumer(const std::string &, bool = false) {};
+    FileConsumer(
+            const std::string&,
+            bool = false)
+    {
+    }
 
-        virtual ~FileConsumer() {}
+    virtual ~FileConsumer() = default;
 };
 
 MATCHER(IsFileConsumer, "Argument is a FileConsumer object?")
@@ -49,4 +54,4 @@ MATCHER(IsFileConsumer, "Argument is a FileConsumer object?")
 } // namespace fastdds
 } // namespace eprosima
 
-#endif // _FASTDDS_FILE_CONSUMER_HPP_
+#endif // _FASTDDS_DDS_LOG_FILECONSUMER_HPP_

@@ -26,6 +26,7 @@
 #include <fastdds/dds/publisher/PublisherListener.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+#include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
 
 #include <fastdds/rtps/participant/RTPSParticipant.h>
@@ -157,7 +158,7 @@ ReturnCode_t PublisherImpl::set_qos(
     bool enabled = user_publisher_->is_enabled();
 
     const PublisherQos& qos_to_set = (&qos == &PUBLISHER_QOS_DEFAULT) ?
-        participant_->get_default_publisher_qos() : qos;
+            participant_->get_default_publisher_qos() : qos;
 
     if (&qos != &PUBLISHER_QOS_DEFAULT)
     {
@@ -308,21 +309,26 @@ ReturnCode_t PublisherImpl::delete_datawriter(
     {
         return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
-    std::lock_guard<std::mutex> lock(mtx_writers_);
+    std::unique_lock<std::mutex> lock(mtx_writers_);
     auto vit = writers_.find(writer->get_topic()->get_name());
     if (vit != writers_.end())
     {
         auto dw_it = std::find(vit->second.begin(), vit->second.end(), writer->impl_);
         if (dw_it != vit->second.end())
         {
-            (*dw_it)->set_listener(nullptr);
-            (*dw_it)->get_topic()->get_impl()->dereference();
-            delete (*dw_it);
+            //First extract the writer from the maps to free the mutex
+            DataWriterImpl* writer_impl = *dw_it;
+            writer_impl->set_listener(nullptr);
             vit->second.erase(dw_it);
             if (vit->second.empty())
             {
                 writers_.erase(vit);
             }
+            lock.unlock();
+
+            //Now we can delete it
+            writer_impl->get_topic()->get_impl()->dereference();
+            delete (writer_impl);
             return ReturnCode_t::RETCODE_OK;
         }
     }
@@ -447,6 +453,21 @@ const DataWriterQos& PublisherImpl::get_default_datawriter_qos() const
     return default_datawriter_qos_;
 }
 
+const ReturnCode_t PublisherImpl::get_datawriter_qos_from_profile(
+        const std::string& profile_name,
+        DataWriterQos& qos) const
+{
+    PublisherAttributes attr;
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(profile_name, attr))
+    {
+        qos = default_datawriter_qos_;
+        set_qos_from_attributes(qos, attr);
+        return ReturnCode_t::RETCODE_OK;
+    }
+
+    return ReturnCode_t::RETCODE_BAD_PARAMETER;
+}
+
 /* TODO
    bool PublisherImpl::copy_from_topic_qos(
         fastrtps::WriterQos&,
@@ -563,6 +584,17 @@ bool PublisherImpl::can_qos_be_updated(
     (void) to;
     (void) from;
     return true;
+}
+
+PublisherListener* PublisherImpl::get_listener_for(
+        const StatusMask& status)
+{
+    if (listener_ != nullptr &&
+            user_publisher_->get_status_mask().is_active(status))
+    {
+        return listener_;
+    }
+    return participant_->get_listener_for(status);
 }
 
 } // dds

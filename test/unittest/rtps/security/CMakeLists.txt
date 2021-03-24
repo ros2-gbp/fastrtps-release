@@ -26,10 +26,14 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
 
         set(SOURCES_SECURITY_TEST_SOURCE
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/security/logging/Logging.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/history/TopicPayloadPool.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/history/TopicPayloadPoolRegistry.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEvent.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEventImpl.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/ResourceEvent.cpp
@@ -58,6 +62,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         target_compile_definitions(SecurityAuthentication PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(SecurityAuthentication PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
+            ${OPENSSL_INCLUDE_DIR}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/SecurityPluginFactory
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
@@ -79,7 +84,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(SecurityAuthentication fastcdr ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES})
+        target_link_libraries(SecurityAuthentication fastcdr
+            ${GTEST_LIBRARIES}
+            ${GMOCK_LIBRARIES}
+            ${OPENSSL_LIBRARIES}
+            )
         add_gtest(SecurityAuthentication
             SOURCES
             ${CMAKE_CURRENT_SOURCE_DIR}/SecurityInitializationTests.cpp

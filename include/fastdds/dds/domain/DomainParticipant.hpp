@@ -39,8 +39,8 @@ using eprosima::fastrtps::types::ReturnCode_t;
 namespace dds {
 namespace domain {
 class DomainParticipant;
-}
-}
+} // namespace domain
+} // namespace dds
 
 namespace eprosima {
 namespace fastrtps {
@@ -109,12 +109,22 @@ public:
             const DomainParticipantQos& qos) const;
 
     /**
-     * Allows modifying the DomainParticipantListener.
-     * @param listener
+     * Modifies the DomainParticipantListener, sets the mask to StatusMask::all()
+     * @param listener new value for the DomainParticipantListener
      * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t set_listener(
             DomainParticipantListener* listener);
+
+    /**
+     * Modifies the DomainParticipantListener.
+     * @param listener new value for the DomainParticipantListener
+     * @param mask StatusMask that holds statuses the listener responds to
+     * @return RETCODE_OK
+     */
+    RTPS_DllAPI ReturnCode_t set_listener(
+            DomainParticipantListener* listener,
+            const StatusMask& mask);
 
     /**
      * Allows accessing the DomainParticipantListener.
@@ -363,6 +373,16 @@ public:
             PublisherQos& qos) const;
 
     /**
+     * Fills the PublisherQos with the values of the XML profile.
+     * @param profile_name Publisher profile name.
+     * @param qos PublisherQos object where the qos is returned.
+     * @return RETCODE_OK if the profile exists. RETCODE_BAD_PARAMETER otherwise.
+     */
+    RTPS_DllAPI ReturnCode_t get_publisher_qos_from_profile(
+            const std::string& profile_name,
+            PublisherQos& qos) const;
+
+    /**
      * This operation sets a default value of the Subscriber QoS policies that will be used for newly created
      * Subscriber entities in the case where the QoS policies are defaulted in the create_subscriber operation.
      *
@@ -402,6 +422,15 @@ public:
     RTPS_DllAPI ReturnCode_t get_default_subscriber_qos(
             SubscriberQos& qos) const;
 
+    /**
+     * Fills the SubscriberQos with the values of the XML profile.
+     * @param profile_name Subscriber profile name.
+     * @param qos SubscriberQos object where the qos is returned.
+     * @return RETCODE_OK if the profile exists. RETCODE_BAD_PARAMETER otherwise.
+     */
+    RTPS_DllAPI ReturnCode_t get_subscriber_qos_from_profile(
+            const std::string& profile_name,
+            SubscriberQos& qos) const;
 
     /**
      * This operation sets a default value of the Topic QoS policies which will be used for newly created
@@ -442,6 +471,17 @@ public:
      */
     RTPS_DllAPI ReturnCode_t get_default_topic_qos(
             TopicQos& qos) const;
+
+    /**
+     * Fills the TopicQos with the values of the XML profile.
+     * @param profile_name Topic profile name.
+     * @param qos TopicQos object where the qos is returned.
+     * @return RETCODE_OK if the profile exists. RETCODE_BAD_PARAMETER otherwise.
+     */
+    RTPS_DllAPI ReturnCode_t get_topic_qos_from_profile(
+            const std::string& profile_name,
+            TopicQos& qos) const;
+
 
     /* TODO
        bool get_discovered_participants(
@@ -585,7 +625,7 @@ public:
      */
     bool has_active_entities();
 
-private:
+protected:
 
     RTPS_DllAPI DomainParticipant(
             const StatusMask& mask = StatusMask::all());

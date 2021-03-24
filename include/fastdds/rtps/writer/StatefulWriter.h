@@ -22,6 +22,9 @@
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include <fastdds/rtps/writer/RTPSWriter.h>
+#include <fastdds/rtps/writer/IReaderDataFilter.hpp>
+#include <fastdds/rtps/history/IChangePool.h>
+#include <fastdds/rtps/history/IPayloadPool.h>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
 #include <condition_variable>
 #include <mutex>
@@ -51,13 +54,43 @@ protected:
 
     //!Constructor
     StatefulWriter(
-            RTPSParticipantImpl*,
+            RTPSParticipantImpl* impl,
             const GUID_t& guid,
             const WriterAttributes& att,
             WriterHistory* hist,
             WriterListener* listen = nullptr);
 
+    StatefulWriter(
+            RTPSParticipantImpl* impl,
+            const GUID_t& guid,
+            const WriterAttributes& att,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            WriterHistory* hist,
+            WriterListener* listen = nullptr);
+
+    StatefulWriter(
+            RTPSParticipantImpl* impl,
+            const GUID_t& guid,
+            const WriterAttributes& att,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            const std::shared_ptr<IChangePool>& change_pool,
+            WriterHistory* hist,
+            WriterListener* listen = nullptr);
+
+    void rebuild_status_after_load();
+
+    virtual void print_inconsistent_acknack(
+            const GUID_t& writer_guid,
+            const GUID_t& reader_guid,
+            const SequenceNumber_t& min_requested_sequence_number,
+            const SequenceNumber_t& max_requested_sequence_number,
+            const SequenceNumber_t& next_sequence_number);
+
 private:
+
+    void init(
+            RTPSParticipantImpl* pimpl,
+            const WriterAttributes& att);
 
     //!Timed Event to manage the periodic HB to the Reader.
     TimedEvent* periodic_hb_event_;
@@ -83,6 +116,8 @@ private:
 
     //!To avoid notifying twice of the same sequence number
     SequenceNumber_t next_all_acked_notify_sequence_;
+    SequenceNumber_t min_readers_low_mark_;
+
     // TODO Join this mutex when main mutex would not be recursive.
     std::mutex all_acked_mutex_;
     std::condition_variable all_acked_cond_;
@@ -162,6 +197,20 @@ public:
 
     bool is_acked_by_all(
             const CacheChange_t* a_change) const override;
+
+    template <typename Function>
+    Function for_each_reader_proxy(
+            Function f) const
+    {
+        // we cannot directly pass iterators neither const_iterators to matched_readers_ because then the functor would
+        // be able to modify ReaderProxy elements
+        for ( const ReaderProxy* rp : matched_readers_ )
+        {
+            f(rp);
+        }
+
+        return f;
+    }
 
     bool wait_for_all_acked(
             const Duration_t& max_wait) override;
@@ -257,7 +306,8 @@ public:
      */
     void send_heartbeat_to_nts(
             ReaderProxy& remoteReaderProxy,
-            bool liveliness = false);
+            bool liveliness = false,
+            bool force = false);
 
     void perform_nack_response();
 
@@ -301,6 +351,18 @@ public:
             const SequenceNumber_t& seq_num,
             const FragmentNumberSet_t fragments_state,
             bool& result) override;
+
+    /**
+     * @brief Set a reader data filter to filter data in ReaderProxies
+     * @param reader_data_filter The reader data filter
+     */
+    void reader_data_filter(
+            fastdds::rtps::IReaderDataFilter* reader_data_filter);
+
+    /**
+     * @brief Get the reader data filter used to filter data in ReaderProxies
+     */
+    const fastdds::rtps::IReaderDataFilter* reader_data_filter() const;
 
 private:
 
@@ -346,12 +408,16 @@ private:
     bool send_hole_gaps_to_group(
             RTPSMessageGroup& group);
 
+    void select_all_readers_with_lowmark_below(
+            SequenceNumber_t seq,
+            RTPSMessageGroup& group);
+
     //! True to disable piggyback heartbeats
     bool disable_heartbeat_piggyback_;
     //! True to disable positive ACKs
     bool disable_positive_acks_;
     //! Keep duration for disable positive ACKs QoS, in microseconds
-    std::chrono::duration<double, std::ratio<1, 1000000> > keep_duration_us_;
+    std::chrono::duration<double, std::ratio<1, 1000000>> keep_duration_us_;
     //! Last acknowledged cache change (only used if using disable positive ACKs QoS)
     SequenceNumber_t last_sequence_number_;
     //! Biggest sequence number removed from history
@@ -361,18 +427,21 @@ private:
 
     int32_t currentUsageSendBufferSize_;
 
-    std::vector<std::unique_ptr<FlowController> > m_controllers;
+    std::vector<std::unique_ptr<FlowController>> m_controllers;
 
     bool there_are_remote_readers_ = false;
     bool there_are_local_readers_ = false;
 
     StatefulWriter& operator =(
             const StatefulWriter&) = delete;
+
+    //! The filter for the reader
+    fastdds::rtps::IReaderDataFilter* reader_data_filter_ = nullptr;
 };
 
 } /* namespace rtps */
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_RTPS_STATEFULWRITER_H_ */

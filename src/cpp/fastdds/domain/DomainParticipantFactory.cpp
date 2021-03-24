@@ -32,6 +32,8 @@
 #include <fastrtps/types/DynamicDataFactory.h>
 #include <fastrtps/types/TypeObjectFactory.h>
 
+#include <rtps/history/TopicPayloadPoolRegistry.hpp>
+
 using namespace eprosima::fastrtps::xmlparser;
 
 using eprosima::fastrtps::ParticipantAttributes;
@@ -65,22 +67,6 @@ static void set_qos_from_attributes(
     qos.name() = attr.getName();
 }
 
-class DomainParticipantFactoryReleaser
-{
-public:
-
-    ~DomainParticipantFactoryReleaser()
-    {
-        DomainParticipantFactory::delete_instance();
-    }
-
-};
-
-static bool g_instance_initialized = false;
-static std::mutex g_mtx;
-static DomainParticipantFactoryReleaser s_releaser;
-static DomainParticipantFactory* g_instance = nullptr;
-
 DomainParticipantFactory::DomainParticipantFactory()
     : default_xml_profiles_loaded(false)
     , default_participant_qos_(PARTICIPANT_QOS_DEFAULT)
@@ -113,36 +99,19 @@ DomainParticipantFactory::~DomainParticipantFactory()
 
 DomainParticipantFactory* DomainParticipantFactory::get_instance()
 {
-    if (!g_instance_initialized)
-    {
-        std::lock_guard<std::mutex> lock(g_mtx);
-        if (g_instance == nullptr)
-        {
-            g_instance = new DomainParticipantFactory();
-            g_instance_initialized = true;
-        }
-    }
-    return g_instance;
-}
+    // Keep a reference to the topic payload pool to avoid it to be destroyed before our own instance
+    using pool_registry_ref = eprosima::fastrtps::rtps::TopicPayloadPoolRegistry::reference;
+    static pool_registry_ref topic_pool_registry = eprosima::fastrtps::rtps::TopicPayloadPoolRegistry::instance();
 
-bool DomainParticipantFactory::delete_instance()
-{
-    std::lock_guard<std::mutex> lock(g_mtx);
-    if (g_instance_initialized && g_instance != nullptr)
-    {
-        delete g_instance;
-        g_instance = nullptr;
-        g_instance_initialized = false;
-        return true;
-    }
-    return false;
+    static DomainParticipantFactory instance;
+    return &instance;
 }
 
 ReturnCode_t DomainParticipantFactory::delete_participant(
         DomainParticipant* part)
 {
     using PartVectorIt = std::vector<DomainParticipantImpl*>::iterator;
-    using VectorIt = std::map<DomainId_t, std::vector<DomainParticipantImpl*> >::iterator;
+    using VectorIt = std::map<DomainId_t, std::vector<DomainParticipantImpl*>>::iterator;
 
     if (part != nullptr)
     {
@@ -197,7 +166,7 @@ DomainParticipant* DomainParticipantFactory::create_participant(
 
     {
         std::lock_guard<std::mutex> guard(mtx_participants_);
-        using VectorIt = std::map<DomainId_t, std::vector<DomainParticipantImpl*> >::iterator;
+        using VectorIt = std::map<DomainId_t, std::vector<DomainParticipantImpl*>>::iterator;
         VectorIt vector_it = participants_.find(did);
 
         if (vector_it == participants_.end())
@@ -238,6 +207,25 @@ DomainParticipant* DomainParticipantFactory::create_participant_with_profile(
         DomainParticipantQos qos = default_participant_qos_;
         set_qos_from_attributes(qos, attr.rtps);
         return create_participant(did, qos, listen, mask);
+    }
+
+    return nullptr;
+}
+
+DomainParticipant* DomainParticipantFactory::create_participant_with_profile(
+        const std::string& profile_name,
+        DomainParticipantListener* listen,
+        const StatusMask& mask)
+{
+    load_profiles();
+
+    // TODO (Miguel C): Change when we have full XML support for DDS QoS profiles
+    ParticipantAttributes attr;
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr))
+    {
+        DomainParticipantQos qos = default_participant_qos_;
+        set_qos_from_attributes(qos, attr.rtps);
+        return create_participant(attr.domainId, qos, listen, mask);
     }
 
     return nullptr;
@@ -306,13 +294,30 @@ ReturnCode_t DomainParticipantFactory::set_default_participant_qos(
     return ReturnCode_t::RETCODE_OK;
 }
 
+ReturnCode_t DomainParticipantFactory::get_participant_qos_from_profile(
+        const std::string& profile_name,
+        DomainParticipantQos& qos) const
+{
+    ParticipantAttributes attr;
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr))
+    {
+        qos = default_participant_qos_;
+        set_qos_from_attributes(qos, attr.rtps);
+        return ReturnCode_t::RETCODE_OK;
+    }
+
+    return ReturnCode_t::RETCODE_BAD_PARAMETER;
+}
+
 ReturnCode_t DomainParticipantFactory::load_profiles()
 {
     if (false == default_xml_profiles_loaded)
     {
         XMLProfileManager::loadDefaultXMLFile();
+        // Only load profile once
         default_xml_profiles_loaded = true;
 
+        // Only change default participant qos when not explicitly set by the user
         if (default_participant_qos_ == PARTICIPANT_QOS_DEFAULT)
         {
             reset_default_participant_qos();

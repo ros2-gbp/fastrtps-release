@@ -83,6 +83,18 @@ public:
             const StatusMask& mask = StatusMask::all());
 
     /**
+     * Create a Participant.
+     * @param profile_name Participant profile name.
+     * @param listener DomainParticipantListener Pointer (default: nullptr)
+     * @param mask StatusMask Reference (default: all)
+     * @return DomainParticipant pointer. (nullptr if not created.)
+     */
+    RTPS_DllAPI DomainParticipant* create_participant_with_profile(
+            const std::string& profile_name,
+            DomainParticipantListener* listener = nullptr,
+            const StatusMask& mask = StatusMask::all());
+
+    /**
      * This operation retrieves a previously created DomainParticipant belonging to specified domain_id.
      * If no such DomainParticipant exists, the operation will return 'nullptr'.
      * If multiple DomainParticipant entities belonging to that domain_id exist,
@@ -142,6 +154,16 @@ public:
             const DomainParticipantQos& qos);
 
     /**
+     * Fills the DomainParticipantQos with the values of the XML profile.
+     * @param profile_name DomainParticipant profile name.
+     * @param qos DomainParticipantQos object where the qos is returned.
+     * @return RETCODE_OK if the profile exists. RETCODE_BAD_PARAMETER otherwise.
+     */
+    RTPS_DllAPI ReturnCode_t get_participant_qos_from_profile(
+            const std::string& profile_name,
+            DomainParticipantQos& qos) const;
+
+    /**
      * Remove a Participant and all associated publishers and subscribers.
      * @param part Pointer to the participant.
      * @return RETCODE_PRECONDITION_NOT_MET if the participant has active entities, RETCODE_OK if the participant is correctly
@@ -187,20 +209,23 @@ public:
     RTPS_DllAPI ReturnCode_t set_qos(
             const DomainParticipantFactoryQos& qos);
 
-private:
+protected:
 
-    friend class DomainParticipantFactoryReleaser;
     friend class DomainParticipant;
 
-    std::map<DomainId_t, std::vector<DomainParticipantImpl*> > participants_;
+    std::map<DomainId_t, std::vector<DomainParticipantImpl*>> participants_;
 
     DomainParticipantFactory();
 
     virtual ~DomainParticipantFactory();
 
-    void reset_default_participant_qos();
+    DomainParticipantFactory (
+            const DomainParticipantFactory&) = delete;
 
-    static bool delete_instance();
+    void operator = (
+            const DomainParticipantFactory&) = delete;
+
+    void reset_default_participant_qos();
 
     static void set_qos(
             DomainParticipantFactoryQos& to,

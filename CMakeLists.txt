@@ -136,6 +136,7 @@ else()
     set(CMAKE_CXX_FLAGS
         "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-unknown-pragmas -Wno-error=deprecated-declarations")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-undefined,error")
@@ -219,12 +220,16 @@ include(${PROJECT_SOURCE_DIR}/cmake/common/eprosima_libraries.cmake)
 eprosima_find_package(fastcdr REQUIRED)
 eprosima_find_thirdparty(Asio asio)
 eprosima_find_thirdparty(TinyXML2 tinyxml2)
+
 find_package(foonathan_memory REQUIRED)
+message(STATUS "Found foonathan_memory: ${foonathan_memory_DIR}")
 find_package(ThirdpartyBoost REQUIRED)
 
 if(ANDROID)
     eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
 endif()
+
+include_directories(thirdparty/nlohmann-json)
 
 ###############################################################################
 # Options
@@ -259,10 +264,25 @@ option(SQLITE3_SUPPORT "Activate SQLITE3 support" ON)
 ###############################################################################
 # SHM as Default transport
 ###############################################################################
-option(SHM_TRANSPORT_DEFAULT "Adds SHM transport to the default transports" OFF)
+option(SHM_TRANSPORT_DEFAULT "Adds SHM transport to the default transports" ON)
 
-if(EPROSIMA_BUILD)
-    set(SHM_TRANSPORT_DEFAULT ON)
+###############################################################################
+# LogConsumer default setup
+###############################################################################
+set(LOG_CONSUMER_DEFAULT AUTO CACHE STRING "Selects default LogConsumer")
+set_property(CACHE LOG_CONSUMER_DEFAULT PROPERTY STRINGS AUTO STDOUT STDOUTERR)
+
+if(LOG_CONSUMER_DEFAULT STREQUAL "STDOUTERR")
+    set(STDOUTERR_LOG_CONSUMER ON)
+endif()
+
+###############################################################################
+# Tools default setup
+###############################################################################
+option(COMPILE_TOOLS "Build tools" ON)
+
+if(EPROSIMA_BUILD AND IS_TOP_LEVEL)
+    set(COMPILE_TOOLS ON)
 endif()
 
 ###############################################################################
@@ -288,6 +308,14 @@ endif()
 
 if(COMPILE_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+###############################################################################
+# Tools
+###############################################################################
+
+if(COMPILE_TOOLS)
+    add_subdirectory(tools)
 endif()
 
 ###############################################################################
@@ -408,6 +436,7 @@ set(CPACK_COMPONENTS_ALL headers licenses)
 option(INSTALL_EXAMPLES "Install example" OFF)
 if(EPROSIMA_INSTALLER)
     set(INSTALL_EXAMPLES ON)
+    set(INSTALL_TOOLS ON)
 endif()
 
 if(INSTALL_EXAMPLES)
@@ -422,6 +451,25 @@ if(INSTALL_EXAMPLES)
   set(CPACK_COMPONENT_EXAMPLES_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} examples")
 
   set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} examples)
+endif()
+
+option(INSTALL_TOOLS "Install tools" OFF)
+if(EPROSIMA_INSTALLER)
+    set(INSTALL_TOOLS ON)
+endif()
+
+if(INSTALL_TOOLS)
+  # Install tools
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/tools
+      DESTINATION tools/
+      COMPONENT tools
+      PATTERN "tools/CMakeLists.txt" EXCLUDE
+      )
+
+  set(CPACK_COMPONENT_TOOLS_DISPLAY_NAME "Tools")
+  set(CPACK_COMPONENT_TOOLS_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} tools")
+
+  set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} tools)
 endif()
 
 if(BUILD_DOCUMENTATION)

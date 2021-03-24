@@ -13,8 +13,11 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
-#include <fastrtps/rtps/history/CacheChangePool.h>
-#include <fastrtps/rtps/common/CacheChange.h>
+
+#include <fastdds/rtps/attributes/HistoryAttributes.h>
+#include <fastdds/rtps/common/CacheChange.h>
+
+#include <rtps/history/CacheChangePool.h>
 
 #include <tuple>
 
@@ -22,7 +25,7 @@ using namespace eprosima::fastrtps::rtps;
 using namespace ::testing;
 using namespace std;
 
-class CacheChangePoolTests : public TestWithParam<tuple<int32_t, int32_t, uint32_t, MemoryManagementPolicy_t> >
+class CacheChangePoolTests : public TestWithParam<tuple<uint32_t, uint32_t, MemoryManagementPolicy_t>>
 {
 protected:
 
@@ -30,7 +33,6 @@ protected:
         : pool(nullptr)
         , pool_size(10)
         , max_pool_size(0)
-        , payload_size(128)
         , memory_policy(MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE)
     {
     }
@@ -43,14 +45,11 @@ protected:
     {
         pool_size     = get<0>(GetParam());
         max_pool_size = get<1>(GetParam());
-        payload_size  = get<2>(GetParam());
-        memory_policy = get<3>(GetParam());
+        memory_policy = get<2>(GetParam());
 
-        pool = new CacheChangePool(
-            pool_size,
-            payload_size,
-            max_pool_size,
-            memory_policy);
+        PoolConfig config{ memory_policy, 0, pool_size, max_pool_size };
+
+        pool = new CacheChangePool(config);
     }
 
     virtual void TearDown()
@@ -60,16 +59,13 @@ protected:
 
     CacheChangePool* pool;
 
-    int32_t pool_size;
-    int32_t max_pool_size;
-    uint32_t payload_size;
+    uint32_t pool_size;
+    uint32_t max_pool_size;
     MemoryManagementPolicy_t memory_policy;
 };
 
 TEST_P(CacheChangePoolTests, init_pool)
 {
-    ASSERT_EQ(pool->getInitialPayloadSize(), payload_size);
-
     size_t expected_size;
     if (memory_policy == MemoryManagementPolicy_t::DYNAMIC_RESERVE_MEMORY_MODE ||
             memory_policy == MemoryManagementPolicy_t::DYNAMIC_REUSABLE_MEMORY_MODE)
@@ -78,7 +74,7 @@ TEST_P(CacheChangePoolTests, init_pool)
     }
     else
     {
-        expected_size = static_cast<size_t>(pool_size + 1U);
+        expected_size = static_cast<size_t>(pool_size ? pool_size : 1u);
     }
 
     ASSERT_EQ(pool->get_allCachesSize(), expected_size);
@@ -89,7 +85,6 @@ TEST_P(CacheChangePoolTests, reserve_cache)
 {
     CacheChange_t* ch = nullptr;
 
-    uint32_t payload = payload_size;
     uint32_t size = static_cast<uint32_t>(pool_size);
     uint32_t max_size = static_cast<uint32_t>(max_pool_size);
 
@@ -101,51 +96,31 @@ TEST_P(CacheChangePoolTests, reserve_cache)
     else if (max_size <= size)
     {
         max_size = size;
-        num_inserts = size + 1;
+        num_inserts = size;
     }
     else // max_size > size
     {
-        num_inserts = max_size + 1;
+        num_inserts = max_size;
     }
 
     for (uint32_t i = 0; i < num_inserts; i++)
     {
-        uint32_t data_size = i * 16;
-        ASSERT_TRUE(pool->reserve_Cache(&ch, [data_size]() -> uint32_t {
-            return data_size;
-        }));
-        ASSERT_EQ(pool->getInitialPayloadSize(), payload);
+        ASSERT_TRUE(pool->reserve_cache(ch));
         ASSERT_GE(pool->get_freeCachesSize(), 0U);
-
-        switch (memory_policy)
-        {
-            case MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE:
-                ASSERT_EQ(ch->serializedPayload.max_size, payload);
-                break;
-            case MemoryManagementPolicy_t::PREALLOCATED_WITH_REALLOC_MEMORY_MODE:
-                ASSERT_EQ(ch->serializedPayload.max_size, max(payload, data_size));
-                break;
-            case MemoryManagementPolicy_t::DYNAMIC_RESERVE_MEMORY_MODE:
-                ASSERT_EQ(ch->serializedPayload.max_size, data_size);
-                break;
-            case MemoryManagementPolicy_t::DYNAMIC_REUSABLE_MEMORY_MODE:
-                ASSERT_EQ(ch->serializedPayload.max_size, data_size);
-                break;
-        }
 
         if (max_size > 0)
         {
-            ASSERT_LE(pool->get_allCachesSize(), max_size + 1U);
+            ASSERT_LE(pool->get_allCachesSize(), max_size);
         }
     }
 
     if (max_size == 0)
     {
-        ASSERT_TRUE(pool->reserve_Cache(&ch, payload));
+        ASSERT_TRUE(pool->reserve_cache(ch));
     }
     else
     {
-        ASSERT_FALSE(pool->reserve_Cache(&ch, payload));
+        ASSERT_FALSE(pool->reserve_cache(ch));
     }
 }
 
@@ -158,11 +133,8 @@ TEST_P(CacheChangePoolTests, release_cache)
     {
         size_t all_caches_size = pool->get_allCachesSize();
         size_t free_caches_size = pool->get_freeCachesSize();
-        uint32_t data_size = i * 16;
 
-        pool->reserve_Cache(&ch, [data_size]() -> uint32_t {
-            return data_size;
-        });
+        pool->reserve_cache(ch);
 
         if (memory_policy == MemoryManagementPolicy_t::DYNAMIC_RESERVE_MEMORY_MODE ||
                 memory_policy == MemoryManagementPolicy_t::DYNAMIC_REUSABLE_MEMORY_MODE)
@@ -176,7 +148,7 @@ TEST_P(CacheChangePoolTests, release_cache)
             ASSERT_EQ(pool->get_freeCachesSize(), free_caches_size - 1U);
         }
 
-        pool->release_Cache(ch);
+        pool->release_cache(ch);
 
         if (memory_policy == MemoryManagementPolicy_t::DYNAMIC_RESERVE_MEMORY_MODE)
         {
@@ -196,23 +168,17 @@ TEST_P(CacheChangePoolTests, release_cache)
     }
 }
 
-TEST_P(CacheChangePoolTests, chage_change)
+TEST_P(CacheChangePoolTests, change_reset_on_release)
 {
     CacheChange_t* ch = nullptr;
 
-    uint32_t data_size = 16;
-
-    pool->reserve_Cache(&ch, [data_size]() -> uint32_t {
-        return data_size;
-    });
+    pool->reserve_cache(ch);
 
     // Check that cache change is initilized
     ASSERT_EQ(ch->kind, ALIVE);
     ASSERT_EQ(ch->sequenceNumber.high, 0);
     ASSERT_EQ(ch->sequenceNumber.low, 0U);
     ASSERT_EQ(ch->writerGUID, c_Guid_Unknown);
-    ASSERT_EQ(ch->serializedPayload.length, 0U);
-    ASSERT_EQ(ch->serializedPayload.pos, 0U);
     for (uint8_t i = 0; i < 16; ++i)
     {
         ASSERT_EQ(ch->instanceHandle.value[i], 0U);
@@ -227,8 +193,6 @@ TEST_P(CacheChangePoolTests, chage_change)
     ch->sequenceNumber.high = 1;
     ch->sequenceNumber.low = 1;
     ch->writerGUID = GUID_t(GuidPrefix_t::unknown(), 1);
-    ch->serializedPayload.length = 1;
-    ch->serializedPayload.pos = 1;
     for (uint8_t i = 0; i < 16; ++i)
     {
         ch->instanceHandle.value[i] = 1;
@@ -237,7 +201,7 @@ TEST_P(CacheChangePoolTests, chage_change)
     ch->sourceTimestamp.seconds(1);
     ch->sourceTimestamp.fraction(1);
 
-    pool->release_Cache(ch);
+    pool->release_cache(ch);
 
     if (memory_policy != MemoryManagementPolicy_t::DYNAMIC_RESERVE_MEMORY_MODE)
     {
@@ -246,8 +210,6 @@ TEST_P(CacheChangePoolTests, chage_change)
         ASSERT_EQ(ch->sequenceNumber.high, 0);
         ASSERT_EQ(ch->sequenceNumber.low, 0U);
         ASSERT_EQ(ch->writerGUID, c_Guid_Unknown);
-        ASSERT_EQ(ch->serializedPayload.length, 0U);
-        ASSERT_EQ(ch->serializedPayload.pos, 0U);
         for (uint8_t i = 0; i < 16; ++i)
         {
             ASSERT_EQ(ch->instanceHandle.value[i], 0U);
@@ -263,14 +225,13 @@ TEST_P(CacheChangePoolTests, chage_change)
 #define GTEST_INSTANTIATE_TEST_MACRO(x, y, z) INSTANTIATE_TEST_SUITE_P(x, y, z)
 #else
 #define GTEST_INSTANTIATE_TEST_MACRO(x, y, z) INSTANTIATE_TEST_CASE_P(x, y, z, )
-#endif
+#endif // ifdef INSTANTIATE_TEST_SUITE_P
 
 GTEST_INSTANTIATE_TEST_MACRO(
     CacheChangePoolTests,
     CacheChangePoolTests,
     Combine(Values(0, 10, 20, 30),
     Values(0, 10, 20, 30),
-    Values(128, 256, 512, 1024),
     Values(MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE,
     MemoryManagementPolicy_t::PREALLOCATED_WITH_REALLOC_MEMORY_MODE,
     MemoryManagementPolicy_t::DYNAMIC_RESERVE_MEMORY_MODE,
