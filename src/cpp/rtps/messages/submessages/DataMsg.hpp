@@ -65,12 +65,12 @@ bool RTPSMessageCreator::addSubmessageData(
     bool inlineQosFlag = false;
 
     Endianness_t old_endianess = msg->msg_endian;
-#if __BIG_ENDIAN__
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
     msg->msg_endian = BIGEND;
 #else
     flags = flags | BIT(0);
     msg->msg_endian = LITTLEEND;
-#endif
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
     if (change->kind == ALIVE && change->serializedPayload.length > 0 && change->serializedPayload.data != NULL)
     {
@@ -267,15 +267,14 @@ bool RTPSMessageCreator::addMessageDataFrag(
             change->serializedPayload.length - fragment_start;
 
     // TODO (Ricardo). Check to create special wrapper.
-    CacheChange_t change_to_add;
-    change_to_add.copy_not_memcpy(change);
-    change_to_add.serializedPayload.data = change->serializedPayload.data + fragment_start;
-    change_to_add.serializedPayload.length = fragment_size;
+    SerializedPayload_t payload;
+    payload.data = change->serializedPayload.data + fragment_start;
+    payload.length = fragment_size;
 
-    RTPSMessageCreator::addSubmessageDataFrag(msg, &change_to_add, fragment_number, change->serializedPayload.length,
+    RTPSMessageCreator::addSubmessageDataFrag(msg, change, fragment_number, payload,
             topicKind, readerId, expectsInlineQos, inlineQos);
 
-    change_to_add.serializedPayload.data = NULL;
+    payload.data = NULL;
 
     msg->length = msg->pos;
     return true;
@@ -285,7 +284,7 @@ bool RTPSMessageCreator::addSubmessageDataFrag(
         CDRMessage_t* msg,
         const CacheChange_t* change,
         uint32_t fragment_number,
-        uint32_t sample_size,
+        const SerializedPayload_t& payload,
         TopicKind_t topicKind,
         const EntityId_t& readerId,
         bool expectsInlineQos,
@@ -297,14 +296,14 @@ bool RTPSMessageCreator::addSubmessageDataFrag(
     bool inlineQosFlag = false;
 
     Endianness_t old_endianess = msg->msg_endian;
-#if __BIG_ENDIAN__
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
     msg->msg_endian = BIGEND;
 #else
     flags = flags | BIT(0);
     msg->msg_endian = LITTLEEND;
-#endif
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
-    if (change->kind == ALIVE && change->serializedPayload.length > 0 && change->serializedPayload.data != NULL)
+    if (change->kind == ALIVE && payload.length > 0 && payload.data != NULL)
     {
         keyFlag = false;
     }
@@ -390,7 +389,7 @@ bool RTPSMessageCreator::addSubmessageDataFrag(
     added_no_error &= CDRMessage::addUInt16(msg, change->getFragmentSize());
 
     // Add total sample size
-    added_no_error &= CDRMessage::addUInt32(msg, sample_size); //TODO(Ricardo) Sample size in CacheChange
+    added_no_error &= CDRMessage::addUInt32(msg, change->serializedPayload.length);
 
     //Add INLINE QOS AND SERIALIZED PAYLOAD DEPENDING ON FLAGS:
     if (inlineQosFlag) //inlineQoS
@@ -422,11 +421,11 @@ bool RTPSMessageCreator::addSubmessageDataFrag(
     //Add Serialized Payload XXX TODO
     if (!keyFlag) // keyflag = 0 means that the serializedPayload SubmessageElement contains the serialized Data
     {
-        added_no_error &= CDRMessage::addData(msg, change->serializedPayload.data,
-                        change->serializedPayload.length);
+        added_no_error &= CDRMessage::addData(msg, payload.data, payload.length);
     }
     else
-    {   // keyflag = 1 means that the serializedPayload SubmessageElement contains the serialized Key
+    {
+        // keyflag = 1 means that the serializedPayload SubmessageElement contains the serialized Key
         /*
             added_no_error &= CDRMessage::addOctet(&submsgElem, 0); //ENCAPSULATION
             if (submsgElem.msg_endian == BIGEND)
@@ -469,6 +468,6 @@ bool RTPSMessageCreator::addSubmessageDataFrag(
     return added_no_error;
 }
 
-}
-}
-}
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima

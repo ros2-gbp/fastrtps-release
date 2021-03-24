@@ -21,7 +21,7 @@
 #
 m4_define([version_major],[1])
 m4_define([version_minor],[0])
-m4_define([version_micro],[10])
+m4_define([version_micro],[20])
 
 AC_INIT([fastcdr], [version_major.version_minor.version_micro], [support@eprosima.com], [eProsima FastCDR], [http://eprosima.com/])
 CONFIG_ARGS="$*"
@@ -47,8 +47,8 @@ AS_IF([test $HAVE_CXX11 = 1],
 
 # Check endianess
 AC_C_BIGENDIAN(
-  AC_DEFINE(__BIG_ENDIAN__, 1, [machine is bigendian]),
-  AC_DEFINE(__BIG_ENDIAN__, 0, [machine is littleendian]),
+  AC_DEFINE(FASTCDR_IS_BIG_ENDIAN_TARGET, 1, [machine is bigendian]),
+  AC_DEFINE(FASTCDR_IS_BIG_ENDIAN_TARGET, 0, [machine is littleendian]),
   AC_MSG_ERROR(unknown endianess),
   AC_MSG_ERROR(universial endianess not supported)
 )

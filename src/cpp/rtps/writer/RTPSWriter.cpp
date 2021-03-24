@@ -18,18 +18,22 @@
  */
 
 #include <fastdds/rtps/writer/RTPSWriter.h>
+
+#include <fastdds/dds/log/Log.hpp>
+
 #include <fastdds/rtps/history/WriterHistory.h>
 #include <fastdds/rtps/messages/RTPSMessageCreator.h>
-#include <fastdds/dds/log/Log.hpp>
-#include <rtps/participant/RTPSParticipantImpl.h>
+
+#include <rtps/history/BasicPayloadPool.hpp>
+#include <rtps/history/CacheChangePool.h>
 #include <rtps/flowcontrol/FlowController.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <mutex>
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
-
 
 RTPSWriter::RTPSWriter(
         RTPSParticipantImpl* impl,
@@ -38,24 +42,75 @@ RTPSWriter::RTPSWriter(
         WriterHistory* hist,
         WriterListener* listen)
     : Endpoint(impl, guid, att.endpoint)
-    , m_pushMode(true)
     , mp_history(hist)
     , mp_listener(listen)
     , is_async_(att.mode == SYNCHRONOUS_WRITER ? false : true)
-    , m_separateSendingEnabled(false)
     , locator_selector_(att.matched_readers_allocation)
     , all_remote_readers_(att.matched_readers_allocation)
     , all_remote_participants_(att.matched_readers_allocation)
-#if HAVE_SECURITY
-    , encrypt_payload_(mp_history->getTypeMaxSerialized())
-#endif
     , liveliness_kind_(att.liveliness_kind)
     , liveliness_lease_duration_(att.liveliness_lease_duration)
     , liveliness_announcement_period_(att.liveliness_announcement_period)
-    , next_{nullptr}
 {
+    PoolConfig cfg = PoolConfig::from_history_attributes(hist->m_att);
+    std::shared_ptr<IChangePool> change_pool;
+    std::shared_ptr<IPayloadPool> payload_pool;
+    payload_pool = BasicPayloadPool::get(cfg, change_pool);
+
+    init(payload_pool, change_pool);
+}
+
+RTPSWriter::RTPSWriter(
+        RTPSParticipantImpl* impl,
+        const GUID_t& guid,
+        const WriterAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+    : RTPSWriter(
+        impl, guid, att, payload_pool,
+        std::make_shared<CacheChangePool>(PoolConfig::from_history_attributes(hist->m_att)),
+        hist, listen)
+{
+}
+
+RTPSWriter::RTPSWriter(
+        RTPSParticipantImpl* impl,
+        const GUID_t& guid,
+        const WriterAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+    : Endpoint(impl, guid, att.endpoint)
+    , mp_history(hist)
+    , mp_listener(listen)
+    , is_async_(att.mode == SYNCHRONOUS_WRITER ? false : true)
+    , locator_selector_(att.matched_readers_allocation)
+    , all_remote_readers_(att.matched_readers_allocation)
+    , all_remote_participants_(att.matched_readers_allocation)
+    , liveliness_kind_(att.liveliness_kind)
+    , liveliness_lease_duration_(att.liveliness_lease_duration)
+    , liveliness_announcement_period_(att.liveliness_announcement_period)
+{
+    init(payload_pool, change_pool);
+}
+
+void RTPSWriter::init(
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool)
+{
+    payload_pool_ = payload_pool;
+    change_pool_ = change_pool;
+    fixed_payload_size_ = 0;
+    if (mp_history->m_att.memoryPolicy == PREALLOCATED_MEMORY_MODE)
+    {
+        fixed_payload_size_ = mp_history->m_att.payloadMaxSize;
+    }
+
     mp_history->mp_writer = this;
     mp_history->mp_mutex = &mp_mutex;
+
     logInfo(RTPS_WRITER, "RTPSWriter created");
 }
 
@@ -64,6 +119,11 @@ RTPSWriter::~RTPSWriter()
     logInfo(RTPS_WRITER, "RTPSWriter destructor");
 
     // Deletion of the events has to be made in child destructor.
+
+    for (auto it = mp_history->changesBegin(); it != mp_history->changesEnd(); ++it)
+    {
+        release_change(*it);
+    }
 
     mp_history->mp_writer = nullptr;
     mp_history->mp_mutex = nullptr;
@@ -75,22 +135,48 @@ CacheChange_t* RTPSWriter::new_change(
         InstanceHandle_t handle)
 {
     logInfo(RTPS_WRITER, "Creating new change");
-    CacheChange_t* ch = nullptr;
 
-    if (!mp_history->reserve_Cache(&ch, dataCdrSerializedSize))
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+    CacheChange_t* reserved_change = nullptr;
+    if (!change_pool_->reserve_cache(reserved_change))
     {
-        logWarning(RTPS_WRITER, "Problem reserving Cache from the History");
+        logWarning(RTPS_WRITER, "Problem reserving cache from pool");
         return nullptr;
     }
 
-    ch->kind = changeKind;
+    uint32_t payload_size = fixed_payload_size_ ? fixed_payload_size_ : dataCdrSerializedSize();
+    if (!payload_pool_->get_payload(payload_size, *reserved_change))
+    {
+        change_pool_->release_cache(reserved_change);
+        logWarning(RTPS_WRITER, "Problem reserving payload from pool");
+        return nullptr;
+    }
+
+    reserved_change->kind = changeKind;
     if (m_att.topicKind == WITH_KEY && !handle.isDefined())
     {
         logWarning(RTPS_WRITER, "Changes in KEYED Writers need a valid instanceHandle");
     }
-    ch->instanceHandle = handle;
-    ch->writerGUID = m_guid;
-    return ch;
+    reserved_change->instanceHandle = handle;
+    reserved_change->writerGUID = m_guid;
+    return reserved_change;
+}
+
+bool RTPSWriter::release_change(
+        CacheChange_t* change)
+{
+    // Asserting preconditions
+    assert(change != nullptr);
+    assert(change->writerGUID == m_guid);
+
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+
+    IPayloadPool* pool = change->payload_owner();
+    if (pool)
+    {
+        pool->release_payload(*change);
+    }
+    return change_pool_->release_cache(change);
 }
 
 SequenceNumber_t RTPSWriter::get_seq_num_min()
@@ -174,7 +260,7 @@ uint32_t RTPSWriter::calculateMaxDataSize(
     {
         maxDataSize -= mp_RTPSParticipant->security_manager().calculate_extra_size_for_encoded_payload(m_guid);
     }
-#endif
+#endif // if HAVE_SECURITY
 
     return maxDataSize;
 }
@@ -210,56 +296,6 @@ void RTPSWriter::update_cached_info_nts()
     locator_selector_.reset(true);
     mp_RTPSParticipant->network_factory().select_locators(locator_selector_);
 }
-
-#if HAVE_SECURITY
-bool RTPSWriter::encrypt_cachechange(
-        CacheChange_t* change)
-{
-    if (getAttributes().security_attributes().is_payload_protected && change->getFragmentCount() == 0)
-    {
-        if (encrypt_payload_.max_size < change->serializedPayload.length +
-            // In future v2 changepool is in writer, and writer set this value to cachechagepool.
-            +20 /*SecureDataHeader*/ + 4 + ((2 * 16) /*EVP_MAX_IV_LENGTH max block size*/ - 1) /* SecureDataBodey*/
-            + 16 + 4 /*SecureDataTag*/ &&
-            (mp_history->m_att.memoryPolicy != MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE))
-        {
-            encrypt_payload_.data = (octet*)realloc(encrypt_payload_.data, change->serializedPayload.length +
-                            // In future v2 changepool is in writer, and writer set this value to cachechagepool.
-                            +20 /*SecureDataHeader*/ + 4 + ((2 * 16) /*EVP_MAX_IV_LENGTH max block size*/ - 1) /* SecureDataBodey*/
-                            + 16 + 4 /*SecureDataTag*/);
-            encrypt_payload_.max_size = change->serializedPayload.length +
-                    // In future v2 changepool is in writer, and writer set this value to cachechagepool.
-                    +20 /*SecureDataHeader*/ + 4 + ((2 * 16) /*EVP_MAX_IV_LENGTH max block size*/ - 1) /* SecureDataBodey*/
-                    + 16 + 4 /*SecureDataTag*/;
-        }
-
-        if (!mp_RTPSParticipant->security_manager().encode_serialized_payload(change->serializedPayload,
-                encrypt_payload_, m_guid))
-        {
-            logError(RTPS_WRITER, "Error encoding change " << change->sequenceNumber);
-            return false;
-        }
-
-        octet* data = change->serializedPayload.data;
-        uint32_t max_size = change->serializedPayload.max_size;
-
-        change->serializedPayload.length = encrypt_payload_.length;
-        change->serializedPayload.data = encrypt_payload_.data;
-        change->serializedPayload.max_size = encrypt_payload_.max_size;
-        change->serializedPayload.pos = encrypt_payload_.pos;
-
-        encrypt_payload_.data = data;
-        encrypt_payload_.length = 0;
-        encrypt_payload_.max_size = max_size;
-        encrypt_payload_.pos = 0;
-
-        change->setFragmentSize(change->getFragmentSize());
-    }
-
-    return true;
-}
-
-#endif
 
 bool RTPSWriter::destinations_have_changed() const
 {

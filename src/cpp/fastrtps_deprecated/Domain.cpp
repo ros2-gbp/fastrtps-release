@@ -19,6 +19,7 @@
 
 #include <fastrtps/Domain.h>
 #include <fastdds/rtps/RTPSDomain.h>
+#include <fastdds/rtps/participant/RTPSParticipant.h>
 
 #include <fastrtps/participant/Participant.h>
 #include <fastrtps_deprecated/participant/ParticipantImpl.h>
@@ -167,19 +168,20 @@ Participant* Domain::createParticipant(
         ParticipantListener* listen)
 {
     Participant* pubsubpar = new Participant();
-    ParticipantImpl* pspartimpl = new ParticipantImpl(att,pubsubpar,listen);
+    ParticipantImpl* pspartimpl = new ParticipantImpl(att, pubsubpar, listen);
 
-    // If DEFAULT_ROS2_MASTER_URI is specified then try to create default server or client if
+    // If DEFAULT_ROS2_MASTER_URI is specified then try to create default client if
     // that already exists.
     RTPSParticipant* part = RTPSDomain::clientServerEnvironmentCreationOverride(
         att.domainId,
+        false,
         att.rtps,
         &pspartimpl->m_rtps_listener);
 
-    if(part == nullptr)
+    if (part == nullptr)
     {
-        // Default creation procedure
-        part = RTPSDomain::createParticipant(att.domainId, att.rtps, &pspartimpl->m_rtps_listener);
+        // Creation procedure without enable
+        part = RTPSDomain::createParticipant(att.domainId, false, att.rtps, &pspartimpl->m_rtps_listener);
     }
 
     if (part == nullptr)
@@ -198,6 +200,10 @@ Participant* Domain::createParticipant(
         std::lock_guard<std::mutex> guard(m_mutex);
         m_participants.push_back(pubsubpair);
     }
+
+    // Enable participant
+    part->enable();
+
     return pubsubpar;
 }
 

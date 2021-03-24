@@ -39,10 +39,11 @@
 
 
 namespace eprosima {
-namespace fastrtps{
+namespace fastrtps {
 namespace rtps {
 
-PDPServerListener::PDPServerListener(PDPServer* in_PDP)
+PDPServerListener::PDPServerListener(
+        PDPServer* in_PDP)
     : PDPListener(in_PDP)
     , parent_server_pdp_(in_PDP)
 {
@@ -54,13 +55,13 @@ void PDPServerListener::onNewCacheChangeAdded(
 {
     CacheChange_t* change = (CacheChange_t*)(change_in);
     GUID_t writer_guid = change->writerGUID;
-    logInfo(RTPS_PDP,"SPDP Message received");
+    logInfo(RTPS_PDP, "SPDP Message received");
 
-    if(change->instanceHandle == c_InstanceHandle_Unknown)
+    if (change->instanceHandle == c_InstanceHandle_Unknown)
     {
-        if(!this->get_key(change))
+        if (!this->get_key(change))
         {
-            logWarning(RTPS_PDP,"Problem getting the key of the change, removing");
+            logWarning(RTPS_PDP, "Problem getting the key of the change, removing");
             parent_pdp_->mp_PDPReaderHistory->remove_change(change);
             return;
         }
@@ -79,11 +80,10 @@ void PDPServerListener::onNewCacheChangeAdded(
     GUID_t guid;
     iHandle2GUID(guid, change->instanceHandle);
 
-    if(change->kind == ALIVE)
+    if (change->kind == ALIVE)
     {
         // Ignore announcement from own RTPSParticipant
-        if (guid == parent_pdp_->getRTPSParticipant()->getGuid()
-            && !parent_server_pdp_->ongoingDeserialization() )
+        if (guid == parent_pdp_->getRTPSParticipant()->getGuid())
         {
             logInfo(RTPS_PDP, "Message from own RTPSParticipant, removing");
             parent_pdp_->mp_PDPReaderHistory->remove_change(change);
@@ -94,9 +94,9 @@ void PDPServerListener::onNewCacheChangeAdded(
 
         // Load information on local_data
         CDRMessage_t msg(change->serializedPayload);
-        if(local_data.readFromCDRMessage(&msg, true, 
-            parent_pdp_->getRTPSParticipant()->network_factory(),
-            parent_pdp_->getRTPSParticipant()->has_shm_transport()))
+        if (local_data.readFromCDRMessage(&msg, true,
+                parent_pdp_->getRTPSParticipant()->network_factory(),
+                parent_pdp_->getRTPSParticipant()->has_shm_transport()))
         {
             change->instanceHandle = local_data.m_key;
             guid = local_data.m_guid;
@@ -109,7 +109,7 @@ void PDPServerListener::onNewCacheChangeAdded(
             std::unique_lock<std::recursive_mutex> lock(*parent_pdp_->getMutex());
             for (ParticipantProxyData* it : parent_pdp_->participant_proxies_)
             {
-                if(guid == it->m_guid)
+                if (guid == it->m_guid)
                 {
                     pdata = it;
                     break;
@@ -117,20 +117,21 @@ void PDPServerListener::onNewCacheChangeAdded(
             }
 
             auto status = (pdata == nullptr) ? ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT :
-                ParticipantDiscoveryInfo::CHANGED_QOS_PARTICIPANT;
+                    ParticipantDiscoveryInfo::CHANGED_QOS_PARTICIPANT;
 
-            if(pdata == nullptr)
+            if (pdata == nullptr)
             {
-                logInfo(RTPS_PDP, "Registering a new participant: " << writer_guid);
+                logInfo(RTPS_PDP, "Registering a new participant: " <<
+                        change->write_params.sample_identity().writer_guid());
 
                 // Create a new one when not found
                 pdata = parent_pdp_->createParticipantProxyData(local_data, writer_guid);
+                lock.unlock();
+
                 if (pdata != nullptr)
                 {
-                    lock.unlock();
-
                     // Dismiss any client data relayed by a server
-                    if (pdata->m_guid.guidPrefix == change->writerGUID.guidPrefix)
+                    if (pdata->m_guid.guidPrefix == writer_guid.guidPrefix)
                     {
                         // This call would be needed again if the clients known not the server prefix
                         //  parent_pdp_->announceParticipantState(false);
@@ -143,15 +144,19 @@ void PDPServerListener::onNewCacheChangeAdded(
             {
                 pdata->updateData(local_data);
                 pdata->isAlive = true;
+                // activate lease duration if the DATA(p) comes directly from the client
+                bool previous_lease_check_status = pdata->should_check_lease_duration;
+                pdata->should_check_lease_duration = writer_guid.guidPrefix == pdata->m_guid.guidPrefix;
                 lock.unlock();
 
                 // Included for symmetry with PDPListener to profit from a future updateInfoMatchesEDP override
-                // right now servers doesn't need to modify EDP on updates
-                if (parent_pdp_->updateInfoMatchesEDP())
+                // right now servers update matching on clients that were previously relayed by a server
+                if ( previous_lease_check_status != pdata->should_check_lease_duration
+                        || parent_pdp_->updateInfoMatchesEDP() )
                 {
-                    parent_pdp_->mp_EDP->assignRemoteEndpoints(*pdata);
+                    parent_pdp_->assignRemoteEndpoints(pdata);
+                    parent_server_pdp_->queueParticipantForEDPMatch(pdata);
                 }
-
             }
 
             if (pdata != nullptr)
@@ -184,18 +189,16 @@ void PDPServerListener::onNewCacheChangeAdded(
             return;
         }
 
-        std::unique_ptr<PDPServer::InPDPCallback> guard = parent_server_pdp_->signalCallback();
-
-        if(parent_pdp_->remove_remote_participant(guid, ParticipantDiscoveryInfo::REMOVED_PARTICIPANT))
+        if (parent_pdp_->remove_remote_participant(guid, ParticipantDiscoveryInfo::REMOVED_PARTICIPANT))
         {
-            return; // all changes related with this participant have been removed from history by removeRemoteParticipant
+            // all changes related with this participant have been removed from history by removeRemoteParticipant
+            return;
         }
     }
 
     //Remove change form history.
     parent_pdp_->mp_PDPReaderHistory->remove_change(change);
 }
-
 
 } /* namespace rtps */
 } /* namespace fastrtps */

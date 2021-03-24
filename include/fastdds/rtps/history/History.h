@@ -22,7 +22,8 @@
 
 #include <fastrtps/fastrtps_dll.h>
 
-#include <fastdds/rtps/history/CacheChangePool.h>
+#include <fastdds/rtps/history/IChangePool.h>
+#include <fastdds/rtps/history/IPayloadPool.h>
 
 #include <fastdds/rtps/common/SequenceNumber.h>
 #include <fastdds/rtps/common/Guid.h>
@@ -30,6 +31,9 @@
 #include <fastrtps/utils/TimedMutex.hpp>
 
 #include <cassert>
+#include <functional>
+#include <memory>
+#include <mutex>
 
 namespace eprosima {
 namespace fastrtps {
@@ -44,7 +48,7 @@ class History
 protected:
 
     History(
-            const HistoryAttributes&  att);
+            const HistoryAttributes& att);
     History(
             History&&) = delete;
     History& operator =(
@@ -59,37 +63,47 @@ public:
 
     //!Attributes of the History
     HistoryAttributes m_att;
+
     /**
      * Reserve a CacheChange_t from the CacheChange pool.
      * @param[out] change Pointer to pointer to the CacheChange_t to reserve
-     * @param[in] calculateSizeFunc Function to calculate the size of the change.
-     * @return True is reserved
+     * @param[in] calculateSizeFunc Function to calculate the size of the payload.
+     * @return True if reserved
+     * @warning This method has been deprecated and will be removed on v3.0.0
      */
+    FASTRTPS_DEPRECATED("Use new_change on RTPSWriter or reserveCache on RTPSReader")
     RTPS_DllAPI inline bool reserve_Cache(
             CacheChange_t** change,
             const std::function<uint32_t()>& calculateSizeFunc)
     {
-        std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
-        return m_changePool.reserve_Cache(change, calculateSizeFunc);
+        return do_reserve_cache(change, calculateSizeFunc());
     }
 
+    /**
+     * Reserve a CacheChange_t from the CacheChange pool.
+     * @param[out] change Pointer to pointer to the CacheChange_t to reserve
+     * @param[in] dataSize Required size for the payload.
+     * @return True if reserved
+     * @warning This method has been deprecated and will be removed on v3.0.0
+     */
+    FASTRTPS_DEPRECATED("Use new_change on RTPSWriter or reserveCache on RTPSReader")
     RTPS_DllAPI inline bool reserve_Cache(
             CacheChange_t** change,
             uint32_t dataSize)
     {
-        std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
-        return m_changePool.reserve_Cache(change, dataSize);
+        return do_reserve_cache(change, dataSize);
     }
 
     /**
      * release a previously reserved CacheChange_t.
      * @param ch Pointer to the CacheChange_t.
+     * @warning This method has been deprecated and will be removed on v3.0.0
      */
+    FASTRTPS_DEPRECATED("Use release_change on RTPSWriter or releaseCache on RTPSReader")
     RTPS_DllAPI inline void release_Cache(
             CacheChange_t* ch)
     {
-        std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
-        return m_changePool.release_Cache(ch);
+        do_release_cache(ch);
     }
 
     /**
@@ -112,6 +126,26 @@ public:
     }
 
     /**
+     * Find a specific change in the history using the matches_change method criteria.
+     * No Thread Safe
+     * @param ch Pointer to the CacheChange_t to search for.
+     * @return an iterator if a suitable change is found
+     */
+    RTPS_DllAPI const_iterator find_change_nts(
+            CacheChange_t* ch);
+
+    /**
+     * Remove a specific change from the history.
+     * No Thread Safe
+     * @param removal iterator to the CacheChange_t to remove.
+     * @param release defaults to true and hints if the CacheChange_t should return to the pool
+     * @return iterator to the next CacheChange_t or end iterator.
+     */
+    RTPS_DllAPI virtual iterator remove_change_nts(
+            const_iterator removal,
+            bool release = true);
+
+    /**
      * Remove all changes from the History
      * @return True if everything was correctly removed.
      */
@@ -122,8 +156,44 @@ public:
      * @param ch Pointer to the CacheChange_t.
      * @return True if removed.
      */
-    virtual bool remove_change(
-            CacheChange_t* ch) = 0;
+    RTPS_DllAPI bool remove_change(
+            CacheChange_t* ch);
+
+    /**
+     * Find a specific change in the history using the matches_change method criteria.
+     * @param ch Pointer to the CacheChange_t to search for.
+     * @return an iterator if a suitable change is found
+     */
+    RTPS_DllAPI const_iterator find_change(
+            CacheChange_t* ch)
+    {
+        std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+        return find_change_nts(ch);
+    }
+
+    /**
+     * Verifies if an element of the changes collection matches a given change
+     * Derived classes have more info on how to identify univocally a change and should override.
+     * @param ch_inner element of the collection to compare with the given change
+     * @param ch_outer Pointer to the CacheChange_t to identify.
+     * @return true if the iterator identifies this change.
+     */
+    RTPS_DllAPI virtual bool matches_change(
+            const CacheChange_t* ch_inner,
+            CacheChange_t* ch_outer);
+    /**
+     * Remove a specific change from the history.
+     * @param removal iterator to the CacheChange_t to remove.
+     * @param release defaults to true and hints if the CacheChange_t should return to the pool
+     * @return iterator to the next CacheChange_t or end iterator.
+     */
+    RTPS_DllAPI iterator remove_change(
+            const_iterator removal,
+            bool release = true)
+    {
+        std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+        return remove_change_nts(removal, release);
+    }
 
     /**
      * Get the beginning of the changes history iterator.
@@ -175,7 +245,7 @@ public:
      */
     RTPS_DllAPI inline uint32_t getTypeMaxSerialized()
     {
-        return m_changePool.getInitialPayloadSize();
+        return m_att.payloadMaxSize;
     }
 
     /*!
@@ -184,7 +254,8 @@ public:
      */
     RTPS_DllAPI inline RecursiveTimedMutex* getMutex()
     {
-        assert(mp_mutex != nullptr); return mp_mutex;
+        assert(mp_mutex != nullptr);
+        return mp_mutex;
     }
 
     RTPS_DllAPI bool get_change(
@@ -212,21 +283,25 @@ protected:
     std::vector<CacheChange_t*> m_changes;
 
     //!Variable to know if the history is full without needing to block the History mutex.
-    bool m_isHistoryFull;
+    bool m_isHistoryFull = false;
 
-    //!Pool of cache changes reserved when the History is created.
-    CacheChangePool m_changePool;
+    //!Mutex for the History.
+    RecursiveTimedMutex* mp_mutex = nullptr;
 
     //!Print the seqNum of the changes in the History (for debuggisi, mng purposes).
     void print_changes_seqNum2();
 
-    //!Mutex for the History.
-    RecursiveTimedMutex* mp_mutex;
+    RTPS_DllAPI virtual bool do_reserve_cache(
+            CacheChange_t** change,
+            uint32_t size) = 0;
+
+    RTPS_DllAPI virtual void do_release_cache(
+            CacheChange_t* ch) = 0;
 
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 
 #endif /* _FASTDDS_RTPS_HISTORY_H_ */

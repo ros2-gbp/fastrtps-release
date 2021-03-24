@@ -1,4 +1,4 @@
-# Copyright 2016 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+# Copyright 2016, 2020 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -162,7 +162,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         ###############################################################################
         # Unit tests
         ###############################################################################
-        file(GLOB RTPS_BLACKBOXTESTS_TEST_SOURCE "RTPSBlackboxTests*.cpp")
+        file(GLOB RTPS_BLACKBOXTESTS_TEST_SOURCE "common/RTPSBlackboxTests*.cpp")
         set(RTPS_BLACKBOXTESTS_SOURCE ${RTPS_BLACKBOXTESTS_TEST_SOURCE}
             types/HelloWorld.cpp
             types/HelloWorldType.cpp
@@ -188,10 +188,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         target_include_directories(BlackboxTests_RTPS PRIVATE
             ${GTEST_INCLUDE_DIRS})
         target_link_libraries(BlackboxTests_RTPS fastrtps fastcdr foonathan_memory ${GTEST_LIBRARIES})
-        add_blackbox_gtest(BlackboxTests_RTPS SOURCES ${RTPS_BLACKBOXTESTS_TEST_SOURCE}
-            )
+        add_blackbox_gtest(BlackboxTests_RTPS SOURCES ${RTPS_BLACKBOXTESTS_TEST_SOURCE})
 
-        file(GLOB BLACKBOXTESTS_TEST_SOURCE "BlackboxTests*.cpp")
+        file(GLOB BLACKBOXTESTS_TEST_SOURCE "common/BlackboxTests*.cpp")
         set(BLACKBOXTESTS_SOURCE ${BLACKBOXTESTS_TEST_SOURCE}
             types/HelloWorld.cpp
             types/HelloWorldType.cpp
@@ -210,8 +209,14 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
             utils/lambda_functions.cpp
             utils/print_functions.cpp
 
-            TCPReqRepHelloWorldRequester.cpp
-            TCPReqRepHelloWorldReplier.cpp
+            common/TCPReqRepHelloWorldRequester.cpp
+            common/TCPReqRepHelloWorldReplier.cpp
+            )
+
+        file(GLOB DDS_BLACKBOXTESTS_TEST_SOURCE "common/DDSBlackboxTests*.cpp")
+        set(DDS_BLACKBOXTESTS_SOURCE
+            ${DDS_BLACKBOXTESTS_TEST_SOURCE}
+            ${BLACKBOXTESTS_SOURCE}
             )
 
         # Prepare static discovery xml file for blackbox tests.
@@ -228,6 +233,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
             ${CMAKE_CURRENT_BINARY_DIR}/PubSubWriter.xml)
         configure_file(${CMAKE_CURRENT_SOURCE_DIR}/PubSubReader.xml.in
             ${CMAKE_CURRENT_BINARY_DIR}/PubSubReader.xml)
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/persistence.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/persistence.xml)
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/utils/check_guid.py
+            ${CMAKE_CURRENT_BINARY_DIR}/check_guid.py)
 
         if(FASTRTPS_API_TESTS)
             set(BLACKBOXTESTS_FASTRTPS_SOURCE
@@ -255,7 +264,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
 
         if(FASTDDS_PIM_API_TESTS)
             set(BLACKBOXTESTS_FASTDDS_PIM_SOURCE
-                ${BLACKBOXTESTS_SOURCE}
+                ${DDS_BLACKBOXTESTS_SOURCE}
                 api/dds-pim/ReqRepHelloWorldRequester.cpp
                 api/dds-pim/ReqRepHelloWorldReplier.cpp
                 )
@@ -267,7 +276,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
                 api/dds-pim
                 ${GTEST_INCLUDE_DIRS})
             target_link_libraries(BlackboxTests_DDS_PIM fastrtps fastcdr foonathan_memory ${GTEST_LIBRARIES})
-            add_blackbox_gtest(BlackboxTests_DDS_PIM SOURCES ${BLACKBOXTESTS_TEST_SOURCE}
+            add_blackbox_gtest(BlackboxTests_DDS_PIM SOURCES ${DDS_BLACKBOXTESTS_SOURCE}
                 ENVIRONMENTS "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs"
                 "TOPIC_RANDOM_NUMBER=${TOPIC_RANDOM_NUMBER}"
                 "W_UNICAST_PORT_RANDOM_NUMBER=${W_UNICAST_PORT_RANDOM_NUMBER}"
@@ -275,5 +284,21 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
                 "MULTICAST_PORT_RANDOM_NUMBER=${MULTICAST_PORT_RANDOM_NUMBER}"
                 )
         endif(FASTDDS_PIM_API_TESTS)
+
+        # Add 'xfail' label to flaky tests
+        set(BLACKBOX_XFAIL_LIST XFAIL_RTPS)
+        if(FASTRTPS_API_TESTS)
+            set(BLACKBOX_XFAIL_LIST ${BLACKBOX_XFAIL_LIST} XFAIL_FASTRTPS)
+        endif()
+        if(FASTDDS_PIM_API_TESTS)
+            set(BLACKBOX_XFAIL_LIST ${BLACKBOX_XFAIL_LIST} XFAIL_DDS_PIM)
+        endif()
+
+        foreach(BLACKBOX_XFAIL_TEST ${BLACKBOX_XFAIL_LIST})
+            add_xfail_label(${CMAKE_CURRENT_SOURCE_DIR}/${BLACKBOX_XFAIL_TEST}.list)
+            if(SECURITY)
+                add_xfail_label(${CMAKE_CURRENT_SOURCE_DIR}/${BLACKBOX_XFAIL_TEST}_SECURITY.list)
+            endif()
+        endforeach()
     endif()
 endif()

@@ -132,6 +132,12 @@ ReturnCode_t DataReader::get_requested_deadline_missed_status(
     return impl_->get_requested_deadline_missed_status(status);
 }
 
+ReturnCode_t DataReader::get_requested_incompatible_qos_status(
+        RequestedIncompatibleQosStatus& status)
+{
+    return impl_->get_requested_incompatible_qos_status(status);
+}
+
 /* TODO
    bool DataReader::read(
         std::vector<void *>& data_values,
@@ -153,7 +159,20 @@ ReturnCode_t DataReader::get_requested_deadline_missed_status(
 ReturnCode_t DataReader::set_listener(
         DataReaderListener* listener)
 {
-    return impl_->set_listener(listener);
+    return set_listener(listener, StatusMask::all());
+}
+
+ReturnCode_t DataReader::set_listener(
+        DataReaderListener* listener,
+        const StatusMask& mask)
+{
+    ReturnCode_t ret_val = impl_->set_listener(listener);
+    if (ret_val == ReturnCode_t::RETCODE_OK)
+    {
+        status_mask_ = mask;
+    }
+
+    return ret_val;
 }
 
 const DataReaderListener* DataReader::get_listener() const
@@ -217,7 +236,6 @@ TypeSupport DataReader::type()
 {
     return impl_->type();
 }
-
 
 const TopicDescription* DataReader::get_topicdescription() const
 {
