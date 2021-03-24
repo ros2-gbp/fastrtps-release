@@ -53,10 +53,52 @@ MessageReceiver::MessageReceiver(
     , timestamp_(c_TimeInvalid)
 #if HAVE_SECURITY
     , crypto_msg_(participant->is_secure() ? rec_buffer_size : 0)
-#endif
+    , crypto_submsg_(participant->is_secure() ? rec_buffer_size : 0)
+    , crypto_payload_(participant->is_secure() ? rec_buffer_size : 0)
+#endif // if HAVE_SECURITY
 {
     (void)rec_buffer_size;
     logInfo(RTPS_MSG_IN, "Created with CDRMessage of size: " << rec_buffer_size);
+
+#if HAVE_SECURITY
+    if (participant->is_secure())
+    {
+        process_data_message_function_ = std::bind(
+            &MessageReceiver::process_data_message_with_security,
+            this,
+            std::placeholders::_1,
+            std::placeholders::_2);
+
+        process_data_fragment_message_function_ = std::bind(
+            &MessageReceiver::process_data_fragment_message_with_security,
+            this,
+            std::placeholders::_1,
+            std::placeholders::_2,
+            std::placeholders::_3,
+            std::placeholders::_4,
+            std::placeholders::_5);
+    }
+    else
+    {
+#endif // if HAVE SECURITY
+    process_data_message_function_ = std::bind(
+        &MessageReceiver::process_data_message_without_security,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2);
+
+    process_data_fragment_message_function_ = std::bind(
+        &MessageReceiver::process_data_fragment_message_without_security,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2,
+        std::placeholders::_3,
+        std::placeholders::_4,
+        std::placeholders::_5);
+#if HAVE_SECURITY
+}
+
+#endif // if HAVE SECURITY
 }
 
 MessageReceiver::~MessageReceiver()
@@ -64,6 +106,115 @@ MessageReceiver::~MessageReceiver()
     logInfo(RTPS_MSG_IN, "");
     assert(associated_writers_.empty());
     assert(associated_readers_.empty());
+}
+
+ #if HAVE_SECURITY
+void MessageReceiver::process_data_message_with_security(
+        const EntityId_t& reader_id,
+        CacheChange_t& change)
+{
+    auto process_message = [&change, this](RTPSReader* reader)
+            {
+                if (!reader->getAttributes().security_attributes().is_payload_protected)
+                {
+                    reader->processDataMsg(&change);
+                    return;
+                }
+
+                if (!reader->matched_writer_is_matched(change.writerGUID))
+                {
+                    return;
+                }
+
+                if (!participant_->security_manager().decode_serialized_payload(change.serializedPayload,
+                        crypto_payload_, reader->getGuid(), change.writerGUID))
+                {
+                    return;
+                }
+
+                std::swap(change.serializedPayload.data, crypto_payload_.data);
+                std::swap(change.serializedPayload.length, crypto_payload_.length);
+
+                SerializedPayload_t original_payload = change.serializedPayload;
+                reader->processDataMsg(&change);
+                IPayloadPool* payload_pool = change.payload_owner();
+                if (payload_pool)
+                {
+                    payload_pool->release_payload(change);
+                    change.serializedPayload = original_payload;
+                }
+                original_payload.data = nullptr;
+                std::swap(change.serializedPayload.data, crypto_payload_.data);
+                std::swap(change.serializedPayload.length, crypto_payload_.length);
+            };
+
+    findAllReaders(reader_id, process_message);
+}
+
+void MessageReceiver::process_data_fragment_message_with_security(
+        const EntityId_t& reader_id,
+        CacheChange_t& change,
+        uint32_t sample_size,
+        uint32_t fragment_starting_num,
+        uint16_t fragments_in_submessage)
+{
+    auto process_message =
+            [&change, sample_size, fragment_starting_num, fragments_in_submessage, this](RTPSReader* reader)
+            {
+                if (!reader->getAttributes().security_attributes().is_payload_protected)
+                {
+                    reader->processDataFragMsg(&change, sample_size, fragment_starting_num, fragments_in_submessage);
+                    return;
+                }
+
+                if (!reader->matched_writer_is_matched(change.writerGUID))
+                {
+                    return;
+                }
+
+                if (!participant_->security_manager().decode_serialized_payload(change.serializedPayload,
+                        crypto_payload_, reader->getGuid(), change.writerGUID))
+                {
+                    return;
+                }
+
+                std::swap(change.serializedPayload.data, crypto_payload_.data);
+                std::swap(change.serializedPayload.length, crypto_payload_.length);
+                reader->processDataFragMsg(&change, sample_size, fragment_starting_num, fragments_in_submessage);
+                std::swap(change.serializedPayload.data, crypto_payload_.data);
+                std::swap(change.serializedPayload.length, crypto_payload_.length);
+            };
+
+    findAllReaders(reader_id, process_message);
+}
+
+#endif // if HAVE SECURITY
+
+void MessageReceiver::process_data_message_without_security(
+        const EntityId_t& reader_id,
+        CacheChange_t& change)
+{
+    auto process_message = [&change](RTPSReader* reader)
+            {
+                reader->processDataMsg(&change);
+            };
+
+    findAllReaders(reader_id, process_message);
+}
+
+void MessageReceiver::process_data_fragment_message_without_security(
+        const EntityId_t& reader_id,
+        CacheChange_t& change,
+        uint32_t sample_size,
+        uint32_t fragment_starting_num,
+        uint16_t fragments_in_submessage)
+{
+    auto process_message = [&change, sample_size, fragment_starting_num, fragments_in_submessage](RTPSReader* reader)
+            {
+                reader->processDataFragMsg(&change, sample_size, fragment_starting_num, fragments_in_submessage);
+            };
+
+    findAllReaders(reader_id, process_message);
 }
 
 void MessageReceiver::associateEndpoint(
@@ -197,10 +348,13 @@ void MessageReceiver::processCDRMsg(
 
     if (decode_ret == 0)
     {
-        // Swap
-        std::swap(msg, auxiliary_buffer);
+        // The original CDRMessage buffer (msg) now points to the proprietary temporary buffer crypto_msg_.
+        // The auxiliary buffer now points to the propietary temporary buffer crypto_submsg_.
+        // This way each decoded sub-message will be processed using the crypto_submsg_ buffer.
+        msg = auxiliary_buffer;
+        auxiliary_buffer = &crypto_submsg_;
     }
-#endif
+#endif // if HAVE_SECURITY
 
     // Loop until there are no more submessages
     bool valid;
@@ -223,7 +377,7 @@ void MessageReceiver::processCDRMsg(
         {
             submessage = auxiliary_buffer;
         }
-#endif
+#endif // if HAVE_SECURITY
 
         //First 4 bytes must contain: ID | flags | octets to next header
         if (!readSubmessageHeader(submessage, &submsgh))
@@ -426,7 +580,7 @@ bool MessageReceiver::readSubmessageHeader(
         return false;
     }
 
-    if ( (length == 0) && (smh->submessageId != INFO_TS) && (smh->submessageId != PAD) )
+    if ((length == 0) && (smh->submessageId != INFO_TS) && (smh->submessageId != PAD))
     {
         // THIS IS THE LAST SUBMESSAGE
         smh->submessageLength = msg->length - msg->pos;
@@ -442,8 +596,10 @@ bool MessageReceiver::readSubmessageHeader(
 }
 
 bool MessageReceiver::willAReaderAcceptMsgDirectedTo(
-        const EntityId_t& readerID)
+        const EntityId_t& readerID,
+        RTPSReader*& first_reader)
 {
+    first_reader = nullptr;
     if (associated_readers_.empty())
     {
         logWarning(RTPS_MSG_IN, IDSTRING "Data received when NO readers are listening");
@@ -455,6 +611,7 @@ bool MessageReceiver::willAReaderAcceptMsgDirectedTo(
         const auto readers = associated_readers_.find(readerID);
         if (readers != associated_readers_.end())
         {
+            first_reader = readers->second.front();
             return true;
         }
     }
@@ -462,15 +619,11 @@ bool MessageReceiver::willAReaderAcceptMsgDirectedTo(
     {
         for (const auto& readers : associated_readers_)
         {
-            if (readers.second.empty())
-            {
-                continue;
-            }
-
             for (const auto& it : readers.second)
             {
                 if (it->m_acceptMessagesToUnknownReaders)
                 {
+                    first_reader = it;
                     return true;
                 }
             }
@@ -549,15 +702,16 @@ bool MessageReceiver::proc_Submsg_Data(
     msg->pos += 2;
 
     bool valid = true;
-    int16_t octetsToInlineQos;
+    int16_t octetsToInlineQos = 0;
     valid &= CDRMessage::readInt16(msg, &octetsToInlineQos); //it should be 16 in this implementation
 
     //reader and writer ID
+    RTPSReader* first_reader = nullptr;
     EntityId_t readerID;
     valid &= CDRMessage::readEntityId(msg, &readerID);
 
     //WE KNOW THE READER THAT THE MESSAGE IS DIRECTED TO SO WE LOOK FOR IT:
-    if (!willAReaderAcceptMsgDirectedTo(readerID))
+    if (!willAReaderAcceptMsgDirectedTo(readerID, first_reader))
     {
         return false;
     }
@@ -599,7 +753,7 @@ bool MessageReceiver::proc_Submsg_Data(
 
     if (inlineQosFlag)
     {
-        if (!ParameterList::updateCacheChangeFromInlineQos(ch, msg, inlineQosSize) )
+        if (!ParameterList::updateCacheChangeFromInlineQos(ch, msg, inlineQosSize))
         {
             logInfo(RTPS_MSG_IN, IDSTRING "SubMessage Data ERROR, Inline Qos ParameterList error");
             return false;
@@ -644,7 +798,7 @@ bool MessageReceiver::proc_Submsg_Data(
             else
             {
                 logWarning(RTPS_MSG_IN, IDSTRING "Ignoring Serialized Payload for too large key-only data (" <<
-                    payload_size << ")");
+                        payload_size << ")");
             }
             msg->pos += payload_size;
         }
@@ -657,14 +811,16 @@ bool MessageReceiver::proc_Submsg_Data(
     }
 
     logInfo(RTPS_MSG_IN, IDSTRING "from Writer " << ch.writerGUID << "; possible RTPSReader entities: " <<
-        associated_readers_.size());
+            associated_readers_.size());
 
     //Look for the correct reader to add the change
-    findAllReaders(readerID, 
-        [&ch] (RTPSReader* reader)
-        {
-            reader->processDataMsg(&ch);
-        });
+    process_data_message_function_(readerID, ch);
+
+    IPayloadPool* payload_pool = ch.payload_owner();
+    if (payload_pool)
+    {
+        payload_pool->release_payload(ch);
+    }
 
     //TODO(Ricardo) If a exception is thrown (ex, by fastcdr), this line is not executed -> segmentation fault
     ch.serializedPayload.data = nullptr;
@@ -705,15 +861,16 @@ bool MessageReceiver::proc_Submsg_DataFrag(
     msg->pos += 2;
 
     bool valid = true;
-    int16_t octetsToInlineQos;
+    int16_t octetsToInlineQos = 0;
     valid &= CDRMessage::readInt16(msg, &octetsToInlineQos); //it should be 16 in this implementation
 
     //reader and writer ID
+    RTPSReader* first_reader = nullptr;
     EntityId_t readerID;
     valid &= CDRMessage::readEntityId(msg, &readerID);
 
     //WE KNOW THE READER THAT THE MESSAGE IS DIRECTED TO SO WE LOOK FOR IT:
-    if (!willAReaderAcceptMsgDirectedTo(readerID))
+    if (!willAReaderAcceptMsgDirectedTo(readerID, first_reader))
     {
         return false;
     }
@@ -742,7 +899,7 @@ bool MessageReceiver::proc_Submsg_DataFrag(
     valid &= CDRMessage::readUInt16(msg, &fragmentsInSubmessage);
 
     // READ FRAGMENTSIZE
-    uint16_t fragmentSize;
+    uint16_t fragmentSize = 0;
     valid &= CDRMessage::readUInt16(msg, &fragmentSize);
 
     // READ SAMPLESIZE
@@ -831,17 +988,9 @@ bool MessageReceiver::proc_Submsg_DataFrag(
         ch.sourceTimestamp = timestamp_;
     }
 
-    //FIXME: DO SOMETHING WITH PARAMETERLIST CREATED.
     logInfo(RTPS_MSG_IN, IDSTRING "from Writer " << ch.writerGUID << "; possible RTPSReader entities: " <<
-        associated_readers_.size());
-
-    //Look for the correct reader to add the change
-    findAllReaders(readerID,
-        [&ch, sampleSize, fragmentStartingNum, fragmentsInSubmessage] (RTPSReader* reader)
-        {
-            reader->processDataFragMsg(&ch, sampleSize, fragmentStartingNum, fragmentsInSubmessage);
-        });
-
+            associated_readers_.size());
+    process_data_fragment_message_function_(readerID, ch, sampleSize, fragmentStartingNum, fragmentsInSubmessage);
     ch.serializedPayload.data = nullptr;
 
     logInfo(RTPS_MSG_IN, IDSTRING "Sub Message DATA_FRAG processed");
@@ -888,10 +1037,10 @@ bool MessageReceiver::proc_Submsg_Heartbeat(
     std::lock_guard<std::mutex> guard(mtx_);
     //Look for the correct reader and writers:
     findAllReaders(readerGUID.entityId,
-        [&writerGUID, &HBCount, &firstSN, &lastSN, finalFlag, livelinessFlag] (RTPSReader* reader)
-        {
-            reader->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag);
-        });
+            [&writerGUID, &HBCount, &firstSN, &lastSN, finalFlag, livelinessFlag](RTPSReader* reader)
+            {
+                reader->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag);
+            });
 
     return true;
 }
@@ -973,10 +1122,10 @@ bool MessageReceiver::proc_Submsg_Gap(
 
     std::lock_guard<std::mutex> guard(mtx_);
     findAllReaders(readerGUID.entityId,
-        [&writerGUID, &gapStart, &gapList] (RTPSReader* reader)
-        {
-            reader->processGapMsg(writerGUID, gapStart, gapList);
-        });
+            [&writerGUID, &gapStart, &gapList](RTPSReader* reader)
+            {
+                reader->processGapMsg(writerGUID, gapStart, gapList);
+            });
 
     return true;
 }
@@ -1161,6 +1310,6 @@ bool MessageReceiver::proc_Submsg_HeartbeatFrag(
     return true;
 }
 
-}
 } /* namespace rtps */
+} /* namespace fastrtps */
 } /* namespace eprosima */

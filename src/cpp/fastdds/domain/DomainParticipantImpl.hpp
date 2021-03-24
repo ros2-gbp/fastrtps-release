@@ -73,7 +73,7 @@ class DomainParticipantImpl
     friend class DomainParticipantFactory;
     friend class DomainParticipant;
 
-private:
+protected:
 
     DomainParticipantImpl(
             DomainParticipant* dp,
@@ -110,8 +110,8 @@ public:
     /**
      * Create a Publisher in this Participant.
      * @param qos QoS of the Publisher.
-     * @param att Attributes of the Publisher.
-     * @param listen Pointer to the listener.
+     * @param listenerer Pointer to the listener.
+     * @param mask StatusMask
      * @return Pointer to the created Publisher.
      */
     Publisher* create_publisher(
@@ -121,8 +121,8 @@ public:
 
     /**
      * Create a Publisher in this Participant.
-     * @param profile Publisher profile name.
-     * @param listen Pointer to the listener.
+     * @param profile_name Publisher profile name.
+     * @param listener Pointer to the listener.
      * @param mask StatusMask
      * @return Pointer to the created Publisher.
      */
@@ -137,7 +137,7 @@ public:
     /**
      * Create a Subscriber in this Participant.
      * @param qos QoS of the Subscriber.
-     * @param listen Pointer to the listener.
+     * @param listener Pointer to the listener.
      * @param mask StatusMask that holds statuses the listener responds to
      * @return Pointer to the created Subscriber.
      */
@@ -149,7 +149,7 @@ public:
     /**
      * Create a Subscriber in this Participant.
      * @param profile Subscriber profile name.
-     * @param listen Pointer to the listener.
+     * @param listener Pointer to the listener.
      * @param mask StatusMask
      * @return Pointer to the created Subscriber.
      */
@@ -166,7 +166,7 @@ public:
      * @param topic_name Name of the Topic.
      * @param type_name Data type of the Topic.
      * @param qos QoS of the Topic.
-     * @param listen Pointer to the listener.
+     * @param listener Pointer to the listener.
      * @param mask StatusMask that holds statuses the listener responds to
      * @return Pointer to the created Topic.
      */
@@ -182,7 +182,7 @@ public:
      * @param topic_name Name of the Topic.
      * @param type_name Data type of the Topic.
      * @param profile Topic profile name.
-     * @param listen Pointer to the listener.
+     * @param listener Pointer to the listener.
      * @param mask StatusMask that holds statuses the listener responds to
      * @return Pointer to the created Topic.
      */
@@ -264,6 +264,10 @@ public:
 
     const PublisherQos& get_default_publisher_qos() const;
 
+    const ReturnCode_t get_publisher_qos_from_profile(
+            const std::string& profile_name,
+            PublisherQos& qos) const;
+
     ReturnCode_t set_default_subscriber_qos(
             const SubscriberQos& qos);
 
@@ -271,12 +275,20 @@ public:
 
     const SubscriberQos& get_default_subscriber_qos() const;
 
+    const ReturnCode_t get_subscriber_qos_from_profile(
+            const std::string& profile_name,
+            SubscriberQos& qos) const;
+
     ReturnCode_t set_default_topic_qos(
             const TopicQos& qos);
 
     void reset_default_topic_qos();
 
     const TopicQos& get_default_topic_qos() const;
+
+    const ReturnCode_t get_topic_qos_from_profile(
+            const std::string& profile_name,
+            TopicQos& qos) const;
 
     /* TODO
        bool get_discovered_participants(
@@ -370,7 +382,15 @@ public:
      */
     bool has_active_entities();
 
-private:
+
+    /**
+     * Returns the most appropriate listener to handle the callback for the given status,
+     * or nullptr if there is no appropriate listener.
+     */
+    DomainParticipantListener* get_listener_for(
+            const StatusMask& status);
+
+protected:
 
     //!Domain id
     DomainId_t domain_id_;
@@ -428,17 +448,17 @@ private:
     std::map<fastrtps::rtps::SampleIdentity,
             std::pair<std::string, std::function<void(
                 const std::string& name,
-                const fastrtps::types::DynamicType_ptr)> > > register_callbacks_;
+                const fastrtps::types::DynamicType_ptr)>>> register_callbacks_;
 
     // Relationship between child and parent request
     std::map<fastrtps::rtps::SampleIdentity, fastrtps::rtps::SampleIdentity> child_requests_;
 
     // All parent's child requests
-    std::map<fastrtps::rtps::SampleIdentity, std::vector<fastrtps::rtps::SampleIdentity> > parent_requests_;
+    std::map<fastrtps::rtps::SampleIdentity, std::vector<fastrtps::rtps::SampleIdentity>> parent_requests_;
 
     class MyRTPSParticipantListener : public fastrtps::rtps::RTPSParticipantListener
     {
-public:
+    public:
 
         MyRTPSParticipantListener(
                 DomainParticipantImpl* impl)
@@ -458,7 +478,7 @@ public:
         void onParticipantAuthentication(
                 fastrtps::rtps::RTPSParticipant* participant,
                 fastrtps::rtps::ParticipantAuthenticationInfo&& info) override;
-#endif
+#endif // if HAVE_SECURITY
 
         void onReaderDiscovery(
                 fastrtps::rtps::RTPSParticipant* participant,
@@ -489,11 +509,12 @@ public:
 
         DomainParticipantImpl* participant_;
 
-    } rtps_listener_;
+    }
+    rtps_listener_;
 
     void create_instance_handle(
             fastrtps::rtps::InstanceHandle_t& handle);
-    
+
     bool exists_entity_id(
             const fastrtps::rtps::EntityId_t& entity_id) const;
 
@@ -549,5 +570,5 @@ public:
 } /* namespace dds */
 } /* namespace fastdds */
 } /* namespace eprosima */
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_PARTICIPANTIMPL_HPP_ */

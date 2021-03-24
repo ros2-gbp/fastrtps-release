@@ -50,6 +50,7 @@ class TimedEvent;
 class WLPListener;
 class WriterHistory;
 class WriterProxyData;
+class ITopicPayloadPool;
 
 /**
  * Class WLP that implements the Writer Liveliness Protocol described in the RTPS specification.
@@ -163,7 +164,7 @@ public:
     bool pairing_remote_writer_with_local_reader_after_security(
             const GUID_t& local_reader,
             const WriterProxyData& remote_writer_data);
-#endif
+#endif // if HAVE_SECURITY
 
 private:
 
@@ -291,16 +292,21 @@ private:
      * @return true if correct.
      */
     bool createSecureEndpoints();
-#endif
+#endif // if HAVE_SECURITY
 
     std::mutex temp_data_lock_;
     ReaderProxyData temp_reader_proxy_data_;
     WriterProxyData temp_writer_proxy_data_;
+
+    std::shared_ptr<ITopicPayloadPool> payload_pool_;
+#if HAVE_SECURITY
+    std::shared_ptr<ITopicPayloadPool> secure_payload_pool_;
+#endif // if HAVE_SECURITY
 };
 
 } /* namespace rtps */
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_RTPS_WLP_H_ */

@@ -62,6 +62,8 @@ class TopicDescription;
  */
 class SubscriberImpl
 {
+protected:
+
     friend class DomainParticipantImpl;
     friend class DataReaderImpl;
 
@@ -145,6 +147,10 @@ public:
 
     DataReaderQos& get_default_datareader_qos();
 
+    const ReturnCode_t get_datareader_qos_from_profile(
+            const std::string& profile_name,
+            DataReaderQos& qos) const;
+
     /* TODO
        bool copy_from_topic_qos(
             ReaderQos& reader_qos,
@@ -206,7 +212,14 @@ public:
             const SubscriberQos& to,
             const SubscriberQos& from);
 
-private:
+    /**
+     * Returns the most appropriate listener to handle the callback for the given status,
+     * or nullptr if there is no appropriate listener.
+     */
+    SubscriberListener* get_listener_for(
+            const StatusMask& status);
+
+protected:
 
     //!Participant
     DomainParticipantImpl* participant_;
@@ -214,7 +227,7 @@ private:
     SubscriberQos qos_;
 
     //!Map of Pointer to associated DataReaders. Topic name is the key.
-    std::map<std::string, std::vector<DataReaderImpl*> > readers_;
+    std::map<std::string, std::vector<DataReaderImpl*>> readers_;
 
     mutable std::mutex mtx_readers_;
 
@@ -223,7 +236,7 @@ private:
 
     class SubscriberReaderListener : public DataReaderListener
     {
-public:
+    public:
 
         SubscriberReaderListener(
                 SubscriberImpl* s)
@@ -263,7 +276,8 @@ public:
                 const SampleLostStatus& status) override;
 
         SubscriberImpl* subscriber_;
-    } subscriber_listener_;
+    }
+    subscriber_listener_;
 
     Subscriber* user_subscriber_;
 
@@ -279,5 +293,5 @@ public:
 } /* namespace dds */
 } /* namespace fastdds */
 } /* namespace eprosima */
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_SUBSCRIBERIMPL_HPP_ */

@@ -20,7 +20,7 @@
 #include <cstdlib>
 #ifdef _WIN32
 #include <windows.h>
-#endif
+#endif // ifdef _WIN32
 
 using namespace eprosima::fastrtps;
 using namespace ::xmlparser;
@@ -171,15 +171,32 @@ void XMLProfileManager::loadDefaultXMLFile()
     {
         loadXMLFile(file_path);
     }
+
+    // Should take into account '\0'
+    char skip_xml[2];
+    size = 2;
+
+    // Try to load the default XML file if variable does not exist or is not set to '1'
+    if (!(getenv_s(&size, skip_xml, size, "SKIP_DEFAULT_XML_FILE") == 0 && skip_xml[0] == '1'))
+    {
+        loadXMLFile(DEFAULT_FASTRTPS_PROFILES);
+    }
 #else
+
     if (const char* file_path = std::getenv(DEFAULT_FASTRTPS_ENV_VARIABLE))
     {
         loadXMLFile(file_path);
     }
-#endif
 
-    // Try to load the default XML file.
-    loadXMLFile(DEFAULT_FASTRTPS_PROFILES);
+    const char* skip_xml = std::getenv("SKIP_DEFAULT_XML_FILE");
+
+    // Try to load the default XML file if variable does not exist or is not set to '1'
+    if (!(skip_xml != nullptr && skip_xml[0] == '1'))
+    {
+        loadXMLFile(DEFAULT_FASTRTPS_PROFILES);
+    }
+
+#endif // ifdef _WIN32
 }
 
 XMLP_ret XMLProfileManager::loadXMLProfiles(
@@ -294,6 +311,11 @@ XMLP_ret XMLProfileManager::loadXMLFile(
         return loaded_ret;
     }
 
+    if (NodeType::LOG == root_node->getType())
+    {
+        return loaded_ret;
+    }
+
     if (NodeType::ROOT == root_node->getType())
     {
         for (auto&& child: root_node->getChildren())
@@ -301,6 +323,16 @@ XMLP_ret XMLProfileManager::loadXMLFile(
             if (NodeType::PROFILES == child.get()->getType())
             {
                 return XMLProfileManager::extractProfiles(std::move(child), filename);
+            }
+            // TODO Workaround when there is a ROOT tag without PROFILES. Return the corresponding error instead of
+            // XMLP_ret::XML_ERROR. Only the type is checked so the objects do not need to be populated.
+            else if (NodeType::TYPES == child.get()->getType())
+            {
+                return loaded_ret;
+            }
+            else if (NodeType::LOG == child.get()->getType())
+            {
+                return loaded_ret;
             }
         }
     }
@@ -476,7 +508,7 @@ XMLP_ret XMLProfileManager::extractParticipantProfile(
     if (it != node_part->getAttributes().end() && it->second == "true") // Set as default profile
     {
         // +V+ TODO: LOG ERROR IN SECOND ATTEMPT
-        default_participant_attributes = *(emplace.first->second.get() );
+        default_participant_attributes = *(emplace.first->second.get());
     }
     return XMLP_ret::XML_OK;
 }
@@ -509,7 +541,7 @@ XMLP_ret XMLProfileManager::extractPublisherProfile(
     if (it != node_part->getAttributes().end() && it->second == "true") // Set as default profile
     {
         // +V+ TODO: LOG ERROR IN SECOND ATTEMPT
-        default_publisher_attributes = *(emplace.first->second.get() );
+        default_publisher_attributes = *(emplace.first->second.get());
     }
     return XMLP_ret::XML_OK;
 }
@@ -542,7 +574,7 @@ XMLP_ret XMLProfileManager::extractSubscriberProfile(
     if (it != node_part->getAttributes().end() && it->second == "true") // Set as default profile
     {
         // +V+ TODO: LOG ERROR IN SECOND ATTEMPT
-        default_subscriber_attributes = *(emplace.first->second.get() );
+        default_subscriber_attributes = *(emplace.first->second.get());
     }
     return XMLP_ret::XML_OK;
 }
@@ -654,7 +686,8 @@ XMLP_ret XMLProfileManager::extractRequesterProfile(
 
     profile_name = it->second;
 
-    std::pair<requester_map_iterator_t, bool> emplace = requester_profiles_.emplace(profile_name, node_requester->getData());
+    std::pair<requester_map_iterator_t, bool> emplace = requester_profiles_.emplace(profile_name,
+                    node_requester->getData());
     if (false == emplace.second)
     {
         logError(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");

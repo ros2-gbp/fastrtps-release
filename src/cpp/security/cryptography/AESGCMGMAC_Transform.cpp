@@ -30,12 +30,12 @@
 #define IS_OPENSSL_1_1 1
 #else
 #define IS_OPENSSL_1_1 0
-#endif
+#endif // if OPENSSL_VERSION_NUMBER >= 0x10100000L
 
 // Solve error with Win32 macro
 #ifdef WIN32
 #undef max
-#endif
+#endif // ifdef WIN32
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::rtps::security;
@@ -227,13 +227,13 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
     std::array<uint8_t, 4> session_id;
     memcpy(session_id.data(), &(session->session_id), 4);
 
-#if __BIG_ENDIAN__
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
     octet flags = 0x0;
     serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 #else
     octet flags = BIT(0);
     serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
-#endif
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
     //Header
     try
@@ -367,13 +367,13 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
     std::array<uint8_t, 4> session_id;
     memcpy(session_id.data(), &(session->session_id), 4);
 
-#if __BIG_ENDIAN__
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
     octet flags = 0x0;
     serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 #else
     octet flags = BIT(0);
     serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
-#endif
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
     //Header
     try
@@ -508,13 +508,13 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
     std::array<uint8_t, 4> session_id;
     memcpy(session_id.data(), &(local_participant->session_id), 4);
 
-#if __BIG_ENDIAN__
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
     octet flags = 0x0;
     serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 #else
     octet flags = BIT(0);
     serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
-#endif
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
     //Header
     try
@@ -904,28 +904,21 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
             *datawriter_crypto = *it;
 
             //We have the remote writer, now lets look for the local datareader
-            AESGCMGMAC_ParticipantCryptoHandle& lookup_participant =
-                    is_key_id_zero ? remote_participant : local_participant;
-            for (std::vector<DatareaderCryptoHandle*>::iterator itt = lookup_participant->Readers.begin();
-                    itt != lookup_participant->Readers.end(); ++itt)
+            bool found = lookup_reader(local_participant, datareader_crypto, key_id);
+
+            if (found)
             {
-                AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(**itt);
-
-                if (reader->Remote2EntityKeyMaterial.size() == 0)
+                return true;
+            }
+            // Datareader not found locally. Look remotely (Discovery case)
+            else if (is_key_id_zero)
+            {
+                found = lookup_reader(remote_participant, datareader_crypto, key_id);
+                if (found)
                 {
-                    logWarning(SECURITY_CRYPTO, "No key material yet");
-                    continue;
+                    return true;
                 }
-
-                for (size_t i = 0; i < reader->Remote2EntityKeyMaterial.size(); ++i)
-                {
-                    if (reader->Remote2EntityKeyMaterial.at(i).sender_key_id == key_id)
-                    {
-                        *datareader_crypto = *itt;
-                        return true;
-                    }
-                }   //For each Reader2WriterKeyMaterial in the local datareader
-            } //For each datareader present in the local participant
+            }
         } //Remote writer key found
     } //For each datawriter present in the remote participant
 
@@ -949,28 +942,21 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
             *datareader_crypto = *it;
 
             //We have the remote reader, now lets look for the local datawriter
-            AESGCMGMAC_ParticipantCryptoHandle& lookup_participant =
-                    is_key_id_zero ? remote_participant : local_participant;
-            for (std::vector<DatawriterCryptoHandle*>::iterator itt = lookup_participant->Writers.begin();
-                    itt != lookup_participant->Writers.end(); ++itt)
+            bool found = lookup_writer(local_participant, datawriter_crypto, key_id);
+
+            if (found)
             {
-                AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_ReaderCryptoHandle::narrow(**itt);
-
-                if (writer->Remote2EntityKeyMaterial.size() == 0)
+                return true;
+            }
+            // Datawriter not found locally. Look remotely (Discovery case)
+            else if (is_key_id_zero)
+            {
+                found = lookup_writer(remote_participant, datawriter_crypto, key_id);
+                if (found)
                 {
-                    logWarning(SECURITY_CRYPTO, "No key material yet");
-                    continue;
+                    return true;
                 }
-
-                for (size_t i = 0; i < writer->Remote2EntityKeyMaterial.size(); ++i)
-                {
-                    if (writer->Remote2EntityKeyMaterial.at(i).sender_key_id == key_id)
-                    {
-                        *datawriter_crypto = *itt;
-                        return true;
-                    }
-                }   //For each Writer2ReaderKeyMaterial in the local datawriter
-            } //For each datawriter present in the local participant
+            }
         } //Remote reader key found
     } //For each datareader present in the remote participant
 
@@ -1512,7 +1498,7 @@ void AESGCMGMAC_Transform::compute_sessionkey(
             EVP_MD_CTX_new();
 #else
             (EVP_MD_CTX*)malloc(sizeof(EVP_MD_CTX));
-#endif
+#endif // if IS_OPENSSL_1_1
     EVP_MD_CTX_init(ctx);
     EVP_DigestSignInit(ctx, NULL, EVP_sha256(), NULL, key);
     EVP_DigestSignUpdate(ctx, source, sourceLen);
@@ -1527,7 +1513,7 @@ void AESGCMGMAC_Transform::compute_sessionkey(
 #else
     EVP_MD_CTX_cleanup(ctx);
     free(ctx);
-#endif
+#endif // if IS_OPENSSL_1_1
 }
 
 void AESGCMGMAC_Transform::serialize_SecureDataHeader(
@@ -1614,13 +1600,13 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
     }
     else
     {
-#if __BIG_ENDIAN__
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
         octet flags = 0x0;
         serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 #else
         octet flags = BIT(0);
         serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
-#endif
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
         if (submessage)
         {
@@ -1647,7 +1633,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
 
         // Check output_buffer contains enough memory to cypher.
         // - EVP_EncryptUpdate needs at maximum: plain_buffer_len + cipher_block_size - 1.
-        // - EVP_EncryptFinal needs ad maximun cipher_block_size.
+        // - EVP_EncryptFinal needs ad maximum cipher_block_size.
         if ((output_buffer.getBufferSize() - (serializer.getCurrentPosition() - serializer.getBufferPointer())) <
                 (plain_buffer_len + (2 * cipher_block_size) - 1))
         {
@@ -2252,4 +2238,60 @@ uint32_t AESGCMGMAC_Transform::calculate_extra_size_for_encoded_payload(
     calculate += number_discovered_readers > 10 ? number_discovered_readers * 20 : 200;
 
     return calculate;
+}
+
+bool AESGCMGMAC_Transform::lookup_reader(
+        AESGCMGMAC_ParticipantCryptoHandle& participant,
+        DatareaderCryptoHandle** datareader_crypto,
+        CryptoTransformKeyId key_id)
+{
+    for (DatareaderCryptoHandle* readerHandle : participant->Readers)
+    {
+        AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(*readerHandle);
+
+        if (reader->Remote2EntityKeyMaterial.empty())
+        {
+            logWarning(SECURITY_CRYPTO, "No key material yet");
+            continue;
+        }
+
+        for (const KeyMaterial_AES_GCM_GMAC& elem : reader->Remote2EntityKeyMaterial)
+        {
+            if (elem.sender_key_id == key_id)
+            {
+                *datareader_crypto = readerHandle;
+                return true;
+            }
+        }   //For each Reader2WriterKeyMaterial in the datareader
+    } //For each datareader present in the participant
+
+    return false;
+}
+
+bool AESGCMGMAC_Transform::lookup_writer(
+        AESGCMGMAC_ParticipantCryptoHandle& participant,
+        DatawriterCryptoHandle** datawriter_crypto,
+        CryptoTransformKeyId key_id)
+{
+    for (DatawriterCryptoHandle* writerHandle : participant->Writers)
+    {
+        AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(*writerHandle);
+
+        if (writer->Remote2EntityKeyMaterial.empty())
+        {
+            logWarning(SECURITY_CRYPTO, "No key material yet");
+            continue;
+        }
+
+        for (const KeyMaterial_AES_GCM_GMAC& elem : writer->Remote2EntityKeyMaterial)
+        {
+            if (elem.sender_key_id == key_id)
+            {
+                *datawriter_crypto = writerHandle;
+                return true;
+            }
+        }   //For each Writer2ReaderKeyMaterial in the datawriter
+    } //For each datawriter present in the participant
+
+    return false;
 }

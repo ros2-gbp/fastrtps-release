@@ -21,6 +21,7 @@
 
 #include <fastdds/rtps/common/Time_t.h>
 #include <fastrtps/qos/DeadlineMissedStatus.h>
+#include <fastdds/dds/core/status/IncompatibleQosStatus.hpp>
 #include <fastdds/dds/core/status/BaseStatus.hpp>
 #include <fastrtps/types/TypesBase.h>
 #include <fastdds/dds/core/Entity.hpp>
@@ -65,12 +66,14 @@ class Topic;
  */
 class DataWriter : public DomainEntity
 {
+protected:
+
     friend class PublisherImpl;
     friend class DataWriterImpl;
 
     /**
-     * Create a data writer, assigning its pointer to the associated writer.
-     * Don't use directly, create Publisher using DomainRTPSParticipant static function.
+     * Create a data writer, assigning its pointer to the associated implementation.
+     * Don't use directly, create DataWriter using create_datawriter from Publisher.
      */
     RTPS_DllAPI DataWriter(
             DataWriterImpl* impl,
@@ -180,11 +183,19 @@ public:
 
     /**
      * @brief Returns the offered deadline missed status
-     * @param status Deadline missed status struct
+     * @param[out] status Deadline missed status struct
      * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t get_offered_deadline_missed_status(
             fastrtps::OfferedDeadlineMissedStatus& status);
+
+    /**
+     * @brief Returns the offered incompatible qos status
+     * @param[out] status Offered incompatible qos status struct
+     * @return RETCODE_OK
+     */
+    RTPS_DllAPI ReturnCode_t get_offered_incompatible_qos_status(
+            OfferedIncompatibleQosStatus& status);
 
     /**
      * Establishes the DataWriterQos for this DataWriter.
@@ -222,12 +233,22 @@ public:
     RTPS_DllAPI const DataWriterListener* get_listener() const;
 
     /**
-     * Establishes the listener for this DataWriter.
-     * @param listener Pointer to DataWriterListener to be set
+     * Modifies the DataWriterListener, sets the mask to StatusMask::all()
+     * @param listener new value for the DataWriterListener
      * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t set_listener(
             DataWriterListener* listener);
+
+    /**
+     * Modifies the DataWriterListener.
+     * @param listener new value for the DataWriterListener
+     * @param mask StatusMask that holds statuses the listener responds to (default: all).
+     * @return RETCODE_OK
+     */
+    RTPS_DllAPI ReturnCode_t set_listener(
+            DataWriterListener* listener,
+            const StatusMask& mask);
 
     /* TODO
        bool get_key_value(
@@ -297,7 +318,7 @@ public:
     RTPS_DllAPI ReturnCode_t clear_history(
             size_t* removed);
 
-private:
+protected:
 
     DataWriterImpl* impl_;
 };

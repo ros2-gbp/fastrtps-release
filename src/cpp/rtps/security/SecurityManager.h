@@ -28,6 +28,7 @@
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
+#include <fastdds/rtps/attributes/HistoryAttributes.h>
 #include <fastdds/rtps/resources/TimedEvent.h>
 
 #include <map>
@@ -47,6 +48,7 @@ class StatefulWriter;
 class StatefulReader;
 class WriterHistory;
 class ReaderHistory;
+class ITopicPayloadPool;
 
 namespace security {
 
@@ -220,208 +222,203 @@ private:
     {
         struct AuthenticationInfo
         {
-            public:
-
-                AuthenticationInfo(
-                        AuthenticationStatus auth_status)
-                    : identity_handle_(nullptr)
-                    , handshake_handle_(nullptr)
-                    , auth_status_(auth_status)
-                    , expected_sequence_number_(0)
-                    , change_sequence_number_(SequenceNumber_t::unknown())
-                    , event_(nullptr)
-                {}
-
-                AuthenticationInfo(
-                        AuthenticationInfo&& auth)
-                    : identity_handle_(std::move(auth.identity_handle_))
-                    , handshake_handle_(std::move(auth.handshake_handle_))
-                    , auth_status_(auth.auth_status_)
-                    , expected_sequence_number_(auth.expected_sequence_number_)
-                    , change_sequence_number_(std::move(auth.change_sequence_number_))
-                    , event_(std::move(auth.event_))
-                {}
-
-                IdentityHandle* identity_handle_;
-
-                HandshakeHandle* handshake_handle_;
-
-                AuthenticationStatus auth_status_;
-
-                int64_t expected_sequence_number_;
-
-                SequenceNumber_t change_sequence_number_;
-
-                TimedEvent* event_;
-
-            private:
-
-                AuthenticationInfo(
-                        const AuthenticationInfo& auth) = delete;
-        };
-
-        struct EmptyDelete
-        {
-            void operator()(
-                    AuthenticationInfo*)
-            {}
-        };
-
         public:
 
-            typedef std::unique_ptr<AuthenticationInfo, EmptyDelete> AuthUniquePtr;
+            typedef std::unique_ptr<TimedEvent> EventUniquePtr;
 
-            DiscoveredParticipantInfo(
-                    AuthenticationStatus auth_status,
-                    const ParticipantProxyData& participant_data)
-                : auth_(auth_status), auth_ptr_(&auth_)
-                , shared_secret_handle_(nullptr)
-                , permissions_handle_(nullptr)
-                , participant_crypto_(nullptr)
-                , participant_data_(participant_data)
-            {}
-
-            DiscoveredParticipantInfo(
-                    DiscoveredParticipantInfo&& info)
-                : auth_(std::move(info.auth_))
-                , auth_ptr_(&auth_)
-                , shared_secret_handle_(std::move(info.shared_secret_handle_))
-                , permissions_handle_(std::move(info.permissions_handle_))
-                , participant_crypto_(info.participant_crypto_)
-                , participant_data_(std::move(info.participant_data_))
-            {}
-
-            AuthUniquePtr get_auth()
+            AuthenticationInfo(
+                    AuthenticationStatus auth_status)
+                : identity_handle_(nullptr)
+                , handshake_handle_(nullptr)
+                , auth_status_(auth_status)
+                , expected_sequence_number_(0)
+                , change_sequence_number_(SequenceNumber_t::unknown())
             {
-                return std::move(auth_ptr_);
             }
 
-            void set_auth(
-                    AuthUniquePtr& auth)
+            AuthenticationInfo(
+                    AuthenticationInfo&& auth)
+                : identity_handle_(std::move(auth.identity_handle_))
+                , handshake_handle_(std::move(auth.handshake_handle_))
+                , auth_status_(auth.auth_status_)
+                , expected_sequence_number_(auth.expected_sequence_number_)
+                , change_sequence_number_(std::move(auth.change_sequence_number_))
+                , event_(std::move(auth.event_))
             {
-                assert(auth.get() == &auth_);
-                auth_ptr_ = std::move(auth);
             }
 
-            void set_shared_secret(
-                    SharedSecretHandle* shared_secret)
-            {
-                shared_secret_handle_ = shared_secret;
-            }
+            IdentityHandle* identity_handle_;
 
-            SharedSecretHandle* get_shared_secret()
-            {
-                return shared_secret_handle_;
-            }
+            HandshakeHandle* handshake_handle_;
 
-            void set_permissions_handle(
-                    PermissionsHandle* handle)
-            {
-                permissions_handle_ = handle;
-            }
+            AuthenticationStatus auth_status_;
 
-            PermissionsHandle* get_permissions_handle()
-            {
-                return permissions_handle_;
-            }
+            int64_t expected_sequence_number_;
 
-            const PermissionsHandle* get_permissions_handle() const
-            {
-                return permissions_handle_;
-            }
+            SequenceNumber_t change_sequence_number_;
 
-            void set_participant_crypto(
-                    ParticipantCryptoHandle* participant_crypto)
-            {
-                participant_crypto_ = participant_crypto;
-            }
-
-            ParticipantCryptoHandle* get_participant_crypto()
-            {
-                return participant_crypto_;
-            }
-
-            void stop_event()
-            {
-                if(auth_.event_ != nullptr)
-                {
-                    auth_.event_->cancel_timer();
-                }
-            }
-
-            const ParticipantProxyData& participant_data() const
-            {
-                return participant_data_;
-            }
+            EventUniquePtr event_;
 
         private:
 
-            DiscoveredParticipantInfo(const DiscoveredParticipantInfo& info) = delete;
+            AuthenticationInfo(
+                    const AuthenticationInfo& auth) = delete;
+        };
 
-            AuthenticationInfo auth_;
+    public:
 
-            AuthUniquePtr auth_ptr_;
+        typedef std::unique_ptr<AuthenticationInfo> AuthUniquePtr;
 
-            SharedSecretHandle* shared_secret_handle_;
+        DiscoveredParticipantInfo(
+                AuthenticationStatus auth_status,
+                const ParticipantProxyData& participant_data)
+            : auth_(new AuthenticationInfo(auth_status))
+            , shared_secret_handle_(nullptr)
+            , permissions_handle_(nullptr)
+            , participant_crypto_(nullptr)
+            , participant_data_(participant_data)
+        {
+        }
 
-            PermissionsHandle* permissions_handle_;
+        DiscoveredParticipantInfo(
+                DiscoveredParticipantInfo&& info)
+            : auth_(std::move(info.auth_))
+            , shared_secret_handle_(std::move(info.shared_secret_handle_))
+            , permissions_handle_(std::move(info.permissions_handle_))
+            , participant_crypto_(info.participant_crypto_)
+            , participant_data_(std::move(info.participant_data_))
+        {
+        }
 
-            ParticipantCryptoHandle* participant_crypto_;
+        AuthUniquePtr get_auth()
+        {
+            return std::move(auth_);
+        }
 
-            ParticipantProxyData participant_data_;
+        void set_auth(
+                AuthUniquePtr& auth)
+        {
+            auth_ = std::move(auth);
+        }
+
+        void set_shared_secret(
+                SharedSecretHandle* shared_secret)
+        {
+            shared_secret_handle_ = shared_secret;
+        }
+
+        SharedSecretHandle* get_shared_secret()
+        {
+            return shared_secret_handle_;
+        }
+
+        void set_permissions_handle(
+                PermissionsHandle* handle)
+        {
+            permissions_handle_ = handle;
+        }
+
+        PermissionsHandle* get_permissions_handle()
+        {
+            return permissions_handle_;
+        }
+
+        const PermissionsHandle* get_permissions_handle() const
+        {
+            return permissions_handle_;
+        }
+
+        void set_participant_crypto(
+                ParticipantCryptoHandle* participant_crypto)
+        {
+            participant_crypto_ = participant_crypto;
+        }
+
+        ParticipantCryptoHandle* get_participant_crypto()
+        {
+            return participant_crypto_;
+        }
+
+        const ParticipantProxyData& participant_data() const
+        {
+            return participant_data_;
+        }
+
+    private:
+
+        DiscoveredParticipantInfo(
+                const DiscoveredParticipantInfo& info) = delete;
+
+        AuthUniquePtr auth_;
+
+        SharedSecretHandle* shared_secret_handle_;
+
+        PermissionsHandle* permissions_handle_;
+
+        ParticipantCryptoHandle* participant_crypto_;
+
+        ParticipantProxyData participant_data_;
 
     };
 
-    class ParticipantStatelessMessageListener: public eprosima::fastrtps::rtps::ReaderListener
+    class ParticipantStatelessMessageListener : public eprosima::fastrtps::rtps::ReaderListener
     {
-        public:
-            ParticipantStatelessMessageListener(
-                    SecurityManager& manager)
-                : manager_(manager)
-            {}
+    public:
 
-            ~ParticipantStatelessMessageListener()
-            {}
+        ParticipantStatelessMessageListener(
+                SecurityManager& manager)
+            : manager_(manager)
+        {
+        }
 
-            void onNewCacheChangeAdded(
-                    RTPSReader* reader,
-                    const CacheChange_t* const change) override;
+        ~ParticipantStatelessMessageListener()
+        {
+        }
 
-        private:
+        void onNewCacheChangeAdded(
+                RTPSReader* reader,
+                const CacheChange_t* const change) override;
 
-            ParticipantStatelessMessageListener& operator=(
-                    const ParticipantStatelessMessageListener&) = delete;
+    private:
 
-            SecurityManager &manager_;
-    } participant_stateless_message_listener_;
+        ParticipantStatelessMessageListener& operator =(
+                const ParticipantStatelessMessageListener&) = delete;
 
-    class ParticipantVolatileMessageListener: public eprosima::fastrtps::rtps::ReaderListener
+        SecurityManager& manager_;
+    }
+    participant_stateless_message_listener_;
+
+    class ParticipantVolatileMessageListener : public eprosima::fastrtps::rtps::ReaderListener
     {
-        public:
-            ParticipantVolatileMessageListener(
-                    SecurityManager &manager)
-                : manager_(manager)
-            {}
+    public:
 
-            ~ParticipantVolatileMessageListener()
-            {}
+        ParticipantVolatileMessageListener(
+                SecurityManager& manager)
+            : manager_(manager)
+        {
+        }
 
-            void onNewCacheChangeAdded(
-                    RTPSReader* reader,
-                    const CacheChange_t* const change) override;
+        ~ParticipantVolatileMessageListener()
+        {
+        }
 
-        private:
+        void onNewCacheChangeAdded(
+                RTPSReader* reader,
+                const CacheChange_t* const change) override;
 
-            ParticipantVolatileMessageListener& operator=(
-                    const ParticipantVolatileMessageListener&) = delete;
+    private:
 
-            SecurityManager &manager_;
-    } participant_volatile_message_secure_listener_;
+        ParticipantVolatileMessageListener& operator =(
+                const ParticipantVolatileMessageListener&) = delete;
+
+        SecurityManager& manager_;
+    }
+    participant_volatile_message_secure_listener_;
 
     void cancel_init();
 
     void remove_discovered_participant_info(
-            DiscoveredParticipantInfo::AuthUniquePtr& auth_ptr);
+            DiscoveredParticipantInfo::AuthUniquePtr&& auth_ptr);
 
     bool restore_discovered_participant_info(
             const GUID_t& remote_participant_key,
@@ -430,12 +427,16 @@ private:
     void delete_entities();
     bool create_participant_stateless_message_entities();
     void delete_participant_stateless_message_entities();
+    void create_participant_stateless_message_pool();
+    void delete_participant_stateless_message_pool();
     bool create_participant_stateless_message_writer();
     void delete_participant_stateless_message_writer();
     bool create_participant_stateless_message_reader();
     void delete_participant_stateless_message_reader();
     bool create_participant_volatile_message_secure_entities();
     void delete_participant_volatile_message_secure_entities();
+    void create_participant_volatile_message_secure_pool();
+    void delete_participant_volatile_message_secure_pool();
     bool create_participant_volatile_message_secure_writer();
     void delete_participant_volatile_message_secure_writer();
     bool create_participant_volatile_message_secure_reader();
@@ -555,7 +556,8 @@ private:
         DatawriterAssociations(
                 DatawriterCryptoHandle* wh)
             : writer_handle(wh)
-        {}
+        {
+        }
 
         DatawriterCryptoHandle* writer_handle;
 
@@ -567,7 +569,8 @@ private:
         DatareaderAssociations(
                 DatareaderCryptoHandle* rh)
             : reader_handle(rh)
-        {}
+        {
+        }
 
         DatareaderCryptoHandle* reader_handle;
 
@@ -579,8 +582,8 @@ private:
     std::map<GUID_t, DatareaderAssociations> reader_handles_;
 
     std::map<GUID_t, DataHolderSeq> remote_participant_pending_messages_;
-    std::map<GUID_t, DataHolderSeq> remote_writer_pending_messages_;
-    std::map<GUID_t, DataHolderSeq> remote_reader_pending_messages_;
+    std::map<std::pair<GUID_t, GUID_t>, DataHolderSeq> remote_writer_pending_messages_;
+    std::map<std::pair<GUID_t, GUID_t>, DataHolderSeq> remote_reader_pending_messages_;
     std::list<std::tuple<ReaderProxyData, GUID_t, GUID_t>> remote_reader_pending_discovery_messages_;
     std::list<std::tuple<WriterProxyData, GUID_t, GUID_t>> remote_writer_pending_discovery_messages_;
 
@@ -590,6 +593,13 @@ private:
     std::mutex temp_volatile_data_lock_;
     ReaderProxyData temp_volatile_reader_proxy_data_;
     WriterProxyData temp_volatile_writer_proxy_data_;
+
+    HistoryAttributes participant_stateless_message_writer_hattr_;
+    HistoryAttributes participant_stateless_message_reader_hattr_;
+    std::shared_ptr<ITopicPayloadPool> participant_stateless_message_pool_;
+
+    HistoryAttributes participant_volatile_message_secure_hattr_;
+    std::shared_ptr<ITopicPayloadPool> participant_volatile_message_secure_pool_;
 };
 
 } //namespace security
