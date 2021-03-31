@@ -74,20 +74,20 @@ macro(add_blackbox_gtest)
                 list(GET GTEST_TEST_NAME 1 GTEST_GROUP_NAME)
                 list(GET GTEST_TEST_NAME 3 GTEST_TEST_NAME)
 
-                add_test(NAME ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.NonIntraprocess
-                    COMMAND ${command} --gtest_filter=*/${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}/NonIntraprocess)
+                add_test(NAME ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Transport
+                    COMMAND ${command} --gtest_filter=*/${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}/Transport)
 
                 # Add environment
                 if(WIN32)
-                    set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.NonIntraprocess APPEND PROPERTY ENVIRONMENT "PATH=${WIN_PATH}")
+                    set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Transport APPEND PROPERTY ENVIRONMENT "PATH=${WIN_PATH}")
                 endif()
 
                 foreach(property ${GTEST_ENVIRONMENTS})
-                    set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.NonIntraprocess APPEND PROPERTY ENVIRONMENT "${property}")
+                    set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Transport APPEND PROPERTY ENVIRONMENT "${property}")
                 endforeach()
 
                 # Add labels
-                set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.NonIntraprocess PROPERTY LABELS "${GTEST_LABELS}")
+                set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Transport PROPERTY LABELS "${GTEST_LABELS}")
 
                 add_test(NAME ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Intraprocess
                     COMMAND ${command} --gtest_filter=*/${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}/Intraprocess)
@@ -103,6 +103,23 @@ macro(add_blackbox_gtest)
 
                 # Add labels
                 set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Intraprocess PROPERTY LABELS "${GTEST_LABELS}")
+
+                if(${test} MATCHES ".*_DDS_PIM$")
+                    add_test(NAME ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Datasharing
+                        COMMAND ${command} --gtest_filter=*/${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}/Datasharing)
+
+                    # Add environment
+                    if(WIN32)
+                        set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Datasharing APPEND PROPERTY ENVIRONMENT "PATH=${WIN_PATH}")
+                    endif()
+
+                    foreach(property ${GTEST_ENVIRONMENTS})
+                        set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Datasharing APPEND PROPERTY ENVIRONMENT "${property}")
+                    endforeach()
+
+                    # Add labels
+                    set_property(TEST ${test}.${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}.Datasharing PROPERTY LABELS "${GTEST_LABELS}")
+                endif()
 
             endforeach()
         endforeach()
@@ -157,7 +174,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
           -DASIO_STANDALONE
         )
 
-        include_directories(${ASIO_INCLUDE_DIR})
+        include_directories(${Asio_INCLUDE_DIR})
 
         ###############################################################################
         # Unit tests
@@ -184,6 +201,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         add_executable(BlackboxTests_RTPS ${RTPS_BLACKBOXTESTS_SOURCE})
         target_compile_definitions(BlackboxTests_RTPS PRIVATE
             $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
             )
         target_include_directories(BlackboxTests_RTPS PRIVATE
             ${GTEST_INCLUDE_DIRS})
@@ -248,6 +267,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
             add_executable(BlackboxTests_FastRTPS ${BLACKBOXTESTS_FASTRTPS_SOURCE})
             target_compile_definitions(BlackboxTests_FastRTPS PRIVATE
                 $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
+                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
                 )
             target_include_directories(BlackboxTests_FastRTPS PRIVATE
                 api/fastrtps_deprecated
@@ -271,6 +292,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
             add_executable(BlackboxTests_DDS_PIM ${BLACKBOXTESTS_FASTDDS_PIM_SOURCE})
             target_compile_definitions(BlackboxTests_DDS_PIM PRIVATE
                 $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
+                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
                 )
             target_include_directories(BlackboxTests_DDS_PIM PRIVATE
                 api/dds-pim

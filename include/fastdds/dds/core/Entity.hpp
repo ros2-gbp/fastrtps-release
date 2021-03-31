@@ -20,8 +20,9 @@
 #ifndef _FASTDDS_ENTITY_HPP_
 #define _FASTDDS_ENTITY_HPP_
 
+#include <fastdds/dds/core/condition/StatusCondition.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
-#include <fastdds/rtps/common/InstanceHandle.h>
+#include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastrtps/types/TypesBase.h>
 
 namespace eprosima {
@@ -99,7 +100,7 @@ public:
      * @brief Retrieves the instance handler that represents the Entity
      * @return Reference to the InstanceHandle
      */
-    const fastrtps::rtps::InstanceHandle_t& get_instance_handle() const
+    const InstanceHandle_t& get_instance_handle() const
     {
         return instance_handle_;
     }
@@ -119,6 +120,16 @@ public:
         return (this->instance_handle_ == other.instance_handle_);
     }
 
+    /**
+     * @brief Allows access to the StatusCondition associated with the Entity
+     * @return Reference to StatusCondition object
+     */
+    RTPS_DllAPI const StatusCondition& get_statuscondition() const
+    {
+        logWarning(CONDITION, "get_statuscondition method not implemented");
+        return status_condition_;
+    }
+
 protected:
 
     /**
@@ -126,7 +137,7 @@ protected:
      * @param handle Instance Handle
      */
     RTPS_DllAPI void set_instance_handle(
-            const fastrtps::rtps::InstanceHandle_t& handle)
+            const InstanceHandle_t& handle)
     {
         instance_handle_ = handle;
     }
@@ -137,12 +148,14 @@ protected:
     //! StatusMask with triggered statuses set to 1
     StatusMask status_changes_;
 
+    //! Condition associated to the Entity
+    StatusCondition status_condition_;
+
     //! InstanceHandle associated to the Entity
-    fastrtps::rtps::InstanceHandle_t instance_handle_;
+    InstanceHandle_t instance_handle_;
 
     //! Boolean that states if the Entity is enabled or disabled
     bool enable_;
-
 };
 
 /**

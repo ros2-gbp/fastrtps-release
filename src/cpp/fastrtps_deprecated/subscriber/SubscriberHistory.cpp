@@ -26,6 +26,7 @@
 #include <fastdds/dds/topic/TopicDataType.hpp>
 #include <fastdds/dds/log/Log.hpp>
 
+#include <limits>
 #include <mutex>
 
 namespace eprosima {
@@ -91,6 +92,21 @@ SubscriberHistory::SubscriberHistory(
         get_key_object_ = type_->createData();
     }
 
+    if (resource_limited_qos_.max_samples == 0)
+    {
+        resource_limited_qos_.max_samples = std::numeric_limits<int32_t>::max();
+    }
+
+    if (resource_limited_qos_.max_instances == 0)
+    {
+        resource_limited_qos_.max_instances = std::numeric_limits<int32_t>::max();
+    }
+
+    if (resource_limited_qos_.max_samples_per_instance == 0)
+    {
+        resource_limited_qos_.max_samples_per_instance = std::numeric_limits<int32_t>::max();
+    }
+
     using std::placeholders::_1;
     using std::placeholders::_2;
 
@@ -135,7 +151,7 @@ bool SubscriberHistory::received_change_keep_all_no_key(
         size_t unknown_missing_changes_up_to)
 {
     // TODO(Ricardo) Check
-    if (m_changes.size() + unknown_missing_changes_up_to < static_cast<size_t>(resource_limited_qos_.max_samples) )
+    if (m_changes.size() + unknown_missing_changes_up_to < static_cast<size_t>(resource_limited_qos_.max_samples))
     {
         return add_received_change(a_change);
     }
@@ -148,7 +164,7 @@ bool SubscriberHistory::received_change_keep_last_no_key(
         size_t /* unknown_missing_changes_up_to */ )
 {
     bool add = false;
-    if (m_changes.size() < static_cast<size_t>(history_qos_.depth) )
+    if (m_changes.size() < static_cast<size_t>(history_qos_.depth))
     {
         add = true;
     }
@@ -178,7 +194,7 @@ bool SubscriberHistory::received_change_keep_all_with_key(
     if (find_key_for_change(a_change, vit))
     {
         std::vector<CacheChange_t*>& instance_changes = vit->second.cache_changes;
-        if (instance_changes.size() < static_cast<size_t>(resource_limited_qos_.max_samples_per_instance) )
+        if (instance_changes.size() < static_cast<size_t>(resource_limited_qos_.max_samples_per_instance))
         {
             return add_received_change_with_key(a_change, vit->second.cache_changes);
         }
@@ -198,7 +214,7 @@ bool SubscriberHistory::received_change_keep_last_with_key(
     {
         bool add = false;
         std::vector<CacheChange_t*>& instance_changes = vit->second.cache_changes;
-        if (instance_changes.size() < static_cast<size_t>(history_qos_.depth) )
+        if (instance_changes.size() < static_cast<size_t>(history_qos_.depth))
         {
             add = true;
         }
@@ -286,7 +302,7 @@ bool SubscriberHistory::find_key_for_change(
 {
     if (!a_change->instanceHandle.isDefined() && type_ != nullptr)
     {
-        logInfo(SUBSCRIBER, "Getting Key of change with no Key transmitted")
+        logInfo(SUBSCRIBER, "Getting Key of change with no Key transmitted");
         type_->deserialize(&a_change->serializedPayload, get_key_object_);
         bool is_key_protected = false;
 #if HAVE_SECURITY
@@ -357,13 +373,15 @@ bool SubscriberHistory::readNextData(
     if (lock.try_lock_until(max_blocking_time))
     {
         CacheChange_t* change;
-        WriterProxy* wp;
+        WriterProxy* wp = nullptr;
         if (mp_reader->nextUnreadCache(&change, &wp))
         {
             logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": reading " << change->sequenceNumber);
             uint32_t ownership = wp && qos_.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
                     wp->ownership_strength() : 0;
-            return deserialize_change(change, ownership, data, info);
+            bool deserialized = deserialize_change(change, ownership, data, info);
+            mp_reader->change_read_by_user(change, wp);
+            return deserialized;
         }
     }
     return false;
@@ -393,6 +411,7 @@ bool SubscriberHistory::takeNextData(
             uint32_t ownership = wp && qos_.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
                     wp->ownership_strength() : 0;
             bool deserialized = deserialize_change(change, ownership, data, info);
+            mp_reader->change_read_by_user(change, wp);
             bool removed = remove_change_sub(change);
             return (deserialized && removed);
         }
@@ -412,6 +431,7 @@ bool SubscriberHistory::get_first_untaken_info(
     {
         uint32_t ownership = wp && qos_.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ? wp->ownership_strength() : 0;
         get_sample_info(info, change, ownership);
+        mp_reader->change_read_by_user(change, wp, false);
         return true;
     }
 
@@ -492,6 +512,58 @@ bool SubscriberHistory::remove_change_sub(
     return false;
 }
 
+bool SubscriberHistory::remove_change_sub(
+        CacheChange_t* change,
+        iterator& it)
+{
+    if (mp_reader == nullptr || mp_mutex == nullptr)
+    {
+        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        return false;
+    }
+
+    std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+    if (topic_att_.getTopicKind() == WITH_KEY)
+    {
+        bool found = false;
+        t_m_Inst_Caches::iterator vit;
+        if (find_key(change, &vit))
+        {
+            for (auto chit = vit->second.cache_changes.begin(); chit != vit->second.cache_changes.end(); ++chit)
+            {
+                if ((*chit)->sequenceNumber == change->sequenceNumber && (*chit)->writerGUID == change->writerGUID)
+                {
+                    assert(it == chit);
+                    it = vit->second.cache_changes.erase(chit);
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found)
+        {
+            logError(SUBSCRIBER, "Change not found on this key, something is wrong");
+        }
+    }
+
+    const_iterator chit = find_change_nts(change);
+    if (chit == changesEnd())
+    {
+        logInfo(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
+        return false;
+    }
+
+    m_isHistoryFull = false;
+    iterator ret_it = remove_change_nts(chit);
+
+    if (topic_att_.getTopicKind() != WITH_KEY)
+    {
+        it = ret_it;
+    }
+
+    return true;
+}
+
 bool SubscriberHistory::set_next_deadline(
         const InstanceHandle_t& handle,
         const std::chrono::steady_clock::time_point& next_deadline_us)
@@ -554,6 +626,58 @@ bool SubscriberHistory::get_next_deadline(
     }
 
     return false;
+}
+
+std::pair<bool, SubscriberHistory::instance_info> SubscriberHistory::lookup_instance(
+        const InstanceHandle_t& handle,
+        bool exact)
+{
+    if (topic_att_.getTopicKind() == NO_KEY)
+    {
+        if (handle.isDefined())
+        {
+            // NO_KEY topics can only return the ficticious instance.
+            // Execution can only get here for two reasons:
+            // - Looking for a specific instance (exact = true)
+            // - Looking for the next instance to the ficticious one (exact = false)
+            // In both cases, no instance should be returned
+            return { false, {InstanceHandle_t(), nullptr} };
+        }
+        else
+        {
+            if (exact)
+            {
+                // Looking for HANDLE_NIL, nothing to return
+                return { false, {InstanceHandle_t(), nullptr} };
+            }
+
+            // Looking for the first instance, return the ficticious one containing all changes
+            InstanceHandle_t tmp;
+            tmp.value[0] = 1;
+            return { true, {tmp, &m_changes} };
+        }
+    }
+
+    t_m_Inst_Caches::iterator it;
+
+    if (exact)
+    {
+        it = keyed_changes_.find(handle);
+    }
+    else
+    {
+        auto comp = [](const InstanceHandle_t& h, const std::pair<InstanceHandle_t, KeyedChanges>& it)
+                {
+                    return h < it.first;
+                };
+        it = std::upper_bound(keyed_changes_.begin(), keyed_changes_.end(), handle, comp);
+    }
+
+    if (it != keyed_changes_.end())
+    {
+        return { true, {it->first, &(it->second.cache_changes)} };
+    }
+    return { false, {InstanceHandle_t(), nullptr} };
 }
 
 } // namespace fastrtps

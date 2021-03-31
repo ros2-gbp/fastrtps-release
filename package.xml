@@ -2,11 +2,12 @@
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="2">
   <name>fastrtps</name>
-  <version>2.1.1</version>
+  <version>2.3.0</version>
   <description>Implementation of RTPS standard.</description>
   <maintainer email="stevenragnarok@osrfoundation.org">Steven! Ragnarök</maintainer>
   <license>Apache License 2.0</license>
 
+  <build_depend>asio</build_depend>
   <build_depend>libssl-dev</build_depend>
 
   <build_export_depend>libssl-dev</build_export_depend>
