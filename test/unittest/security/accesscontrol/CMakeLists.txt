@@ -24,7 +24,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 )
         endif()
 
-        include_directories(${ASIO_INCLUDE_DIR})
+        include_directories(${Asio_INCLUDE_DIR})
 
         set(COMMON_SOURCES_ACCESS_CONTROL_TEST_SOURCE
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
@@ -51,9 +51,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 ${TINYXML2_SOURCE_DIR}/tinyxml2.cpp
             )
         endif()
-        
+
         include_directories(${TINYXML2_INCLUDE_DIR})
-            
+
         add_executable(AccessControlTests ${COMMON_SOURCES_ACCESS_CONTROL_TEST_SOURCE}
             ${PROJECT_SOURCE_DIR}/src/cpp/security/authentication/PKIDH.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/security/authentication/PKIIdentityHandle.cpp
@@ -69,8 +69,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/StringMatching.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/publisher/qos/WriterQos.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/AccessControlTests.cpp)
-            
-        target_compile_definitions(AccessControlTests PRIVATE FASTRTPS_NO_LIB)
+
+        target_compile_definitions(AccessControlTests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
 
         target_include_directories(AccessControlTests PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
@@ -85,8 +88,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-            
-        target_link_libraries(AccessControlTests 
+
+        target_link_libraries(AccessControlTests
             ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES}
             fastcdr
             foonathan_memory

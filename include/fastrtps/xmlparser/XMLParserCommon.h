@@ -81,6 +81,7 @@ extern const char* HEALTHY_CHECK_TIMEOUT_MS;
 extern const char* DISCARD;
 extern const char* FAIL;
 extern const char* RTPS_DUMP_FILE;
+extern const char* ON;
 
 // IntraprocessDeliveryType
 extern const char* OFF;
@@ -206,6 +207,7 @@ extern const char* TOPIC_DATA;
 extern const char* GROUP_DATA;
 extern const char* PUB_MODE;
 extern const char* DISABLE_POSITIVE_ACKS;
+extern const char* DATA_SHARING;
 
 extern const char* SYNCHRONOUS;
 extern const char* ASYNCHRONOUS;
@@ -247,6 +249,7 @@ extern const char* HISTORY_QOS;
 extern const char* RES_LIMITS_QOS;
 extern const char* DEPTH;
 extern const char* ALLOCATED_SAMPLES;
+extern const char* EXTRA_SAMPLES;
 extern const char* BYTES_PER_SECOND;
 extern const char* PERIOD_MILLISECS;
 extern const char* PORT_BASE;
@@ -286,6 +289,7 @@ extern const char* STATIC;
 extern const char* PUBWRITER_SUBREADER;
 extern const char* PUBREADER_SUBWRITER;
 extern const char* STATIC_ENDPOINT_XML;
+extern const char* STATIC_ENDPOINT_XML_URI;
 extern const char* READER_HIST_MEM_POLICY;
 extern const char* WRITER_HIST_MEM_POLICY;
 extern const char* READER_PAYLOAD_SIZE;
@@ -293,6 +297,9 @@ extern const char* WRITER_PAYLOAD_SIZE;
 extern const char* MUTATION_TRIES;
 extern const char* ACCESS_SCOPE;
 extern const char* ENABLED;
+extern const char* DOMAIN_IDS;
+extern const char* SHARED_DIR;
+extern const char* MAX_DOMAINS;
 
 // Endpoint parser
 extern const char* STATICDISCOVERY;

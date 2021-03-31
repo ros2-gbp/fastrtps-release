@@ -31,10 +31,10 @@
 #include <fastdds/rtps/common/CacheChange.h>
 #include <fastrtps/utils/DBQueue.h>
 
-#include "./DiscoveryDataFilter.hpp"
-#include "./DiscoveryParticipantInfo.hpp"
-#include "./DiscoveryEndpointInfo.hpp"
-#include "./DiscoveryDataQueueInfo.hpp"
+#include <rtps/builtin/discovery/database/DiscoveryDataFilter.hpp>
+#include <rtps/builtin/discovery/database/DiscoveryParticipantInfo.hpp>
+#include <rtps/builtin/discovery/database/DiscoveryEndpointInfo.hpp>
+#include <rtps/builtin/discovery/database/DiscoveryDataQueueInfo.hpp>
 
 #include <json.hpp>
 
@@ -270,7 +270,7 @@ public:
 
     const std::vector<fastrtps::rtps::GuidPrefix_t> direct_clients_and_servers();
 
-    fastrtps::rtps::LocatorList_t participant_metatraffic_locators(
+    LocatorList participant_metatraffic_locators(
             fastrtps::rtps::GuidPrefix_t participant_guid_prefix);
 
     // return a list of participants that are not the server one
@@ -341,6 +341,10 @@ public:
     // Check if an participant is stored as local. If the participant does not exist, it returns false
     bool is_participant_local(
             const eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix);
+
+    //! Add a server to the list of remote servers
+    void add_server(
+            fastrtps::rtps::GuidPrefix_t server);
 
 protected:
 
@@ -569,10 +573,10 @@ protected:
     // Whether it has been a new entity discovered or updated in this subroutine loop
     std::atomic<int> new_updates_;
 
-    // Wheter the database is restoring a backup
+    // Whether the database is restoring a backup
     std::atomic<bool> processing_backup_;
 
-    // Wheter the database is persistent, so it must store every cache it arrives
+    // Whether the database is persistent, so it must store every cache it arrives
     bool is_persistent_;
 
     // File to save every cacheChange that is updated to the ddb queues

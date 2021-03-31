@@ -31,6 +31,12 @@ namespace eprosima {
 namespace fastdds {
 namespace dds {
 
+//! Handle to identiy different instances of the same Topic of a certain type.
+using InstanceHandle_t = eprosima::fastrtps::rtps::InstanceHandle_t;
+
+//! The NIL instance handle.
+extern RTPS_DllAPI const InstanceHandle_t HANDLE_NIL;
+
 class DomainParticipant;
 
 /**
@@ -132,10 +138,7 @@ public:
      */
     RTPS_DllAPI virtual bool serialize(
             void* data,
-            fastrtps::rtps::SerializedPayload_t* payload)
-    {
-        return get()->serialize(data, payload);
-    }
+            fastrtps::rtps::SerializedPayload_t* payload);
 
     /**
      * @brief Deserializes the data
@@ -145,10 +148,7 @@ public:
      */
     RTPS_DllAPI virtual bool deserialize(
             fastrtps::rtps::SerializedPayload_t* payload,
-            void* data)
-    {
-        return get()->deserialize(payload, data);
-    }
+            void* data);
 
     /**
      * @brief Getter for the SerializedSizeProvider
@@ -189,7 +189,7 @@ public:
      */
     RTPS_DllAPI virtual bool get_key(
             void* data,
-            fastrtps::rtps::InstanceHandle_t* i_handle,
+            InstanceHandle_t* i_handle,
             bool force_md5 = false)
     {
         return get()->getKey(data, i_handle, force_md5);
@@ -213,6 +213,34 @@ public:
     RTPS_DllAPI bool empty() const
     {
         return get() == nullptr;
+    }
+
+    /**
+     * Checks if the type is bounded.
+     */
+    RTPS_DllAPI virtual inline bool is_bounded() const
+    {
+        return get()->is_bounded();
+    }
+
+    /**
+     * Checks if the type is plain.
+     */
+    RTPS_DllAPI virtual inline bool is_plain() const
+    {
+        return get()->is_plain();
+    }
+
+    RTPS_DllAPI bool operator !=(
+            std::nullptr_t) const
+    {
+        return bool(*this);
+    }
+
+    RTPS_DllAPI bool operator ==(
+            std::nullptr_t) const
+    {
+        return !*this;
     }
 
 };

@@ -78,6 +78,7 @@ static void set_qos_from_attributes(
     qos.publish_mode() = attr.qos.m_publishMode;
     qos.history() = attr.topic.historyQos;
     qos.resource_limits() = attr.topic.resourceLimitsQos;
+    qos.data_sharing() = attr.qos.data_sharing;
 }
 
 PublisherImpl::PublisherImpl(
@@ -303,7 +304,7 @@ DataWriter* PublisherImpl::create_datawriter_with_profile(
 }
 
 ReturnCode_t PublisherImpl::delete_datawriter(
-        DataWriter* writer)
+        const DataWriter* writer)
 {
     if (user_publisher_ != writer->get_publisher())
     {
@@ -318,6 +319,11 @@ ReturnCode_t PublisherImpl::delete_datawriter(
         {
             //First extract the writer from the maps to free the mutex
             DataWriterImpl* writer_impl = *dw_it;
+            ReturnCode_t ret_code = writer_impl->check_delete_preconditions();
+            if (!ret_code)
+            {
+                return ret_code;
+            }
             writer_impl->set_listener(nullptr);
             vit->second.erase(dw_it);
             if (vit->second.empty())
@@ -458,7 +464,7 @@ const ReturnCode_t PublisherImpl::get_datawriter_qos_from_profile(
         DataWriterQos& qos) const
 {
     PublisherAttributes attr;
-    if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(profile_name, attr))
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(profile_name, attr, false))
     {
         qos = default_datawriter_qos_;
         set_qos_from_attributes(qos, attr);
@@ -507,7 +513,7 @@ ReturnCode_t PublisherImpl::wait_for_acknowledgments(
 
 const DomainParticipant* PublisherImpl::get_participant() const
 {
-    return participant_->get_participant();
+    return const_cast<const DomainParticipantImpl*>(participant_)->get_participant();
 }
 
 const Publisher* PublisherImpl::get_publisher() const

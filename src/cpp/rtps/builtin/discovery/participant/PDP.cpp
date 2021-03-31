@@ -64,19 +64,6 @@
 #include <chrono>
 
 namespace eprosima {
-namespace fastdds {
-namespace rtps {
-
-// Values for participant type parameter property
-const char ParticipantType::SIMPLE[] = "SIMPLE";
-const char ParticipantType::SERVER[] = "SERVER";
-const char ParticipantType::CLIENT[] = "CLIENT";
-const char ParticipantType::BACKUP[] = "BACKUP";
-const char ParticipantType::SUPER_CLIENT[] = "SUPER_CLIENT";
-
-} // namespace rtps
-} // namespace fastdds
-
 namespace fastrtps {
 namespace rtps {
 
@@ -153,7 +140,6 @@ PDP::~PDP()
         if (writer_payload_pool_)
         {
             writer_payload_pool_->release_history(cfg, false);
-            TopicPayloadPoolRegistry::release(writer_payload_pool_);
         }
     }
 
@@ -164,7 +150,6 @@ PDP::~PDP()
         if (reader_payload_pool_)
         {
             reader_payload_pool_->release_history(cfg, true);
-            TopicPayloadPoolRegistry::release(reader_payload_pool_);
         }
     }
 
@@ -355,6 +340,12 @@ void PDP::initializeParticipantProxyData(
         participant_data->plugin_security_attributes_ = 0UL;
     }
 #endif // if HAVE_SECURITY
+
+    // Set participant type property
+    std::stringstream participant_type;
+    participant_type << mp_RTPSParticipant->getAttributes().builtin.discovery_config.discoveryProtocol;
+    participant_data->m_properties.push_back(std::pair<std::string,
+            std::string>({fastdds::dds::parameter_property_participant_type, participant_type.str()}));
 }
 
 bool PDP::initPDP(

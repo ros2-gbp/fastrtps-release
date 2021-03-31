@@ -71,19 +71,8 @@ bool ReaderHistory::add_change(
         logError(RTPS_READER_HISTORY, "The Writer GUID_t must be defined");
     }
 
-    if (!m_changes.empty() && a_change->sourceTimestamp < (*m_changes.rbegin())->sourceTimestamp)
-    {
-        auto it = std::lower_bound(m_changes.begin(), m_changes.end(), a_change,
-                        [](const CacheChange_t* c1, const CacheChange_t* c2) -> bool
-                        {
-                            return c1->sourceTimestamp < c2->sourceTimestamp;
-                        });
-        m_changes.insert(it, a_change);
-    }
-    else
-    {
-        m_changes.push_back(a_change);
-    }
+    auto it = get_first_change_with_minimum_ts(a_change->sourceTimestamp);
+    m_changes.insert(it, a_change);
 
     logInfo(RTPS_READER_HISTORY,
             "Change " << a_change->sequenceNumber << " added with " << a_change->serializedPayload.length << " bytes");
@@ -98,7 +87,7 @@ bool ReaderHistory::matches_change(
     if (nullptr == outer_change
             || nullptr == inner_change)
     {
-        logError(RTPS_READER_HISTORY, "Pointer is not valid")
+        logError(RTPS_READER_HISTORY, "Pointer is not valid");
         return false;
     }
 
@@ -123,13 +112,16 @@ History::iterator ReaderHistory::remove_change_nts(
     }
 
     CacheChange_t* change = *removal;
+    auto ret_val = m_changes.erase(removal);
+    m_isHistoryFull = false;
+
     mp_reader->change_removed_by_history(change);
-    if ( release )
+    if (release)
     {
         mp_reader->releaseCache(change);
     }
 
-    return m_changes.erase(removal);
+    return ret_val;
 }
 
 bool ReaderHistory::remove_changes_with_guid(
@@ -237,6 +229,22 @@ void ReaderHistory::do_release_cache(
         CacheChange_t* ch)
 {
     mp_reader->releaseCache(ch);
+}
+
+History::iterator ReaderHistory::get_first_change_with_minimum_ts(
+        const Time_t timestamp)
+{
+    if (!m_changes.empty() && timestamp < (*m_changes.rbegin())->sourceTimestamp)
+    {
+        iterator it = std::lower_bound(m_changes.begin(), m_changes.end(), timestamp,
+                        [](const CacheChange_t* c1, const Time_t& ts) -> bool
+                        {
+                            return c1->sourceTimestamp < ts;
+                        });
+        return it;
+    }
+
+    return m_changes.end();
 }
 
 } /* namespace rtps */

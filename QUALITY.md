@@ -1,13 +1,12 @@
 This document is a declaration of software quality for *eprosima Fast DDS* inspired on the guidelines provided in the [ROS 2 REP-2004 document](https://www.ros.org/reps/rep-2004.html).
 
-Quality Declaration
-=============================
+# Quality Declaration
 
 *eprosima Fast DDS* (formerly Fast RTPS) is a C++ implementation of the DDS (Data Distribution Service) standard of the OMG (Object Management Group).
 eProsima Fast DDS implements the RTPS (Real Time Publish Subscribe) protocol, which provides publisher-subscriber communications over unreliable transports such as UDP,
 as defined and maintained by the Object Management Group (OMG) consortium.
 
-*eprosima Fast DDS* claims to be in the **Quality Level 2** category.
+*eprosima Fast DDS* claims to be in the **Quality Level 1** category.
 
 Below are the rationales, notes and caveats for this claim, organized by the requirements listed in the [Package Requirements for Quality Level 1 in REP-2004](https://www.ros.org/reps/rep-2004.html#package-requirements).
 
@@ -112,12 +111,18 @@ The tests aim to cover typical usage. Currently, efforts are being made to impro
 
 ### Coverage [4.iii]
 
-*eprosima Fast DDS* coverage reports can be accessed from the CI nightly results. These reports provide statistics of line and conditional coverage.
+[![Coverage](https://img.shields.io/jenkins/coverage/cobertura.svg?jobUrl=http%3A%2F%2Fjenkins.eprosima.com%3A8080%2Fjob%2Fnightly_fastdds_coverage_linux)](http://jenkins.eprosima.com:8080/job/nightly_fastdds_coverage_linux)
+*eProsima Fast DDS* aims to provide a line coverage **above 95%**.
+*Fast DDS* code coverage policy comprises:
+1. All contributions to *Fast DDS* must increase (or at least keep) current line coverage.
+   This is done to ensure that the **95%** line coverage goal is eventually met.
+1. Line coverage regressions are only permitted if properly justified and accepted by maintainers.
+1. If the CI system reports a coverage regression after a pull request has been merged, the maintainers must study the case and decide how to proceed, mostly reverting the changes and asking for a more thorough testing of the committed changes.
+1. External dependencies are excluded from the coverage report.
+1. *Fast DDS* examples are excluded from the coverage report.
+1. This policy is enforced through the [nightly Fast DDS coverage CI job](http://jenkins.eprosima.com:8080/job/nightly_fastdds_coverage_linux/).
 
-* [Linux Coverage Report](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux/cobertura)
-* [Mac Coverage Report](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac/cobertura)
-
-Changes are required to make a best effort to keep or increase coverage before being accepted, but decreases are allowed if properly justified and accepted by maintainers.
+As stated in [CONTRIBUTING.md](CONTRIBUTING.md), developers and contributors are asked to run a line coverage assessment locally before submitting a PR.
 
 ### Performance [4.iv]
 
@@ -157,12 +162,10 @@ However, the tendency will be to homogenize the older source files to the code s
 The first two dependencies are suggested to be installed for Linux using apt package manager, which would pull them from the Debian upstream.
 Therefore, these dependencies can be considered Quality Level 1 following the [advantages of being packaged for Debian](https://wiki.debian.org/AdvantagesForUpstream).
 
-**eProsima Fast CDR** Quality Declaration can be found [here](https://github.com/eProsima/Fast-CDR/blob/master/QUALITY.md). Currently, **eProsima Fast CDR** claims to be in the **Quality Level 2** category.
+**eProsima Fast CDR** Quality Declaration can be found [here](https://github.com/eProsima/Fast-CDR/blob/master/QUALITY.md). Currently, **eProsima Fast CDR** claims to be in the **Quality Level 1** category.
 
 `foonathan_memory` Quality Declaration can be found [here](Quality_Declaration_foonathan_memory.md).
-This declaration claims that, even though `foonathan_memory` does not meet several quality requirements, it is considered to fulfill the **Quality Level 2** requirements for its use within *eprosima Fast DDS* with the caveats explained in the declaration.
-
-Therefore, *eprosima Fast DDS* currently could claim to be **Quality Level 2** at most.
+This declaration claims that, even though `foonathan_memory` does not meet several quality requirements, it is considered to fulfill the **Quality Level 1** requirements for its use within *eprosima Fast DDS* with the caveats explained in the declaration.
 
 ## Platform Support [6]
 
@@ -207,7 +210,7 @@ The chart below compares the requirements in the [REP-2004](https://www.ros.org/
 |4.i| Feature items tests |✓|
 |4.ii| Public API tests |✓|
 |4.iii.a| Using coverage |✓|
-|4.iii.b| Coverage policy ||
+|4.iii.b| Coverage policy |✓|
 |4.iv.a| Performance tests (if applicable) |✓|
 |4.iv.b| Performance tests policy|✓|
 |4.v.a| Code style enforcement (linters)|✓|

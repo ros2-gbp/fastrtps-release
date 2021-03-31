@@ -77,6 +77,7 @@ static void set_qos_from_attributes(
     qos.time_based_filter() = attr.qos.m_timeBasedFilter;
     qos.history() = attr.topic.historyQos;
     qos.resource_limits() = attr.topic.resourceLimitsQos;
+    qos.data_sharing() = attr.qos.data_sharing;
 }
 
 SubscriberImpl::SubscriberImpl(
@@ -206,7 +207,7 @@ DataReader* SubscriberImpl::create_datareader(
         DataReaderListener* listener,
         const StatusMask& mask)
 {
-    logInfo(SUBSCRIBER, "CREATING SUBSCRIBER IN TOPIC: " << topic->get_name())
+    logInfo(SUBSCRIBER, "CREATING SUBSCRIBER IN TOPIC: " << topic->get_name());
     //Look for the correct type registration
     TypeSupport type_support = participant_->find_type(topic->get_type_name());
 
@@ -271,7 +272,7 @@ DataReader* SubscriberImpl::create_datareader_with_profile(
 }
 
 ReturnCode_t SubscriberImpl::delete_datareader(
-        DataReader* reader)
+        const DataReader* reader)
 {
     if (user_subscriber_ != reader->get_subscriber())
     {
@@ -286,6 +287,11 @@ ReturnCode_t SubscriberImpl::delete_datareader(
         {
             //First extract the reader from the maps to free the mutex
             DataReaderImpl* reader_impl = *dr_it;
+            if (!reader_impl->can_be_deleted())
+            {
+                return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+            }
+
             reader_impl->set_listener(nullptr);
             it->second.erase(dr_it);
             if (it->second.empty())
@@ -435,7 +441,7 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
         DataReaderQos& qos) const
 {
     SubscriberAttributes attr;
-    if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr))
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr, false))
     {
         qos = default_datareader_qos_;
         set_qos_from_attributes(qos, attr);
@@ -457,7 +463,7 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
 
 const DomainParticipant* SubscriberImpl::get_participant() const
 {
-    return participant_->get_participant();
+    return const_cast<const DomainParticipantImpl*>(participant_)->get_participant();
 }
 
 void SubscriberImpl::SubscriberReaderListener::on_data_available(

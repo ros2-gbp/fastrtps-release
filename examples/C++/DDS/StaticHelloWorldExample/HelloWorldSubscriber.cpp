@@ -41,7 +41,7 @@ bool HelloWorldSubscriber::init()
     pqos.name("HelloWorldSubscriber");
     pqos.wire_protocol().builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
     pqos.wire_protocol().builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-    pqos.wire_protocol().builtin.discovery_config.setStaticEndpointXMLFilename("HelloWorldPublisher.xml");
+    pqos.wire_protocol().builtin.discovery_config.static_edp_xml_config("file://HelloWorldPublisher.xml");
     participant_ = DomainParticipantFactory::get_instance()->create_participant(0, pqos);
 
     if (participant_ == nullptr)
@@ -127,7 +127,7 @@ void HelloWorldSubscriber::SubListener::on_data_available(
     SampleInfo info;
     if (reader->take_next_sample(&hello_, &info) == ReturnCode_t::RETCODE_OK)
     {
-        if (info.instance_state == ALIVE)
+        if (info.instance_state == ALIVE_INSTANCE_STATE)
         {
             samples_++;
             // Print your structure data here.

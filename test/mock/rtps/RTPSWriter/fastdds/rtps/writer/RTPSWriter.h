@@ -71,6 +71,10 @@ public:
             InstanceHandle_t));
 
     MOCK_METHOD2(new_change, CacheChange_t* (
+            ChangeKind_t,
+            InstanceHandle_t));
+
+    MOCK_METHOD2(new_change, CacheChange_t* (
             const std::function<uint32_t()>&,
             ChangeKind_t));
 
@@ -101,6 +105,14 @@ public:
     }
 
     virtual bool try_remove_change(
+            const std::chrono::steady_clock::time_point&,
+            std::unique_lock<RecursiveTimedMutex>&)
+    {
+        return true;
+    }
+
+    virtual bool wait_for_acknowledgement(
+            const SequenceNumber_t&,
             const std::chrono::steady_clock::time_point&,
             std::unique_lock<RecursiveTimedMutex>&)
     {

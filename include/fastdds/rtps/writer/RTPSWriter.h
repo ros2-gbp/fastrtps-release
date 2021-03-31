@@ -27,6 +27,7 @@
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
 #include <fastdds/rtps/common/LocatorSelector.hpp>
 #include <fastdds/rtps/messages/RTPSMessageSenderInterface.hpp>
+#include <fastdds/statistics/IListeners.hpp>
 
 #include <vector>
 #include <memory>
@@ -41,6 +42,7 @@ namespace rtps {
 class WriterListener;
 class WriterHistory;
 class FlowController;
+class DataSharingNotifier;
 struct CacheChange_t;
 
 /**
@@ -105,6 +107,10 @@ public:
 
     RTPS_DllAPI CacheChange_t* new_change(
             const std::function<uint32_t()>& dataCdrSerializedSize,
+            ChangeKind_t changeKind,
+            InstanceHandle_t handle = c_InstanceHandle_Unknown);
+
+    RTPS_DllAPI CacheChange_t* new_change(
             ChangeKind_t changeKind,
             InstanceHandle_t handle = c_InstanceHandle_Unknown);
 
@@ -250,12 +256,44 @@ public:
             const std::chrono::steady_clock::time_point& max_blocking_time_point,
             std::unique_lock<RecursiveTimedMutex>& lock) = 0;
 
+    /**
+     * Waits till a change has been acknowledged.
+     * @param seq Sequence number to wait for acknowledgement.
+     * @param max_blocking_time_point Maximum time to wait for.
+     * @param lock Lock of the Change list.
+     * @return true when change was acknowledged, false when timeout is reached.
+     */
+    virtual bool wait_for_acknowledgement(
+            const SequenceNumber_t& seq,
+            const std::chrono::steady_clock::time_point& max_blocking_time_point,
+            std::unique_lock<RecursiveTimedMutex>& lock) = 0;
+
     /*
-     * Adds a flow controller that will apply to this writer exclusively.
+     * Add a flow controller that will apply to this writer exclusively.
      * @param controller
      */
     virtual void add_flow_controller(
             std::unique_ptr<FlowController> controller) = 0;
+
+#ifdef FASTDDS_STATISTICS
+
+    /*
+     * Add a listener to receive statistics backend callbacks
+     * @param listener
+     * @return true if successfully added
+     */
+    RTPS_DllAPI bool add_statistics_listener(
+            std::shared_ptr<fastdds::statistics::IListener> listener);
+
+    /*
+     * Remove a listener from receiving statistics backend callbacks
+     * @param listener
+     * @return true if successfully removed
+     */
+    RTPS_DllAPI bool remove_statistics_listener(
+            std::shared_ptr<fastdds::statistics::IListener> listener);
+
+#endif // FASTDDS_STATISTICS
 
     /**
      * Get RTPS participant
@@ -278,7 +316,7 @@ public:
     }
 
     /**
-     * Inform if data is sent to readers separatedly
+     * Inform if data is sent to readers separately
      * @return true if separate sending is enabled
      */
     bool get_separate_sending () const
@@ -344,7 +382,7 @@ public:
 
     /**
      * @brief A method to retrieve the liveliness lease duration
-     * @return Lease durtation
+     * @return Lease duration
      */
     const Duration_t& get_liveliness_lease_duration() const;
 
@@ -397,6 +435,11 @@ public:
             CDRMessage_t* message,
             std::chrono::steady_clock::time_point& max_blocking_time_point) const override;
 
+    /**
+     * @return Whether the writer is data sharing compatible or not
+     */
+    bool is_datasharing_compatible() const;
+
 protected:
 
     //!Is the data sent directly or announced by HB and THEN sent to the ones who ask for it?.
@@ -446,6 +489,11 @@ protected:
     virtual bool change_removed_by_history(
             CacheChange_t* a_change) = 0;
 
+    bool is_datasharing_compatible_with(
+            const ReaderProxyData& rdata) const;
+
+    bool is_pool_initialized() const;
+
 private:
 
     RTPSWriter& operator =(
@@ -453,10 +501,12 @@ private:
 
     void init(
             const std::shared_ptr<IPayloadPool>& payload_pool,
-            const std::shared_ptr<IChangePool>& change_pool);
+            const std::shared_ptr<IChangePool>& change_pool,
+            const WriterAttributes& att);
 
 
     RTPSWriter* next_[2] = { nullptr, nullptr };
+
 };
 
 } /* namespace rtps */

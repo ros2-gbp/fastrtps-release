@@ -93,6 +93,8 @@ public:
 
     MOCK_METHOD1(wait_for_unread_cache, bool (const eprosima::fastrtps::Duration_t& timeout));
 
+    MOCK_METHOD0(get_unread_count, uint64_t());
+
     // *INDENT-ON*
 
 
@@ -160,6 +162,37 @@ public:
     {
         getHistory_mock();
         return history_;
+    }
+
+    bool is_sample_valid(
+            const void* /*data*/,
+            const GUID_t& /*writer*/,
+            const SequenceNumber_t& /*sn*/) const
+    {
+        return true;
+    }
+
+    virtual bool begin_sample_access_nts(
+            CacheChange_t* /*change*/,
+            WriterProxy*& /*wp*/,
+            bool& /*is_future_change*/)
+    {
+        return true;
+    }
+
+    virtual void end_sample_access_nts(
+            CacheChange_t* /*change*/,
+            WriterProxy*& /*wp*/,
+            bool /*mark_as_read*/)
+    {
+    }
+
+    virtual void change_read_by_user(
+            CacheChange_t* /*change*/,
+            const WriterProxy* /*writer*/,
+            bool mark_as_read = true)
+    {
+        (void) mark_as_read;
     }
 
     ReaderHistory* history_;

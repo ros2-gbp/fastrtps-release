@@ -55,6 +55,7 @@ class DomainParticipantImpl;
 class Subscriber;
 class DataReaderImpl;
 class TopicDescription;
+class TypeSupport;
 
 /**
  * Class SubscriberImpl, contains the actual implementation of the behaviour of the Subscriber.
@@ -105,7 +106,7 @@ public:
             const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_datareader(
-            DataReader* reader);
+            const DataReader* reader);
 
     DataReader* lookup_datareader(
             const std::string& topic_name) const;

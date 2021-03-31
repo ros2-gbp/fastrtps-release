@@ -26,6 +26,10 @@
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
 #include <fastdds/rtps/writer/LivelinessManager.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/DataSharing/DataSharingListener.hpp>
+#include <rtps/DataSharing/ReaderPool.hpp>
+
+#include "rtps/RTPSDomainImpl.hpp"
 
 #include <mutex>
 #include <thread>
@@ -39,6 +43,13 @@ using namespace eprosima::fastrtps::rtps;
 StatelessReader::~StatelessReader()
 {
     logInfo(RTPS_READER, "Removing reader " << m_guid);
+
+    // Datasharing listener must be stopped to avoid processing notifications
+    // while the reader is being destroyed
+    if (is_datasharing_compatible_)
+    {
+        datasharing_listener_->stop();
+    }
 }
 
 StatelessReader::StatelessReader(
@@ -90,39 +101,73 @@ bool StatelessReader::matched_writer_add(
         }
     }
 
+    bool is_datasharing = is_datasharing_compatible_with(wdata);
+    bool is_same_process = RTPSDomainImpl::should_intraprocess_between(m_guid, wdata.guid());
+
     RemoteWriterInfo_t info;
     info.guid = wdata.guid();
     info.persistence_guid = wdata.persistence_guid();
     info.has_manual_topic_liveliness = (MANUAL_BY_TOPIC_LIVELINESS_QOS == wdata.m_qos.m_liveliness.kind);
-    RemoteWriterInfo_t* att = matched_writers_.emplace_back(info);
-    if (att != nullptr)
+    info.is_datasharing = is_datasharing;
+
+    if (is_datasharing)
     {
-        add_persistence_guid(info.guid, info.persistence_guid);
-
-        m_acceptMessagesFromUnkownWriters = false;
-        logInfo(RTPS_READER, "Writer " << info.guid << " added to reader " << m_guid);
-
-        if (liveliness_lease_duration_ < c_TimeInfinite)
+        if (datasharing_listener_->add_datasharing_writer(wdata.guid(),
+                m_att.durabilityKind == VOLATILE))
         {
-            auto wlp = mp_RTPSParticipant->wlp();
-            if ( wlp != nullptr)
-            {
-                wlp->sub_liveliness_manager_->add_writer(
-                    wdata.guid(),
-                    liveliness_kind_,
-                    liveliness_lease_duration_);
-            }
-            else
-            {
-                logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
-            }
+            logInfo(RTPS_READER, "Writer Proxy " << wdata.guid() << " added to " << this->m_guid.entityId
+                                                 << " with data sharing");
+        }
+        else
+        {
+            logError(RTPS_READER, "Failed to add Writer Proxy " << wdata.guid()
+                                                                << " to " << this->m_guid.entityId
+                                                                << " with data sharing.");
+            return false;
         }
 
-        return true;
     }
 
-    logWarning(RTPS_READER, "No space to add writer " << wdata.guid() << " to reader " << m_guid);
-    return false;
+    if (matched_writers_.emplace_back(info) == nullptr)
+    {
+        logWarning(RTPS_READER, "No space to add writer " << wdata.guid() << " to reader " << m_guid);
+        if (is_datasharing)
+        {
+            datasharing_listener_->remove_datasharing_writer(wdata.guid());
+        }
+        return false;
+    }
+    logInfo(RTPS_READER, "Writer " << wdata.guid() << " added to reader " << m_guid);
+
+    add_persistence_guid(info.guid, info.persistence_guid);
+
+    m_acceptMessagesFromUnkownWriters = false;
+
+    if (liveliness_lease_duration_ < c_TimeInfinite)
+    {
+        auto wlp = mp_RTPSParticipant->wlp();
+        if ( wlp != nullptr)
+        {
+            wlp->sub_liveliness_manager_->add_writer(
+                wdata.guid(),
+                liveliness_kind_,
+                liveliness_lease_duration_);
+        }
+        else
+        {
+            logError(RTPS_LIVELINESS, "Finite liveliness lease duration but WLP not enabled");
+        }
+    }
+
+    // Intraprocess manages durability itself
+    if (is_datasharing && !is_same_process && m_att.durabilityKind != VOLATILE)
+    {
+        // simulate a notification to force reading of transient changes
+        // this has to be done after the writer is added to the matched_writers or the processing may fail
+        datasharing_listener_->notify(false);
+    }
+
+    return true;
 }
 
 bool StatelessReader::matched_writer_remove(
@@ -131,6 +176,26 @@ bool StatelessReader::matched_writer_remove(
 {
     std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
 
+    //Remove cachechanges belonging to the unmatched writer
+    mp_history->remove_changes_with_guid(writer_guid);
+
+    if (liveliness_lease_duration_ < c_TimeInfinite)
+    {
+        auto wlp = mp_RTPSParticipant->wlp();
+        if ( wlp != nullptr)
+        {
+            wlp->sub_liveliness_manager_->remove_writer(
+                writer_guid,
+                liveliness_kind_,
+                liveliness_lease_duration_);
+        }
+        else
+        {
+            logError(RTPS_LIVELINESS,
+                    "Finite liveliness lease duration but WLP not enabled, cannot remove writer");
+        }
+    }
+
     ResourceLimitedVector<RemoteWriterInfo_t>::iterator it;
     for (it = matched_writers_.begin(); it != matched_writers_.end(); ++it)
     {
@@ -138,26 +203,14 @@ bool StatelessReader::matched_writer_remove(
         {
             logInfo(RTPS_READER, "Writer " << writer_guid << " removed from " << m_guid);
 
-            if (liveliness_lease_duration_ < c_TimeInfinite)
+            if (it->is_datasharing && datasharing_listener_->remove_datasharing_writer(writer_guid))
             {
-                auto wlp = mp_RTPSParticipant->wlp();
-                if ( wlp != nullptr)
-                {
-                    wlp->sub_liveliness_manager_->remove_writer(
-                        writer_guid,
-                        liveliness_kind_,
-                        liveliness_lease_duration_);
-                }
-                else
-                {
-                    logError(RTPS_LIVELINESS,
-                            "Finite liveliness lease duration but WLP not enabled, cannot remove writer");
-                }
+                logInfo(RTPS_READER, "Data sharing writer " << writer_guid << " removed from " << m_guid.entityId);
+                remove_changes_from(writer_guid, true);
             }
 
             remove_persistence_guid(it->guid, it->persistence_guid, removed_by_lease);
             matched_writers_.erase(it);
-
             return true;
         }
     }
@@ -169,11 +222,16 @@ bool StatelessReader::matched_writer_is_matched(
         const GUID_t& writer_guid)
 {
     std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
-    return std::any_of(matched_writers_.begin(), matched_writers_.end(),
-                   [writer_guid](const RemoteWriterInfo_t& item)
-                   {
-                       return item.guid == writer_guid;
-                   });
+    if (std::any_of(matched_writers_.begin(), matched_writers_.end(),
+            [writer_guid](const RemoteWriterInfo_t& item)
+            {
+                return item.guid == writer_guid;
+            }))
+    {
+        return true;
+    }
+
+    return false;
 }
 
 bool StatelessReader::change_received(
@@ -202,27 +260,41 @@ bool StatelessReader::change_received(
     return false;
 }
 
+void StatelessReader::remove_changes_from(
+        const GUID_t& writerGUID,
+        bool is_payload_pool_lost)
+{
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+    std::vector<CacheChange_t*> toremove;
+    for (std::vector<CacheChange_t*>::iterator it = mp_history->changesBegin();
+            it != mp_history->changesEnd(); ++it)
+    {
+        if ((*it)->writerGUID == writerGUID)
+        {
+            toremove.push_back((*it));
+        }
+    }
+
+    for (std::vector<CacheChange_t*>::iterator it = toremove.begin();
+            it != toremove.end(); ++it)
+    {
+        logInfo(RTPS_READER,
+                "Removing change " << (*it)->sequenceNumber << " from " << (*it)->writerGUID);
+        if (is_payload_pool_lost)
+        {
+            (*it)->serializedPayload.data = nullptr;
+            (*it)->payload_owner(nullptr);
+        }
+        mp_history->remove_change(*it);
+    }
+}
+
 bool StatelessReader::nextUntakenCache(
         CacheChange_t** change,
         WriterProxy** /*wpout*/)
 {
     std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
-    bool ret = mp_history->get_min_change(change);
-
-    if (ret)
-    {
-        if (!(*change)->isRead)
-        {
-            if (0 < total_unread_)
-            {
-                --total_unread_;
-            }
-        }
-
-        (*change)->isRead = true;
-    }
-
-    return ret;
+    return mp_history->get_min_change(change);
 }
 
 bool StatelessReader::nextUnreadCache(
@@ -231,32 +303,29 @@ bool StatelessReader::nextUnreadCache(
 {
     std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
     bool found = false;
-    std::vector<CacheChange_t*>::iterator it;
-
-    for (it = mp_history->changesBegin();
-            it != mp_history->changesEnd(); ++it)
+    std::vector<CacheChange_t*>::iterator it = mp_history->changesBegin();
+    while (it != mp_history->changesEnd())
     {
-        if (!(*it)->isRead)
+        if ((*it)->isRead)
         {
-            found = true;
-            break;
+            ++it;
+            continue;
         }
+
+        found = true;
+        break;
     }
 
     if (found)
     {
         *change = *it;
-        if (0 < total_unread_)
-        {
-            --total_unread_;
-        }
-        (*change)->isRead = true;
-
-        return true;
+    }
+    else
+    {
+        logInfo(RTPS_READER, "No Unread elements left");
     }
 
-    logInfo(RTPS_READER, "No Unread elements left");
-    return false;
+    return found;
 }
 
 bool StatelessReader::change_removed_by_history(
@@ -272,6 +341,40 @@ bool StatelessReader::change_removed_by_history(
     }
 
     return true;
+}
+
+bool StatelessReader::begin_sample_access_nts(
+        CacheChange_t* /*change*/,
+        WriterProxy*& /*wp*/,
+        bool& is_future_change)
+{
+    is_future_change = false;
+    return true;
+}
+
+void StatelessReader::end_sample_access_nts(
+        CacheChange_t* change,
+        WriterProxy*& wp,
+        bool mark_as_read)
+{
+    change_read_by_user(change, wp, mark_as_read);
+}
+
+void StatelessReader::change_read_by_user(
+        CacheChange_t* change,
+        const WriterProxy* /*writer*/,
+        bool mark_as_read)
+{
+    // Mark change as read
+    if (mark_as_read && !change->isRead)
+    {
+        change->isRead = true;
+        if (0 < total_unread_)
+        {
+            --total_unread_;
+        }
+    }
+
 }
 
 bool StatelessReader::processDataMsg(
@@ -300,7 +403,32 @@ bool StatelessReader::processDataMsg(
 
         // Ask payload pool to copy the payload
         IPayloadPool* payload_owner = change->payload_owner();
-        if (payload_pool_->get_payload(change->serializedPayload, payload_owner, *change_to_add))
+
+        bool is_datasharing = std::any_of(matched_writers_.begin(), matched_writers_.end(),
+                        [&change](const RemoteWriterInfo_t& writer)
+                        {
+                            return (writer.guid == change->writerGUID) && (writer.is_datasharing);
+                        });
+
+        if (is_datasharing)
+        {
+            //We may receive the change from the listener (with owner a ReaderPool) or intraprocess (with owner a WriterPool)
+            ReaderPool* datasharing_pool = dynamic_cast<ReaderPool*>(payload_owner);
+            if (!datasharing_pool)
+            {
+                datasharing_pool = datasharing_listener_->get_pool_for_writer(change->writerGUID).get();
+            }
+            if (!datasharing_pool)
+            {
+                logWarning(RTPS_MSG_IN, IDSTRING "Problem copying DataSharing CacheChange from writer "
+                        << change->writerGUID);
+                change_pool_->release_cache(change_to_add);
+                return false;
+            }
+
+            datasharing_pool->get_payload(change->serializedPayload, payload_owner, *change_to_add);
+        }
+        else if (payload_pool_->get_payload(change->serializedPayload, payload_owner, *change_to_add))
         {
             change->payload_owner(payload_owner);
         }
@@ -318,8 +446,9 @@ bool StatelessReader::processDataMsg(
         if (!change_received(change_to_add))
         {
             logInfo(RTPS_MSG_IN, IDSTRING "MessageReceiver not add change " << change_to_add->sequenceNumber);
-            payload_pool_->release_payload(*change_to_add);
+            change_to_add->payload_owner()->release_payload(*change_to_add);
             change_pool_->release_cache(change_to_add);
+            return false;
         }
     }
 
@@ -341,6 +470,8 @@ bool StatelessReader::processDataFragMsg(
     {
         if (writer.guid == writer_guid)
         {
+            // Datasharing communication will never send fragments
+            assert(!writer.is_datasharing);
             assert_writer_liveliness(writer_guid);
 
             // Check if CacheChange was received.
