@@ -275,6 +275,11 @@ public:
         }
     }
 
+    eprosima::fastrtps::Publisher& get_native_writer() const
+    {
+        return *publisher_;
+    }
+
     void init()
     {
         //Create participant
@@ -309,6 +314,32 @@ public:
 
             eprosima::fastrtps::Domain::removeParticipant(participant_);
         }
+    }
+
+    void createPublisher()
+    {
+        if (participant_ != nullptr)
+        {
+            //Create publisher
+            publisher_ = eprosima::fastrtps::Domain::createPublisher(participant_, publisher_attr_, &listener_);
+
+            if (publisher_ != nullptr)
+            {
+                publisher_guid_ = publisher_->getGuid();
+                std::cout << "Created publisher " << publisher_guid_ << " for topic " <<
+                    publisher_attr_.topic.topicName << std::endl;
+                initialized_ = true;
+                return;
+            }
+        }
+        return;
+    }
+
+    void removePublisher()
+    {
+        initialized_ = false;
+        eprosima::fastrtps::Domain::removePublisher(publisher_);
+        return;
     }
 
     bool isInitialized() const
@@ -720,6 +751,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& resource_limits_extra_samples(
+            const int32_t extra)
+    {
+        publisher_attr_.topic.resourceLimitsQos.extra_samples = extra;
+        return *this;
+    }
+
     PubSubWriter& matched_readers_allocation(
             size_t initial,
             size_t maximum)
@@ -761,7 +799,15 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         publisher_attr_.unicastLocatorList.push_back(loc);
 
@@ -780,7 +826,15 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         publisher_attr_.multicastLocatorList.push_back(loc);
 
@@ -799,7 +853,15 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         participant_attr_.rtps.builtin.metatrafficUnicastLocatorList.push_back(loc);
 
@@ -818,9 +880,71 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         participant_attr_.rtps.builtin.metatrafficMulticastLocatorList.push_back(loc);
+
+        return *this;
+    }
+
+    PubSubWriter& set_default_unicast_locators(
+            const eprosima::fastrtps::rtps::LocatorList_t& locators)
+    {
+        participant_attr_.rtps.defaultUnicastLocatorList = locators;
+        return *this;
+    }
+
+    PubSubWriter& add_to_default_unicast_locator_list(
+            const std::string& ip,
+            uint32_t port)
+    {
+        eprosima::fastrtps::rtps::Locator_t loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
+        loc.port = port;
+        participant_attr_.rtps.defaultUnicastLocatorList.push_back(loc);
+
+        return *this;
+    }
+
+    PubSubWriter& set_default_multicast_locators(
+            const eprosima::fastrtps::rtps::LocatorList_t& locators)
+    {
+        participant_attr_.rtps.defaultMulticastLocatorList = locators;
+        return *this;
+    }
+
+    PubSubWriter& add_to_default_multicast_locator_list(
+            const std::string& ip,
+            uint32_t port)
+    {
+        eprosima::fastrtps::rtps::Locator_t loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
+        loc.port = port;
+        participant_attr_.rtps.defaultMulticastLocatorList.push_back(loc);
 
         return *this;
     }
@@ -837,7 +961,7 @@ public:
     {
         participant_attr_.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
         participant_attr_.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_attr_.rtps.builtin.discovery_config.setStaticEndpointXMLFilename(filename);
+        participant_attr_.rtps.builtin.discovery_config.static_edp_xml_config(filename);
         return *this;
     }
 

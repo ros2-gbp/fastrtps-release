@@ -325,6 +325,17 @@ public:
         t << topic_name << "_" << asio::ip::host_name() << "_" << GET_PID();
         topic_name_ = t.str();
 
+        if (enable_datasharing)
+        {
+            datareader_qos_.data_sharing().automatic();
+            datawriter_qos_.data_sharing().automatic();
+        }
+        else
+        {
+            datareader_qos_.data_sharing().off();
+            datawriter_qos_.data_sharing().off();
+        }
+
         // By default, memory mode is preallocated (the most restritive)
         datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
         datareader_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
@@ -764,7 +775,7 @@ private:
             ASSERT_LT(last_seq, info.sample_identity.sequence_number());
             last_seq = info.sample_identity.sequence_number();
 
-            if (info.instance_state == eprosima::fastdds::dds::ALIVE)
+            if (info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
             {
                 auto it = std::find(total_msgs_.begin(), total_msgs_.end(), data);
                 ASSERT_NE(it, total_msgs_.end());

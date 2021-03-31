@@ -18,34 +18,58 @@
 #include "PubSubWriter.hpp"
 
 #include <fastdds/dds/log/Log.hpp>
-#include <fastrtps/transport/test_UDPv4Transport.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <rtps/transport/test_UDPv4Transport.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
+using test_UDPv4Transport = eprosima::fastdds::rtps::test_UDPv4Transport;
+using test_UDPv4TransportDescriptor = eprosima::fastdds::rtps::test_UDPv4TransportDescriptor;
 
-class PubSubFragments : public testing::TestWithParam<bool>
+enum communication_type
+{
+    TRANSPORT,
+    INTRAPROCESS,
+    DATASHARING
+};
+
+class PubSubFragments : public testing::TestWithParam<communication_type>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = true;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
-
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = false;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
     }
 
@@ -395,7 +419,7 @@ TEST(PubSubFragments, AsyncPubSubAsReliableData300kbInLossyConditions)
 
     // Sanity check. Make sure we have dropped a few packets
     ASSERT_EQ(
-        eprosima::fastrtps::rtps::test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
+        test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
         testTransport->dropLogLength);
 }
 
@@ -450,7 +474,7 @@ TEST(PubSubFragments, AsyncPubSubAsReliableVolatileData300kbInLossyConditions)
 
     // Sanity check. Make sure we have dropped a few packets
     ASSERT_EQ(
-        eprosima::fastrtps::rtps::test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
+        test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
         testTransport->dropLogLength);
 }
 
@@ -506,7 +530,7 @@ TEST(PubSubFragments, AsyncPubSubAsReliableData300kbInLossyConditionsSmallFragme
 
     // Sanity check. Make sure we have dropped a few packets
     ASSERT_EQ(
-        eprosima::fastrtps::rtps::test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
+        test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
         testTransport->dropLogLength);
 }
 
@@ -563,7 +587,7 @@ TEST(PubSubFragments, AsyncPubSubAsReliableVolatileData300kbInLossyConditionsSma
 
     // Sanity check. Make sure we have dropped a few packets
     ASSERT_EQ(
-        eprosima::fastrtps::rtps::test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
+        test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
         testTransport->dropLogLength);
 }
 
@@ -672,12 +696,20 @@ TEST(PubSubFragments, AsyncFragmentSizeTest)
 
 GTEST_INSTANTIATE_TEST_MACRO(PubSubFragments,
         PubSubFragments,
-        testing::Values(false, true),
+        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
         [](const testing::TestParamInfo<PubSubFragments::ParamType>& info)
         {
-            if (info.param)
+            switch (info.param)
             {
-                return "Intraprocess";
+                case INTRAPROCESS:
+                    return "Intraprocess";
+                    break;
+                case DATASHARING:
+                    return "Datasharing";
+                    break;
+                case TRANSPORT:
+                default:
+                    return "Transport";
             }
-            return "NonIntraprocess";
+
         });
