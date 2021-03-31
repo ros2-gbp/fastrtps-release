@@ -1,4 +1,4 @@
-From 24cc80efe00cd7bcc167201c302d72d40518e47f Mon Sep 17 00:00:00 2001
+From 31e16ab9eb35bc50d268168a03d4abadb95d514b Mon Sep 17 00:00:00 2001
 From: Scott K Logan <logans@cottsay.net>
 Date: Thu, 11 Mar 2021 16:48:28 -0800
 Subject: [PATCH] Bundle Asio on RHEL 8
@@ -23,21 +23,21 @@ Signed-off-by: Scott K Logan <logans@cottsay.net>
  3 files changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/cmake/common/eprosima_libraries.cmake b/cmake/common/eprosima_libraries.cmake
-index d326e81b..01dd9132 100644
+index fe8d9797..9a5b25dd 100644
 --- a/cmake/common/eprosima_libraries.cmake
 +++ b/cmake/common/eprosima_libraries.cmake
-@@ -39,7 +39,7 @@ macro(eprosima_find_package package)
-             if(THIRDPARTY_UPDATE OR NOT EXISTS "${PROJECT_SOURCE_DIR}/thirdparty/${package}/CMakeLists.txt")
-                 message(STATUS "${package} thirdparty is being updated...")
-                 execute_process(
--                    COMMAND git submodule update --recursive --init "thirdparty/${package}"
-+                    COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
-                     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-                     RESULT_VARIABLE EXECUTE_RESULT
-                     )
-@@ -80,7 +80,7 @@ macro(eprosima_find_thirdparty package thirdparty_name)
- 
-         if(THIRDPARTY OR THIRDPARTY_${package})
+@@ -98,7 +98,7 @@ macro(eprosima_find_package package)
+             # Update submodule
+             message(STATUS "Updating submodule thirdparty/${package}")
+             execute_process(
+-                COMMAND git submodule update --recursive --init "thirdparty/${package}"
++                COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
+                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                 RESULT_VARIABLE EXECUTE_RESULT
+                 )
+@@ -221,7 +221,7 @@ macro(eprosima_find_thirdparty package thirdparty_name)
+             # Update submodule
+             message(STATUS "Updating submodule thirdparty/${thirdparty_name}")
              execute_process(
 -                COMMAND git submodule update --recursive --init "thirdparty/${thirdparty_name}"
 +                COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
@@ -45,7 +45,7 @@ index d326e81b..01dd9132 100644
                  RESULT_VARIABLE EXECUTE_RESULT
                  )
 diff --git a/package.xml b/package.xml
-index dfc760a2..f6576165 100644
+index 8543c43c..0c9755cb 100644
 --- a/package.xml
 +++ b/package.xml
 @@ -7,7 +7,6 @@
@@ -57,7 +57,7 @@ index dfc760a2..f6576165 100644
  
    <build_export_depend>libssl-dev</build_export_depend>
 diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
-index 65784c34..4bea0e1a 100644
+index c8e27402..45e9fdcc 100644
 --- a/rpm/ros-rolling-fastrtps.spec
 +++ b/rpm/ros-rolling-fastrtps.spec
 @@ -18,7 +18,6 @@ Requires:       ros-rolling-fastcdr
