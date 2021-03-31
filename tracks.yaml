@@ -215,7 +215,7 @@ tracks:
       :{release_inc} --os-name fedora
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc} --os-name rhel
-    devel_branch: 2.1.x
+    devel_branch: 2.3.x
     last_release: v2.1.1
     last_version: 2.1.1
     name: fastrtps
@@ -226,4 +226,4 @@ tracks:
     ros_distro: rolling
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-DDS.git
-    version: 2.1.1
+    version: 2.3.0
