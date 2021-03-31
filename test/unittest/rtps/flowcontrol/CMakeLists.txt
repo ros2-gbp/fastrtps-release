@@ -21,7 +21,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             add_definitions(-D_WIN32_WINNT=0x0601)
         endif()
 
-        include_directories(${ASIO_INCLUDE_DIR})
+        include_directories(${Asio_INCLUDE_DIR})
 
         set(THROUGHPUTCONTROLLERTESTS_SOURCE
             ThroughputControllerTests.cpp
@@ -31,7 +31,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp)
 
         add_executable(ThroughputControllerTests ${THROUGHPUTCONTROLLERTESTS_SOURCE})
-        target_compile_definitions(ThroughputControllerTests PRIVATE FASTRTPS_NO_LIB)
+        target_compile_definitions(ThroughputControllerTests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
         target_include_directories(ThroughputControllerTests PRIVATE ${GTEST_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/AsyncWriterThread

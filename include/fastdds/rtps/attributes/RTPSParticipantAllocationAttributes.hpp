@@ -81,7 +81,7 @@ struct SendBuffersAllocationAttributes
      *
      * This attribute controls how the buffer manager behaves when a send buffer is not
      * available. When true, a new buffer will be created. When false, it will wait for a
-     * buffer to be returned. This is a tradeoff between latency and dynamic allocations.
+     * buffer to be returned. This is a trade-off between latency and dynamic allocations.
      */
     bool dynamic = false;
 };
@@ -96,7 +96,8 @@ struct VariableLengthDataLimits
     {
         return (this->max_properties == b.max_properties) &&
                (this->max_user_data == b.max_user_data) &&
-               (this->max_partitions == b.max_partitions);
+               (this->max_partitions == b.max_partitions) &&
+               (this->max_datasharing_domains == b.max_datasharing_domains);
     }
 
     //! Defines the maximum size (in octets) of properties data in the local or remote participant
@@ -105,6 +106,8 @@ struct VariableLengthDataLimits
     size_t max_user_data = 0;
     //! Defines the maximum size (in octets) of partitions data
     size_t max_partitions = 0;
+    //! Defines the maximum size (in elements) of the list of data sharing domain IDs
+    size_t max_datasharing_domains = 0;
 };
 
 /**
@@ -153,7 +156,7 @@ private:
     ResourceLimitedContainerConfig total_endpoints(
             const ResourceLimitedContainerConfig& endpoints) const
     {
-        constexpr size_t max = std::numeric_limits<size_t>::max();
+        constexpr size_t max = (std::numeric_limits<size_t>::max)();
         size_t initial;
         size_t maximum;
         size_t increment;
@@ -161,7 +164,7 @@ private:
         initial = participants.initial * endpoints.initial;
         maximum = (participants.maximum == max || endpoints.maximum == max)
                 ? max : participants.maximum * endpoints.maximum;
-        increment = std::max(participants.increment, endpoints.increment);
+        increment = (std::max)(participants.increment, endpoints.increment);
 
         return { initial, maximum, increment };
     }

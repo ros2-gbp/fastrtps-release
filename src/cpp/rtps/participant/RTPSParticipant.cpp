@@ -170,6 +170,46 @@ void RTPSParticipant::enable()
     mp_impl->enable();
 }
 
+#if HAVE_SECURITY
+
+bool RTPSParticipant::is_security_enabled_for_writer(
+        const WriterAttributes& writer_attributes)
+{
+    return mp_impl->is_security_enabled_for_writer(writer_attributes);
+}
+
+bool RTPSParticipant::is_security_enabled_for_reader(
+        const ReaderAttributes& reader_attributes)
+{
+    return mp_impl->is_security_enabled_for_reader(reader_attributes);
+}
+
+#endif // if HAVE_SECURITY
+
+#ifdef FASTDDS_STATISTICS
+
+bool RTPSParticipant::add_statistics_listener(
+        std::shared_ptr<fastdds::statistics::IListener> listener,
+        fastdds::statistics::EventKind kind)
+{
+    (void)listener;
+    (void)kind;
+
+    return false;
+}
+
+bool RTPSParticipant::remove_statistics_listener(
+        std::shared_ptr<fastdds::statistics::IListener> listener,
+        fastdds::statistics::EventKind kind)
+{
+    (void)listener;
+    (void)kind;
+
+    return false;
+}
+
+#endif // FASTDDS_STATISTICS
+
 } /* namespace rtps */
 } /* namespace fastrtps */
 } /* namespace eprosima */

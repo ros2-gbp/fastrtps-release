@@ -14,6 +14,7 @@
 
 #include "BlackboxTests.hpp"
 
+#include "PubSubParticipant.hpp"
 #include "PubSubReader.hpp"
 #include "PubSubWriter.hpp"
 #include "ReqRepAsReliableHelloWorldRequester.hpp"
@@ -25,28 +26,50 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-class PubSubBasic : public testing::TestWithParam<bool>
+enum communication_type
+{
+    TRANSPORT,
+    INTRAPROCESS,
+    DATASHARING
+};
+
+class PubSubBasic : public testing::TestWithParam<communication_type>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = true;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
-
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = false;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
     }
 
@@ -253,6 +276,7 @@ TEST_P(PubSubBasic, PubSubMoreThan256Unacknowledged)
 
     reader.startReception(expected_data);
     reader.block_for_all();
+    EXPECT_TRUE(writer.waitForAllAcked(std::chrono::seconds(10)));
 }
 
 TEST_P(PubSubBasic, PubSubAsReliableHelloworldMulticastDisabled)
@@ -286,6 +310,7 @@ TEST_P(PubSubBasic, PubSubAsReliableHelloworldMulticastDisabled)
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
     reader.block_for_all();
+    EXPECT_TRUE(writer.waitForAllAcked(std::chrono::seconds(10)));
 }
 
 TEST_P(PubSubBasic, ReceivedDynamicDataWithNoSizeLimit)
@@ -467,7 +492,7 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataWithinSizeLimit)
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     WriterMulticastLocators.push_back(LocatorBuffer);
 
-    writer.static_discovery("PubSubWriter.xml").
+    writer.static_discovery("file://PubSubWriter.xml").
             unicastLocatorList(WriterUnicastLocators).multicastLocatorList(WriterMulticastLocators).
             setPublisherIDs(1,
             2).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
@@ -484,9 +509,9 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataWithinSizeLimit)
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     ReaderMulticastLocators.push_back(LocatorBuffer);
 
-    //Expected properties have exactly size 52
-    reader.properties_max_size(52).
-            static_discovery("PubSubReader.xml").
+    //Expected properties have exactly size 92
+    reader.properties_max_size(92).
+            static_discovery("file://PubSubReader.xml").
             unicastLocatorList(ReaderUnicastLocators).multicastLocatorList(ReaderMulticastLocators).
             setSubscriberIDs(3,
             4).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
@@ -564,7 +589,7 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataExceedsSizeLimit)
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     WriterMulticastLocators.push_back(LocatorBuffer);
 
-    writer.static_discovery("PubSubWriter.xml").
+    writer.static_discovery("file://PubSubWriter.xml").
             unicastLocatorList(WriterUnicastLocators).multicastLocatorList(WriterMulticastLocators).
             setPublisherIDs(1,
             2).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
@@ -581,9 +606,9 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataExceedsSizeLimit)
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     ReaderMulticastLocators.push_back(LocatorBuffer);
 
-    //Expected properties have size 52
+    //Expected properties have size 92
     reader.properties_max_size(50)
-            .static_discovery("PubSubReader.xml")
+            .static_discovery("file://PubSubReader.xml")
             .unicastLocatorList(ReaderUnicastLocators).multicastLocatorList(ReaderMulticastLocators)
             .setSubscriberIDs(3,
             4).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
@@ -598,6 +623,36 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataExceedsSizeLimit)
     ASSERT_FALSE(reader.is_matched());
 }
 
+TEST_P(PubSubBasic, unique_flows_one_writer_two_readers)
+{
+    PubSubParticipant<HelloWorldType> readers(0, 2, 0, 2);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    PropertyPolicy properties;
+    properties.properties().emplace_back("fastdds.unique_network_flows", "");
+
+    readers.sub_topic_name(TEST_TOPIC_NAME).sub_property_policy(properties).reliability(RELIABLE_RELIABILITY_QOS);
+
+    ASSERT_TRUE(readers.init_participant());
+    ASSERT_TRUE(readers.init_subscriber(0));
+    ASSERT_TRUE(readers.init_subscriber(1));
+
+    writer.history_depth(100).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Wait for discovery.
+    writer.wait_discovery();
+    readers.sub_wait_discovery();
+
+    // Send data
+    auto data = default_helloworld_data_generator();
+    writer.send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block until readers have acknowledged all samples.
+    EXPECT_TRUE(writer.waitForAllAcked(std::chrono::seconds(30)));
+}
 
 #ifdef INSTANTIATE_TEST_SUITE_P
 #define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
@@ -607,13 +662,20 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataExceedsSizeLimit)
 
 GTEST_INSTANTIATE_TEST_MACRO(PubSubBasic,
         PubSubBasic,
-        testing::Values(false, true),
+        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
         [](const testing::TestParamInfo<PubSubBasic::ParamType>& info)
         {
-            if (info.param)
+            switch (info.param)
             {
-                return "Intraprocess";
+                case INTRAPROCESS:
+                    return "Intraprocess";
+                    break;
+                case DATASHARING:
+                    return "Datasharing";
+                    break;
+                case TRANSPORT:
+                default:
+                    return "Transport";
             }
-            return "NonIntraprocess";
-        });
 
+        });

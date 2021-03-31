@@ -24,7 +24,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 )
         endif()
 
-        include_directories(${ASIO_INCLUDE_DIR})
+        include_directories(${Asio_INCLUDE_DIR})
 
         # Copy certs
         if(TLS_FOUND)
@@ -201,7 +201,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         include_directories(mock/)
 
         add_executable(UDPv4Tests ${UDPV4TESTS_SOURCE})
-        target_compile_definitions(UDPv4Tests PRIVATE FASTRTPS_NO_LIB)
+        target_compile_definitions(UDPv4Tests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
         target_include_directories(UDPv4Tests PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
@@ -220,7 +223,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
 
         if(NOT DISABLE_UDPV6_TESTS)
             add_executable(UDPv6Tests ${UDPV6TESTS_SOURCE})
-            target_compile_definitions(UDPv6Tests PRIVATE FASTRTPS_NO_LIB)
+            target_compile_definitions(UDPv6Tests PRIVATE FASTRTPS_NO_LIB
+                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+                )
             target_include_directories(UDPv6Tests PRIVATE
                 ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
@@ -236,7 +242,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_UDP6)
 
             add_executable(TCPv6Tests ${TCPV6TESTS_SOURCE})
-            target_compile_definitions(TCPv6Tests PRIVATE FASTRTPS_NO_LIB)
+            target_compile_definitions(TCPv6Tests PRIVATE FASTRTPS_NO_LIB
+                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+                )
             target_include_directories(TCPv6Tests PRIVATE
                 ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
@@ -258,7 +267,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         endif()
 
         add_executable(test_UDPv4Tests ${TEST_UDPV4TESTS_SOURCE})
-        target_compile_definitions(test_UDPv4Tests PRIVATE FASTRTPS_NO_LIB)
+        target_compile_definitions(test_UDPv4Tests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
         target_include_directories(test_UDPv4Tests PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
@@ -278,7 +290,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TEST_UDP4)
 
         add_executable(TCPv4Tests ${TCPV4TESTS_SOURCE})
-        target_compile_definitions(TCPv4Tests PRIVATE FASTRTPS_NO_LIB)
+        target_compile_definitions(TCPv4Tests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
         target_include_directories(TCPv4Tests PRIVATE
             ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
@@ -302,7 +317,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             add_executable(SharedMemTests ${SHAREDMEMTESTS_SOURCE})
 
             target_compile_definitions(SharedMemTests PRIVATE FASTRTPS_NO_LIB
-            $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>)
+                $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
+                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+                )
 
             target_include_directories(SharedMemTests PRIVATE
                 ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
@@ -313,8 +331,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 ${THIRDPARTY_BOOST_INCLUDE_DIR}
                 )
             target_link_libraries(SharedMemTests ${GTEST_LIBRARIES} ${MOCKS}
-                    $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
-                    ${THIRDPARTY_BOOST_LINK_LIBS})
+                $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
+                ${THIRDPARTY_BOOST_LINK_LIBS}
+                eProsima_atomic
+                )
             if(MSVC OR MSVC_IDE)
                 target_link_libraries(SharedMemTests ${PRIVACY} iphlpapi Shlwapi )
             else()

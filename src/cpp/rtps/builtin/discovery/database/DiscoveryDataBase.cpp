@@ -24,10 +24,10 @@
 #include <fastdds/rtps/common/GuidPrefix_t.hpp>
 #include <fastdds/rtps/common/RemoteLocators.hpp>
 
-#include "./DiscoveryDataBase.hpp"
+#include <rtps/builtin/discovery/database/DiscoveryDataBase.hpp>
 
 #include <json.hpp>
-#include "backup/SharedBackupFunctions.hpp"
+#include <rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -58,6 +58,13 @@ DiscoveryDataBase::~DiscoveryDataBase()
     {
         backup_file_.close();
     }
+}
+
+void DiscoveryDataBase::add_server(
+        fastrtps::rtps::GuidPrefix_t server)
+{
+    logInfo(DISCOVERY_DATABASE, "Server " << server << " added");
+    servers_.push_back(server);
 }
 
 std::vector<fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::clear()
@@ -576,9 +583,9 @@ void DiscoveryDataBase::create_participant_from_change_(
 void DiscoveryDataBase::match_new_server_(
         eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix)
 {
-    // Send our DATA(p) to the new participant
+    // Send Our DATA(p) to the new participant
     // If this is not done, our data could be skip afterwards because a gap sent in newer DATA(p)s
-    // so the new participant could never receive out data
+    //  so the new participant could never receive out data
     auto our_data_it = participants_.find(server_guid_prefix_);
     assert(our_data_it != participants_.end());
     add_pdp_to_send_(our_data_it->second.change());
@@ -672,9 +679,9 @@ void DiscoveryDataBase::create_new_participant_from_change_(
         {
             // If the participant is a new participant, mark that not everyone has ACKed this server's DATA(p)
             // TODO if the new participant is a server it may be that our DATA(p) is already acked because he is
-            // our server and we have pinged it. But also if we are its server it could be the case that
-            // our DATA(p) is not acked even when it is our server. Solution: see in PDPServer how the change has
-            // arrived. if because our ping or because their DATA(p). MINOR PROBLEM
+            //  our server and we have pinged it. But also if we are its server it could be the case that
+            //  our DATA(p) is not acked even when it is our server. Solution: see in PDPServer how the change has
+            //  arrived, if because our ping or because their DATA(p). MINOR PROBLEM
             server_acked_by_all(false);
         }
 
@@ -724,7 +731,7 @@ void DiscoveryDataBase::update_participant_from_change_(
         server_acked_by_all(false);
 
         // It is possible that this Data(P) is in our history if it has not been acked by all
-        // In this case we have to resend it with the new update
+        // In this case we have to resent it with the new update
         if (!participant_info.is_acked_by_all())
         {
             add_pdp_to_send_(ch);
@@ -792,7 +799,7 @@ void DiscoveryDataBase::create_writers_from_change_(
             // The change could be newer and at the same time not being an update.
             // This happens with DATAs coming from servers, since they take their own DATAs in and out frequently,
             // so the sequence number in `write_params` changes.
-            // To account for that, we discard the DATA if the payload is exactly the same as what we have.
+            // To account for that, we discard the DATA if the payload is exactly the same as what wee have.
             if (!(ch->serializedPayload == writer_it->second.change()->serializedPayload))
             {
                 // Update the change related to the writer and return the old change to the pool
@@ -909,7 +916,7 @@ void DiscoveryDataBase::create_readers_from_change_(
             // The change could be newer and at the same time not being an update.
             // This happens with DATAs coming from servers, since they take their own DATAs in and out frequently,
             // so the sequence number in `write_params` changes.
-            // To account for that, we discard the DATA if the payload is exactly the same as what we have.
+            // To account for that, we discard the DATA if the payload is exactly the same as what wee have.
             if (!(ch->serializedPayload == reader_it->second.change()->serializedPayload))
             {
                 // Update the change related to the reader and return the old change to the pool
@@ -1630,10 +1637,10 @@ std::vector<fastrtps::rtps::GuidPrefix_t> DiscoveryDataBase::ack_pending_servers
     return ack_pending_servers;
 }
 
-fastrtps::rtps::LocatorList_t DiscoveryDataBase::participant_metatraffic_locators(
+LocatorList DiscoveryDataBase::participant_metatraffic_locators(
         fastrtps::rtps::GuidPrefix_t participant_guid_prefix)
 {
-    fastrtps::rtps::LocatorList_t locators;
+    LocatorList locators;
     auto part_it = participants_.find(participant_guid_prefix);
     if (part_it != participants_.end())
     {

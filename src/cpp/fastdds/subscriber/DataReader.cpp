@@ -78,6 +78,160 @@ bool DataReader::wait_for_unread_message(
     return impl_->wait_for_unread_message(timeout);
 }
 
+ReturnCode_t DataReader::read(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        SampleStateMask sample_states,
+        ViewStateMask view_states,
+        InstanceStateMask instance_states)
+{
+    return impl_->read(data_values, sample_infos, max_samples, sample_states, view_states, instance_states);
+}
+
+ReturnCode_t DataReader::read_w_condition(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        ReadCondition* a_condition)
+{
+    static_cast<void> (data_values);
+    static_cast<void> (sample_infos);
+    static_cast<void> (max_samples);
+    static_cast<void> (a_condition);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+}
+
+ReturnCode_t DataReader::read_instance(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        const InstanceHandle_t& a_handle,
+        SampleStateMask sample_states,
+        ViewStateMask view_states,
+        InstanceStateMask instance_states)
+{
+    return impl_->read_instance(data_values, sample_infos, max_samples, a_handle, sample_states, view_states,
+                   instance_states);
+}
+
+ReturnCode_t DataReader::read_next_instance(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        const InstanceHandle_t& previous_handle,
+        SampleStateMask sample_states,
+        ViewStateMask view_states,
+        InstanceStateMask instance_states)
+{
+    return impl_->read_next_instance(data_values, sample_infos, max_samples, previous_handle, sample_states,
+                   view_states, instance_states);
+}
+
+ReturnCode_t DataReader::read_next_instance_w_condition(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        const InstanceHandle_t& previous_handle,
+        ReadCondition* a_condition)
+{
+    static_cast<void> (data_values);
+    static_cast<void> (sample_infos);
+    static_cast<void> (max_samples);
+    static_cast<void> (previous_handle);
+    static_cast<void> (a_condition);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+}
+
+ReturnCode_t DataReader::take(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        SampleStateMask sample_states,
+        ViewStateMask view_states,
+        InstanceStateMask instance_states)
+{
+    return impl_->take(data_values, sample_infos, max_samples, sample_states, view_states, instance_states);
+}
+
+ReturnCode_t DataReader::take_w_condition(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        ReadCondition* a_condition)
+{
+    static_cast<void> (data_values);
+    static_cast<void> (sample_infos);
+    static_cast<void> (max_samples);
+    static_cast<void> (a_condition);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+}
+
+ReturnCode_t DataReader::take_instance(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        const InstanceHandle_t& a_handle,
+        SampleStateMask sample_states,
+        ViewStateMask view_states,
+        InstanceStateMask instance_states)
+{
+    return impl_->take_instance(data_values, sample_infos, max_samples, a_handle, sample_states, view_states,
+                   instance_states);
+}
+
+ReturnCode_t DataReader::take_next_instance(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        const InstanceHandle_t& previous_handle,
+        SampleStateMask sample_states,
+        ViewStateMask view_states,
+        InstanceStateMask instance_states)
+{
+    return impl_->take_next_instance(data_values, sample_infos, max_samples, previous_handle, sample_states,
+                   view_states, instance_states);
+}
+
+ReturnCode_t DataReader::take_next_instance_w_condition(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos,
+        int32_t max_samples,
+        const InstanceHandle_t& previous_handle,
+        ReadCondition* a_condition)
+{
+    static_cast<void> (data_values);
+    static_cast<void> (sample_infos);
+    static_cast<void> (max_samples);
+    static_cast<void> (previous_handle);
+    static_cast<void> (a_condition);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+}
+
+ReturnCode_t DataReader::return_loan(
+        LoanableCollection& data_values,
+        SampleInfoSeq& sample_infos)
+{
+    return impl_->return_loan(data_values, sample_infos);
+}
+
+ReturnCode_t DataReader::get_key_value(
+        void* key_holder,
+        const InstanceHandle_t& handle)
+{
+    static_cast<void> (key_holder);
+    static_cast<void> (handle);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+}
+
+InstanceHandle_t DataReader::lookup_instance(
+        const void* instance) const
+{
+    static_cast<void> (instance);
+    logWarning(DATA_READER, "lookup_instance method not implemented")
+    return HANDLE_NIL;
+}
+
 ReturnCode_t DataReader::read_next_sample(
         void* data,
         SampleInfo* info)
@@ -96,6 +250,11 @@ ReturnCode_t DataReader::get_first_untaken_info(
         SampleInfo* info)
 {
     return impl_->get_first_untaken_info(info);
+}
+
+uint64_t DataReader::get_unread_count() const
+{
+    return impl_->get_unread_count();
 }
 
 const GUID_t& DataReader::guid()
@@ -138,24 +297,6 @@ ReturnCode_t DataReader::get_requested_incompatible_qos_status(
     return impl_->get_requested_incompatible_qos_status(status);
 }
 
-/* TODO
-   bool DataReader::read(
-        std::vector<void *>& data_values,
-        std::vector<SampleInfo>& sample_infos,
-        uint32_t max_samples)
-   {
-    return impl_->read(...);
-   }
-
-   bool DataReader::take(
-        std::vector<void *>& data_values,
-        std::vector<SampleInfo>& sample_infos,
-        uint32_t max_samples)
-   {
-    return impl_->take(...);
-   }
- */
-
 ReturnCode_t DataReader::set_listener(
         DataReaderListener* listener)
 {
@@ -183,7 +324,7 @@ const DataReaderListener* DataReader::get_listener() const
 /* TODO
    bool DataReader::get_key_value(
         void* data,
-        const rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
    {
     return impl->get_key_value(...);
    }
@@ -195,42 +336,124 @@ ReturnCode_t DataReader::get_liveliness_changed_status(
     return impl_->get_liveliness_changed_status(status);
 }
 
-/* TODO
-   bool DataReader::get_requested_incompatible_qos_status(
-        RequestedIncompatibleQosStatus& status) const
-   {
-    return impl_->get...;
-   }
- */
-
-/* TODO
-   bool DataReader::get_sample_lost_status(
+ReturnCode_t DataReader::get_sample_lost_status(
         SampleLostStatus& status) const
-   {
-    return impl_->get...;
-   }
- */
+{
+    static_cast<void> (status);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_sample_lost_status(status);
+     */
+}
 
-/* TODO
-   bool DataReader::get_sample_rejected_status(
+ReturnCode_t DataReader::get_sample_rejected_status(
         SampleRejectedStatus& status) const
-   {
-    return impl_->get...;
-   }
- */
+{
+    static_cast<void> (status);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_sample_rejected_status(status);
+     */
+}
+
+ReturnCode_t DataReader::get_subscription_matched_status(
+        SubscriptionMatchedStatus& status) const
+{
+    static_cast<void> (status);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_subscription_matched_status(status);
+     */
+}
+
+ReturnCode_t DataReader::get_matched_publication_data(
+        builtin::PublicationBuiltinTopicData& publication_data,
+        const fastrtps::rtps::InstanceHandle_t& publication_handle) const
+{
+    static_cast<void> (publication_data);
+    static_cast<void> (publication_handle);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_matched_publication_data(publication_data, publication_handle);
+     */
+}
+
+ReturnCode_t DataReader::get_matched_publications(
+        std::vector<fastrtps::rtps::InstanceHandle_t>& publication_handles) const
+{
+    static_cast<void> (publication_handles);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_matched_publication_data(publication_handles);
+     */
+}
+
+ReadCondition* DataReader::create_readcondition(
+        const std::vector<SampleStateKind>& sample_states,
+        const std::vector<ViewStateKind>& view_states,
+        const std::vector<InstanceStateKind>& instance_states)
+{
+    logWarning(DATA_READER, "create_readcondition method not implemented");
+    static_cast<void> (sample_states);
+    static_cast<void> (view_states);
+    static_cast<void> (instance_states);
+    return nullptr;
+    /*
+       return impl_->create_readcondition(sample_states, view_states, instance_states);
+     */
+}
+
+QueryCondition* DataReader::create_querycondition(
+        const std::vector<SampleStateKind>& sample_states,
+        const std::vector<ViewStateKind>& view_states,
+        const std::vector<InstanceStateKind>& instance_states,
+        const std::string& query_expression,
+        const std::vector<std::string>& query_parameters)
+{
+    logWarning(DATA_READER, "create_querycondition method not implemented");
+    static_cast<void> (sample_states);
+    static_cast<void> (view_states);
+    static_cast<void> (instance_states);
+    static_cast<void> (query_expression);
+    static_cast<void> (query_parameters);
+    return nullptr;
+    /*
+       return impl_->create_querycondition(sample_states, view_states, instance_states, query_expression, query_parameters);
+     */
+}
+
+ReturnCode_t DataReader::delete_readcondition(
+        const ReadCondition* a_condition)
+{
+    static_cast<void> (a_condition);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->delete_readcondition(a_condition);
+     */
+}
+
+ReturnCode_t DataReader::delete_contained_entities()
+{
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->delete_contained_entities();
+     */
+}
 
 const Subscriber* DataReader::get_subscriber() const
 {
     return impl_->get_subscriber();
 }
 
-/* TODO
-   bool DataReader::wait_for_historical_data(
+ReturnCode_t DataReader::wait_for_historical_data(
         const Duration_t& max_wait) const
-   {
-    return impl_->wait_for_historical_data(max_wait);
-   }
- */
+{
+    static_cast<void> (max_wait);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->wait_for_historical_data(a_condition);
+     */
+}
 
 TypeSupport DataReader::type()
 {
@@ -240,6 +463,19 @@ TypeSupport DataReader::type()
 const TopicDescription* DataReader::get_topicdescription() const
 {
     return impl_->get_topicdescription();
+}
+
+bool DataReader::is_sample_valid(
+        const void* data,
+        const SampleInfo* info) const
+{
+    return impl_->is_sample_valid(data, info);
+}
+
+ReturnCode_t DataReader::get_listening_locators(
+        rtps::LocatorList& locators) const
+{
+    return impl_->get_listening_locators(locators);
 }
 
 } /* namespace dds */

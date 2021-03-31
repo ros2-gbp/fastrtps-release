@@ -125,6 +125,7 @@ enum ParameterId_t : uint16_t
     PID_TYPE_CONSISTENCY_ENFORCEMENT = 0x0074,
     PID_TYPE_INFORMATION = 0x0075,
     PID_DISABLE_POSITIVE_ACKS = 0x8005,
+    PID_DATASHARING = 0x8006,
 };
 
 //!Base Parameter class with parameter PID and parameter length in bytes.
@@ -232,7 +233,7 @@ class ParameterLocator_t : public Parameter_t
 public:
 
     //!Locator
-    fastrtps::rtps::Locator_t locator;
+    rtps::Locator locator;
 
     /**
      * @brief Constructor without parameters
@@ -262,7 +263,7 @@ public:
     ParameterLocator_t(
             ParameterId_t pid,
             uint16_t in_length,
-            const fastrtps::rtps::Locator_t& loc)
+            const rtps::Locator& loc)
         : Parameter_t(pid, in_length)
         , locator(loc)
     {
@@ -1063,13 +1064,13 @@ public:
         }
 
         bool operator ==(
-                const self_type& rhs)
+                const self_type& rhs) const
         {
             return ptr_ == rhs.ptr_;
         }
 
         bool operator !=(
-                const self_type& rhs)
+                const self_type& rhs) const
         {
             return ptr_ != rhs.ptr_;
         }
@@ -1149,13 +1150,13 @@ public:
         }
 
         bool operator ==(
-                const self_type& rhs)
+                const self_type& rhs) const
         {
             return ptr_ == rhs.ptr_;
         }
 
         bool operator !=(
-                const self_type& rhs)
+                const self_type& rhs) const
         {
             return ptr_ != rhs.ptr_;
         }

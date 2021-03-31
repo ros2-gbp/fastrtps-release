@@ -58,6 +58,7 @@ class DomainParticipant;
 class Publisher;
 class DataWriterImpl;
 class Topic;
+class TypeSupport;
 
 /**
  * Class PublisherImpl, contains the actual implementation of the behaviour of the Publisher.
@@ -108,7 +109,7 @@ public:
             const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_datawriter(
-            DataWriter* writer);
+            const DataWriter* writer);
 
     DataWriter* lookup_datawriter(
             const std::string& topic_name) const;
