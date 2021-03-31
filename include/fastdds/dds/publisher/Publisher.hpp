@@ -20,13 +20,14 @@
 #ifndef _FASTDDS_PUBLISHER_HPP_
 #define _FASTDDS_PUBLISHER_HPP_
 
-#include <fastrtps/fastrtps_dll.h>
-#include <fastdds/rtps/common/Time_t.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/types/TypesBase.h>
 #include <fastdds/dds/core/Entity.hpp>
-#include <fastdds/dds/publisher/qos/PublisherQos.hpp>
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+#include <fastdds/dds/publisher/qos/PublisherQos.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
+#include <fastdds/rtps/common/Time_t.h>
+
+#include <fastrtps/fastrtps_dll.h>
+#include <fastrtps/types/TypesBase.h>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -182,7 +183,7 @@ public:
      * RETCODE_ERROR otherwise.
      */
     RTPS_DllAPI ReturnCode_t delete_datawriter(
-            DataWriter* writer);
+            const DataWriter* writer);
 
     /**
      * This operation retrieves a previously created DataWriter belonging to the Publisher that is attached to a
@@ -197,34 +198,28 @@ public:
             const std::string& topic_name) const;
 
     /**
-     * Fills the given vector with all the datawriters of this publisher.
-     * @param writers Vector where the DataWriters are returned
-     * @return true
+     * @brief Indicates to FastDDS that the contained DataWriters are about to be modified
+     * @return RETCODE_OK if successful, an error code otherwise
      */
-    RTPS_DllAPI bool get_datawriters(
-            std::vector<DataWriter*>& writers) const;
+    RTPS_DllAPI ReturnCode_t suspend_publications();
 
     /**
-     * This operation checks if the publisher has DataWriters
-     * @return true if the publisher has one or several DataWriters, false otherwise
+     * @brief Indicates to FastDDS that the modifications to the DataWriters are complete.
+     * @return RETCODE_OK if successful, an error code otherwise
      */
-    RTPS_DllAPI bool has_datawriters() const;
+    RTPS_DllAPI ReturnCode_t resume_publications();
 
-    /* TODO
-       bool suspend_publications();
+    /**
+     * @brief Signals the beginning of a set of coherent cache changes using the Datawriters attached to the publisher
+     * @return RETCODE_OK if successful, an error code otherwise
      */
+    RTPS_DllAPI ReturnCode_t begin_coherent_changes();
 
-    /* TODO
-       bool resume_publications();
+    /**
+     * @brief Signals the end of a set of coherent cache changes
+     * @return RETCODE_OK if successful, an error code otherwise
      */
-
-    /* TODO
-       bool begin_coherent_changes();
-     */
-
-    /* TODO
-       bool end_coherent_changes();
-     */
+    RTPS_DllAPI ReturnCode_t end_coherent_changes();
 
     /**
      * This operation blocks the calling thread until either all data written by the reliable DataWriter entities
@@ -245,9 +240,11 @@ public:
      */
     RTPS_DllAPI const DomainParticipant* get_participant() const;
 
-    /* TODO
-       bool delete_contained_entities();
+    /**
+     * @brief Deletes all contained DataWriters
+     * @return RETCODE_OK if successful, an error code otherwise
      */
+    RTPS_DllAPI ReturnCode_t delete_contained_entities();
 
     /**
      * This operation sets a default value of the DataWriter QoS policies which will be used for newly created
@@ -290,6 +287,16 @@ public:
             DataWriterQos& qos) const;
 
     /**
+     * @brief Copies TopicQos into the corresponding DataWriterQos
+     * @param[out] writer_qos
+     * @param[in] topic_qos
+     * @return RETCODE_OK if successful, an error code otherwise
+     */
+    RTPS_DllAPI ReturnCode_t copy_from_topic_qos(
+            fastdds::dds::DataWriterQos& writer_qos,
+            const fastdds::dds::TopicQos& topic_qos) const;
+
+    /**
      * Fills the DataWriterQos with the values of the XML profile.
      * @param profile_name DataWriter profile name.
      * @param qos DataWriterQos object where the qos is returned.
@@ -299,17 +306,25 @@ public:
             const std::string& profile_name,
             DataWriterQos& qos) const;
 
-    /* TODO
-       bool copy_from_topic_qos(
-            WriterQos& writer_qos,
-            const fastrtps::TopicAttributes& topic_qos) const;
-     */
-
     /**
      * Returns the Publisher's handle.
      * @return InstanceHandle of this Publisher.
      */
-    RTPS_DllAPI const fastrtps::rtps::InstanceHandle_t& get_instance_handle() const;
+    RTPS_DllAPI const InstanceHandle_t& get_instance_handle() const;
+
+    /**
+     * Fills the given vector with all the datawriters of this publisher.
+     * @param writers Vector where the DataWriters are returned
+     * @return true
+     */
+    RTPS_DllAPI bool get_datawriters(
+            std::vector<DataWriter*>& writers) const;
+
+    /**
+     * This operation checks if the publisher has DataWriters
+     * @return true if the publisher has one or several DataWriters, false otherwise
+     */
+    RTPS_DllAPI bool has_datawriters() const;
 
 protected:
 

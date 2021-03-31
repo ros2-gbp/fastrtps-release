@@ -367,6 +367,20 @@ public:
             const GUID_t& local_reader,
             const WriterProxyData& remote_writer_data);
 
+    /**
+     * @brief Checks whether the writer has security attributes enabled
+     * @param writer_attributes Attibutes of the writer as given to the create_writer
+     */
+    bool is_security_enabled_for_writer(
+            const WriterAttributes& writer_attributes);
+
+    /**
+     * @brief Checks whether the reader has security attributes enabled
+     * @param reader_attributes Attibutes of the reader as given to the create_reader
+     */
+    bool is_security_enabled_for_reader(
+            const ReaderAttributes& reader_attributes);
+
 #endif // if HAVE_SECURITY
 
     PDPSimple* pdpsimple();
@@ -394,6 +408,14 @@ public:
     {
         return m_network_Factory.get_min_send_buffer_size();
     }
+
+    /**
+     * Get the list of locators from which this participant may send data.
+     *
+     * @param [out] locators  LocatorList_t where the list of locators will be stored.
+     */
+    void get_sending_locators(
+            rtps::LocatorList_t& locators) const;
 
     AsyncWriterThread& async_thread()
     {
@@ -540,10 +562,16 @@ private:
 
     /** Create the new ReceiverResources needed for a new Locator, contains the calls to assignEndpointListenResources
         and consequently assignEndpoint2LocatorList
-        @param pend - Pointer to the endpoint which triggered the creation of the Receivers
+        @param pend - Pointer to the endpoint which triggered the creation of the Receivers.
+        @param unique_flows - Whether unique listening ports should be created for this endpoint.
+        @param initial_unique_port - First unique listening port to try.
+        @param final_unique_port - Unique listening port that will not be tried.
      */
     bool createAndAssociateReceiverswithEndpoint(
-            Endpoint* pend);
+            Endpoint* pend,
+            bool unique_flows = false,
+            uint16_t initial_unique_port = 0,
+            uint16_t final_unique_port = 0);
 
     /** Create non-existent SendResources based on the Locator list of the entity
         @param pend - Pointer to the endpoint whose SenderResources are to be created
@@ -603,7 +631,6 @@ private:
      * using endpoint attributes (or participant
      * attributes if endpoint does not define a persistence service config)
      *
-     * @param [in]  debug_label Label indicating enpoint kind (reader or writer) for logs.
      * @param [in]  is_builtin  Whether the enpoint being created is a builtin one.
      * @param [in]  param       Attributes of the endpoint being created.
      * @param [out] service     Pointer to the persistence service.
@@ -613,14 +640,12 @@ private:
      * @return true if persistence service is created
      */
     bool get_persistence_service(
-            const char* debug_label,
             bool is_builtin,
             const EndpointAttributes& param,
             IPersistenceService*& service);
 
     template <EndpointKind_t kind, octet no_key, octet with_key>
     bool preprocess_endpoint_attributes(
-            const char* debug_label,
             const EntityId_t& entity_id,
             EndpointAttributes& att,
             EntityId_t& entId);
@@ -840,7 +865,7 @@ public:
      * @param ApplyMutation - True if we want to create a Resource with a "similar" locator if the one we provide is unavailable
      * @param RegisterReceiver - True if we want the receiver to be registered. Useful for receivers created after participant is enabled.
      */
-    void createReceiverResources(
+    bool createReceiverResources(
             LocatorList_t& Locator_list,
             bool ApplyMutation,
             bool RegisterReceiver);

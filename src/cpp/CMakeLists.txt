@@ -14,7 +14,6 @@
 
 include(${PROJECT_SOURCE_DIR}/cmake/dev/set_sources.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/dev/generate_msvc_libraries.cmake)
-include(CheckLibatomic)
 
 # Set source files
 
@@ -58,6 +57,9 @@ set(${PROJECT_NAME}_source_files
     rtps/history/ReaderHistory.cpp
     rtps/history/TopicPayloadPool.cpp
     rtps/history/TopicPayloadPoolRegistry.cpp
+    rtps/DataSharing/DataSharingPayloadPool.cpp
+    rtps/DataSharing/DataSharingListener.cpp
+    rtps/DataSharing/DataSharingNotification.cpp
     rtps/reader/WriterProxy.cpp
     rtps/reader/StatefulReader.cpp
     rtps/reader/StatelessReader.cpp
@@ -156,6 +158,8 @@ set(${PROJECT_NAME}_source_files
     dynamic-types/DynamicDataHelper.cpp
 
     fastrtps_deprecated/attributes/TopicAttributes.cpp
+    fastdds/core/condition/StatusCondition.cpp
+    fastdds/core/condition/WaitSet.cpp
     fastdds/core/policy/ParameterList.cpp
     fastdds/publisher/qos/WriterQos.cpp
     fastdds/subscriber/qos/ReaderQos.cpp
@@ -175,12 +179,14 @@ set(${PROJECT_NAME}_source_files
     rtps/builtin/data/ReaderProxyData.cpp
     rtps/flowcontrol/ThroughputController.cpp
     rtps/flowcontrol/ThroughputControllerDescriptor.cpp
+    rtps/flowcontrol/FlowControllerConsts.cpp
     rtps/flowcontrol/FlowController.cpp
     rtps/exceptions/Exception.cpp
     rtps/attributes/PropertyPolicy.cpp
     rtps/common/Token.cpp
     rtps/xmlparser/XMLParserCommon.cpp
     rtps/xmlparser/XMLElementParser.cpp
+    rtps/xmlparser/XMLDynamicParser.cpp
     rtps/xmlparser/XMLEndpointParser.cpp
     rtps/xmlparser/XMLParser.cpp
     rtps/xmlparser/XMLProfileManager.cpp
@@ -191,48 +197,19 @@ set(${PROJECT_NAME}_source_files
     rtps/reader/StatefulPersistentReader.cpp
     rtps/persistence/PersistenceFactory.cpp
 
-    # old discovery-server sources
-
-    rtps/builtin/discovery/participant/timedevent/DSClientEvent.cpp
-    rtps/builtin/discovery/participant/timedevent/DServerEvent.cpp
-    rtps/builtin/discovery/participant/PDPClient.cpp
-    rtps/builtin/discovery/participant/PDPServer.cpp
-    rtps/builtin/discovery/participant/PDPServerListener.cpp
+    rtps/builtin/discovery/database/backup/SharedBackupFunctions.cpp
     rtps/builtin/discovery/endpoint/EDPClient.cpp
     rtps/builtin/discovery/endpoint/EDPServer.cpp
     rtps/builtin/discovery/endpoint/EDPServerListeners.cpp
-
-    # new discovery-server sources
-
-#   rtps/builtin/discovery/database/DiscoveryDataFilter.hpp
-#   rtps/builtin/discovery/database/DiscoveryDataBase.hpp
     rtps/builtin/discovery/database/DiscoveryDataBase.cpp
-#   rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.hpp
-    rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.cpp
-#   rtps/builtin/discovery/database/DiscoveryParticipantInfo.hpp
     rtps/builtin/discovery/database/DiscoveryParticipantInfo.cpp
-#   rtps/builtin/discovery/database/DiscoverySharedInfo.hpp
+    rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.cpp
     rtps/builtin/discovery/database/DiscoverySharedInfo.cpp
-#   rtps/builtin/discovery/database/DiscoveryDataQueueInfo.hpp
-#   rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp
-    rtps/builtin/discovery/database/backup/SharedBackupFunctions.cpp
-
-#   rtps/builtin/discovery/participant/DSClientEvent2.hpp
-    rtps/builtin/discovery/participant/DSClientEvent2.cpp
-#   rtps/builtin/discovery/participant/DServerEvent2.hpp
-    rtps/builtin/discovery/participant/DServerEvent2.cpp
-#   rtps/builtin/discovery/participant/PDPClient2.hpp
-    rtps/builtin/discovery/participant/PDPClient2.cpp
-#   rtps/builtin/discovery/participant/PDPServer2.hpp
-    rtps/builtin/discovery/participant/PDPServer2.cpp
-#   rtps/builtin/discovery/participant/PDPServerListener2.hpp
-    rtps/builtin/discovery/participant/PDPServerListener2.cpp
-#   rtps/builtin/discovery/endpoint/EDPClient2.hpp
-    rtps/builtin/discovery/endpoint/EDPClient2.cpp
-#   rtps/builtin/discovery/endpoint/EDPServer2.hpp
-    rtps/builtin/discovery/endpoint/EDPServer2.cpp
-#   rtps/builtin/discovery/endpoint/EDPServerListeners2.hpp
-    rtps/builtin/discovery/endpoint/EDPServerListeners2.cpp
+    rtps/builtin/discovery/participant/PDPClient.cpp
+    rtps/builtin/discovery/participant/PDPServer.cpp
+    rtps/builtin/discovery/participant/PDPServerListener.cpp
+    rtps/builtin/discovery/participant/timedevent/DSClientEvent.cpp
+    rtps/builtin/discovery/participant/timedevent/DServerEvent.cpp
 
     utils/IPFinder.cpp
     utils/md5.cpp
@@ -251,7 +228,25 @@ set(${PROJECT_NAME}_source_files
     dds/sub/Subscriber.cpp
     dds/sub/DataReader.cpp
     dds/topic/Topic.cpp
+
+    statistics/fastdds/domain/DomainParticipant.cpp
+    statistics/fastdds/publisher/qos/DataWriterQos.cpp
+    statistics/fastdds/subscriber/qos/DataReaderQos.cpp
     )
+
+# Statistics support
+if (FASTDDS_STATISTICS)
+
+    set(statistics_sources
+    statistics/types/typesPubSubTypes.cxx
+    statistics/types/types.cxx
+        )
+
+    list(APPEND ${PROJECT_NAME}_source_files
+        ${statistics_sources}
+        )
+
+endif()
 
 # SHM Transport
 if(IS_THIRDPARTY_BOOST_OK)
@@ -392,15 +387,18 @@ elseif(NOT EPROSIMA_INSTALLER)
     #Create library
     add_library(${PROJECT_NAME} ${${PROJECT_NAME}_source_files})
     set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
-    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
+    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
     option(INTERNAL_DEBUG "Activate developer debug messages" OFF)
 
-    # make visual studio more clang like
+    # make visual studio more gcc and clang like. Propagated to dependent targets.
     if(MSVC)
-        # C4101 'identifier' : unreferenced local variable
-        # C4555 expression has no effect; expected expression with side-effect
-        target_compile_options(${PROJECT_NAME} PRIVATE /w34101 /w34555 )
+        # C4101 'identifier' : unreferenced local variable 
+        # C4189 'identifier' : local variable is initialized but not referenced
+        # C4555  expression has no effect; expected expression with side-effect
+        # C4715: 'Test': not all control paths return a value
+        # C5038 data member 'member1' will be initialized after data member 'member2'
+        target_compile_options(${PROJECT_NAME} PUBLIC /w34101 /w34555 /w34189 /w35038 /w34715)
     endif(MSVC)
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -428,21 +426,23 @@ elseif(NOT EPROSIMA_INSTALLER)
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/cpp>
         $<INSTALL_INTERFACE:include>
         PRIVATE
-        ${ASIO_INCLUDE_DIR}
+        ${Asio_INCLUDE_DIR}
         ${TINYXML2_INCLUDE_DIR}
         $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
         ${THIRDPARTY_BOOST_INCLUDE_DIR}
         )
 
     # Made linked libraries PRIVATE to prevent local directories in Windows installer.
-    if(EPROSIMA_INSTALLER_MINION)
+    if(EPROSIMA_INSTALLER_MINION
+        # No need to expose linked libs when target is a shared library on MSVC.
+            OR (BUILD_SHARED_LIBS AND MSVC))
         set(PRIVACY "PRIVATE")
+    else()
+        set(PRIVACY "PUBLIC")
     endif()
 
-    # No need to expose linked libs when target is a shared library on MSVC.
-    if(BUILD_SHARED_LIBS AND MSVC)
-        set(PRIVACY "PRIVATE")
-    endif()
+    # Find out if libatomic link is required in this platform
+    find_package(Atomic MODULE)
 
     # Link library to external libraries.
     target_link_libraries(${PROJECT_NAME} ${PRIVACY} fastcdr foonathan_memory
@@ -451,7 +451,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
         $<$<BOOL:${WIN32}>:iphlpapi$<SEMICOLON>Shlwapi>
         ${THIRDPARTY_BOOST_LINK_LIBS}
-        $<$<BOOL:${LINK_LIBATOMIC}>:atomic>
+        PRIVATE eProsima_atomic
         )
 
     if(MSVC OR MSVC_IDE)
@@ -515,7 +515,7 @@ if(UNIX AND EPROSIMA_INSTALLER)
         COMPONENT headers
         )
 
-    set_public_headers_directory(${ASIO_INCLUDE_DIR} ""
+    set_public_headers_directory(${Asio_INCLUDE_DIR} ""
         DESTINATION thirdparty/asio
         COMPONENT headers
         )
@@ -565,7 +565,7 @@ if((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER)
         COMPONENT cmake
         )
 elseif(NOT EPROSIMA_INSTALLER)
-    install(TARGETS ${PROJECT_NAME}
+    install(TARGETS ${PROJECT_NAME} eProsima_atomic
         EXPORT ${PROJECT_NAME}-targets
         RUNTIME DESTINATION ${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         LIBRARY DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
@@ -573,7 +573,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         COMPONENT libraries${MSVCARCH_EXTENSION}
         )
 
-    export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-targets.cmake)
+    export(TARGETS ${PROJECT_NAME} eProsima_atomic FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-targets.cmake)
 
     if(INSTALLER_PLATFORM)
         set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}-${INSTALLER_PLATFORM}/cmake)
@@ -640,7 +640,7 @@ elseif(NOT EPROSIMA_INSTALLER)
     endif()
 
     # Add fastrtps dependencies in its CMake config file.
-    if(LINK_SSL AND NOT EPROSIMA_INSTALLER_MINION)
+    if(LINK_SSL AND NOT INSTALLER_PLATFORM)
         set(FASTRTPS_PACKAGE_OPT_DEPS "find_package(OpenSSL REQUIRED)")
     endif()
 

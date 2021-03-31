@@ -18,8 +18,8 @@
  */
 
 #include <fastdds/dds/publisher/DataWriter.hpp>
-#include <fastdds/publisher/DataWriterImpl.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
+#include <fastdds/publisher/DataWriterImpl.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -65,6 +65,19 @@ ReturnCode_t DataWriter::enable()
     return ret_code;
 }
 
+ReturnCode_t DataWriter::loan_sample(
+        void*& sample,
+        LoanInitializationKind initialization)
+{
+    return impl_->loan_sample(sample, initialization);
+}
+
+ReturnCode_t DataWriter::discard_loan(
+        void*& sample)
+{
+    return impl_->discard_loan(sample);
+}
+
 bool DataWriter::write(
         void* data)
 {
@@ -80,37 +93,86 @@ bool DataWriter::write(
 
 ReturnCode_t DataWriter::write(
         void* data,
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
 {
     return impl_->write(data, handle);
 }
 
-fastrtps::rtps::InstanceHandle_t DataWriter::register_instance(
+ReturnCode_t DataWriter::write_w_timestamp(
+        void* data,
+        const InstanceHandle_t& handle,
+        const fastrtps::rtps::Time_t& timestamp)
+{
+    static_cast<void> (data);
+    static_cast<void> (handle);
+    static_cast<void> (timestamp);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+}
+
+InstanceHandle_t DataWriter::register_instance(
         void* instance)
 {
     return impl_->register_instance(instance);
 }
 
+InstanceHandle_t DataWriter::register_instance_w_timestamp(
+        void* instance,
+        const fastrtps::rtps::Time_t& timestamp)
+{
+    static_cast<void> (instance);
+    static_cast<void> (timestamp);
+    logWarning(DATA_WRITER, "register_instance_w_timestamp method not yet implemented")
+    return HANDLE_NIL;
+}
+
 ReturnCode_t DataWriter::unregister_instance(
         void* instance,
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
 {
     return impl_->unregister_instance(instance, handle);
 }
 
+ReturnCode_t DataWriter::unregister_instance_w_timestamp(
+        void* instance,
+        const InstanceHandle_t& handle,
+        const fastrtps::rtps::Time_t& timestamp)
+{
+    static_cast<void> (instance);
+    static_cast<void> (handle);
+    static_cast<void> (timestamp);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+}
+
+ReturnCode_t DataWriter::get_key_value(
+        void* key_holder,
+        const InstanceHandle_t& handle)
+{
+    static_cast<void> (key_holder);
+    static_cast<void> (handle);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+}
+
+InstanceHandle_t DataWriter::lookup_instance(
+        const void* instance) const
+{
+    static_cast<void> (instance);
+    logWarning(DATA_WRITER, "lookup_instance method not implemented")
+    return HANDLE_NIL;
+}
+
 ReturnCode_t DataWriter::dispose(
         void* data,
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
 {
     return impl_->unregister_instance(data, handle, true);
 }
 
-const fastrtps::rtps::GUID_t& DataWriter::guid()
+const fastrtps::rtps::GUID_t& DataWriter::guid() const
 {
     return impl_->guid();
 }
 
-fastrtps::rtps::InstanceHandle_t DataWriter::get_instance_handle() const
+InstanceHandle_t DataWriter::get_instance_handle() const
 {
     return impl_->get_instance_handle();
 }
@@ -185,6 +247,16 @@ ReturnCode_t DataWriter::get_offered_incompatible_qos_status(
     return impl_->get_offered_incompatible_qos_status(status);
 }
 
+ReturnCode_t DataWriter::get_publication_matched_status(
+        PublicationMatchedStatus& status) const
+{
+    static_cast<void> (status);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_publication_matched_status(status);
+     */
+}
+
 ReturnCode_t DataWriter::get_liveliness_lost_status(
         LivelinessLostStatus& status)
 {
@@ -196,10 +268,38 @@ ReturnCode_t DataWriter::assert_liveliness()
     return impl_->assert_liveliness();
 }
 
+ReturnCode_t DataWriter::get_matched_subscription_data(
+        builtin::SubscriptionBuiltinTopicData& subscription_data,
+        const fastrtps::rtps::InstanceHandle_t& subscription_handle) const
+{
+    static_cast<void> (subscription_data);
+    static_cast<void> (subscription_handle);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_matched_subscription_data(subscription_data, subscription_handle);
+     */
+}
+
+ReturnCode_t DataWriter::get_matched_subscriptions(
+        std::vector<fastrtps::rtps::InstanceHandle_t*>& subscription_handles) const
+{
+    static_cast<void> (subscription_handles);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_matched_subscription_data(subscription_handles);
+     */
+}
+
 ReturnCode_t DataWriter::clear_history(
         size_t* removed)
 {
     return impl_->clear_history(removed);
+}
+
+ReturnCode_t DataWriter::get_sending_locators(
+        rtps::LocatorList& locators) const
+{
+    return impl_->get_sending_locators(locators);
 }
 
 } // namespace dds

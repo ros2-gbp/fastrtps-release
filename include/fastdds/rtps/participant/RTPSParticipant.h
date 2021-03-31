@@ -23,10 +23,10 @@
 #include <memory>
 #include <fastrtps/fastrtps_dll.h>
 #include <fastdds/rtps/common/Guid.h>
-#include <fastdds/rtps/reader/StatefulReader.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastrtps/qos/ReaderQos.h>
 #include <fastrtps/qos/WriterQos.h>
+#include <fastdds/statistics/IListeners.hpp>
 
 namespace eprosima {
 
@@ -52,6 +52,8 @@ class RTPSWriter;
 class RTPSReader;
 class WriterProxyData;
 class ReaderProxyData;
+class WriterAttributes;
+class ReaderAttributes;
 class ResourceEvent;
 class WLP;
 
@@ -238,13 +240,57 @@ public:
      */
     void enable();
 
+#if HAVE_SECURITY
+
+    /**
+     * @brief Checks whether the writer has security attributes enabled
+     * @param writer_attributes Attributes of the writer as given to the RTPSParticipantImpl::create_writer
+     */
+
+    bool is_security_enabled_for_writer(
+            const WriterAttributes& writer_attributes);
+
+    /**
+     * @brief Checks whether the reader has security attributes enabled
+     * @param reader_attributes Attributes of the reader as given to the RTPSParticipantImpl::create_reader
+     */
+
+    bool is_security_enabled_for_reader(
+            const ReaderAttributes& reader_attributes);
+
+#endif // if HAVE_SECURITY
+
+#ifdef FASTDDS_STATISTICS
+
+    /*
+     * Add a listener to receive statistics backend callbacks
+     * @param listener
+     * @param kind mask that specifies which callbacks to receive
+     * @return true if successfully added
+     */
+    bool add_statistics_listener(
+            std::shared_ptr<fastdds::statistics::IListener> listener,
+            fastdds::statistics::EventKind kind);
+
+    /*
+     * Remove a listener from receiving statistics backend callbacks
+     * @param listener
+     * @param kind mask that specifies which callbacks to ignore
+     * @return true if successfully removed
+     */
+    bool remove_statistics_listener(
+            std::shared_ptr<fastdds::statistics::IListener> listener,
+            fastdds::statistics::EventKind kind);
+
+#endif // FASTDDS_STATISTICS
+
 private:
 
     //!Pointer to the implementation.
     RTPSParticipantImpl* mp_impl;
 };
 
-}
+} // namespace rtps
 } /* namespace rtps */
 } /* namespace eprosima */
 

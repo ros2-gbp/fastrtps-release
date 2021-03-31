@@ -227,6 +227,7 @@ int main (
 
         // Print running server attributes
         cout << "### Server is running ###" << endl;
+        cout << "  Participant Type:   " << rtps.builtin.discovery_config.discoveryProtocol << endl;
         cout << "  Server ID:          " << server_id << endl;
         cout << "  Server GUID prefix: " << pServer->getGuid().guidPrefix << endl;
         cout << "  Server Addresses:   ";
