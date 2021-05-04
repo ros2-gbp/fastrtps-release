@@ -1,3 +1,26 @@
+## fastrtps (rolling) - 2.3.1-2
+
+The packages in the `fastrtps` repository were released into the `rolling` distro by running `/home/steven/osrf/bloom/.direnv/python-3.9.4/bin/bloom-release -r rolling fastrtps --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Tue, 04 May 2021 22:53:42 -0000`
+
+The `fastrtps` package was released.
+
+Version of package(s) in repository `fastrtps`:
+
+- upstream repository: https://github.com/eProsima/Fast-DDS.git
+- release repository: https://github.com/ros2-gbp/fastrtps-release.git
+- rosdistro version: `2.3.1-1`
+- old version: `2.3.1-1`
+- new version: `2.3.1-2`
+
+Versions of tools used:
+
+- bloom version: `0.10.7`
+- catkin_pkg version: `0.4.23`
+- rosdep version: `0.20.1`
+- rosdistro version: `0.8.3`
+- vcstools version: `0.1.42`
+
+
 ## fastrtps (rolling) - 2.3.1-1
 
 The packages in the `fastrtps` repository were released into the `rolling` distro by running `/home/steven/osrf/bloom/.direnv/python-3.9.4/bin/bloom-release -r rolling fastrtps -e --override-release-repository-push-url git@github.com:ros2-gbp/fastrtps-release` on `Tue, 04 May 2021 21:26:02 -0000`
