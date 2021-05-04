@@ -1,4 +1,4 @@
-From 8299fbc31198f0c87d414ba38e0b1f050d47fef5 Mon Sep 17 00:00:00 2001
+From 157c3b8beeff359ca6b4d3ca69ee22ebef1de8be Mon Sep 17 00:00:00 2001
 From: Scott K Logan <logans@cottsay.net>
 Date: Thu, 11 Mar 2021 16:48:28 -0800
 Subject: [PATCH] Bundle Asio on RHEL 8
@@ -19,7 +19,7 @@ Signed-off-by: Scott K Logan <logans@cottsay.net>
 ---
  cmake/common/eprosima_libraries.cmake | 4 ++--
  package.xml                           | 1 -
- rpm/ros-rolling-fastrtps.spec         | 2 +-
+ rpm/ros-galactic-fastrtps.spec        | 2 +-
  3 files changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/cmake/common/eprosima_libraries.cmake b/cmake/common/eprosima_libraries.cmake
@@ -56,18 +56,18 @@ index 461bf632..456f6941 100644
    <build_depend>libssl-dev</build_depend>
  
    <build_export_depend>libssl-dev</build_export_depend>
-diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
-index bfeb7aa8..08b9c1f8 100644
---- a/rpm/ros-rolling-fastrtps.spec
-+++ b/rpm/ros-rolling-fastrtps.spec
-@@ -18,7 +18,6 @@ Requires:       ros-rolling-fastcdr
- Requires:       ros-rolling-foonathan-memory-vendor
+diff --git a/rpm/ros-galactic-fastrtps.spec b/rpm/ros-galactic-fastrtps.spec
+index 1aca1df7..0de29e3d 100644
+--- a/rpm/ros-galactic-fastrtps.spec
++++ b/rpm/ros-galactic-fastrtps.spec
+@@ -18,7 +18,6 @@ Requires:       ros-galactic-fastcdr
+ Requires:       ros-galactic-foonathan-memory-vendor
  Requires:       tinyxml2-devel
- Requires:       ros-rolling-ros-workspace
+ Requires:       ros-galactic-ros-workspace
 -BuildRequires:  asio-devel
  BuildRequires:  cmake3
  BuildRequires:  openssl-devel
- BuildRequires:  ros-rolling-fastcdr
+ BuildRequires:  ros-galactic-fastcdr
 @@ -52,6 +51,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
      -DSETUPTOOLS_DEB_LAYOUT=OFF \
      -DINSTALL_EXAMPLES=OFF \
@@ -77,5 +77,5 @@ index bfeb7aa8..08b9c1f8 100644
  
  %make_build
 -- 
-2.30.2
+2.31.1
 
