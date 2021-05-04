@@ -1,4 +1,4 @@
-From 16960ebe9b971a288f7232fcf5feb0ca69b9883f Mon Sep 17 00:00:00 2001
+From e1c0ac74a70e059302c22400e0b2ab535cf19da4 Mon Sep 17 00:00:00 2001
 From: Scott K Logan <logans@cottsay.net>
 Date: Wed, 20 Jan 2021 12:08:26 -0800
 Subject: [PATCH] Set CMake flags for Fast-RTPS
@@ -9,7 +9,7 @@ Signed-off-by: Scott K Logan <logans@cottsay.net>
  1 file changed, 2 insertions(+)
 
 diff --git a/rpm/template.spec.em b/rpm/template.spec.em
-index 0ae27a87..ceaf8764 100644
+index de5e5a79..b31a6b33 100644
 --- a/rpm/template.spec.em
 +++ b/rpm/template.spec.em
 @@ -45,6 +45,8 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
@@ -22,5 +22,5 @@ index 0ae27a87..ceaf8764 100644
  
  %make_build
 -- 
-2.30.2
+2.31.1
 
