@@ -63,6 +63,8 @@
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
 
+#include <statistics/rtps/GuidUtils.hpp>
+
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
@@ -130,7 +132,6 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     : domain_id_(domain_id)
     , m_att(PParam)
     , m_guid(guidP, c_EntityId_RTPSParticipant)
-    , m_persistence_guid(persistence_guid, c_EntityId_RTPSParticipant)
     , mp_builtinProtocols(nullptr)
     , mp_ResourceSemaphore(new Semaphore(0))
     , IdCounter(0)
@@ -144,6 +145,10 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     , is_intraprocess_only_(should_be_intraprocess_only(PParam))
     , has_shm_transport_(false)
 {
+    if (c_GuidPrefix_Unknown != persistence_guid)
+    {
+        m_persistence_guid = GUID_t(persistence_guid, c_EntityId_RTPSParticipant);
+    }
     // Builtin transports by default
     if (PParam.useBuiltinTransports)
     {
@@ -242,6 +247,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     uint32_t metatraffic_multicast_port = m_att.port.getMulticastPort(domain_id_);
     uint32_t metatraffic_unicast_port = m_att.port.getUnicastPort(domain_id_,
                     static_cast<uint32_t>(m_att.participantID));
+    uint32_t meta_multicast_port_for_check = metatraffic_multicast_port;
 
     /* INSERT DEFAULT MANDATORY MULTICAST LOCATORS HERE */
     if (m_att.builtin.metatrafficMulticastLocatorList.empty() && m_att.builtin.metatrafficUnicastLocatorList.empty())
@@ -256,6 +262,11 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     }
     else
     {
+        if (0 < m_att.builtin.metatrafficMulticastLocatorList.size() &&
+                0 !=  m_att.builtin.metatrafficMulticastLocatorList.begin()->port)
+        {
+            meta_multicast_port_for_check = m_att.builtin.metatrafficMulticastLocatorList.begin()->port;
+        }
         std::for_each(m_att.builtin.metatrafficMulticastLocatorList.begin(),
                 m_att.builtin.metatrafficMulticastLocatorList.end(), [&](Locator_t& locator)
                 {
@@ -354,6 +365,15 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false);
     createReceiverResources(m_att.defaultUnicastLocatorList, true, false);
     createReceiverResources(m_att.defaultMulticastLocatorList, true, false);
+
+    // Check metatraffic multicast port
+    if (0 < m_att.builtin.metatrafficMulticastLocatorList.size() &&
+            m_att.builtin.metatrafficMulticastLocatorList.begin()->port != meta_multicast_port_for_check)
+    {
+        logWarning(RTPS_PARTICIPANT,
+                "Metatraffic multicast port " << meta_multicast_port_for_check << " cannot be opened."
+                " It may is opened by another application. Discovery may fail.");
+    }
 
     bool allow_growing_buffers = m_att.allocation.send_buffers.dynamic;
     size_t num_send_buffers = m_att.allocation.send_buffers.preallocated_number;
@@ -471,6 +491,7 @@ RTPSParticipantImpl::~RTPSParticipantImpl()
 
     delete mp_ResourceSemaphore;
     delete mp_userParticipant;
+    mp_userParticipant = nullptr;
     send_resource_list_.clear();
 
     delete mp_mutex;
@@ -1989,10 +2010,13 @@ bool RTPSParticipantImpl::register_in_writer(
         res = true;
         for ( auto writer : m_userWriterList)
         {
-            res &= writer->add_statistics_listener(listener);
+            if (!fastdds::statistics::is_statistics_builtin(writer->getGuid().entityId))
+            {
+                res &= writer->add_statistics_listener(listener);
+            }
         }
     }
-    else
+    else if (!fastdds::statistics::is_statistics_builtin(writer_guid.entityId))
     {
         RTPSWriter* writer = find_local_writer(writer_guid);
         res = writer->add_statistics_listener(listener);
@@ -2012,10 +2036,13 @@ bool RTPSParticipantImpl::register_in_reader(
         res = true;
         for ( auto reader : m_userReaderList)
         {
-            res &= reader->add_statistics_listener(listener);
+            if (!fastdds::statistics::is_statistics_builtin(reader->getGuid().entityId))
+            {
+                res &= reader->add_statistics_listener(listener);
+            }
         }
     }
-    else
+    else if (!fastdds::statistics::is_statistics_builtin(reader_guid.entityId))
     {
         RTPSReader* reader = find_local_reader(reader_guid);
         res = reader->add_statistics_listener(listener);
@@ -2032,7 +2059,10 @@ bool RTPSParticipantImpl::unregister_in_writer(
 
     for ( auto writer : m_userWriterList)
     {
-        res &= writer->remove_statistics_listener(listener);
+        if (!fastdds::statistics::is_statistics_builtin(writer->getGuid().entityId))
+        {
+            res &= writer->remove_statistics_listener(listener);
+        }
     }
 
     return res;
@@ -2046,7 +2076,10 @@ bool RTPSParticipantImpl::unregister_in_reader(
 
     for ( auto reader : m_userReaderList)
     {
-        res &= reader->remove_statistics_listener(listener);
+        if (!fastdds::statistics::is_statistics_builtin(reader->getGuid().entityId))
+        {
+            res &= reader->remove_statistics_listener(listener);
+        }
     }
 
     return res;
