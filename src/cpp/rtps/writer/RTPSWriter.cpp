@@ -38,6 +38,7 @@
 #include <fastdds/rtps/messages/RTPSMessageCreator.h>
 
 #include <statistics/rtps/StatisticsBase.hpp>
+#include <statistics/rtps/messages/RTPSStatisticsMessages.hpp>
 
 namespace eprosima {
 namespace fastrtps {
@@ -304,6 +305,10 @@ uint32_t RTPSWriter::calculateMaxDataSize(
     }
 #endif // if HAVE_SECURITY
 
+#ifdef FASTDDS_STATISTICS
+    maxDataSize -= eprosima::fastdds::statistics::rtps::statistics_submessage_length;
+#endif // FASTDDS_STATISTICS
+
     return maxDataSize;
 }
 
@@ -437,6 +442,19 @@ bool RTPSWriter::remove_statistics_listener(
 }
 
 #endif // FASTDDS_STATISTICS
+
+void RTPSWriter::add_statistics_sent_submessage(
+        CacheChange_t* change,
+        size_t num_locators)
+{
+    static_cast<void>(change);
+    static_cast<void>(num_locators);
+
+#ifdef FASTDDS_STATISTICS
+    change->num_sent_submessages += num_locators;
+    on_data_generated(num_locators);
+#endif // ifdef FASTDDS_STATISTICS
+}
 
 }  // namespace rtps
 }  // namespace fastrtps

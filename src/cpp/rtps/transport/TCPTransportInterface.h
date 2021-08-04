@@ -26,8 +26,10 @@
 #include <asio/ssl.hpp>
 #endif // if TLS_FOUND
 
+#include <statistics/rtps/messages/OutputTrafficManager.hpp>
 
 #include <asio.hpp>
+#include <asio/steady_timer.hpp>
 #include <thread>
 #include <vector>
 #include <map>
@@ -94,6 +96,8 @@ protected:
     asio::steady_timer keep_alive_event_;
 
     std::map<Locator, std::shared_ptr<TCPAcceptor>> acceptors_;
+
+    eprosima::fastdds::statistics::rtps::OutputTrafficManager statistics_info_;
 
     TCPTransportInterface(
             int32_t transport_kind);

@@ -217,6 +217,7 @@ set(${PROJECT_NAME}_source_files
     utils/StringMatching.cpp
     utils/IPLocator.cpp
     utils/System.cpp
+    utils/SystemInfo.cpp
     utils/TimedConditionVariable.cpp
     utils/string_convert.cpp
 
@@ -390,6 +391,7 @@ if((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER AND IS_TOP_LEVEL)
     generate_msvc_libraries(i86Win32VS2017)
     generate_msvc_libraries(x64Win64VS2017)
 elseif(NOT EPROSIMA_INSTALLER)
+
     #Create library
     add_library(${PROJECT_NAME} ${${PROJECT_NAME}_source_files})
     set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
@@ -411,6 +413,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         ${PROJECT_NAME_UPPER}_SOURCE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
+        ASIO_DISABLE_VISIBILITY
         SQLITE_WIN32_GETVERSIONEX=0
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
         $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
@@ -454,13 +457,55 @@ elseif(NOT EPROSIMA_INSTALLER)
     target_link_libraries(${PROJECT_NAME} ${PRIVACY} fastcdr foonathan_memory
         ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS}
         ${TINYXML2_LIBRARY}
-        $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
+        $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto$<$<BOOL:${WIN32}>:$<SEMICOLON>crypt32.lib>>
         $<$<BOOL:${WIN32}>:iphlpapi$<SEMICOLON>Shlwapi>
         ${THIRDPARTY_BOOST_LINK_LIBS}
         PRIVATE eProsima_atomic
         )
 
     if(MSVC OR MSVC_IDE)
+
+        # On installed binaries use manifest to specify dependencies
+        if(INSTALLER_PLATFORM AND OPENSSL_FOUND)
+
+            # Get Fast-DDS version suitable manifest format
+            set(FASTDDS_CANONICAL_VERSION ${fastrtps_VERSION})
+            
+            if( NOT FASTDDS_CANONICAL_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+                message(FATAL_ERROR "Fast-DDS version number ${fastrtps_VERSION} must include major, minor and patch.")
+            endif()
+
+            if( NOT fastrtps_VERSION_TWEAK)
+                set(FASTDDS_CANONICAL_VERSION "${FASTDDS_CANONICAL_VERSION}.0")
+            endif()
+
+            # Get OpenSSL version suitable manifest format
+            execute_process( COMMAND PowerShell -NoLogo -Command "&{ param([string]$original) 
+                    if ($original -notmatch '\\d+$')
+                    { $res = $original.Substring(0,$original.length-1) + '.' +
+                            ([int]$original[$original.length-1]-[int][char]'a'+1); }
+                    else { while(($original -split '\\.').count -le 3)
+                        { $original += '.0'; } $res = $original; } $res }" -original ${OPENSSL_VERSION}
+                OUTPUT_VARIABLE OPENSSL_CANONICAL_VERSION
+                )
+            string(STRIP ${OPENSSL_CANONICAL_VERSION} OPENSSL_CANONICAL_VERSION)
+
+            # replace the values in the manifest template
+            configure_file(
+                "${CMAKE_SOURCE_DIR}/cmake/packaging/windows/fastrtps.manifest.in"
+                "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest"
+                @ONLY
+                )
+
+            file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest" MANIFEST_FILE_PATH)
+            target_link_options(${PROJECT_NAME} PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${MANIFEST_FILE_PATH}")
+
+            unset(WINDOWS_SOURCE_DIR)
+            unset(FASTDDS_CANONICAL_VERSION)
+            unset(OPENSSL_CANONICAL_VERSION)
+            unset(MANIFEST_FILE_PATH)
+        endif()
+
         set_target_properties(${PROJECT_NAME} PROPERTIES RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
         set_target_properties(${PROJECT_NAME} PROPERTIES RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
         set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
@@ -469,9 +514,17 @@ elseif(NOT EPROSIMA_INSTALLER)
         if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
             # Export symbols in DLL library
             target_compile_definitions(${PROJECT_NAME} PUBLIC ${PROJECT_NAME_UPPER}_DYN_LINK)
+            set_target_properties(${PROJECT_NAME} PROPERTIES
+                PDB_NAME_DEBUG "${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+                PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
+            )
         else()
             # Rename the library to have a "lib" before.
             set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME lib${PROJECT_NAME})
+            set_target_properties(${PROJECT_NAME} PROPERTIES
+                COMPILE_PDB_NAME_DEBUG "lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+                COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
+            )
         endif()
 
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "WindowsStore")
@@ -488,6 +541,11 @@ elseif(NOT EPROSIMA_INSTALLER)
             endif()
         endif()
     endif()
+endif()
+
+if(DEFINED ENV{LIB_FUZZING_ENGINE})
+  add_executable(fuzz_processCDRMsg rtps/messages/fuzz_processCDRMsg.cpp)
+  target_link_libraries(fuzz_processCDRMsg ${PROJECT_NAME} $ENV{LIB_FUZZING_ENGINE})
 endif()
 
 ###############################################################################
@@ -557,7 +615,17 @@ if(UNIX AND EPROSIMA_INSTALLER)
         COMPONENT sources
         )
 endif()
+
 # Install libraries
+
+# Generate different target names depending on linking
+get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
+if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
+    set(FASTDDS_LINKING dynamic)
+else()
+    set(FASTDDS_LINKING static)
+endif()
+
 if((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER)
     if(IS_TOP_LEVEL)
         install_msvc_libraries(i86Win32VS2015)
@@ -572,14 +640,14 @@ if((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER)
         )
 elseif(NOT EPROSIMA_INSTALLER)
     install(TARGETS ${PROJECT_NAME} eProsima_atomic
-        EXPORT ${PROJECT_NAME}-targets
+        EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
         RUNTIME DESTINATION ${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         LIBRARY DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         ARCHIVE DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         COMPONENT libraries${MSVCARCH_EXTENSION}
         )
 
-    export(TARGETS ${PROJECT_NAME} eProsima_atomic FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-targets.cmake)
+    export(TARGETS ${PROJECT_NAME} eProsima_atomic FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-${FASTDDS_LINKING}-targets.cmake)
 
     if(INSTALLER_PLATFORM)
         set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}-${INSTALLER_PLATFORM}/cmake)
@@ -587,25 +655,32 @@ elseif(NOT EPROSIMA_INSTALLER)
         set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}/cmake${MSVCARCH_DIR_EXTENSION_EXT})
     endif()
 
-    install(EXPORT ${PROJECT_NAME}-targets
+    install(EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
         DESTINATION ${INSTALL_DESTINATION_PATH}
         COMPONENT cmake
         )
 
     if(MSVC OR MSVC_IDE)
-        if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
-            # Install pdb files
-            install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Debug/
-                DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-                COMPONENT libraries${MSVCARCH_EXTENSION}
-                CONFIGURATIONS Debug
-                FILES_MATCHING
-                PATTERN "*.pdb"
-                )
+
+        # first try dll symbols
+        get_target_property(PDB_FILE ${PROJECT_NAME} PDB_NAME_DEBUG)
+        if(PDB_FILE)
+            get_target_property(PDB_DIR ${PROJECT_NAME} PDB_OUTPUT_DIRECTORY_DEBUG)
+            set(PDB_FILE "${PDB_DIR}/${PDB_FILE}.pdb")
         else()
-            install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.dir/Debug/${PROJECT_NAME}.pdb
+            # fallback to static lib symbols
+            get_target_property(PDB_FILE ${PROJECT_NAME} COMPILE_PDB_NAME_DEBUG)
+            if(PDB_FILE)
+                get_target_property(PDB_DIR ${PROJECT_NAME} COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG)
+                set(PDB_FILE "${PDB_DIR}/${PDB_FILE}.pdb")
+            endif()
+        endif()
+
+        # install symbols if any
+        if(PDB_FILE)
+            install(FILES ${PDB_FILE}
                 DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-                COMPONENT libraries${MSVCARCH_EXTENSION}
+                COMPONENT symbols
                 CONFIGURATIONS Debug
                 )
         endif()
@@ -646,8 +721,28 @@ elseif(NOT EPROSIMA_INSTALLER)
     endif()
 
     # Add fastrtps dependencies in its CMake config file.
-    if(LINK_SSL AND NOT INSTALLER_PLATFORM)
-        set(FASTRTPS_PACKAGE_OPT_DEPS "find_package(OpenSSL REQUIRED)")
+    if(LINK_SSL)
+        if(INSTALLER_PLATFORM)
+            # OpenSSL dependency is only propagated on static linking
+            # We must use the deployed OpenSSL binaries to prevent compatibility issues
+            set(FASTRTPS_INSTALLER_DEPS_ANCILLARY "\
+function(find_fastdds_deployed_openssl)\n\
+    if(OPENSSL_FOUND AND NOT(OPENSSL_VERSION STREQUAL \"${OPENSSL_VERSION}\") )\n\
+        message(WARNING \"OpenSSL already loaded. Version \${OPENSSL_VERSION} differs from version ${OPENSSL_VERSION}, used in Fast-DDS binaries building, ABI issues may arise\")\n\
+    endif()\n\
+    set(OPENSSL_USE_STATIC_LIBS TRUE)\n\
+    set(OPENSSL_ROOT_DIR  \"\${PACKAGE_PREFIX_DIR}/lib/${INSTALLER_PLATFORM}\")\n\
+    find_package(OpenSSL REQUIRED)\n\
+endfunction()"
+            )
+            set(FASTRTPS_INSTALLER_OPT_DEPS "find_fastdds_deployed_openssl()")
+        elseif(WIN32)
+            # windows from sources only requires OpenSSL on static libraries
+            set(FASTRTPS_PACKAGE_WIN32_OPT_DEPS "find_package(OpenSSL REQUIRED)")
+        else()
+            # linux from sources requires OpenSSL always
+            set(FASTRTPS_PACKAGE_UNIX_OPT_DEPS "find_package(OpenSSL REQUIRED)")
+        endif()
     endif()
 
     configure_package_config_file(${PROJECT_SOURCE_DIR}/cmake/packaging/Config.cmake.in
