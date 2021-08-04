@@ -215,7 +215,8 @@ bool StatefulReader::matched_writer_add(
     if (is_datasharing)
     {
         if (datasharing_listener_->add_datasharing_writer(wdata.guid(),
-                m_att.durabilityKind == VOLATILE))
+                m_att.durabilityKind == VOLATILE,
+                mp_history->m_att.maximumReservedCaches))
         {
             matched_writers_.push_back(wp);
             logInfo(RTPS_READER, "Writer Proxy " << wdata.guid() << " added to " << this->m_guid.entityId
@@ -420,7 +421,7 @@ bool StatefulReader::processDataMsg(
 
     assert(change);
 
-    std::lock_guard<RecursiveTimedMutex> lock(mp_mutex);
+    std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
     if (!is_alive_)
     {
         return false;
@@ -428,8 +429,6 @@ bool StatefulReader::processDataMsg(
 
     if (acceptMsgFrom(change->writerGUID, &pWP))
     {
-        assert_writer_liveliness(change->writerGUID);
-
         // Check if CacheChange was received or is framework data
         if (!pWP || !pWP->change_was_received(change->sequenceNumber))
         {
@@ -490,6 +489,10 @@ bool StatefulReader::processDataMsg(
                 return false;
             }
         }
+
+        lock.unlock(); // Avoid deadlock with LivelinessManager.
+        assert_writer_liveliness(change->writerGUID);
+
         return true;
     }
 
@@ -515,8 +518,6 @@ bool StatefulReader::processDataFragMsg(
     // TODO: see if we need manage framework fragmented DATA message
     if (acceptMsgFrom(incomingChange->writerGUID, &pWP) && pWP)
     {
-        assert_writer_liveliness(incomingChange->writerGUID);
-
         // Check if CacheChange was received.
         if (!pWP->change_was_received(incomingChange->sequenceNumber))
         {
@@ -575,6 +576,10 @@ bool StatefulReader::processDataFragMsg(
                 NotifyChanges(pWP);
             }
         }
+
+        lock.unlock(); // Avoid deadlock with LivelinessManager;
+        assert_writer_liveliness(incomingChange->writerGUID);
+
     }
 
     return true;
@@ -604,6 +609,9 @@ bool StatefulReader::processHeartbeatMsg(
         {
             mp_history->remove_fragmented_changes_until(firstSN, writerGUID);
 
+            // Maybe now we have to notify user from new CacheChanges.
+            NotifyChanges(writer);
+
             // Try to assert liveliness if requested by proxy's logic
             if (assert_liveliness)
             {
@@ -615,6 +623,7 @@ bool StatefulReader::processHeartbeatMsg(
                         auto wlp = this->mp_RTPSParticipant->wlp();
                         if ( wlp != nullptr)
                         {
+                            lock.unlock(); // Avoid deadlock with LivelinessManager.
                             wlp->sub_liveliness_manager_->assert_liveliness(
                                 writerGUID,
                                 liveliness_kind_,
@@ -627,10 +636,8 @@ bool StatefulReader::processHeartbeatMsg(
                     }
                 }
             }
-
-            // Maybe now we have to notify user from new CacheChanges.
-            NotifyChanges(writer);
         }
+
         return true;
     }
 
@@ -827,6 +834,8 @@ bool StatefulReader::change_received(
     // inside the call to mp_history->received_change
     if (mp_history->received_change(a_change, unknown_missing_changes_up_to))
     {
+        auto payload_length = a_change->serializedPayload.length;
+
         Time_t::now(a_change->receptionTimestamp);
         GUID_t proxGUID = prox->guid();
 
@@ -844,7 +853,11 @@ bool StatefulReader::change_received(
             ret = prox->received_change_set(a_change->sequenceNumber);
         }
 
+        // WARNING! This method could destroy a_change
         NotifyChanges(prox);
+
+        // statistics callback
+        on_subscribe_throughput(payload_length);
 
         return ret;
     }
@@ -867,6 +880,8 @@ void StatefulReader::NotifyChanges(
             if (!ch_to_give->isRead)
             {
                 ++total_unread_;
+
+                on_data_notify(ch_to_give->writerGUID, ch_to_give->sourceTimestamp);
 
                 if (getListener() != nullptr)
                 {
@@ -1123,7 +1138,6 @@ void StatefulReader::change_read_by_user(
     {
         // This may not be the change read with highest SN,
         // need to find largest SN to ACK
-        std::vector<CacheChange_t*>::iterator last_read_from_writer;
         for (std::vector<CacheChange_t*>::iterator it = mp_history->changesBegin();
                 it != mp_history->changesEnd(); ++it)
         {

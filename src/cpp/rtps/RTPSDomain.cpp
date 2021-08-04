@@ -142,8 +142,6 @@ RTPSParticipant* RTPSDomain::createParticipant(
     }
 
     PParam.participantID = ID;
-    LocatorList_t loc;
-    IPFinder::getIP4Address(&loc);
 
     // Generate a new GuidPrefix_t
     GuidPrefix_t guidP;
@@ -214,6 +212,7 @@ bool RTPSDomain::removeRTPSParticipant(
 {
     if (p != nullptr)
     {
+        assert((p->mp_impl != nullptr) && "This participant has been previously invalidated");
         p->mp_impl->disable();
 
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -237,6 +236,8 @@ bool RTPSDomain::removeRTPSParticipant(
 void RTPSDomain::removeRTPSParticipant_nts(
         RTPSDomain::t_p_RTPSParticipant& participant)
 {
+    // The destructor of RTPSParticipantImpl already deletes the associated RTPSParticipant and sets
+    // its pointer to the RTPSParticipant to nullptr, so there is no need to do it here manually.
     delete(participant.second);
 }
 
