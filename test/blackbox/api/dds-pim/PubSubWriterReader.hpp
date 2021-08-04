@@ -370,6 +370,9 @@ public:
             bool avoid_multicast = true,
             uint32_t initial_pdp_count = 5)
     {
+        matched_readers_.clear();
+        matched_writers_.clear();
+
         //Create participant
         participant_qos_.wire_protocol().builtin.avoid_builtin_multicast = avoid_multicast;
         participant_qos_.wire_protocol().builtin.discovery_config.initial_announcements.count = initial_pdp_count;
@@ -412,21 +415,23 @@ public:
     }
 
     bool create_additional_topics(
-            size_t num_topics)
+            size_t num_topics,
+            const char* suffix)
     {
         bool ret_val = initialized_;
         if (ret_val)
         {
             std::string topic_name = topic_name_;
+            size_t vector_size = entities_extra_.size();
 
-            for (size_t i = 0; i < entities_extra_.size(); i++)
+            for (size_t i = 0; i < vector_size; i++)
             {
-                topic_name += "/";
+                topic_name += suffix;
             }
 
             for (size_t i = 0; ret_val && (i < num_topics); i++)
             {
-                topic_name += "/";
+                topic_name += suffix;
                 eprosima::fastdds::dds::Topic* topic = participant_->create_topic(topic_name,
                                 type_->getName(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
                 ret_val &= (nullptr != topic);
@@ -451,7 +456,9 @@ public:
                     break;
                 }
 
+                mutex_.lock();
                 entities_extra_.push_back({topic, datawriter, datareader});
+                mutex_.unlock();
             }
         }
 
