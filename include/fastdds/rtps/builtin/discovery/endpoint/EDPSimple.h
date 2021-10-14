@@ -39,6 +39,7 @@ class HistoryAttributes;
 class ReaderAttributes;
 class WriterAttributes;
 class EDPListener;
+class ITopicPayloadPool;
 
 /**
  * Class EDPSimple, implements the Simple Endpoint Discovery Protocol defined in the RTPS specification.
@@ -221,6 +222,18 @@ protected:
             t_p_StatefulReader& reader,
             t_p_StatefulWriter& writer,
             key_list& demises);
+
+    std::shared_ptr<ITopicPayloadPool> pub_writer_payload_pool_;
+    std::shared_ptr<ITopicPayloadPool> pub_reader_payload_pool_;
+    std::shared_ptr<ITopicPayloadPool> sub_writer_payload_pool_;
+    std::shared_ptr<ITopicPayloadPool> sub_reader_payload_pool_;
+
+#if HAVE_SECURITY
+    std::shared_ptr<ITopicPayloadPool> sec_pub_writer_payload_pool_;
+    std::shared_ptr<ITopicPayloadPool> sec_pub_reader_payload_pool_;
+    std::shared_ptr<ITopicPayloadPool> sec_sub_writer_payload_pool_;
+    std::shared_ptr<ITopicPayloadPool> sec_sub_reader_payload_pool_;
+#endif // if HAVE_SECURITY
 
 private:
 

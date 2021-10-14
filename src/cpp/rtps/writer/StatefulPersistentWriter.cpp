@@ -29,13 +29,41 @@ namespace rtps {
 
 StatefulPersistentWriter::StatefulPersistentWriter(
         RTPSParticipantImpl* pimpl,
-        GUID_t& guid,
-        WriterAttributes& att,
+        const GUID_t& guid,
+        const WriterAttributes& att,
         WriterHistory* hist,
         WriterListener* listen,
         IPersistenceService* persistence)
     : StatefulWriter(pimpl, guid, att, hist, listen)
-    , PersistentWriter(guid, att, hist, persistence)
+    , PersistentWriter(guid, att, payload_pool_, change_pool_, hist, persistence)
+{
+    rebuild_status_after_load();
+}
+
+StatefulPersistentWriter::StatefulPersistentWriter(
+        RTPSParticipantImpl* pimpl,
+        const GUID_t& guid,
+        const WriterAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        WriterHistory* hist,
+        WriterListener* listen,
+        IPersistenceService* persistence)
+    : StatefulWriter(pimpl, guid, att, payload_pool, hist, listen)
+    , PersistentWriter(guid, att, payload_pool_, change_pool_, hist, persistence)
+{
+}
+
+StatefulPersistentWriter::StatefulPersistentWriter(
+        RTPSParticipantImpl* pimpl,
+        const GUID_t& guid,
+        const WriterAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        WriterHistory* hist,
+        WriterListener* listen,
+        IPersistenceService* persistence)
+    : StatefulWriter(pimpl, guid, att, payload_pool, change_pool, hist, listen)
+    , PersistentWriter(guid, att, payload_pool_, change_pool_, hist, persistence)
 {
 }
 
@@ -72,17 +100,13 @@ void StatefulPersistentWriter::print_inconsistent_acknack(
     if (!log_error_printed_)
     {
         log_error_printed_ = true;
-
-        logError(RTPS_WRITER, "Inconsistent acknack received in Local Writer " << writer_guid <<
-                ". Beware that deleting persistent database without resetting the matched readers "
-                "prevents communication with them.");
-
+        logError(RTPS_WRITER, "Inconsistent acknack received in Local Writer "
+                << writer_guid << ". Maybe the persistent database has been erased locally.");
     }
-
     StatefulWriter::print_inconsistent_acknack(writer_guid, reader_guid, min_requested_sequence_number,
             max_requested_sequence_number, next_sequence_number);
 }
 
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
 } // namespace eprosima

@@ -1,26 +1,22 @@
 # Test compilation of boost on thirdparty directory
-# and set
+# and set 
 
 # (This file is almost an identical copy of the original FindGTest.cmake file,
 #  feel free to use it as it is or modify it for your own needs.)
 
-set(THIRDPARTY_BOOST_INCLUDE_DIR
-    ${PROJECT_SOURCE_DIR}/thirdparty/boost/include
-    CACHE
+set(THIRDPARTY_BOOST_INCLUDE_DIR 
+    ${PROJECT_SOURCE_DIR}/thirdparty/boost/include 
+    CACHE 
     FILEPATH
     "Path to thirdparty/boost"
 )
 
 find_package(Threads REQUIRED)
 
-if(WIN32 OR APPLE OR QNXNTO)
+if(WIN32 OR APPLE OR ANDROID OR QNXNTO)
     set(THIRDPARTY_BOOST_LINK_LIBS ${CMAKE_THREAD_LIBS_INIT})
 else() # Posix
     set(THIRDPARTY_BOOST_LINK_LIBS ${CMAKE_THREAD_LIBS_INIT} rt)
-endif()
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    list(APPEND THIRDPARTY_BOOST_LINK_LIBS atomic)
 endif()
 
 try_compile(IS_THIRDPARTY_BOOST_OK

@@ -55,9 +55,26 @@ class RTPSReader : public Endpoint
 protected:
 
     RTPSReader(
-            RTPSParticipantImpl*,
+            RTPSParticipantImpl* pimpl,
             const GUID_t& guid,
             const ReaderAttributes& att,
+            ReaderHistory* hist,
+            ReaderListener* listen = nullptr);
+
+    RTPSReader(
+            RTPSParticipantImpl* pimpl,
+            const GUID_t& guid,
+            const ReaderAttributes& att,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            ReaderHistory* hist,
+            ReaderListener* listen = nullptr);
+
+    RTPSReader(
+            RTPSParticipantImpl* pimpl,
+            const GUID_t& guid,
+            const ReaderAttributes& att,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            const std::shared_ptr<IChangePool>& change_pool,
             ReaderHistory* hist,
             ReaderListener* listen = nullptr);
 
@@ -76,10 +93,12 @@ public:
     /**
      * Remove a writer represented by its attributes from the matched writers.
      * @param writer_guid GUID of the writer to remove.
+     * @param removed_by_lease Whether the writer is being unmatched due to a participant drop.
      * @return True if correctly removed.
      */
     RTPS_DllAPI virtual bool matched_writer_remove(
-            const GUID_t& writer_guid) = 0;
+            const GUID_t& writer_guid,
+            bool removed_by_lease = false) = 0;
 
     /**
      * Tells us if a specific Writer is matched against this reader.
@@ -251,6 +270,9 @@ public:
 
 protected:
 
+    virtual bool may_remove_history_record(
+            bool removed_by_lease);
+
     /*!
      * @brief Add a remote writer to the persistence_guid map
      * @param guid GUID of the remote writer
@@ -264,10 +286,12 @@ protected:
      * @brief Remove a remote writer from the persistence_guid map
      * @param guid GUID of the remote writer
      * @param persistence_guid Persistence GUID of the remote writer
+     * @param removed_by_lease Whether the GUIDs are being removed due to a participant drop.
      */
     void remove_persistence_guid(
             const GUID_t& guid,
-            const GUID_t& persistence_guid);
+            const GUID_t& persistence_guid,
+            bool removed_by_lease);
 
     /*!
      * @brief Get the last notified sequence for a RTPS guid
@@ -346,6 +370,11 @@ private:
 
     RTPSReader& operator =(
             const RTPSReader&) = delete;
+
+    void init(
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            const std::shared_ptr<IChangePool>& change_pool);
+
 };
 
 } /* namespace rtps */

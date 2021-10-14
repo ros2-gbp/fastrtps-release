@@ -1679,8 +1679,8 @@ ValidationResult_t PKIDH::begin_handshake_reply(
 
         if (hash_c1_vec != nullptr)
         {
-            if ( (hash_c1_vec->size() == SHA256_DIGEST_LENGTH) &&
-                    (memcmp(hash_c1, hash_c1_vec->data(), SHA256_DIGEST_LENGTH) != 0) )
+            if ((hash_c1_vec->size() == SHA256_DIGEST_LENGTH) &&
+                    (memcmp(hash_c1, hash_c1_vec->data(), SHA256_DIGEST_LENGTH) != 0))
             {
                 WARNING_SECURITY_LOGGING("PKIDH", "Wrong hash_c1");
             }

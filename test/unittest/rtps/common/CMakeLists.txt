@@ -19,10 +19,16 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
     if(GTEST_FOUND)
         set(CACHECHANGETESTS_SOURCE CacheChangeTests.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp)
+        set(GUID_UTILS_TESTS_SOURCE GuidUtilsTests.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp)
         set(SEQUENCENUMBERTESTS_SOURCE SequenceNumberTests.cpp)
         set(PORTPARAMETERSTESTS_SOURCE PortParametersTests.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp)
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp)
 
         add_executable(CacheChangeTests ${CACHECHANGETESTS_SOURCE})
         target_compile_definitions(CacheChangeTests PRIVATE FASTRTPS_NO_LIB)
@@ -30,6 +36,18 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
         target_link_libraries(CacheChangeTests ${GTEST_LIBRARIES})
         add_gtest(CacheChangeTests SOURCES ${CACHECHANGETESTS_SOURCE})
+
+        add_executable(GuidUtilsTests ${GUID_UTILS_TESTS_SOURCE})
+        target_compile_definitions(GuidUtilsTests PRIVATE FASTRTPS_NO_LIB)
+        target_include_directories(GuidUtilsTests PRIVATE
+            ${GTEST_INCLUDE_DIRS}
+            ${PROJECT_SOURCE_DIR}/src/cpp
+            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
+        target_link_libraries(GuidUtilsTests ${GTEST_LIBRARIES})
+        if(MSVC OR MSVC_IDE)
+            target_link_libraries(GuidUtilsTests ws2_32)
+        endif()
+        add_gtest(GuidUtilsTests SOURCES ${GUID_UTILS_TESTS_SOURCE})
 
         add_executable(SequenceNumberTests ${SEQUENCENUMBERTESTS_SOURCE})
         target_compile_definitions(SequenceNumberTests PRIVATE FASTRTPS_NO_LIB)

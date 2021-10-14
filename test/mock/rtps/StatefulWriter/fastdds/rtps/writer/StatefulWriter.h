@@ -56,6 +56,8 @@ public:
 
     MOCK_METHOD1(matched_reader_remove, bool(const GUID_t&));
 
+    MOCK_METHOD1 (matched_reader_is_matched, bool(const GUID_t& reader_guid));
+
     MOCK_METHOD0(getGuid, const GUID_t& ());
 
     MOCK_METHOD1(unsent_change_added_to_history_mock, void(CacheChange_t*));
@@ -65,6 +67,16 @@ public:
     MOCK_METHOD1(intraprocess_heartbeat, void(const ReaderProxy*));
 
     MOCK_METHOD2(intraprocess_gap, void(const ReaderProxy*, const SequenceNumber_t&));
+
+    MOCK_METHOD2(send_periodic_heartbeat, bool(
+                bool final,
+                bool liveliness));
+
+    MOCK_METHOD1(send_periodic_heartbeat, bool(
+                bool final));
+
+    MOCK_METHOD0(send_periodic_heartbeat, bool());
+
 
     RTPSParticipantImpl* getRTPSParticipant()
     {

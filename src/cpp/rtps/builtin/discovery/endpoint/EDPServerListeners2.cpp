@@ -20,6 +20,7 @@
 #include <fastdds/rtps/writer/StatefulWriter.h>
 #include <fastdds/rtps/history/WriterHistory.h>
 #include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/reader/RTPSReader.h>
 
 #include <fastrtps/utils/fixed_size_string.hpp>
 
@@ -70,6 +71,13 @@ void EDPServerPUBListener2::onNewCacheChangeAdded(
     // Get writer's GUID and EDP publications' reader history
     GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
     ReaderHistory* reader_history = sedp_->publications_reader_.second;
+
+    // Related_sample_identity could be lost in message delivered, so we set as sample_identity
+    // An empty related_sample_identity could lead into an empty sample_identity when resending this msg
+    if (change->write_params.related_sample_identity() == SampleIdentity::unknown())
+    {
+        change->write_params.related_sample_identity(change->write_params.sample_identity());
+    }
 
     // String to store the topic of the writer
     std::string topic_name = "";
@@ -128,7 +136,7 @@ void EDPServerPUBListener2::onNewCacheChangeAdded(
         else
         {
             // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-            reader_history->release_Cache(change);
+            reader->releaseCache(change);
         }
     }
     logInfo(RTPS_EDP_LISTENER,
@@ -230,7 +238,7 @@ void EDPServerSUBListener2::onNewCacheChangeAdded(
         else
         {
             // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-            reader_history->release_Cache(change);
+            reader->releaseCache(change);
         }
     }
 

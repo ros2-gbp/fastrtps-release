@@ -41,11 +41,7 @@ inline bool CDRMessage::initCDRMsg(
     }
     msg->pos = 0;
     msg->length = 0;
-#if __BIG_ENDIAN__
-    msg->msg_endian = BIGEND;
-#else
-    msg->msg_endian = LITTLEEND;
-#endif
+    msg->msg_endian = DEFAULT_ENDIAN;
     return true;
 }
 
@@ -62,11 +58,7 @@ inline bool CDRMessage::wrapVector(
     msg->buffer = vectorToWrap.data();
     msg->length = (uint32_t)vectorToWrap.size();
     msg->max_size = (uint32_t)vectorToWrap.capacity();
-#if __BIG_ENDIAN__
-    msg->msg_endian = BIGEND;
-#else
-    msg->msg_endian = LITTLEEND;
-#endif
+    msg->msg_endian = DEFAULT_ENDIAN;
     return true;
 }
 
@@ -229,20 +221,24 @@ inline SequenceNumberSet_t CDRMessage::readSequenceNumberSet(
         CDRMessage_t* msg)
 {
     bool valid = true;
+    SequenceNumberSet_t sns(c_SequenceNumber_Unknown);
 
     SequenceNumber_t seqNum;
     valid &= CDRMessage::readSequenceNumber(msg, &seqNum);
-    SequenceNumberSet_t sns(seqNum);
     uint32_t numBits = 0;
     valid &= CDRMessage::readUInt32(msg, &numBits);
+    valid &= (numBits <= 256u);
+
     uint32_t n_longs = (numBits + 31u) / 32u;
     uint32_t bitmap[8];
-    for (uint32_t i = 0; i < n_longs; ++i)
+    for (uint32_t i = 0; valid && (i < n_longs); ++i)
     {
         valid &= CDRMessage::readUInt32(msg, &bitmap[i]);
     }
+
     if (valid)
     {
+        sns.base(seqNum);
         sns.bitmap_set(numBits, bitmap);
     }
 
@@ -254,21 +250,26 @@ inline bool CDRMessage::readFragmentNumberSet(
         FragmentNumberSet_t* fns)
 {
     bool valid = true;
+
     FragmentNumber_t base = 0ul;
     valid &= CDRMessage::readUInt32(msg, &base);
-    fns->base(base);
     uint32_t numBits = 0;
     valid &= CDRMessage::readUInt32(msg, &numBits);
+    valid &= (numBits <= 256u);
+
     uint32_t n_longs = (numBits + 31u) / 32u;
     uint32_t bitmap[8];
-    for (uint32_t i = 0; i < n_longs; ++i)
+    for (uint32_t i = 0; valid && (i < n_longs); ++i)
     {
         valid &= CDRMessage::readUInt32(msg, &bitmap[i]);
     }
+
     if (valid)
     {
+        fns->base(base);
         fns->bitmap_set(numBits, bitmap);
     }
+
     return valid;
 }
 
@@ -912,7 +913,7 @@ inline bool CDRMessage::addBinaryPropertySeq(
                     --number_to_serialize;
                     returnedValue =
                             CDRMessage::addBinaryProperty(msg, *it,
-                                    add_final_padding || (number_to_serialize != 0) );
+                                    add_final_padding || (number_to_serialize != 0));
                 }
             }
         }
@@ -952,7 +953,7 @@ inline bool CDRMessage::addBinaryPropertySeq(
                     --number_to_serialize;
                     returnedValue =
                             CDRMessage::addBinaryProperty(msg, *it,
-                                    add_final_padding || (number_to_serialize != 0) );
+                                    add_final_padding || (number_to_serialize != 0));
                 }
             }
         }
@@ -1218,8 +1219,8 @@ inline bool CDRMessage::readParticipantGenericMessage(
     return true;
 }
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */

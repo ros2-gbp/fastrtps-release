@@ -23,8 +23,8 @@
 #include <vector>
 #include <map>
 #include <mutex>
-#include <iostream> 
-#include <fstream> 
+#include <iostream>
+#include <fstream>
 
 #include <fastrtps/utils/fixed_size_string.hpp>
 #include <fastdds/rtps/writer/ReaderProxy.h>
@@ -36,7 +36,7 @@
 #include "./DiscoveryEndpointInfo.hpp"
 #include "./DiscoveryDataQueueInfo.hpp"
 
-#include "backup/json.hpp"
+#include <json.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -143,7 +143,8 @@ public:
     }
 
     // enable ddb in persistence mode and open the file to backup up in append mode
-    void persistence_enable(std::string backup_file_name);
+    void persistence_enable(
+            std::string backup_file_name);
 
     //! Disable the possibility to add new entries to the database
     void disable()
@@ -168,11 +169,11 @@ public:
     // This is different than lock_incoming_data() because it does not store the changes or lock the listener
     // This method is only used when the Server is restoring the backup file, and so sending messages to the
     // listener that should not be process
-    void backup_in_progress(bool v)
+    void backup_in_progress(
+            bool v)
     {
         processing_backup_ = v;
     }
-
 
     /* Clear all the collections in the database
      * @return: The changes that can be released
@@ -297,7 +298,8 @@ public:
     // Check if the data queue is empty
     bool data_queue_empty();
 
-    void to_json(nlohmann::json& j) const;
+    void to_json(
+            nlohmann::json& j) const;
 
     bool from_json(
             nlohmann::json& j,
@@ -309,7 +311,7 @@ public:
     // an state in the middle of an routine execution, and every message that has arrived and has not
     // been process.
     // By this, we do not lose any change or information in any case
-    // This function must be called with the incoming datas blocked    
+    // This function must be called with the incoming datas blocked
     void clean_backup();
 
     // Lock the incoming of new data to the DDB queue. This locks the Listener as well
@@ -324,10 +326,21 @@ public:
         data_queues_mutex_.unlock();
     }
 
+    // Return string with virtual topic default name
     std::string virtual_topic() const
     {
         return virtual_topic_;
     }
+
+    // Return number of updated entities since last call to this same function
+    int updates_since_last_checked()
+    {
+        return new_updates_.exchange(0);
+    }
+
+    // Check if an participant is stored as local. If the participant does not exist, it returns false
+    bool is_participant_local(
+            const eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix);
 
 protected:
 
@@ -367,6 +380,27 @@ protected:
     void create_readers_from_change_(
             eprosima::fastrtps::rtps::CacheChange_t* ch,
             const std::string& topic_name);
+
+    // Functions related with create_participant_from_change_
+
+    void match_new_server_(
+            eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix);
+
+    void create_virtual_endpoints_(
+            eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix);
+
+    static bool participant_data_has_changed_(
+            const DiscoveryParticipantInfo& participant_info,
+            const DiscoveryParticipantChangeData& new_change_data);
+
+    void create_new_participant_from_change_(
+            eprosima::fastrtps::rtps::CacheChange_t* ch,
+            const DiscoveryParticipantChangeData& change_data);
+
+    void update_participant_from_change_(
+            DiscoveryParticipantInfo& participant_info,
+            eprosima::fastrtps::rtps::CacheChange_t* ch,
+            const DiscoveryParticipantChangeData& change_data);
 
     // change ack relevants and matched between entities participants and endpoints
     void match_writer_reader_(
@@ -532,6 +566,9 @@ protected:
     // Whether the database is enabled
     std::atomic<bool> enabled_;
 
+    // Whether it has been a new entity discovered or updated in this subroutine loop
+    std::atomic<int> new_updates_;
+
     // Wheter the database is restoring a backup
     std::atomic<bool> processing_backup_;
 
@@ -542,7 +579,7 @@ protected:
     std::string backup_file_name_;
     // This file will keep open to write it fast every time a new cache arrives
     // It needs a flush every time a new change is added
-    std::ofstream backup_file_; 
+    std::ofstream backup_file_;
 };
 
 

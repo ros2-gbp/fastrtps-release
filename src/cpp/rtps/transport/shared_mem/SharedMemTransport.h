@@ -59,9 +59,8 @@ public:
      * multicast range, it joins the specified multicast group,
      */
     bool OpenInputChannel(
-            const fastrtps::rtps::Locator_t&,
-            TransportReceiverInterface*,
-            uint32_t) override;
+        const fastrtps::rtps::Locator_t&,
+        TransportReceiverInterface*, uint32_t) override;
 
     //! Removes the listening socket for the specified port.
     bool CloseInputChannel(
@@ -114,10 +113,7 @@ public:
     bool is_local_locator(
             const fastrtps::rtps::Locator_t& locator) const override;
 
-    TransportDescriptorInterface* get_configuration() override
-    {
-        return &configuration_;
-    }
+    TransportDescriptorInterface* get_configuration() override { return &configuration_; }
 
     void AddDefaultOutputLocator(
             fastrtps::rtps::LocatorList_t& defaultList) override;
@@ -210,7 +206,7 @@ private:
 
     void clean_up();
 
-    std::map<uint32_t, std::shared_ptr<SharedMemManager::Port> > opened_ports_;
+    std::map<uint32_t, std::shared_ptr<SharedMemManager::Port>> opened_ports_;
 
     mutable std::recursive_mutex input_channels_mutex_;
 
@@ -218,7 +214,7 @@ private:
 
     std::shared_ptr<SharedMemManager::Segment> shared_mem_segment_;
 
-    std::shared_ptr<PacketsLog<SHMPacketFileConsumer> > packet_logger_;
+    std::shared_ptr<PacketsLog<SHMPacketFileConsumer>> packet_logger_;
 
     friend class SharedMemChannelResource;
 
@@ -248,13 +244,12 @@ private:
 
     std::shared_ptr<SharedMemManager::Port> find_port(
             uint32_t port_id);
-
+    
     bool push_discard(
             const std::shared_ptr<SharedMemManager::Buffer>& buffer,
             const fastrtps::rtps::Locator_t& remote_locator);
 
-    void delete_input_channel(
-            SharedMemChannelResource* channel);
+    void delete_input_channel(SharedMemChannelResource* channel);
 };
 
 } // namespace rtps

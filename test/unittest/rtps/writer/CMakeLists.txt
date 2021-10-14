@@ -26,7 +26,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/ReaderProxy.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/qos/ReaderQos.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
             )
 
@@ -50,11 +52,12 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReaderLocator
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSGapBuilder
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/TimedEvent
-            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
+            ${PROJECT_SOURCE_DIR}/include
+            ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
         target_link_libraries(ReaderProxyTests
-            ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+            ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES} foonathan_memory
             ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
         add_gtest(ReaderProxyTests SOURCES ${WRITERPROXYTESTS_SOURCE})
 
@@ -62,7 +65,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
 
     set(LIVELINESSMANAGERTESTS_SOURCE LivelinessManagerTests.cpp
           ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+          ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
           ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+          ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
           ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/LivelinessManager.cpp
           ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/ResourceEvent.cpp
           ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEvent.cpp
@@ -83,5 +88,19 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         ${GTEST_LIBRARIES}
         ${GMOCK_LIBRARIES})
     add_gtest(LivelinessManagerTests SOURCES ${LIVELINESSMANAGERTESTS_SOURCE})
+
+    # RTPSWriter
+
+    set(RTPSWRITERTESTS_SOURCE RTPSWriterTests.cpp)
+
+    add_executable(RTPSWriterTests ${RTPSWRITERTESTS_SOURCE})
+    target_include_directories(RTPSWriterTests PRIVATE
+        ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
+        )
+    target_link_libraries(RTPSWriterTests fastrtps foonathan_memory
+        ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+        ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+    add_gtest(RTPSWriterTests SOURCES ${RTPSWRITERTESTS_SOURCE})
+
     endif()
 endif()

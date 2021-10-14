@@ -58,6 +58,8 @@
 
 #include <fastdds/dds/log/Log.hpp>
 
+#include <rtps/history/TopicPayloadPoolRegistry.hpp>
+
 #include <mutex>
 #include <chrono>
 
@@ -70,6 +72,7 @@ const char ParticipantType::SIMPLE[] = "SIMPLE";
 const char ParticipantType::SERVER[] = "SERVER";
 const char ParticipantType::CLIENT[] = "CLIENT";
 const char ParticipantType::BACKUP[] = "BACKUP";
+const char ParticipantType::SUPER_CLIENT[] = "SUPER_CLIENT";
 
 } // namespace rtps
 } // namespace fastdds
@@ -142,8 +145,29 @@ PDP::~PDP()
     delete mp_EDP;
     mp_RTPSParticipant->deleteUserEndpoint(mp_PDPWriter);
     mp_RTPSParticipant->deleteUserEndpoint(mp_PDPReader);
-    delete mp_PDPWriterHistory;
-    delete mp_PDPReaderHistory;
+
+    if (mp_PDPWriterHistory)
+    {
+        PoolConfig cfg = PoolConfig::from_history_attributes(mp_PDPWriterHistory->m_att);
+        delete mp_PDPWriterHistory;
+        if (writer_payload_pool_)
+        {
+            writer_payload_pool_->release_history(cfg, false);
+            TopicPayloadPoolRegistry::release(writer_payload_pool_);
+        }
+    }
+
+    if (mp_PDPReaderHistory)
+    {
+        PoolConfig cfg = PoolConfig::from_history_attributes(mp_PDPReaderHistory->m_att);
+        delete mp_PDPReaderHistory;
+        if (reader_payload_pool_)
+        {
+            reader_payload_pool_->release_history(cfg, true);
+            TopicPayloadPoolRegistry::release(reader_payload_pool_);
+        }
+    }
+
     delete mp_listener;
 
     for (ParticipantProxyData* it : participant_proxies_)
@@ -620,7 +644,7 @@ bool PDP::removeWriterProxyData(
             if (wit != pit->m_writers->end())
             {
                 WriterProxyData* pW = wit->second;
-                mp_EDP->unpairWriterProxy(pit->m_guid, writer_guid);
+                mp_EDP->unpairWriterProxy(pit->m_guid, writer_guid, false);
 
                 RTPSParticipantListener* listener = mp_RTPSParticipant->getListener();
                 if (listener)
@@ -914,7 +938,8 @@ bool PDP::remove_remote_participant(
                 GUID_t writer_guid(wit->guid());
                 if (writer_guid != c_Guid_Unknown)
                 {
-                    mp_EDP->unpairWriterProxy(partGUID, writer_guid);
+                    mp_EDP->unpairWriterProxy(partGUID, writer_guid,
+                            reason == ParticipantDiscoveryInfo::DISCOVERY_STATUS::DROPPED_PARTICIPANT);
 
                     if (listener)
                     {
@@ -1033,6 +1058,24 @@ CDRMessage_t PDP::get_participant_proxy_data_serialized(
     }
 
     return cdr_msg;
+}
+
+ParticipantProxyData* PDP::get_participant_proxy_data(
+        const GuidPrefix_t& guid_prefix)
+{
+    for (auto pit = ParticipantProxiesBegin(); pit != ParticipantProxiesEnd(); ++pit)
+    {
+        if (guid_prefix == (*pit)->m_guid.guidPrefix)
+        {
+            return *(pit);
+        }
+    }
+    return nullptr;
+}
+
+std::list<eprosima::fastdds::rtps::RemoteServerAttributes>& PDP::remote_server_attributes()
+{
+    return mp_builtin->m_DiscoveryServers;
 }
 
 void PDP::check_remote_participant_liveliness(

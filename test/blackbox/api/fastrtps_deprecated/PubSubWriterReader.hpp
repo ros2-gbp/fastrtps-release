@@ -563,6 +563,62 @@ public:
 
 #endif // if HAVE_SECURITY
 
+    PubSubWriterReader& pub_durability_kind(
+            const eprosima::fastrtps::DurabilityQosPolicyKind kind)
+    {
+        publisher_attr_.qos.m_durability.kind = kind;
+        return *this;
+    }
+
+    PubSubWriterReader& sub_durability_kind(
+            const eprosima::fastrtps::DurabilityQosPolicyKind kind)
+    {
+        subscriber_attr_.qos.m_durability.kind = kind;
+        return *this;
+    }
+
+    PubSubWriterReader& pub_reliability(
+            const eprosima::fastrtps::ReliabilityQosPolicyKind kind)
+    {
+        publisher_attr_.qos.m_reliability.kind = kind;
+        return *this;
+    }
+
+    PubSubWriterReader& sub_reliability(
+            const eprosima::fastrtps::ReliabilityQosPolicyKind kind)
+    {
+        subscriber_attr_.qos.m_reliability.kind = kind;
+        return *this;
+    }
+
+    PubSubWriterReader& pub_history_kind(
+            const eprosima::fastrtps::HistoryQosPolicyKind kind)
+    {
+        publisher_attr_.topic.historyQos.kind = kind;
+        return *this;
+    }
+
+    PubSubWriterReader& sub_history_kind(
+            const eprosima::fastrtps::HistoryQosPolicyKind kind)
+    {
+        subscriber_attr_.topic.historyQos.kind = kind;
+        return *this;
+    }
+
+    PubSubWriterReader& pub_history_depth(
+            const int32_t depth)
+    {
+        publisher_attr_.topic.historyQos.depth = depth;
+        return *this;
+    }
+
+    PubSubWriterReader& sub_history_depth(
+            const int32_t depth)
+    {
+        subscriber_attr_.topic.historyQos.depth = depth;
+        return *this;
+    }
+
     PubSubWriterReader& disable_builtin_transport()
     {
         participant_attr_.rtps.useBuiltinTransports = false;
