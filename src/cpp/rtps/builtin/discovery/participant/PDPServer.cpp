@@ -40,6 +40,7 @@
 #include <fastdds/rtps/builtin/discovery/participant/PDPServer.h>
 #include <fastdds/rtps/builtin/discovery/endpoint/EDPServer.h>
 
+
 #include <fastdds/rtps/writer/ReaderProxy.h>
 #include <rtps/builtin/data/ProxyHashTables.hpp>
 
@@ -203,7 +204,7 @@ bool PDPServer::createPDPEndpoints()
     watt.endpoint.properties.properties().push_back(Property("dds.persistence.plugin", "builtin.SQLITE3"));
     watt.endpoint.properties.properties().push_back(Property("dds.persistence.sqlite3.filename",
             GetPersistenceFileName()));
-#endif // if HAVE_SQLITE3
+#endif // HAVE_SQLITE3
 
     watt.endpoint.reliabilityKind = RELIABLE;
     watt.endpoint.topicKind = WITH_KEY;
@@ -492,7 +493,6 @@ bool PDPServer::trimWriterHistory()
 
     logInfo(RTPS_PDPSERVER_TRIM, "Trying to trim the history. HistorySize:" << mp_PDPWriterHistory->getHistorySize()
                                                                             << " Demises:" << _demises.size());
-
     EDPServer* pEDP = dynamic_cast<EDPServer*>(mp_EDP);
     assert(pEDP);
 
@@ -607,9 +607,8 @@ bool PDPServer::addRelayedChangeToHistory(
         sid.writer_guid(c.writerGUID);
         sid.sequence_number(c.sequenceNumber);
         logError(RTPS_PDP,
-                "A DATA(p) received by server " << mp_PDPWriter->getGuid()
-                                                << " from participant " << c.writerGUID
-                                                << " without a valid SampleIdentity");
+                "A DATA(p) received by server " << mp_PDPWriter->getGuid() <<
+                " from participant " << c.writerGUID << " without a valid SampleIdentity");
         return false;
     }
 
@@ -643,7 +642,12 @@ bool PDPServer::addRelayedChangeToHistory(
     }
     else
     {
-        if (mp_PDPWriterHistory->reserve_Cache(&pCh, c.serializedPayload.max_size) && pCh )
+        pCh = mp_PDPWriter->new_change(
+            [&c]()
+            {
+                return c.serializedPayload.max_size;
+            }, ALIVE);
+        if (pCh)
         {
             if ( mp_PDPWriter->getAttributes().durabilityKind == DurabilityKind_t::TRANSIENT_LOCAL )
             {
@@ -804,7 +808,7 @@ std::string PDPServer::GetPersistenceFileName()
     return filename.str();
 }
 
-#endif // if HAVE_SQLITE3
+#endif // HAVE_SQLITE3
 
 //! returns true if loading info from persistency database
 bool PDPServer::ongoingDeserialization()
@@ -931,7 +935,8 @@ void PDPServer::processPersistentData()
 
                     CacheChange_t* change_to_add = nullptr;
 
-                    if (!p_PDPReader->reserveCache(&change_to_add, change->serializedPayload.length)) //Reserve a new cache from the corresponding cache pool
+                    //Reserve a new cache from the corresponding cache pool
+                    if (!p_PDPReader->reserveCache(&change_to_add, change->serializedPayload.length))
                     {
                         logError(RTPS_PDP, "Problem reserving CacheChange in PDPServer reader");
                         return;
@@ -1170,7 +1175,7 @@ void PDPServer::announceParticipantState(
             }
 
             // free change
-            mp_PDPWriterHistory->release_Cache(change);
+            mp_PDPWriter->release_change(change);
         }
 
     }
@@ -1434,8 +1439,8 @@ bool PDPServer::set_data_disposal_payload(
 uint32_t PDPServer::get_data_disposal_payload_serialized_size()
 {
     // GUID_t sizes
-    // |GUID UNKNOWN| lenght 14
-    // ff.ff.ff.ff.ff.ff.ff.ff.ff.ff.ff.ff|ff.ff.ff.ff lenght 47
+    //     |GUID UNKNOWN| lenght 14
+    //     ff.ff.ff.ff.ff.ff.ff.ff.ff.ff.ff.ff|ff.ff.ff.ff lenght 47
     // SequenceNumber sizes
     //     0 length 1
     //     18446744073709551615 length 20

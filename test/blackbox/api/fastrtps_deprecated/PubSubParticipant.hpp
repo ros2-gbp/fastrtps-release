@@ -398,22 +398,22 @@ public:
     PubSubParticipant& pub_topic_name(
             std::string topicName)
     {
-        publisher_attr_.topic.topicDataType = type_.getName();
         // Generate topic name
-        std::ostringstream topic;
-        topic << topicName << "_" << asio::ip::host_name() << "_" << GET_PID();
-        publisher_attr_.topic.topicName = topic.str();
+        std::ostringstream t;
+        t << topicName << "_" << asio::ip::host_name() << "_" << GET_PID();
+        publisher_attr_.topic.topicName = t.str();
+        publisher_attr_.topic.topicDataType = type_.getName();
         return *this;
     }
 
     PubSubParticipant& sub_topic_name(
             std::string topicName)
     {
-        subscriber_attr_.topic.topicDataType = type_.getName();
         // Generate topic name
-        std::ostringstream topic;
-        topic << topicName << "_" << asio::ip::host_name() << "_" << GET_PID();
-        subscriber_attr_.topic.topicName = topic.str();
+        std::ostringstream t;
+        t << topicName << "_" << asio::ip::host_name() << "_" << GET_PID();
+        subscriber_attr_.topic.topicName = t.str();
+        subscriber_attr_.topic.topicDataType = type_.getName();
         return *this;
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2019 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+// Copyright 2019, 2020 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,24 +19,27 @@
 #ifndef _FASTRTPS_DATAWRITERIMPL_HPP_
 #define _FASTRTPS_DATAWRITERIMPL_HPP_
 
+#include <fastdds/dds/core/status/BaseStatus.hpp>
+#include <fastdds/dds/core/status/IncompatibleQosStatus.hpp>
+#include <fastdds/dds/publisher/DataWriterListener.hpp>
+#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+#include <fastdds/dds/topic/Topic.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
+
+#include <fastdds/rtps/attributes/WriterAttributes.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/common/WriteParams.h>
-
-#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
-
-#include <fastdds/rtps/attributes/WriterAttributes.h>
-#include <fastdds/dds/publisher/DataWriterListener.hpp>
-#include <fastdds/dds/topic/TypeSupport.hpp>
-#include <fastrtps/publisher/PublisherHistory.h>
-#include <fastdds/dds/topic/Topic.hpp>
-
+#include <fastdds/rtps/history/IPayloadPool.h>
 #include <fastdds/rtps/writer/WriterListener.h>
+
+#include <fastrtps/publisher/PublisherHistory.h>
 #include <fastrtps/qos/DeadlineMissedStatus.h>
-#include <fastdds/dds/core/status/IncompatibleQosStatus.hpp>
 #include <fastrtps/qos/LivelinessLostStatus.h>
-#include <fastdds/dds/core/status/BaseStatus.hpp>
+
 #include <fastrtps/types/TypesBase.h>
+
+#include <rtps/history/ITopicPayloadPool.h>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -65,6 +68,8 @@ class Publisher;
  */
 class DataWriterImpl
 {
+protected:
+
     friend class PublisherImpl;
 
     /**
@@ -167,12 +172,11 @@ public:
     ReturnCode_t wait_for_acknowledgments(
             const fastrtps::Duration_t& max_wait);
 
-    /**
-     * @brief Returns the offered deadline missed status
-     * @param Deadline missed status struct
-     */
     ReturnCode_t get_offered_deadline_missed_status(
             fastrtps::OfferedDeadlineMissedStatus& status);
+
+    ReturnCode_t get_offered_incompatible_qos_status(
+            OfferedIncompatibleQosStatus& status);
 
     ReturnCode_t set_qos(
             const DataWriterQos& qos);
@@ -220,7 +224,10 @@ public:
     ReturnCode_t clear_history(
             size_t* removed);
 
-private:
+protected:
+
+    using IPayloadPool = eprosima::fastrtps::rtps::IPayloadPool;
+    using ITopicPayloadPool = eprosima::fastrtps::rtps::ITopicPayloadPool;
 
     PublisherImpl* publisher_ = nullptr;
 
@@ -243,7 +250,7 @@ private:
     //!Listener to capture the events of the Writer
     class InnerDataWriterListener : public fastrtps::rtps::WriterListener
     {
-public:
+    public:
 
         InnerDataWriterListener(
                 DataWriterImpl* w)
@@ -259,6 +266,10 @@ public:
                 fastrtps::rtps::RTPSWriter* writer,
                 const fastdds::dds::PublicationMatchedStatus& info) override;
 
+        void on_offered_incompatible_qos(
+                fastrtps::rtps::RTPSWriter* writer,
+                fastdds::dds::PolicyMask qos) override;
+
         void onWriterChangeReceivedByAll(
                 fastrtps::rtps::RTPSWriter* writer,
                 fastrtps::rtps::CacheChange_t* change) override;
@@ -268,7 +279,8 @@ public:
                 const fastrtps::LivelinessLostStatus& status) override;
 
         DataWriterImpl* data_writer_;
-    } writer_listener_;
+    }
+    writer_listener_;
 
     uint32_t high_mark_for_frag_;
 
@@ -276,7 +288,7 @@ public:
     fastrtps::rtps::TimedEvent* deadline_timer_ = nullptr;
 
     //! Deadline duration in microseconds
-    std::chrono::duration<double, std::ratio<1, 1000000> > deadline_duration_us_;
+    std::chrono::duration<double, std::ratio<1, 1000000>> deadline_duration_us_;
 
     //! The current timer owner, i.e. the instance which started the deadline timer
     fastrtps::rtps::InstanceHandle_t timer_owner_;
@@ -284,13 +296,18 @@ public:
     //! The offered deadline missed status
     fastrtps::OfferedDeadlineMissedStatus deadline_missed_status_;
 
+    //! The offered incompatible qos status
+    OfferedIncompatibleQosStatus offered_incompatible_qos_status_;
+
     //! A timed callback to remove expired samples for lifespan QoS
     fastrtps::rtps::TimedEvent* lifespan_timer_ = nullptr;
 
     //! The lifespan duration, in microseconds
-    std::chrono::duration<double, std::ratio<1, 1000000> > lifespan_duration_us_;
+    std::chrono::duration<double, std::ratio<1, 1000000>> lifespan_duration_us_;
 
     DataWriter* user_datawriter_ = nullptr;
+
+    std::shared_ptr<ITopicPayloadPool> payload_pool_;
 
     /**
      *
@@ -378,7 +395,24 @@ public:
 
     void publisher_qos_updated();
 
+    OfferedIncompatibleQosStatus& update_offered_incompatible_qos(
+            PolicyMask incompatible_policies);
 
+    /**
+     * Returns the most appropriate listener to handle the callback for the given status,
+     * or nullptr if there is no appropriate listener.
+     */
+    DataWriterListener* get_listener_for(
+            const StatusMask& status);
+
+    void set_fragment_size_on_change(
+            fastrtps::rtps::WriteParams& wparams,
+            fastrtps::rtps::CacheChange_t* ch,
+            const uint32_t& high_mark_for_frag);
+
+    std::shared_ptr<IPayloadPool> get_payload_pool();
+
+    void release_payload_pool();
 };
 
 } /* namespace dds */

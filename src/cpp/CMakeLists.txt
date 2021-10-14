@@ -14,6 +14,7 @@
 
 include(${PROJECT_SOURCE_DIR}/cmake/dev/set_sources.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/dev/generate_msvc_libraries.cmake)
+include(CheckLibatomic)
 
 # Set source files
 
@@ -34,6 +35,8 @@ set(${PROJECT_NAME}_source_files
     ${ALL_HEADERS}
 
     fastdds/log/Log.cpp
+    fastdds/log/OStreamConsumer.cpp
+    fastdds/log/StdoutErrConsumer.cpp
     fastdds/log/StdoutConsumer.cpp
     fastdds/log/FileConsumer.cpp
 
@@ -53,6 +56,8 @@ set(${PROJECT_NAME}_source_files
     rtps/history/History.cpp
     rtps/history/WriterHistory.cpp
     rtps/history/ReaderHistory.cpp
+    rtps/history/TopicPayloadPool.cpp
+    rtps/history/TopicPayloadPoolRegistry.cpp
     rtps/reader/WriterProxy.cpp
     rtps/reader/StatefulReader.cpp
     rtps/reader/StatelessReader.cpp
@@ -199,21 +204,34 @@ set(${PROJECT_NAME}_source_files
 
     # new discovery-server sources
 
+#   rtps/builtin/discovery/database/DiscoveryDataFilter.hpp
+#   rtps/builtin/discovery/database/DiscoveryDataBase.hpp
     rtps/builtin/discovery/database/DiscoveryDataBase.cpp
+#   rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.hpp
     rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.cpp
+#   rtps/builtin/discovery/database/DiscoveryParticipantInfo.hpp
     rtps/builtin/discovery/database/DiscoveryParticipantInfo.cpp
+#   rtps/builtin/discovery/database/DiscoverySharedInfo.hpp
     rtps/builtin/discovery/database/DiscoverySharedInfo.cpp
 #   rtps/builtin/discovery/database/DiscoveryDataQueueInfo.hpp
 #   rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp
     rtps/builtin/discovery/database/backup/SharedBackupFunctions.cpp
 
+#   rtps/builtin/discovery/participant/DSClientEvent2.hpp
     rtps/builtin/discovery/participant/DSClientEvent2.cpp
+#   rtps/builtin/discovery/participant/DServerEvent2.hpp
     rtps/builtin/discovery/participant/DServerEvent2.cpp
+#   rtps/builtin/discovery/participant/PDPClient2.hpp
     rtps/builtin/discovery/participant/PDPClient2.cpp
+#   rtps/builtin/discovery/participant/PDPServer2.hpp
     rtps/builtin/discovery/participant/PDPServer2.cpp
+#   rtps/builtin/discovery/participant/PDPServerListener2.hpp
     rtps/builtin/discovery/participant/PDPServerListener2.cpp
+#   rtps/builtin/discovery/endpoint/EDPClient2.hpp
     rtps/builtin/discovery/endpoint/EDPClient2.cpp
+#   rtps/builtin/discovery/endpoint/EDPServer2.hpp
     rtps/builtin/discovery/endpoint/EDPServer2.cpp
+#   rtps/builtin/discovery/endpoint/EDPServerListeners2.hpp
     rtps/builtin/discovery/endpoint/EDPServerListeners2.cpp
 
     utils/IPFinder.cpp
@@ -222,6 +240,7 @@ set(${PROJECT_NAME}_source_files
     utils/IPLocator.cpp
     utils/System.cpp
     utils/TimedConditionVariable.cpp
+    utils/string_convert.cpp
 
     dds/core/types.cpp
     dds/core/Exception.cpp
@@ -398,6 +417,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
         $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
         $<$<BOOL:${SHM_TRANSPORT_DEFAULT}>:SHM_TRANSPORT_BUILTIN> # Enable SHM as built-in transport
+        $<$<BOOL:${STDOUTERR_LOG_CONSUMER}>:STDOUTERR_LOG_CONSUMER> # Enable StdoutErrConsumer as default LogConsumer
         )
 
     # Define public headers
@@ -431,6 +451,7 @@ elseif(NOT EPROSIMA_INSTALLER)
         $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
         $<$<BOOL:${WIN32}>:iphlpapi$<SEMICOLON>Shlwapi>
         ${THIRDPARTY_BOOST_LINK_LIBS}
+        $<$<BOOL:${LINK_LIBATOMIC}>:atomic>
         )
 
     if(MSVC OR MSVC_IDE)

@@ -21,6 +21,7 @@
 #include <fastdds/rtps/common/Locator.h>
 
 #include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
+// #include "./discovery/participant/PDPClient2.hpp"
 #include <fastdds/rtps/builtin/discovery/participant/PDPClient.h>
 #include "./discovery/participant/PDPServer2.hpp"
 #include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
@@ -115,6 +116,10 @@ bool BuiltinProtocols::initBuiltinProtocols(
             mp_PDP = new fastdds::rtps::PDPServer2(this, allocation, DurabilityKind_t::TRANSIENT);
             break;
 #endif // if HAVE_SQLITE3
+
+        case DiscoveryProtocol_t::SUPER_CLIENT:
+            mp_PDP = new fastrtps::rtps::PDPClient(this, allocation, true);
+            break;
 
         default:
             logError(RTPS_PDP, "Unknown DiscoveryProtocol_t specified.");

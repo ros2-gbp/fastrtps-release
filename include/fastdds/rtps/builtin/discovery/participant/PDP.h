@@ -49,6 +49,7 @@ struct ParticipantType
     static const char SERVER[];
     static const char CLIENT[];
     static const char BACKUP[];
+    static const char SUPER_CLIENT[];
 };
 
 } // namespace rtps
@@ -72,6 +73,7 @@ class ParticipantProxyData;
 class ReaderListener;
 class PDPListener;
 class PDPServerListener;
+class ITopicPayloadPool;
 
 /**
  * Abstract class PDP that implements the basic interfaces for all Participant Discovery implementations
@@ -348,6 +350,20 @@ public:
     CDRMessage_t get_participant_proxy_data_serialized(
             Endianness_t endian);
 
+    /**
+     * Retrive the ParticipantProxyData of a participant
+     * @param guid_prefix The GUID prefix of the participant of which the proxy data is retrieved
+     * @return A pointer to the ParticipantProxyData. nullptr if there is no such ParticipantProxyData
+     */
+    ParticipantProxyData* get_participant_proxy_data(
+            const GuidPrefix_t& guid_prefix);
+
+    /**
+     * Get the list of remote servers to which the client should connect
+     * @return A reference to the list of RemoteServerAttributes
+     */
+    std::list<eprosima::fastdds::rtps::RemoteServerAttributes>& remote_server_attributes();
+
 protected:
 
     //!Pointer to the builtin protocols object.
@@ -382,8 +398,12 @@ protected:
     ReaderListener* mp_listener;
     //!WriterHistory
     WriterHistory* mp_PDPWriterHistory;
+    //!Writer payload pool
+    std::shared_ptr<ITopicPayloadPool> writer_payload_pool_;
     //!Reader History
     ReaderHistory* mp_PDPReaderHistory;
+    //!Reader payload pool
+    std::shared_ptr<ITopicPayloadPool> reader_payload_pool_;
     //!ReaderProxyData to allow preallocation of remote locators
     ReaderProxyData temp_reader_data_;
     //!WriterProxyData to allow preallocation of remote locators

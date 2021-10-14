@@ -136,6 +136,7 @@ else()
     set(CMAKE_CXX_FLAGS
         "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-unknown-pragmas -Wno-error=deprecated-declarations")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-undefined,error")
@@ -219,12 +220,16 @@ include(${PROJECT_SOURCE_DIR}/cmake/common/eprosima_libraries.cmake)
 eprosima_find_package(fastcdr REQUIRED)
 eprosima_find_thirdparty(Asio asio)
 eprosima_find_thirdparty(TinyXML2 tinyxml2)
+
 find_package(foonathan_memory REQUIRED)
+message(STATUS "Found foonathan_memory: ${foonathan_memory_DIR}")
 find_package(ThirdpartyBoost REQUIRED)
 
 if(ANDROID)
     eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
 endif()
+
+include_directories(thirdparty/nlohmann-json)
 
 ###############################################################################
 # Options
@@ -261,9 +266,18 @@ option(SQLITE3_SUPPORT "Activate SQLITE3 support" ON)
 ###############################################################################
 option(SHM_TRANSPORT_DEFAULT "Adds SHM transport to the default transports" ON)
 
+###############################################################################
+# LogConsumer default setup
+###############################################################################
+set(LOG_CONSUMER_DEFAULT AUTO CACHE STRING "Selects default LogConsumer")
+set_property(CACHE LOG_CONSUMER_DEFAULT PROPERTY STRINGS AUTO STDOUT STDOUTERR)
+
+if(LOG_CONSUMER_DEFAULT STREQUAL "STDOUTERR")
+    set(STDOUTERR_LOG_CONSUMER ON)
+endif()
 
 ###############################################################################
-# Tools default setup 
+# Tools default setup
 ###############################################################################
 option(COMPILE_TOOLS "Build tools" ON)
 
@@ -297,7 +311,7 @@ if(COMPILE_EXAMPLES)
 endif()
 
 ###############################################################################
-# Tools 
+# Tools
 ###############################################################################
 
 if(COMPILE_TOOLS)
@@ -445,10 +459,10 @@ if(EPROSIMA_INSTALLER)
 endif()
 
 if(INSTALL_TOOLS)
-  # Install tools 
+  # Install tools
   install(DIRECTORY ${PROJECT_SOURCE_DIR}/tools
       DESTINATION tools/
-      COMPONENT tools 
+      COMPONENT tools
       PATTERN "tools/CMakeLists.txt" EXCLUDE
       )
 

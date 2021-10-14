@@ -13,33 +13,28 @@
 // limitations under the License.
 
 /*
- * RTPSDomain.cpp
- *
+ * @file RTPSDomain.cpp
  */
 
 #include <fastdds/rtps/RTPSDomain.h>
 
-#include <fastdds/rtps/participant/RTPSParticipant.h>
-#include <rtps/participant/RTPSParticipantImpl.h>
-
 #include <fastdds/dds/log/Log.hpp>
+
+#include <fastdds/rtps/history/WriterHistory.h>
+#include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <fastdds/rtps/reader/RTPSReader.h>
+#include <fastdds/rtps/writer/RTPSWriter.h>
 
 #include <fastdds/rtps/transport/UDPv4Transport.h>
 #include <fastdds/rtps/transport/UDPv6Transport.h>
 #include <fastdds/rtps/transport/test_UDPv4Transport.h>
 
-#include <fastrtps/utils/IPFinder.h>
-#include <fastrtps/utils/IPLocator.h>
-#include <fastrtps/utils/System.h>
-#include <fastrtps/utils/md5.h>
-
-#include <fastdds/rtps/writer/RTPSWriter.h>
-#include <fastdds/rtps/reader/RTPSReader.h>
-
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
-#include "RTPSDomainImpl.hpp"
-#include <utils/Host.hpp>
+#include <rtps/RTPSDomainImpl.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
+
+#include <rtps/common/GuidUtils.hpp>
 
 #include <chrono>
 #include <thread>
@@ -54,24 +49,7 @@ static void guid_prefix_create(
         uint32_t ID,
         GuidPrefix_t& guidP)
 {
-    // Make a new participant GuidPrefix_t up
-    int pid = System::GetPID();
-
-    guidP.value[0] = c_VendorId_eProsima[0];
-    guidP.value[1] = c_VendorId_eProsima[1];
-
-    uint16_t host_id = Host::get().id();
-    guidP.value[2] = octet(host_id);
-    guidP.value[3] = octet(host_id >> 8);
-
-    guidP.value[4] = octet(pid);
-    guidP.value[5] = octet(pid >> 8);
-    guidP.value[6] = octet(pid >> 16);
-    guidP.value[7] = octet(pid >> 24);
-    guidP.value[8] = octet(ID);
-    guidP.value[9] = octet(ID >> 8);
-    guidP.value[10] = octet(ID >> 16);
-    guidP.value[11] = octet(ID >> 24);
+    eprosima::fastdds::rtps::GuidUtils::instance().guid_prefix_create(ID, guidP);
 }
 
 // environment variables that forces server-client discovery
@@ -269,21 +247,36 @@ RTPSWriter* RTPSDomain::createRTPSWriter(
         WriterHistory* hist,
         WriterListener* listen)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    for (auto it = m_RTPSParticipants.begin(); it != m_RTPSParticipants.end(); ++it)
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
     {
-        if (it->first->getGuid().guidPrefix == p->getGuid().guidPrefix)
+        RTPSWriter* ret_val = nullptr;
+        if (impl->createWriter(&ret_val, watt, hist, listen))
         {
-            t_p_RTPSParticipant participant = *it;
-            lock.unlock();
-            RTPSWriter* writ;
-            if (participant.second->createWriter(&writ, watt, hist, listen))
-            {
-                return writ;
-            }
-            return nullptr;
+            return ret_val;
         }
     }
+
+    return nullptr;
+}
+
+RTPSWriter* RTPSDomain::createRTPSWriter(
+        RTPSParticipant* p,
+        WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+{
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
+    {
+        RTPSWriter* ret_val = nullptr;
+        if (impl->createWriter(&ret_val, watt, payload_pool, hist, listen))
+        {
+            return ret_val;
+        }
+    }
+
     return nullptr;
 }
 
@@ -312,20 +305,32 @@ RTPSReader* RTPSDomain::createRTPSReader(
         ReaderHistory* rhist,
         ReaderListener* rlisten)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    for (auto it = m_RTPSParticipants.begin(); it != m_RTPSParticipants.end(); ++it)
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
     {
-        if (it->first->getGuid().guidPrefix == p->getGuid().guidPrefix)
+        RTPSReader* reader;
+        if (impl->createReader(&reader, ratt, rhist, rlisten))
         {
-            t_p_RTPSParticipant participant = *it;
-            lock.unlock();
-            RTPSReader* reader;
-            if (participant.second->createReader(&reader, ratt, rhist, rlisten))
-            {
-                return reader;
-            }
+            return reader;
+        }
+    }
+    return nullptr;
+}
 
-            return nullptr;
+RTPSReader* RTPSDomain::createRTPSReader(
+        RTPSParticipant* p,
+        ReaderAttributes& ratt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        ReaderHistory* rhist,
+        ReaderListener* rlisten)
+{
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
+    {
+        RTPSReader* reader;
+        if (impl->createReader(&reader, ratt, payload_pool, rhist, rlisten))
+        {
+            return reader;
         }
     }
     return nullptr;
@@ -428,6 +433,22 @@ void RTPSDomainImpl::create_participant_guid(
 
     guid_prefix_create(participant_id, guid.guidPrefix);
     guid.entityId = c_EntityId_RTPSParticipant;
+}
+
+RTPSParticipantImpl* RTPSDomainImpl::find_local_participant(
+        const GUID_t& guid)
+{
+    std::lock_guard<std::mutex> guard(RTPSDomain::m_mutex);
+    for (const RTPSDomain::t_p_RTPSParticipant& participant : RTPSDomain::m_RTPSParticipants)
+    {
+        if (participant.second->getGuid().guidPrefix == guid.guidPrefix)
+        {
+            // Participant found, forward the query
+            return participant.second;
+        }
+    }
+
+    return nullptr;
 }
 
 RTPSReader* RTPSDomainImpl::find_local_reader(

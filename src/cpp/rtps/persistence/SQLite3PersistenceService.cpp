@@ -20,7 +20,7 @@
 #include <rtps/persistence/SQLite3PersistenceService.h>
 #include <rtps/persistence/SQLite3PersistenceServiceStatements.h>
 #include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/history/CacheChangePool.h>
+#include <fastdds/rtps/history/WriterHistory.h>
 
 #include <rtps/persistence/sqlite3.h>
 
@@ -187,7 +187,8 @@ SQLite3PersistenceService::SQLite3PersistenceService(
 {
     // Prepare writer statements
     sqlite3_prepare_v3(db_, "SELECT seq_num,instance,payload FROM writers_histories WHERE guid=?;", -1,
-            SQLITE_PREPARE_PERSISTENT, &load_writer_stmt_, NULL);
+            SQLITE_PREPARE_PERSISTENT,
+            &load_writer_stmt_, NULL);
     sqlite3_prepare_v3(db_, "INSERT INTO writers_histories VALUES(?,?,?,?);", -1, SQLITE_PREPARE_PERSISTENT,
             &add_writer_change_stmt_, NULL);
     sqlite3_prepare_v3(db_, "DELETE FROM writers_histories WHERE guid=? AND seq_num=?;", -1, SQLITE_PREPARE_PERSISTENT,
@@ -234,16 +235,16 @@ SQLite3PersistenceService::~SQLite3PersistenceService()
  * @param writer_guid GUID of the writer to load.
  * @param changes History of CacheChanges of the writer. It will be filled.
  * @param pool Pool of CacheChanges from which new ones are reserved to add to the history.
- * @param last_seq_num Buffer to fill with the last sequence number on the history.
+ * @param next_sequence Buffer to fill with the last sequence number on the history.
  * @return True if operation was successful.
  */
 bool SQLite3PersistenceService::load_writer_from_storage(
         const std::string& persistence_guid,
         const GUID_t& writer_guid,
         std::vector<CacheChange_t*>& changes,
-        CacheChangePool* pool,
-        SequenceNumber_t* last_seq_num
-        )
+        const std::shared_ptr<IChangePool>& change_pool,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        SequenceNumber_t& next_sequence)
 {
     logInfo(RTPS_PERSISTENCE, "Loading writer " << writer_guid);
 
@@ -252,25 +253,38 @@ bool SQLite3PersistenceService::load_writer_from_storage(
         sqlite3_reset(load_writer_stmt_);
         sqlite3_bind_text(load_writer_stmt_, 1, persistence_guid.c_str(), -1, SQLITE_STATIC);
 
+
         while (SQLITE_ROW == sqlite3_step(load_writer_stmt_))
         {
+            sqlite3_int64 sn = sqlite3_column_int64(load_writer_stmt_, 0);
             CacheChange_t* change = nullptr;
             int size = sqlite3_column_bytes(load_writer_stmt_, 2);
-            if (pool->reserve_Cache(&change, size))
-            {
-                sqlite3_int64 sn = sqlite3_column_int64(load_writer_stmt_, 0);
-                int instance_size = sqlite3_column_bytes(load_writer_stmt_, 1);
-                instance_size = (instance_size > 16) ? 16 : instance_size;
-                change->kind = ALIVE;
-                change->writerGUID = writer_guid;
-                memcpy(change->instanceHandle.value, sqlite3_column_blob(load_writer_stmt_, 1), instance_size);
-                change->sequenceNumber.high = (int32_t)((sn >> 32) & 0xFFFFFFFF);
-                change->sequenceNumber.low = (int32_t)(sn & 0xFFFFFFFF);
-                change->serializedPayload.length = size;
-                memcpy(change->serializedPayload.data, sqlite3_column_blob(load_writer_stmt_, 2), size);
 
-                changes.insert(changes.begin(), change);
+            if (!change_pool->reserve_cache(change))
+            {
+                continue;
             }
+
+            SampleIdentity identity;
+            identity.writer_guid(writer_guid);
+            identity.sequence_number().high = static_cast<int32_t>((sn >> 32) & 0xFFFFFFFF);
+            identity.sequence_number().low = static_cast<uint32_t>(sn & 0xFFFFFFFF);
+            if (!payload_pool->get_payload(size, *change))
+            {
+                change_pool->release_cache(change);
+                continue;
+            }
+
+            int instance_size = sqlite3_column_bytes(load_writer_stmt_, 1);
+            instance_size = (instance_size > 16) ? 16 : instance_size;
+            change->kind = ALIVE;
+            change->writerGUID = writer_guid;
+            memcpy(change->instanceHandle.value, sqlite3_column_blob(load_writer_stmt_, 1), instance_size);
+            change->sequenceNumber = identity.sequence_number();
+            change->serializedPayload.length = size;
+            memcpy(change->serializedPayload.data, sqlite3_column_blob(load_writer_stmt_, 2), size);
+
+            changes.insert(changes.begin(), change);
         }
 
         sqlite3_reset(load_writer_last_seq_num_stmt_);
@@ -279,8 +293,8 @@ bool SQLite3PersistenceService::load_writer_from_storage(
         while (SQLITE_ROW == sqlite3_step(load_writer_last_seq_num_stmt_))
         {
             sqlite3_int64 sn = sqlite3_column_int64(load_writer_last_seq_num_stmt_, 0);
-            last_seq_num->high = (int32_t)((sn >> 32) & 0xFFFFFFFF);
-            last_seq_num->low = (int32_t)(sn & 0xFFFFFFFF);
+            next_sequence.high = (int32_t)((sn >> 32) & 0xFFFFFFFF);
+            next_sequence.low = (int32_t)(sn & 0xFFFFFFFF);
         }
     }
 

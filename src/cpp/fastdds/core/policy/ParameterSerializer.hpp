@@ -92,6 +92,11 @@ class ParameterSerializer<Parameter_t>
 {
 public:
 
+    static constexpr uint32_t PARAMETER_STATUS_SIZE = 8u;
+    static constexpr uint32_t PARAMETER_KEY_SIZE = 20u;
+    static constexpr uint32_t PARAMETER_SENTINEL_SIZE = 4u;
+    static constexpr uint32_t PARAMETER_SAMPLE_IDENTITY_SIZE = 28u;
+
     static bool add_parameter_status(
             fastrtps::rtps::CDRMessage_t* cdr_message,
             fastrtps::rtps::octet status)
@@ -801,7 +806,7 @@ inline bool ParameterSerializer<ParameterEndpointSecurityInfo_t>::read_content_f
     return valid;
 }
 
-#endif
+#endif // if HAVE_SECURITY
 
 } //namespace dds
 } //namespace fastdds

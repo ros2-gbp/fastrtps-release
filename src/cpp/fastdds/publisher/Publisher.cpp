@@ -92,7 +92,20 @@ const PublisherListener* Publisher::get_listener() const
 ReturnCode_t Publisher::set_listener(
         PublisherListener* listener)
 {
-    return impl_->set_listener(listener);
+    return set_listener(listener, StatusMask::all());
+}
+
+ReturnCode_t Publisher::set_listener(
+        PublisherListener* listener,
+        const StatusMask& mask)
+{
+    ReturnCode_t ret_val = impl_->set_listener(listener);
+    if (ret_val == ReturnCode_t::RETCODE_OK)
+    {
+        status_mask_ = mask;
+    }
+
+    return ret_val;
 }
 
 DataWriter* Publisher::create_datawriter(
@@ -198,6 +211,13 @@ ReturnCode_t Publisher::get_default_datawriter_qos(
 {
     qos = impl_->get_default_datawriter_qos();
     return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t Publisher::get_datawriter_qos_from_profile(
+        const std::string& profile_name,
+        DataWriterQos& qos) const
+{
+    return impl_->get_datawriter_qos_from_profile(profile_name, qos);
 }
 
 /* TODO

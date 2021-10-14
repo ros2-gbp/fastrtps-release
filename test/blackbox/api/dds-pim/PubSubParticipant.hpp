@@ -460,9 +460,9 @@ public:
             std::string topicName)
     {
         // Generate topic name
-        std::ostringstream topic;
-        topic << topicName << "_" << asio::ip::host_name() << "_" << GET_PID();
-        publisher_topicname_ = topic.str();
+        std::ostringstream t;
+        t << topicName << "_" << asio::ip::host_name() << "_" << GET_PID();
+        publisher_topicname_ = t.str();
         return *this;
     }
 
@@ -470,9 +470,9 @@ public:
             std::string topicName)
     {
         // Generate topic name
-        std::ostringstream topic;
-        topic << topicName << "_" << asio::ip::host_name() << "_" << GET_PID();
-        subscriber_topicname_ = topic.str();
+        std::ostringstream t;
+        t << topicName << "_" << asio::ip::host_name() << "_" << GET_PID();
+        subscriber_topicname_ = t.str();
         return *this;
     }
 

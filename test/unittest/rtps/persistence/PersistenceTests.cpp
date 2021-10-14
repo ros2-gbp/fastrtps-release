@@ -12,22 +12,50 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rtps/persistence/PersistenceService.h"
-#include <rtps/persistence/SQLite3PersistenceServiceStatements.h>
-#include <fastrtps/rtps/attributes/PropertyPolicy.h>
-#include <fastrtps/rtps/history/CacheChangePool.h>
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
+
+#include <rtps/history/CacheChangePool.h>
+#include <rtps/persistence/PersistenceService.h>
 #include <rtps/persistence/sqlite3.h>
+#include <rtps/persistence/SQLite3PersistenceServiceStatements.h>
 
 #include <climits>
 #include <gtest/gtest.h>
 
 using namespace eprosima::fastrtps::rtps;
 
+class NoOpPayloadPool : public IPayloadPool
+{
+    virtual bool get_payload(
+            uint32_t,
+            CacheChange_t&) override
+    {
+        return true;
+    }
+
+    virtual bool get_payload(
+            SerializedPayload_t&,
+            IPayloadPool*&,
+            CacheChange_t&) override
+    {
+        return true;
+    }
+
+    virtual bool release_payload(
+            CacheChange_t&) override
+    {
+        return true;
+    }
+
+};
+
 class PersistenceTest : public ::testing::Test
 {
 protected:
 
     IPersistenceService* service = nullptr;
+
+    std::shared_ptr<NoOpPayloadPool> payload_pool_ = std::make_shared<NoOpPayloadPool>();
 
     virtual void SetUp()
     {
@@ -170,18 +198,23 @@ TEST_F(PersistenceTest, Writer)
     service = PersistenceFactory::create_persistence_service(policy);
     ASSERT_NE(service, nullptr);
 
-    CacheChangePool pool(10, 128, 0, MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE);
+    auto init_cache = [](CacheChange_t* item)
+            {
+                item->serializedPayload.reserve(128);
+            };
+    PoolConfig cfg{ MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE, 0, 10, 0 };
+    auto pool = std::make_shared<CacheChangePool>(cfg, init_cache);
+    SequenceNumber_t max_seq;
     CacheChange_t change;
     GUID_t guid(GuidPrefix_t::unknown(), 1U);
     std::vector<CacheChange_t*> changes;
-    SequenceNumber_t last_seq_number;
     change.kind = ALIVE;
     change.writerGUID = guid;
     change.serializedPayload.length = 0;
 
     // Initial load should return empty vector
     changes.clear();
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, &pool, &last_seq_number));
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, max_seq));
     ASSERT_EQ(changes.size(), 0u);
 
     // Add two changes
@@ -198,9 +231,9 @@ TEST_F(PersistenceTest, Writer)
 
     // Loading should return two changes (seqs = 1, 2)
     changes.clear();
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, &pool, &last_seq_number));
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, max_seq));
     ASSERT_EQ(changes.size(), 2u);
-    ASSERT_EQ(last_seq_number, SequenceNumber_t(0, 2u));
+    ASSERT_EQ(max_seq, SequenceNumber_t(0, 2u));
     uint32_t i = 0;
     for (auto it : changes)
     {
@@ -215,18 +248,18 @@ TEST_F(PersistenceTest, Writer)
 
     // Loading should return one change (seq = 2)
     changes.clear();
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, &pool, &last_seq_number));
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, max_seq));
     ASSERT_EQ(changes.size(), 1u);
     ASSERT_EQ((*changes.begin())->sequenceNumber, SequenceNumber_t(0, 2));
-    ASSERT_EQ(last_seq_number, SequenceNumber_t(0, 2u));
+    ASSERT_EQ(max_seq, SequenceNumber_t(0, 2u));
 
     // Remove seq = 2, and check that load returns empty vector
     changes.clear();
     change.sequenceNumber.low = 2;
     ASSERT_TRUE(service->remove_writer_change_from_storage(persist_guid, change));
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, &pool, &last_seq_number));
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, max_seq));
     ASSERT_EQ(changes.size(), 0u);
-    ASSERT_EQ(last_seq_number, SequenceNumber_t(0, 2u));
+    ASSERT_EQ(max_seq, SequenceNumber_t(0, 2u));
 }
 
 
@@ -274,7 +307,12 @@ TEST_F(PersistenceTest, SchemaVersionUpdateFrom1To2)
     service = PersistenceFactory::create_persistence_service(policy);
     ASSERT_NE(service, nullptr);
 
-    CacheChangePool pool(10, 128, 0, MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE);
+    auto init_cache = [](CacheChange_t* item)
+            {
+                item->serializedPayload.reserve(128);
+            };
+    PoolConfig cfg{ MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE, 0, 10, 0 };
+    auto pool = std::make_shared<CacheChangePool>(cfg, init_cache);
     CacheChange_t change;
     GUID_t guid(GuidPrefix_t::unknown(), 1U);
     std::vector<CacheChange_t*> changes;
@@ -285,7 +323,7 @@ TEST_F(PersistenceTest, SchemaVersionUpdateFrom1To2)
 
     // Load data
     changes.clear();
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, &pool, &last_seq_number));
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, last_seq_number));
     ASSERT_EQ(changes.size(), 2u);
     ASSERT_EQ(last_seq_number, SequenceNumber_t(0, 2u));
     uint32_t i = 0;

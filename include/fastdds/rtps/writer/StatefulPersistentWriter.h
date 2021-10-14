@@ -39,11 +39,39 @@ class StatefulPersistentWriter : public StatefulWriter, private PersistentWriter
 
     StatefulPersistentWriter(
             RTPSParticipantImpl*,
-            GUID_t& guid,
-            WriterAttributes& att,
+            const GUID_t& guid,
+            const WriterAttributes& att,
             WriterHistory* hist,
             WriterListener* listen = nullptr,
             IPersistenceService* persistence = nullptr);
+
+    StatefulPersistentWriter(
+            RTPSParticipantImpl*,
+            const GUID_t& guid,
+            const WriterAttributes& att,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            WriterHistory* hist,
+            WriterListener* listen = nullptr,
+            IPersistenceService* persistence = nullptr);
+
+    StatefulPersistentWriter(
+            RTPSParticipantImpl*,
+            const GUID_t& guid,
+            const WriterAttributes& att,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            const std::shared_ptr<IChangePool>& change_pool,
+            WriterHistory* hist,
+            WriterListener* listen = nullptr,
+            IPersistenceService* persistence = nullptr);
+
+    void print_inconsistent_acknack(
+            const GUID_t& writer_guid,
+            const GUID_t& reader_guid,
+            const SequenceNumber_t& min_requested_sequence_number,
+            const SequenceNumber_t& max_requested_sequence_number,
+            const SequenceNumber_t& next_sequence_number) override;
+
+    bool log_error_printed_ = false;
 
 public:
 
@@ -65,20 +93,11 @@ public:
      */
     bool change_removed_by_history(
             CacheChange_t* a_change) override;
-
-    void print_inconsistent_acknack(
-            const GUID_t& writer_guid,
-            const GUID_t& reader_guid,
-            const SequenceNumber_t& min_requested_sequence_number,
-            const SequenceNumber_t& max_requested_sequence_number,
-            const SequenceNumber_t& next_sequence_number) override;
-
-    bool log_error_printed_ = false;
 };
 
 } // namespace rtps
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace fastrtps
+} // namespace eprosima
 
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_RTPS_STATEFULPERSISTENTWRITER_H_ */
