@@ -20,18 +20,6 @@
 #ifndef _TEST_BLACKBOX_PUBSUBWRITER_HPP_
 #define _TEST_BLACKBOX_PUBSUBWRITER_HPP_
 
-#include <string>
-#include <list>
-#include <map>
-#include <condition_variable>
-#include <asio.hpp>
-#include <gtest/gtest.h>
-#include <thread>
-
-#if _MSC_VER
-#include <Windows.h>
-#endif // _MSC_VER
-
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
@@ -42,19 +30,21 @@
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
 #include <fastdds/dds/core/policy/QosPolicies.hpp>
-#include <fastdds/rtps/transport/UDPTransportDescriptor.h>
-#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
-#include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
 #include <fastrtps/utils/IPLocator.h>
-
+#include <fastrtps/transport/UDPv4TransportDescriptor.h>
+#include <string>
+#include <list>
+#include <map>
+#include <condition_variable>
+#include <asio.hpp>
+#include <gtest/gtest.h>
+#include <thread>
 
 using DomainParticipantFactory = eprosima::fastdds::dds::DomainParticipantFactory;
 using eprosima::fastrtps::rtps::IPLocator;
-using eprosima::fastdds::rtps::UDPTransportDescriptor;
-using eprosima::fastdds::rtps::UDPv4TransportDescriptor;
-using eprosima::fastdds::rtps::UDPv6TransportDescriptor;
+using eprosima::fastrtps::rtps::UDPv4TransportDescriptor;
 
 template<class TypeSupport>
 class PubSubWriter
@@ -272,21 +262,6 @@ public:
         t << topic_name << "_" << asio::ip::host_name() << "_" << GET_PID();
         topic_name_ = t.str();
 
-        if (enable_datasharing)
-        {
-            datawriter_qos_.data_sharing().automatic();
-            datawriter_qos_.resource_limits().extra_samples = 5;
-        }
-        else
-        {
-            datawriter_qos_.data_sharing().off();
-        }
-
-        if (use_pull_mode)
-        {
-            datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
-        }
-
         // By default, memory mode is preallocated (the most restritive)
         datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 
@@ -307,15 +282,8 @@ public:
         destroy();
     }
 
-    eprosima::fastdds::dds::DataWriter& get_native_writer() const
-    {
-        return *datawriter_;
-    }
-
     void init()
     {
-        matched_ = 0;
-
         if (!xml_file_.empty())
         {
             DomainParticipantFactory::get_instance()->load_XML_profiles_file(xml_file_);
@@ -348,26 +316,16 @@ public:
             // Register type
             ASSERT_EQ(participant_->register_type(type_), ReturnCode_t::RETCODE_OK);
 
+            // Create publisher
+            publisher_ = participant_->create_publisher(publisher_qos_);
+            ASSERT_NE(publisher_, nullptr);
+            ASSERT_TRUE(publisher_->is_enabled());
+
             // Create topic
             topic_ = participant_->create_topic(topic_name_, type_->getName(),
                             eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
             ASSERT_NE(topic_, nullptr);
             ASSERT_TRUE(topic_->is_enabled());
-
-            // Create publisher
-            createPublisher();
-        }
-        return;
-    }
-
-    void createPublisher()
-    {
-        if (participant_ != nullptr)
-        {
-            // Create publisher
-            publisher_ = participant_->create_publisher(publisher_qos_);
-            ASSERT_NE(publisher_, nullptr);
-            ASSERT_TRUE(publisher_->is_enabled());
 
             if (!xml_file_.empty())
             {
@@ -393,23 +351,6 @@ public:
                 initialized_ = datawriter_->is_enabled();
             }
         }
-        return;
-    }
-
-    void removePublisher()
-    {
-        initialized_ = false;
-        if (datawriter_ != nullptr)
-        {
-            publisher_->delete_datawriter(datawriter_);
-        }
-        datawriter_ = nullptr;
-        if (publisher_ != nullptr)
-        {
-            participant_->delete_publisher(publisher_);
-        }
-        publisher_ = nullptr;
-        matched_ = 0;
         return;
     }
 
@@ -736,13 +677,6 @@ public:
         return *this;
     }
 
-    PubSubWriter& mem_policy(
-            const eprosima::fastrtps::rtps::MemoryManagementPolicy mem_policy)
-    {
-        datawriter_qos_.endpoint().history_memory_policy = mem_policy;
-        return *this;
-    }
-
     PubSubWriter& deadline_period(
             const eprosima::fastrtps::Duration_t deadline_period)
     {
@@ -809,15 +743,6 @@ public:
             uint32_t bytesPerPeriod,
             uint32_t periodInMs)
     {
-        static const std::string flow_controller_name("MyFlowController");
-        auto new_flow_controller = std::make_shared<eprosima::fastdds::rtps::FlowControllerDescriptor>();
-        new_flow_controller->name = flow_controller_name.c_str();
-        new_flow_controller->max_bytes_per_period = bytesPerPeriod;
-        new_flow_controller->period_ms = static_cast<uint64_t>(periodInMs);
-        participant_qos_.flow_controllers().push_back(new_flow_controller);
-        datawriter_qos_.publish_mode().flow_controller_name = flow_controller_name.c_str();
-
-
         eprosima::fastrtps::rtps::ThroughputControllerDescriptor descriptor {bytesPerPeriod, periodInMs};
         datawriter_qos_.throughput_controller() = descriptor;
 
@@ -852,7 +777,7 @@ public:
     }
 
     PubSubWriter& add_user_transport_to_pparams(
-            std::shared_ptr<eprosima::fastdds::rtps::TransportDescriptorInterface> userTransportDescriptor)
+            std::shared_ptr<eprosima::fastrtps::rtps::TransportDescriptorInterface> userTransportDescriptor)
     {
         participant_qos_.transport().user_transports.push_back(userTransportDescriptor);
         return *this;
@@ -893,13 +818,6 @@ public:
         return *this;
     }
 
-    PubSubWriter& resource_limits_extra_samples(
-            const int32_t extra)
-    {
-        datawriter_qos_.resource_limits().extra_samples = extra;
-        return *this;
-    }
-
     PubSubWriter& matched_readers_allocation(
             size_t initial,
             size_t maximum)
@@ -930,7 +848,7 @@ public:
     }
 
     PubSubWriter& unicastLocatorList(
-            const eprosima::fastdds::rtps::LocatorList& unicastLocators)
+            eprosima::fastrtps::rtps::LocatorList_t unicastLocators)
     {
         datawriter_qos_.endpoint().unicast_locator_list = unicastLocators;
         return *this;
@@ -940,16 +858,8 @@ public:
             const std::string& ip,
             uint32_t port)
     {
-        eprosima::fastdds::rtps::Locator loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
+        eprosima::fastrtps::rtps::Locator_t loc;
+        IPLocator::setIPv4(loc, ip);
         loc.port = port;
         datawriter_qos_.endpoint().unicast_locator_list.push_back(loc);
 
@@ -957,7 +867,7 @@ public:
     }
 
     PubSubWriter& multicastLocatorList(
-            const eprosima::fastdds::rtps::LocatorList& multicastLocators)
+            eprosima::fastrtps::rtps::LocatorList_t multicastLocators)
     {
         datawriter_qos_.endpoint().multicast_locator_list = multicastLocators;
         return *this;
@@ -967,16 +877,8 @@ public:
             const std::string& ip,
             uint32_t port)
     {
-        eprosima::fastdds::rtps::Locator loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
+        eprosima::fastrtps::rtps::Locator_t loc;
+        IPLocator::setIPv4(loc, ip);
         loc.port = port;
         datawriter_qos_.endpoint().multicast_locator_list.push_back(loc);
 
@@ -984,7 +886,7 @@ public:
     }
 
     PubSubWriter& metatraffic_unicast_locator_list(
-            const eprosima::fastdds::rtps::LocatorList& unicastLocators)
+            eprosima::fastrtps::rtps::LocatorList_t unicastLocators)
     {
         participant_qos_.wire_protocol().builtin.metatrafficUnicastLocatorList = unicastLocators;
         return *this;
@@ -994,16 +896,8 @@ public:
             const std::string& ip,
             uint32_t port)
     {
-        eprosima::fastdds::rtps::Locator loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
+        eprosima::fastrtps::rtps::Locator_t loc;
+        IPLocator::setIPv4(loc, ip);
         loc.port = port;
         participant_qos_.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(loc);
 
@@ -1011,7 +905,7 @@ public:
     }
 
     PubSubWriter& metatraffic_multicast_locator_list(
-            const eprosima::fastdds::rtps::LocatorList& unicastLocators)
+            eprosima::fastrtps::rtps::LocatorList_t unicastLocators)
     {
         participant_qos_.wire_protocol().builtin.metatrafficMulticastLocatorList = unicastLocators;
         return *this;
@@ -1021,78 +915,16 @@ public:
             const std::string& ip,
             uint32_t port)
     {
-        eprosima::fastdds::rtps::Locator loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
+        eprosima::fastrtps::rtps::Locator_t loc;
+        IPLocator::setIPv4(loc, ip);
         loc.port = port;
         participant_qos_.wire_protocol().builtin.metatrafficMulticastLocatorList.push_back(loc);
 
         return *this;
     }
 
-    PubSubWriter& set_default_unicast_locators(
-            const eprosima::fastdds::rtps::LocatorList& locators)
-    {
-        participant_qos_.wire_protocol().default_unicast_locator_list = locators;
-        return *this;
-    }
-
-    PubSubWriter& add_to_default_unicast_locator_list(
-            const std::string& ip,
-            uint32_t port)
-    {
-        eprosima::fastdds::rtps::Locator loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
-        loc.port = port;
-        participant_qos_.wire_protocol().default_unicast_locator_list.push_back(loc);
-
-        return *this;
-    }
-
-    PubSubWriter& set_default_multicast_locators(
-            const eprosima::fastdds::rtps::LocatorList& locators)
-    {
-        participant_qos_.wire_protocol().default_multicast_locator_list = locators;
-        return *this;
-    }
-
-    PubSubWriter& add_to_default_multicast_locator_list(
-            const std::string& ip,
-            uint32_t port)
-    {
-        eprosima::fastdds::rtps::Locator loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
-        loc.port = port;
-        participant_qos_.wire_protocol().default_multicast_locator_list.push_back(loc);
-
-        return *this;
-    }
-
     PubSubWriter& initial_peers(
-            const eprosima::fastdds::rtps::LocatorList& initial_peers)
+            eprosima::fastrtps::rtps::LocatorList_t initial_peers)
     {
         participant_qos_.wire_protocol().builtin.initialPeersList = initial_peers;
         return *this;
@@ -1103,19 +935,19 @@ public:
     {
         participant_qos_.wire_protocol().builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
         participant_qos_.wire_protocol().builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_qos_.wire_protocol().builtin.discovery_config.static_edp_xml_config(filename);
+        participant_qos_.wire_protocol().builtin.discovery_config.setStaticEndpointXMLFilename(filename);
         return *this;
     }
 
     PubSubWriter& property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy& property_policy)
+            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
     {
         participant_qos_.properties() = property_policy;
         return *this;
     }
 
     PubSubWriter& entity_property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy& property_policy)
+            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
     {
         datawriter_qos_.properties() = property_policy;
         return *this;
@@ -1142,22 +974,14 @@ public:
     {
         participant_qos_.wire_protocol().participant_id = participantId;
 
-        eprosima::fastdds::rtps::LocatorList default_unicast_locators;
-        eprosima::fastdds::rtps::Locator default_unicast_locator;
-        eprosima::fastdds::rtps::Locator loopback_locator;
-        if (!use_udpv4)
-        {
-            default_unicast_locator.kind = LOCATOR_KIND_UDPv6;
-            loopback_locator.kind = LOCATOR_KIND_UDPv6;
-        }
+        eprosima::fastrtps::rtps::LocatorList_t default_unicast_locators;
+        eprosima::fastrtps::rtps::Locator_t default_unicast_locator;
 
         default_unicast_locators.push_back(default_unicast_locator);
         participant_qos_.wire_protocol().builtin.metatrafficUnicastLocatorList = default_unicast_locators;
 
-        if (!IPLocator::setIPv4(loopback_locator, 127, 0, 0, 1))
-        {
-            IPLocator::setIPv6(loopback_locator, "::1");
-        }
+        eprosima::fastrtps::rtps::Locator_t loopback_locator;
+        IPLocator::setIPv4(loopback_locator, 127, 0, 0, 1);
         participant_qos_.wire_protocol().builtin.initialPeersList.push_back(loopback_locator);
         return *this;
     }
@@ -1241,15 +1065,7 @@ public:
             uint32_t maxInitialPeerRange)
     {
         participant_qos_.transport().use_builtin_transports = false;
-        std::shared_ptr<UDPTransportDescriptor> descriptor;
-        if (use_udpv4)
-        {
-            descriptor = std::make_shared<UDPv4TransportDescriptor>();
-        }
-        else
-        {
-            descriptor = std::make_shared<UDPv6TransportDescriptor>();
-        }
+        std::shared_ptr<UDPv4TransportDescriptor> descriptor = std::make_shared<UDPv4TransportDescriptor>();
         descriptor->maxInitialPeersRange = maxInitialPeerRange;
         participant_qos_.transport().user_transports.push_back(descriptor);
         return *this;
@@ -1266,27 +1082,6 @@ public:
             int32_t participantId)
     {
         participant_qos_.wire_protocol().participant_id = participantId;
-        return *this;
-    }
-
-    PubSubWriter& datasharing_off()
-    {
-        datawriter_qos_.data_sharing().off();
-        return *this;
-    }
-
-    PubSubWriter& datasharing_auto(
-            std::vector<uint16_t> domain_id = std::vector<uint16_t>())
-    {
-        datawriter_qos_.data_sharing().automatic(domain_id);
-        return *this;
-    }
-
-    PubSubWriter& datasharing_on(
-            const std::string directory,
-            std::vector<uint16_t> domain_id = std::vector<uint16_t>())
-    {
-        datawriter_qos_.data_sharing().on(directory, domain_id);
         return *this;
     }
 

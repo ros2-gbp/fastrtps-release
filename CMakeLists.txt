@@ -13,7 +13,7 @@
 # limitations under the License.
 
 ###############################################################################
-# CMake build rules for Fast DDS
+# CMake build rules for FastRTPS
 ###############################################################################
 cmake_minimum_required(VERSION 3.5)
 cmake_policy(VERSION 3.5...3.13)
@@ -160,10 +160,8 @@ endif()
 # Test system configuration
 ###############################################################################
 include(${PROJECT_SOURCE_DIR}/cmake/common/check_configuration.cmake)
-
-set(FORCE_CXX "11" CACHE STRING "C++ standard fulfillment selection")
+set(FORCE_CXX "11")
 check_stdcxx()
-
 check_compile_feature()
 check_endianness()
 
@@ -219,13 +217,8 @@ option(BUILD_SHARED_LIBS "Create shared libraries by default" ON)
 ###############################################################################
 include(${PROJECT_SOURCE_DIR}/cmake/common/eprosima_libraries.cmake)
 
-# if we are building Fast-DDS as a static library we must load Fast-CDR as one
-if(NOT BUILD_SHARED_LIBS)
-    set(FASTDDS_STATIC ON)
-endif()
-
 eprosima_find_package(fastcdr REQUIRED)
-eprosima_find_thirdparty(Asio asio VERSION 1.10.8)
+eprosima_find_thirdparty(Asio asio)
 eprosima_find_thirdparty(TinyXML2 tinyxml2)
 
 find_package(foonathan_memory REQUIRED)
@@ -271,7 +264,7 @@ option(SQLITE3_SUPPORT "Activate SQLITE3 support" ON)
 ###############################################################################
 # SHM as Default transport
 ###############################################################################
-option(SHM_TRANSPORT_DEFAULT "Add SHM transport to the default transports" ON)
+option(SHM_TRANSPORT_DEFAULT "Adds SHM transport to the default transports" ON)
 
 ###############################################################################
 # LogConsumer default setup
@@ -284,53 +277,6 @@ if(LOG_CONSUMER_DEFAULT STREQUAL "STDOUTERR")
 endif()
 
 ###############################################################################
-# Log Info default setup
-###############################################################################
-
-include(CMakeDependentOption)
-
-set(LOG_NO_INFO_HELP "\
-Do not compile Info Log level. For the sake of efficiency non-debug \
-configs do not log info messages unless the option FASTDDS_ENFORCE_LOG_INFO \
-is set to on.")
-if(CMAKE_BUILD_TYPE MATCHES "^([Dd][Ee][Bb][Uu][Gg])$"  # single config generator
-   OR ("Debug" IN_LIST CMAKE_CONFIGURATION_TYPES))      # multi config generator
-    option(LOG_NO_INFO ${LOG_NO_INFO_HELP} OFF)
-else()
-    option(LOG_NO_INFO ${LOG_NO_INFO_HELP} ON)
-endif()
-unset(LOG_NO_INFO_HELP)
-
-option(LOG_NO_WARNING "Do not compile Warning Log level" OFF)
-
-option(LOG_NO_ERROR "Do not compile Error Log level" OFF)
-
-cmake_dependent_option(
-    FASTDDS_ENFORCE_LOG_INFO
-    "The LOG_NO_INFO option must be enforced regardless of selected configuration"
-    OFF
-    "NOT LOG_NO_INFO"
-    OFF)
-
-if(LOG_NO_INFO)
-    set(HAVE_LOG_NO_INFO 1)
-else()
-    set(HAVE_LOG_NO_INFO 0)
-endif()
-
-if(LOG_NO_WARNING)
-    set(HAVE_LOG_NO_WARNING 1)
-else()
-    set(HAVE_LOG_NO_WARNING 0)
-endif()
-
-if(LOG_NO_ERROR)
-    set(HAVE_LOG_NO_ERROR 1)
-else()
-    set(HAVE_LOG_NO_ERROR 0)
-endif()
-
-###############################################################################
 # Tools default setup
 ###############################################################################
 option(COMPILE_TOOLS "Build tools" ON)
@@ -338,11 +284,6 @@ option(COMPILE_TOOLS "Build tools" ON)
 if(EPROSIMA_BUILD AND IS_TOP_LEVEL)
     set(COMPILE_TOOLS ON)
 endif()
-
-###############################################################################
-# Fast DDS statistics tool default setup
-###############################################################################
-option(FASTDDS_STATISTICS "Enable Fast DDS Statistics Module" OFF)
 
 ###############################################################################
 # Compile library.

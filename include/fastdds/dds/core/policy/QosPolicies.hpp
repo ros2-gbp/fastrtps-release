@@ -21,20 +21,17 @@
 #define _FASTDDS_DDS_QOS_QOSPOLICIES_HPP_
 
 #include <vector>
-
+#include <fastdds/rtps/common/Types.h>
+#include <fastdds/rtps/common/Time_t.h>
 #include <fastdds/dds/core/policy/ParameterTypes.hpp>
-
 #include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastdds/rtps/common/LocatorList.hpp>
-#include <fastdds/rtps/common/Types.h>
-#include <fastdds/rtps/common/Time_t.h>
 #include <fastdds/rtps/resources/ResourceManagement.h>
-#include <fastdds/rtps/flowcontrol/FlowControllerConsts.hpp>
-
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastrtps/types/TypeObject.h>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
+
 
 namespace eprosima {
 namespace fastdds {
@@ -1315,13 +1312,13 @@ public:
         }
 
         bool operator ==(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ == rhs.ptr_;
         }
 
         bool operator !=(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ != rhs.ptr_;
         }
@@ -1659,9 +1656,6 @@ public:
     int32_t depth;
 };
 
-//! A special value indicating an unlimited quantity
-constexpr int32_t LENGTH_UNLIMITED = -1;
-
 /**
  * Specifies the resources that the Service can consume in order to meet the requested QoS
  * @note Immutable Qos Policy
@@ -1694,11 +1688,6 @@ public:
      * By default, 100.
      */
     int32_t allocated_samples;
-    /**
-     * @brief Represents the extra number of samples available once the max_samples have been reached in the history.
-     * This makes it possible, for example, to loan samples even with a full history. By default, 1.
-     */
-    int32_t extra_samples;
 
     /**
      * @brief Constructor
@@ -1710,7 +1699,6 @@ public:
         , max_instances(10)
         , max_samples_per_instance(400)
         , allocated_samples(100)
-        , extra_samples(1)
     {
     }
 
@@ -1758,9 +1746,9 @@ public:
         , QosPolicy(false)
         , history_kind(KEEP_LAST_HISTORY_QOS)
         , history_depth(1)
-        , max_samples(LENGTH_UNLIMITED)
-        , max_instances(LENGTH_UNLIMITED)
-        , max_samples_per_instance(LENGTH_UNLIMITED)
+        , max_samples(-1)
+        , max_instances(-1)
+        , max_samples_per_instance(-1)
     {
     }
 
@@ -1811,20 +1799,20 @@ public:
      * Specifies the maximum number of data-samples the DataWriter (or DataReader) can manage across all the instances
      * associated with it. Represents the maximum samples the middleware can store for any one DataWriter (or DataReader).
      * It is inconsistent for this value to be less than max_samples_per_instance. <br>
-     * By default, LENGTH_UNLIMITED.
+     * By default, -1 (Length Unlimited).
      */
     int32_t max_samples;
     /**
      * @brief Control the ResourceLimitsQos of the implied DataReader that stores the data within the durability service.
      * Represents the maximum number of instances DataWriter (or DataReader) can manage. <br>
-     * By default, LENGTH_UNLIMITED.
+     * By default, -1 (Length Unlimited).
      */
     int32_t max_instances;
     /**
      * @brief Control the ResourceLimitsQos of the implied DataReader that stores the data within the durability service.
      * Represents the maximum number of samples of any one instance a DataWriter(or DataReader) can manage.
      * It is inconsistent for this value to be greater than max_samples. <br>
-     * By default, LENGTH_UNLIMITED.
+     * By default, -1 (Length Unlimited).
      */
     int32_t max_samples_per_instance;
 };
@@ -1978,11 +1966,20 @@ class PublishModeQosPolicy : public QosPolicy
 public:
 
     //!PublishModeQosPolicyKind <br> By default, SYNCHRONOUS_PUBLISH_MODE.
-    PublishModeQosPolicyKind kind = SYNCHRONOUS_PUBLISH_MODE;
+    PublishModeQosPolicyKind kind;
 
-    //! Name of the flow controller used when publish mode kind is ASYNCHRONOUS_PUBLISH_MODE.
-    //! @since Functionality not implemented yet. Coming soon.
-    const char* flow_controller_name = fastdds::rtps::FASTDDS_FLOW_CONTROLLER_DEFAULT;
+    /**
+     * @brief Constructor
+     */
+    RTPS_DllAPI PublishModeQosPolicy()
+        : kind(SYNCHRONOUS_PUBLISH_MODE)
+    {
+    }
+
+    /**
+     * @brief Destructor
+     */
+    virtual RTPS_DllAPI ~PublishModeQosPolicy() = default;
 
     inline void clear() override
     {
@@ -2615,13 +2612,13 @@ public:
      * Default list of Unicast Locators to be used for any Endpoint defined inside this RTPSParticipant in the case
      * that it was defined with NO UnicastLocators. At least ONE locator should be included in this list.
      */
-    rtps::LocatorList default_unicast_locator_list;
+    fastrtps::rtps::LocatorList_t default_unicast_locator_list;
 
     /**
      * Default list of Multicast Locators to be used for any Endpoint defined inside this RTPSParticipant in the
      * case that it was defined with NO UnicastLocators. This is usually left empty.
      */
-    rtps::LocatorList default_multicast_locator_list;
+    fastrtps::rtps::LocatorList_t default_multicast_locator_list;
 };
 
 //! Qos Policy to configure the transport layer
@@ -2705,13 +2702,13 @@ public:
     }
 
     //!Unicast locator list
-    rtps::LocatorList unicast_locator_list;
+    fastrtps::rtps::LocatorList_t unicast_locator_list;
 
     //!Multicast locator list
-    rtps::LocatorList multicast_locator_list;
+    fastrtps::rtps::LocatorList_t multicast_locator_list;
 
     //!Remote locator list
-    rtps::LocatorList remote_locator_list;
+    fastrtps::rtps::LocatorList_t remote_locator_list;
 
     //!User Defined ID, used for StaticEndpointDiscovery. <br> By default, -1.
     int16_t user_defined_id;
@@ -2749,299 +2746,6 @@ public:
     //!Matched subscribers allocation limits.
     fastrtps::ResourceLimitedContainerConfig matched_subscriber_allocation;
 };
-
-/**
- * Data sharing configuration kinds
- */
-enum DataSharingKind : fastrtps::rtps::octet
-{
-    /**
-     * Automatic configuration.
-     * DataSharing will be used if requirements are met.
-     */
-    AUTO = 0x01,
-    /**
-     * Activate the use of DataSharing.
-     * Entity creation will fail if requirements for DataSharing are not met
-     */
-    ON = 0x02,
-    /**
-     * Disable the use of DataSharing
-     */
-    OFF = 0x03
-};
-
-
-/**
- * Qos Policy to configure the data sharing
- * @note Immutable Qos Policy
- */
-class DataSharingQosPolicy : public Parameter_t, public QosPolicy
-{
-public:
-
-    /**
-     * @brief Constructor
-     */
-    RTPS_DllAPI DataSharingQosPolicy()
-        : Parameter_t(PID_DATASHARING, 0)
-        , QosPolicy(true)
-    {
-        //Needed to generate the automatic domain ID
-        automatic();
-    }
-
-    /**
-     * @brief Destructor
-     */
-    virtual RTPS_DllAPI ~DataSharingQosPolicy() = default;
-
-    /**
-     * @brief Copy constructor
-     * @param b Another DataSharingQosPolicy instance
-     */
-    RTPS_DllAPI DataSharingQosPolicy(
-            const DataSharingQosPolicy& b)
-        : Parameter_t(b)
-        , QosPolicy(b)
-        , kind_(b.kind())
-        , shm_directory_ (b.shm_directory())
-        , max_domains_ (b.max_domains())
-        , domain_ids_(b.max_domains() != 0 ?
-                b.max_domains() :
-                b.domain_ids().size())
-    {
-        domain_ids_ = b.domain_ids();
-    }
-
-    RTPS_DllAPI DataSharingQosPolicy& operator =(
-            const DataSharingQosPolicy& b)
-    {
-        QosPolicy::operator =(b);
-        Parameter_t::operator =(b);
-        kind_ = b.kind();
-        shm_directory_ = b.shm_directory();
-        max_domains_ = b.max_domains();
-        domain_ids_.reserve(max_domains_ != 0 ?
-                max_domains_ :
-                b.domain_ids().size());
-        domain_ids_ = b.domain_ids();
-
-        return *this;
-    }
-
-    bool operator ==(
-            const DataSharingQosPolicy& b) const
-    {
-        return kind_ == b.kind_ &&
-               shm_directory_ == b.shm_directory_ &&
-               domain_ids_ == b.domain_ids_ &&
-               Parameter_t::operator ==(b) &&
-               QosPolicy::operator ==(b);
-    }
-
-    inline void clear() override
-    {
-        DataSharingQosPolicy reset = DataSharingQosPolicy();
-        std::swap(*this, reset);
-    }
-
-    /**
-     * @return the current DataSharing configuration mode
-     */
-    RTPS_DllAPI const DataSharingKind& kind() const
-    {
-        return kind_;
-    }
-
-    /**
-     * @return the current DataSharing shared memory directory
-     */
-    RTPS_DllAPI const std::string& shm_directory() const
-    {
-        return shm_directory_;
-    }
-
-    /**
-     * Gets the set of DataSharing domain IDs.
-     *
-     * Each domain ID is 64 bit long.
-     * However, user-defined domain IDs are only 16 bit long,
-     * while the rest of the 48 bits are used for the
-     * automatically generated domain ID (if any).
-     *
-     * - Automatic domain IDs use the 48 MSB and leave the 16 LSB as zero.
-     * - User defined domain IDs use the 16 LSB and leave the 48 MSB as zero.
-     *
-     * @return the current DataSharing domain IDs
-     */
-    RTPS_DllAPI const std::vector<uint64_t>& domain_ids() const
-    {
-        return domain_ids_;
-    }
-
-    /**
-     * @param size the new maximum number of domain IDs
-     */
-    RTPS_DllAPI void set_max_domains(
-            uint32_t size)
-    {
-        domain_ids_.reserve(size);
-        max_domains_ = size;
-    }
-
-    /**
-     * @return the current configured maximum number of domain IDs
-     */
-    RTPS_DllAPI const uint32_t& max_domains() const
-    {
-        return max_domains_;
-    }
-
-    /**
-     * @brief Configures the DataSharing in automatic mode
-     *
-     * The default shared memory directory of the OS is used.
-     * A default domain ID is automatically computed.
-     */
-    RTPS_DllAPI void automatic()
-    {
-        setup (AUTO, "", std::vector<uint16_t>());
-    }
-
-    /**
-     * @brief Configures the DataSharing in automatic mode
-     *
-     * The default shared memory directory of the OS is used.
-     *
-     * @param domain_ids the user configured DataSharing domain IDs (16 bits).
-     */
-    RTPS_DllAPI void automatic(
-            const std::vector<uint16_t>& domain_ids)
-    {
-        setup (AUTO, "", domain_ids);
-    }
-
-    /**
-     * @brief Configures the DataSharing in automatic mode
-     *
-     * A default domain ID is automatically computed.
-     *
-     * @param directory The shared memory directory to use.
-     */
-    RTPS_DllAPI void automatic(
-            const std::string& directory)
-    {
-        setup (AUTO, directory, std::vector<uint16_t>());
-    }
-
-    /**
-     * @brief Configures the DataSharing in automatic mode
-     *
-     * @param directory The shared memory directory to use.
-     * @param domain_ids the user configured DataSharing domain IDs (16 bits).
-     */
-    RTPS_DllAPI void automatic(
-            const std::string& directory,
-            const std::vector<uint16_t>& domain_ids)
-    {
-        setup (AUTO, directory, domain_ids);
-    }
-
-    /**
-     * @brief Configures the DataSharing in active mode
-     *
-     * A default domain ID is automatically computed.
-     *
-     * @param directory The shared memory directory to use.
-     *      It is mandatory to provide a non-empty name or the creation of endpoints will fail.
-     */
-    RTPS_DllAPI void on(
-            const std::string& directory)
-    {
-        // TODO [ILG]: This parameter is unused right now. Activate the assert once it is used
-        //assert(!directory.empty());
-        setup (ON, directory, std::vector<uint16_t>());
-    }
-
-    /**
-     * @brief Configures the DataSharing in active mode
-     *
-     * @param directory The shared memory directory to use.
-     *      It is mandatory to provide a non-empty name or the creation of endpoints will fail.
-     * @param domain_ids the user configured DataSharing domain IDs (16 bits).
-     */
-    RTPS_DllAPI void on(
-            const std::string& directory,
-            const std::vector<uint16_t>& domain_ids)
-    {
-        // TODO [ILG]: This parameter is unused right now. Activate the assert once it is used
-        //assert(!directory.empty());
-        setup (ON, directory, domain_ids);
-    }
-
-    /**
-     * @brief Configures the DataSharing in disabled mode
-     */
-    RTPS_DllAPI void off()
-    {
-        setup (OFF, "", std::vector<uint16_t>());
-    }
-
-    /**
-     * @brief Adds a user-specific DataSharing domain ID
-     *
-     * @param id 16 bit identifier
-     */
-    RTPS_DllAPI void add_domain_id(
-            uint16_t id)
-    {
-        if (max_domains_ == 0 || domain_ids_.size() < max_domains_)
-        {
-            domain_ids_.push_back(id);
-        }
-    }
-
-    // Not on the exported API, but must be public for other internal classes
-    void add_domain_id(
-            uint64_t id)
-    {
-        if (max_domains_ == 0 || domain_ids_.size() < max_domains_)
-        {
-            domain_ids_.push_back(id);
-        }
-    }
-
-private:
-
-    void setup(
-            const DataSharingKind& kind,
-            const std::string& directory,
-            const std::vector<uint16_t>& domain_ids)
-    {
-        kind_ = kind;
-        shm_directory_ = directory;
-        domain_ids_.clear();
-
-        for (uint16_t id : domain_ids)
-        {
-            add_domain_id(id);
-        }
-    }
-
-    //! DataSharing configuration mode
-    DataSharingKind kind_ = AUTO;
-
-    //! Shared memory directory to use on DataSharing
-    std::string shm_directory_;
-
-    //! Maximum number of domain IDs
-    uint32_t max_domains_ = 0;
-
-    //! Only endpoints with matching domain IDs are DataSharing compatible
-    std::vector<uint64_t> domain_ids_;
-};
-
 
 } // namespace dds
 } // namespace fastdds

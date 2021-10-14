@@ -49,7 +49,7 @@ public:
     //! RUN the subscriber
     void run();
 
-    //! Run the subscriber until number samples have been received.
+    //! Run the subscriber until number samples have been recevied.
     void run(
             uint32_t number);
 

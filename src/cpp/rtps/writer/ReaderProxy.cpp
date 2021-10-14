@@ -30,7 +30,6 @@
 #include <rtps/history/HistoryAttributesExtension.hpp>
 
 #include "rtps/messages/RTPSGapBuilder.hpp"
-#include <rtps/DataSharing/DataSharingNotifier.hpp>
 
 #include <mutex>
 #include <cassert>
@@ -107,15 +106,13 @@ ReaderProxy::~ReaderProxy()
 }
 
 void ReaderProxy::start(
-        const ReaderProxyData& reader_attributes,
-        bool is_datasharing)
+        const ReaderProxyData& reader_attributes)
 {
     locator_info_.start(
         reader_attributes.guid(),
         reader_attributes.remote_locators().unicast,
         reader_attributes.remote_locators().multicast,
-        reader_attributes.m_expectsInlineQos,
-        is_datasharing);
+        reader_attributes.m_expectsInlineQos);
 
     is_active_ = true;
     durability_kind_ = reader_attributes.m_qos.m_durability.durabilityKind();
@@ -160,7 +157,7 @@ bool ReaderProxy::update(
 
 void ReaderProxy::stop()
 {
-    locator_info_.stop();
+    locator_info_.stop(guid());
     is_active_ = false;
     disable_timers();
 
@@ -401,7 +398,7 @@ bool ReaderProxy::process_initial_acknack()
 {
     if (is_local_reader())
     {
-        return 0 != convert_status_on_all_changes(UNACKNOWLEDGED, UNSENT);
+        return convert_status_on_all_changes(UNACKNOWLEDGED, UNSENT);
     }
 
     return true;
@@ -434,7 +431,7 @@ bool ReaderProxy::set_change_to_status(
         {
             status = ACKNOWLEDGED;
         }
-        else if (is_local_reader() || is_datasharing_reader())
+        else if (is_local_reader())
         {
             status = UNACKNOWLEDGED;
         }
@@ -498,15 +495,15 @@ bool ReaderProxy::mark_fragment_as_sent_for_change(
 
 bool ReaderProxy::perform_nack_supression()
 {
-    return 0 != convert_status_on_all_changes(UNDERWAY, UNACKNOWLEDGED);
+    return convert_status_on_all_changes(UNDERWAY, UNACKNOWLEDGED);
 }
 
-uint32_t ReaderProxy::perform_acknack_response()
+bool ReaderProxy::perform_acknack_response()
 {
     return convert_status_on_all_changes(REQUESTED, UNSENT);
 }
 
-uint32_t ReaderProxy::convert_status_on_all_changes(
+bool ReaderProxy::convert_status_on_all_changes(
         ChangeForReaderStatus_t previous,
         ChangeForReaderStatus_t next)
 {
@@ -515,17 +512,17 @@ uint32_t ReaderProxy::convert_status_on_all_changes(
     // NOTE: This is only called for REQUESTED=>UNSENT (acknack response) or
     //       UNDERWAY=>UNACKNOWLEDGED (nack supression)
 
-    uint32_t changed = 0;
+    bool at_least_one_modified = false;
     for (ChangeForReader_t& change : changes_for_reader_)
     {
         if (change.getStatus() == previous)
         {
-            ++changed;
+            at_least_one_modified = true;
             change.setStatus(next);
         }
     }
 
-    return changed;
+    return at_least_one_modified;
 }
 
 void ReaderProxy::change_has_been_removed(

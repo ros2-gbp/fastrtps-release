@@ -13,7 +13,11 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    if(GTest_FOUND )
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
+    check_gtest()
+    check_gmock()
+
+    if(GTEST_FOUND AND GMOCK_FOUND)
         find_package(Threads REQUIRED)
 
         configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../profiles/test_xml_profiles.xml
@@ -27,40 +31,31 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             )
 
         if(WIN32)
-            add_definitions(
-                -D_WIN32_WINNT=0x0601
-                -D_CRT_SECURE_NO_WARNINGS
-                )
+            add_definitions(-D_WIN32_WINNT=0x0601)
         endif()
 
         add_executable(PublisherTests ${PUBLISHERTESTS_SOURCE})
-        target_compile_definitions(PublisherTests PRIVATE FASTRTPS_NO_LIB
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+        target_compile_definitions(PublisherTests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(PublisherTests PRIVATE
+            ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
         target_link_libraries(PublisherTests fastrtps fastcdr foonathan_memory
-            GTest::gmock
-            ${CMAKE_DL_LIBS})
+            ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+            ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
         add_gtest(PublisherTests SOURCES ${PUBLISHERTESTS_SOURCE})
 
         add_executable(DataWriterTests ${DATAWRITERTESTS_SOURCE})
-        target_compile_definitions(DataWriterTests PRIVATE FASTRTPS_NO_LIB
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+        target_compile_definitions(DataWriterTests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(DataWriterTests PRIVATE
+            ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
         target_link_libraries(DataWriterTests fastrtps fastcdr foonathan_memory
-            GTest::gmock
-            ${CMAKE_DL_LIBS})
-        add_gtest(DataWriterTests
-            SOURCES ${DATAWRITERTESTS_SOURCE}
-            ENVIRONMENTS "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs")
+            ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+            ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+        add_gtest(DataWriterTests SOURCES ${DATAWRITERTESTS_SOURCE})
     endif()
 endif()

@@ -19,9 +19,6 @@
 #include <rtps/persistence/sqlite3.h>
 #include <rtps/persistence/SQLite3PersistenceServiceStatements.h>
 
-#include <rtps/common/GuidUtils.hpp>
-#include <fastrtps/utils/TimeConversion.h>
-
 #include <climits>
 #include <gtest/gtest.h>
 
@@ -52,7 +49,7 @@ class NoOpPayloadPool : public IPayloadPool
 
 };
 
-class PersistenceTest : public ::testing::TestWithParam<int>
+class PersistenceTest : public ::testing::Test
 {
 protected:
 
@@ -90,7 +87,7 @@ protected:
                 create_statement = SQLite3PersistenceServiceSchemaV2::database_create_statement().c_str();
                 break;
             default:
-                FAIL() << "unsupported database version " << version;
+                FAIL() << "unsuppoerted database version " << version;
         }
 
         int rc;
@@ -136,7 +133,7 @@ protected:
             int seq_num)
     {
         sqlite3_stmt* add_last_seq_statement;
-        sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO writers_states VALUES(?,?);", -1, &add_last_seq_statement, NULL);
+        sqlite3_prepare_v2(db, "INSERT INTO writers_states VALUES(?,?);", -1, &add_last_seq_statement, NULL);
 
         sqlite3_bind_text(add_last_seq_statement, 1, persist_guid, -1, SQLITE_STATIC);
         sqlite3_bind_int64(add_last_seq_statement, 2, seq_num);
@@ -162,41 +159,6 @@ protected:
         sqlite3_finalize(add_data_statement);
     }
 
-    void add_writer_data_v3(
-            sqlite3* db,
-            const char* persist_guid,
-            int seq_num)
-    {
-        sqlite3_stmt* add_last_seq_statement;
-        sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO writers_states VALUES(?,?);", -1, &add_last_seq_statement, NULL);
-
-        sqlite3_bind_text(add_last_seq_statement, 1, persist_guid, -1, SQLITE_STATIC);
-        sqlite3_bind_int64(add_last_seq_statement, 2, seq_num);
-
-        if (sqlite3_step(add_last_seq_statement) != SQLITE_DONE)
-        {
-            FAIL() << sqlite3_errmsg(db);
-        }
-        sqlite3_finalize(add_last_seq_statement);
-
-        sqlite3_stmt* add_data_statement;
-        sqlite3_prepare_v2(db, "INSERT INTO writers_histories VALUES(?,?,?,?,?,?,?);", -1, &add_data_statement, NULL);
-
-        sqlite3_bind_text(add_data_statement, 1, persist_guid, -1, SQLITE_STATIC);
-        sqlite3_bind_int64(add_data_statement, 2, seq_num);
-        sqlite3_bind_zeroblob(add_data_statement, 3, 16);
-        sqlite3_bind_zeroblob(add_data_statement, 4, 128);
-        sqlite3_bind_text(add_data_statement, 5, SQLite3PersistenceServiceSchemaV3::default_guid(), -1, SQLITE_STATIC);
-        sqlite3_bind_int64(add_data_statement, 6, SQLite3PersistenceServiceSchemaV3::default_seqnum());
-        sqlite3_bind_int64(add_data_statement, 7, SQLite3PersistenceServiceSchemaV3::now());
-
-        if (sqlite3_step(add_data_statement) != SQLITE_DONE)
-        {
-            FAIL() << sqlite3_errmsg(db);
-        }
-        sqlite3_finalize(add_data_statement);
-    }
-
     void add_writer_data(
             sqlite3* db,
             int version,
@@ -212,11 +174,8 @@ protected:
             case 2:
                 add_writer_data_v2(db, persist_guid, seq_num);
                 break;
-            case 3:
-                add_writer_data_v3(db, persist_guid, seq_num);
-                break;
             default:
-                FAIL() << "unsupported database version " << version;
+                FAIL() << "unsuppoerted database version " << version;
         }
     }
 
@@ -327,20 +286,16 @@ TEST_F(PersistenceTest, SchemaVersionMismatch)
 }
 
 /*!
- * @fn TEST_P(PersistenceTest, SchemaVersionUpdate)
+ * @fn TEST_F(PersistenceTest, SchemaVersionUpdateFrom1To2)
  * @brief This test checks that the database is updated correctly.
  */
-TEST_P(PersistenceTest, SchemaVersionUpdate)
+TEST_F(PersistenceTest, SchemaVersionUpdateFrom1To2)
 {
-    auto from = GetParam();
-
-    ASSERT_LT(from, 3);
-
     const char* persist_guid = "TEST_WRITER";
     sqlite3* db = nullptr;
-    create_database(&db, from);
-    add_writer_data(db, from, persist_guid, 1);
-    add_writer_data(db, from, persist_guid, 2);
+    create_database(&db, 1);
+    add_writer_data(db, 1, persist_guid, 1);
+    add_writer_data(db, 1, persist_guid, 2);
     sqlite3_close(db);
 
     PropertyPolicy policy;
@@ -440,11 +395,3 @@ int main(
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-
-#ifdef INSTANTIATE_TEST_SUITE_P
-#define GTEST_INSTANTIATE_TEST_MACRO(x, y, z) INSTANTIATE_TEST_SUITE_P(x, y, z)
-#else
-#define GTEST_INSTANTIATE_TEST_MACRO(x, y, z) INSTANTIATE_TEST_CASE_P(x, y, z, )
-#endif // ifdef INSTANTIATE_TEST_SUITE_P
-
-GTEST_INSTANTIATE_TEST_MACRO(PersistenceSchemaUpgrades, PersistenceTest, testing::Values(1, 2));

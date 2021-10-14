@@ -39,7 +39,7 @@ public:
     bool init();
     //!RUN the subscriber
     void run();
-    //!Run the subscriber until number samples have been received.
+    //!Run the subscriber until number samples have been recevied.
     void run(
             uint32_t number);
 
@@ -52,19 +52,12 @@ public:
 
     class SubListener : public eprosima::fastrtps::SubscriberListener
     {
-    public:
+	public:
 
         SubListener()
             : n_matched(0)
-            , n_samples(0)
-        {
-            m_Hello = std::make_shared<HelloWorld>();
-        }
-
-        ~SubListener()
-        {
-        }
-
+            , n_samples(0) { m_Hello = std::make_shared<HelloWorld>(); };
+        ~SubListener(){};
         void onSubscriptionMatched(
                 eprosima::fastrtps::Subscriber* sub,
                 eprosima::fastrtps::rtps::MatchingInfo& info);
@@ -74,8 +67,7 @@ public:
         eprosima::fastrtps::SampleInfo_t m_info;
         int n_matched;
         uint32_t n_samples;
-    }
-    m_listener;
+    } m_listener;
 
 private:
 

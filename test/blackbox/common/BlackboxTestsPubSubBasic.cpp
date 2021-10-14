@@ -14,7 +14,6 @@
 
 #include "BlackboxTests.hpp"
 
-#include "PubSubParticipant.hpp"
 #include "PubSubReader.hpp"
 #include "PubSubWriter.hpp"
 #include "ReqRepAsReliableHelloWorldRequester.hpp"
@@ -23,72 +22,38 @@
 
 #include <gtest/gtest.h>
 
-#include <tuple>
-
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-enum communication_type
-{
-    TRANSPORT,
-    INTRAPROCESS,
-    DATASHARING
-};
-
-class PubSubBasic : public testing::TestWithParam<std::tuple<communication_type, bool>>
+class PubSubBasic : public testing::TestWithParam<bool>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (std::get<0>(GetParam()))
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = true;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
 
-        use_pull_mode = std::get<1>(GetParam());
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (std::get<0>(GetParam()))
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = false;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
-
-        use_pull_mode = false;
     }
 
 };
 
 TEST_P(PubSubBasic, PubSubAsNonReliableHelloworld)
 {
-    // Best effort incompatible with best effort
-    if (use_pull_mode)
-    {
-        return;
-    }
-
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
@@ -288,7 +253,6 @@ TEST_P(PubSubBasic, PubSubMoreThan256Unacknowledged)
 
     reader.startReception(expected_data);
     reader.block_for_all();
-    EXPECT_TRUE(writer.waitForAllAcked(std::chrono::seconds(10)));
 }
 
 TEST_P(PubSubBasic, PubSubAsReliableHelloworldMulticastDisabled)
@@ -322,7 +286,6 @@ TEST_P(PubSubBasic, PubSubAsReliableHelloworldMulticastDisabled)
     ASSERT_TRUE(data.empty());
     // Block reader until reception finished or timeout.
     reader.block_for_all();
-    EXPECT_TRUE(writer.waitForAllAcked(std::chrono::seconds(10)));
 }
 
 TEST_P(PubSubBasic, ReceivedDynamicDataWithNoSizeLimit)
@@ -504,7 +467,7 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataWithinSizeLimit)
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     WriterMulticastLocators.push_back(LocatorBuffer);
 
-    writer.static_discovery("file://PubSubWriter.xml").
+    writer.static_discovery("PubSubWriter.xml").
             unicastLocatorList(WriterUnicastLocators).multicastLocatorList(WriterMulticastLocators).
             setPublisherIDs(1,
             2).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
@@ -521,9 +484,9 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataWithinSizeLimit)
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     ReaderMulticastLocators.push_back(LocatorBuffer);
 
-    //Expected properties have exactly size 92
-    reader.properties_max_size(92).
-            static_discovery("file://PubSubReader.xml").
+    //Expected properties have exactly size 52
+    reader.properties_max_size(52).
+            static_discovery("PubSubReader.xml").
             unicastLocatorList(ReaderUnicastLocators).multicastLocatorList(ReaderMulticastLocators).
             setSubscriberIDs(3,
             4).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
@@ -601,7 +564,7 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataExceedsSizeLimit)
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     WriterMulticastLocators.push_back(LocatorBuffer);
 
-    writer.static_discovery("file://PubSubWriter.xml").
+    writer.static_discovery("PubSubWriter.xml").
             unicastLocatorList(WriterUnicastLocators).multicastLocatorList(WriterMulticastLocators).
             setPublisherIDs(1,
             2).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
@@ -618,9 +581,9 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataExceedsSizeLimit)
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     ReaderMulticastLocators.push_back(LocatorBuffer);
 
-    //Expected properties have size 92
+    //Expected properties have size 52
     reader.properties_max_size(50)
-            .static_discovery("file://PubSubReader.xml")
+            .static_discovery("PubSubReader.xml")
             .unicastLocatorList(ReaderUnicastLocators).multicastLocatorList(ReaderMulticastLocators)
             .setSubscriberIDs(3,
             4).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
@@ -635,126 +598,6 @@ TEST_P(PubSubBasic, ReceivedPropertiesDataExceedsSizeLimit)
     ASSERT_FALSE(reader.is_matched());
 }
 
-TEST_P(PubSubBasic, unique_flows_one_writer_two_readers)
-{
-    PubSubParticipant<HelloWorldType> readers(0, 2, 0, 2);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-
-    PropertyPolicy properties;
-    properties.properties().emplace_back("fastdds.unique_network_flows", "");
-
-    readers.sub_topic_name(TEST_TOPIC_NAME).sub_property_policy(properties).reliability(RELIABLE_RELIABILITY_QOS);
-
-    ASSERT_TRUE(readers.init_participant());
-    ASSERT_TRUE(readers.init_subscriber(0));
-    ASSERT_TRUE(readers.init_subscriber(1));
-
-    writer.history_depth(100).init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    // Wait for discovery.
-    writer.wait_discovery();
-    readers.sub_wait_discovery();
-
-    // Send data
-    auto data = default_helloworld_data_generator();
-    writer.send(data);
-    // In this test all data should be sent.
-    ASSERT_TRUE(data.empty());
-    // Block until readers have acknowledged all samples.
-    EXPECT_TRUE(writer.waitForAllAcked(std::chrono::seconds(30)));
-}
-
-template<typename T>
-static void two_consecutive_writers(
-        PubSubReader<T>& reader,
-        PubSubWriter<T>& writer,
-        bool block_for_all)
-{
-    writer.init();
-    EXPECT_TRUE(writer.isInitialized());
-
-    // Wait for discovery.
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    auto complete_data = default_helloworld_data_generator();
-
-    reader.startReception(complete_data);
-
-    // Send data
-    writer.send(complete_data);
-    EXPECT_TRUE(complete_data.empty());
-
-    if (block_for_all)
-    {
-        reader.block_for_all();
-    }
-    else
-    {
-        reader.block_for_at_least(2);
-    }
-    reader.stopReception();
-
-    writer.destroy();
-
-    // Wait for undiscovery
-    reader.wait_writer_undiscovery();
-}
-
-TEST_P(PubSubBasic, BestEffortTwoWritersConsecutives)
-{
-    // Pull mode incompatible with best effort
-    if (use_pull_mode)
-    {
-        return;
-    }
-
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-
-    reader.history_depth(10).init();
-    EXPECT_TRUE(reader.isInitialized());
-
-    for (int i = 0; i < 2; ++i)
-    {
-        PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-        writer.history_depth(10).reliability(BEST_EFFORT_RELIABILITY_QOS);
-        two_consecutive_writers(reader, writer, false);
-    }
-}
-
-
-TEST_P(PubSubBasic, ReliableVolatileTwoWritersConsecutives)
-{
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-
-    reader.history_depth(10).reliability(RELIABLE_RELIABILITY_QOS).init();
-    EXPECT_TRUE(reader.isInitialized());
-
-    for (int i = 0; i < 2; ++i)
-    {
-        PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-        writer.history_depth(10).durability_kind(VOLATILE_DURABILITY_QOS);
-        two_consecutive_writers(reader, writer, true);
-    }
-}
-
-TEST_P(PubSubBasic, ReliableTransientLocalTwoWritersConsecutives)
-{
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-
-    reader.history_depth(10).reliability(RELIABLE_RELIABILITY_QOS).durability_kind(TRANSIENT_LOCAL_DURABILITY_QOS);
-    reader.init();
-    EXPECT_TRUE(reader.isInitialized());
-
-    for (int i = 0; i < 2; ++i)
-    {
-        PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-        writer.history_depth(10).reliability(RELIABLE_RELIABILITY_QOS);
-        two_consecutive_writers(reader, writer, true);
-    }
-}
 
 #ifdef INSTANTIATE_TEST_SUITE_P
 #define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
@@ -764,22 +607,13 @@ TEST_P(PubSubBasic, ReliableTransientLocalTwoWritersConsecutives)
 
 GTEST_INSTANTIATE_TEST_MACRO(PubSubBasic,
         PubSubBasic,
-        testing::Combine(testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING), testing::Values(false, true)),
+        testing::Values(false, true),
         [](const testing::TestParamInfo<PubSubBasic::ParamType>& info)
         {
-            bool pull_mode = std::get<1>(info.param);
-            std::string suffix = pull_mode ? "_pull_mode" : "";
-            switch (std::get<0>(info.param))
+            if (info.param)
             {
-                case INTRAPROCESS:
-                    return "Intraprocess" + suffix;
-                    break;
-                case DATASHARING:
-                    return "Datasharing" + suffix;
-                    break;
-                case TRANSPORT:
-                default:
-                    return "Transport" + suffix;
+                return "Intraprocess";
             }
-
+            return "NonIntraprocess";
         });
+

@@ -24,108 +24,67 @@
 
 using namespace eprosima::fastrtps::rtps;
 
-StringType::StringType()
-{
+StringType::StringType() {
     setName("StringType");
     m_typeSize = (uint32_t)String::getMaxCdrSerializedSize() + 4 /*encapsulation*/;
     m_isGetKeyDefined = false;
 
 }
 
-StringType::~StringType()
-{
+StringType::~StringType() {
     // TODO Auto-generated destructor stub
 }
 
-bool StringType::serialize(
-        void* data,
-        SerializedPayload_t* payload)
+bool StringType::serialize(void* data, SerializedPayload_t* payload)
 {
-    bool ret_value = false;
     String* hw = (String*) data;
-
-    try
-    {
-        // Object that manages the raw buffer.
-        eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->max_size);
-        // Object that serializes the data.
-        eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                eprosima::fastcdr::Cdr::DDS_CDR);
-        payload->encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-        // Serialize encapsulation
-        ser.serialize_encapsulation();
-        //serialize the object:
-        hw->serialize(ser);
-        payload->length = (uint32_t)ser.getSerializedDataLength();
-        ret_value = true;
-    }
-    catch (eprosima::fastcdr::exception::Exception&)
-    {
-    }
-    return ret_value;
+    // Object that manages the raw buffer.
+    eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->max_size);
+    // Object that serializes the data.
+    eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
+            eprosima::fastcdr::Cdr::DDS_CDR);
+    payload->encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+    // Serialize encapsulation
+    ser.serialize_encapsulation();
+    //serialize the object:
+    hw->serialize(ser);
+    payload->length = (uint32_t)ser.getSerializedDataLength();
+    return true;
 }
 
-bool StringType::deserialize(
-        SerializedPayload_t* payload,
-        void* data)
+bool StringType::deserialize(SerializedPayload_t* payload, void* data)
 {
-    bool ret_value = false;
     String* hw = (String*) data;
-
-    try
-    {
-        // Object that manages the raw buffer.
-        eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->length);
-        // Object that serializes the data.
-        eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
-        // Deserialize encapsulation.
-        deser.read_encapsulation();
-        payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-        //serialize the object:
-        hw->deserialize(deser);
-        ret_value =  true;
-    }
-    catch (eprosima::fastcdr::exception::Exception&)
-    {
-    }
-    return ret_value;
+    // Object that manages the raw buffer.
+    eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->length);
+    // Object that serializes the data.
+    eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
+    // Deserialize encapsulation.
+    deser.read_encapsulation();
+    payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+    //serialize the object:
+    hw->deserialize(deser);
+    return true;
 }
 
-std::function<uint32_t()> StringType::getSerializedSizeProvider(
-        void* data)
+std::function<uint32_t()> StringType::getSerializedSizeProvider(void *data)
 {
-    return [data]() -> uint32_t
-           {
-               return (uint32_t)type::getCdrSerializedSize(*static_cast<String*>(data)) + 4 /*encapsulation*/;
-           };
+    return [data]() -> uint32_t {
+        return (uint32_t)type::getCdrSerializedSize(*static_cast<String*>(data)) + 4 /*encapsulation*/;
+    };
 }
 
 void* StringType::createData()
 {
     return (void*)new String();
 }
-
-void StringType::deleteData(
-        void* data)
+void StringType::deleteData(void* data)
 {
     delete((String*)data);
 }
 
-bool StringType::getKey(
-        void* /*data*/,
-        InstanceHandle_t* /*ihandle*/,
-        bool /*force_md5*/)
-{
-    return false;
-}
-
-bool StringType::is_bounded() const
-{
-    return true;
-}
-
-bool StringType::is_plain() const
+bool StringType::getKey(void* /*data*/, InstanceHandle_t* /*ihandle*/, bool /*force_md5*/)
 {
     return false;
 }

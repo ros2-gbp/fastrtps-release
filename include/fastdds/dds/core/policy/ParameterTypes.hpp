@@ -125,7 +125,6 @@ enum ParameterId_t : uint16_t
     PID_TYPE_CONSISTENCY_ENFORCEMENT = 0x0074,
     PID_TYPE_INFORMATION = 0x0075,
     PID_DISABLE_POSITIVE_ACKS = 0x8005,
-    PID_DATASHARING = 0x8006,
 };
 
 //!Base Parameter class with parameter PID and parameter length in bytes.
@@ -233,7 +232,7 @@ class ParameterLocator_t : public Parameter_t
 public:
 
     //!Locator
-    rtps::Locator locator;
+    fastrtps::rtps::Locator_t locator;
 
     /**
      * @brief Constructor without parameters
@@ -263,7 +262,7 @@ public:
     ParameterLocator_t(
             ParameterId_t pid,
             uint16_t in_length,
-            const rtps::Locator& loc)
+            const fastrtps::rtps::Locator_t& loc)
         : Parameter_t(pid, in_length)
         , locator(loc)
     {
@@ -1064,13 +1063,13 @@ public:
         }
 
         bool operator ==(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ == rhs.ptr_;
         }
 
         bool operator !=(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ != rhs.ptr_;
         }
@@ -1150,13 +1149,13 @@ public:
         }
 
         bool operator ==(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ == rhs.ptr_;
         }
 
         bool operator !=(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ != rhs.ptr_;
         }
@@ -1301,25 +1300,27 @@ public:
     bool push_back(
             std::pair<std::string, std::string> p)
     {
-        return push_back(p.first, p.second);
-    }
+        //Realloc if needed;
+        uint32_t size1 = (uint32_t) p.first.length() + 1;
+        uint32_t alignment1 = ((size1 + 3u) & ~3u) - size1;
 
-    /**
-     * @brief Introduce a new property in the ParameterPropertyList
-     * @param key Key part of the new property
-     * @param value Value part of the new property
-     * @return true if it is introduced, false if not.
-     */
-    bool push_back(
-            const std::string& key,
-            const std::string& value)
-    {
-        auto str1 = reinterpret_cast<const unsigned char*>(key.c_str());
-        uint32_t size1 = (uint32_t) key.length() + 1;
-        auto str2 = reinterpret_cast<const unsigned char*>(value.c_str());
-        uint32_t size2 = (uint32_t) value.length() + 1;
+        uint32_t size2 = (uint32_t) p.second.length() + 1;
+        uint32_t alignment2 = ((size2 + 3u) & ~3u) - size2;
 
-        return push_back(str1, size1, str2, size2);
+        if (limit_size_ && (properties_.max_size < properties_.length +
+                size1 + alignment1 + 4 +
+                size2 + alignment2 + 4))
+        {
+            return false;
+        }
+        properties_.reserve(properties_.length +
+                size1 + alignment1 + 4 +
+                size2 + alignment2 + 4);
+
+        push_back_helper((fastrtps::rtps::octet*)p.first.c_str(), size1, alignment1);
+        push_back_helper((fastrtps::rtps::octet*)p.second.c_str(), size2, alignment2);
+        ++Nproperties_;
+        return true;
     }
 
     /**
@@ -1634,7 +1635,7 @@ void set_proxy_property(
     else
     {
         // if not exists add
-        properties.push_back(pair.first, pair.second);
+        properties.push_back(pair);
     }
 }
 

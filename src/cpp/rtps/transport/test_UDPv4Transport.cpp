@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/test_UDPv4Transport.h>
-
+#include <asio.hpp>
+#include <fastdds/rtps/transport/test_UDPv4Transport.h>
 #include <cstdlib>
 #include <functional>
-
-#include <asio.hpp>
 
 using namespace std;
 
@@ -26,6 +24,7 @@ namespace fastdds {
 namespace rtps {
 
 using octet = fastrtps::rtps::octet;
+using Locator_t = fastrtps::rtps::Locator_t;
 using CDRMessage_t = fastrtps::rtps::CDRMessage_t;
 using SubmessageHeader_t = fastrtps::rtps::SubmessageHeader_t;
 using SequenceNumber_t = fastrtps::rtps::SequenceNumber_t;
@@ -113,23 +112,6 @@ TransportInterface* test_UDPv4TransportDescriptor::create_transport() const
     return new test_UDPv4Transport(*this);
 }
 
-bool test_UDPv4TransportDescriptor::operator ==(
-        const test_UDPv4TransportDescriptor& t) const
-{
-    return (this->dropDataMessagesPercentage == t.dropDataMessagesPercentage &&
-           this->dropParticipantBuiltinTopicData == t.dropParticipantBuiltinTopicData &&
-           this->dropPublicationBuiltinTopicData == t.dropPublicationBuiltinTopicData &&
-           this->dropSubscriptionBuiltinTopicData == t.dropSubscriptionBuiltinTopicData &&
-           this->dropDataFragMessagesPercentage == t.dropDataFragMessagesPercentage &&
-           this->dropHeartbeatMessagesPercentage == t.dropHeartbeatMessagesPercentage &&
-           this->dropAckNackMessagesPercentage == t.dropAckNackMessagesPercentage &&
-           this->dropGapMessagesPercentage == t.dropGapMessagesPercentage &&
-           this->percentageOfMessagesToDrop == t.percentageOfMessagesToDrop &&
-           this->sequenceNumberDataMessagesToDrop == t.sequenceNumberDataMessagesToDrop &&
-           this->dropLogLength == t.dropLogLength &&
-           SocketTransportDescriptor::operator ==(t));
-}
-
 void test_UDPv4Transport::get_ips(
         std::vector<fastrtps::rtps::IPFinder::info_IP>& locNames,
         bool return_loopback)
@@ -195,13 +177,12 @@ bool test_UDPv4Transport::send(
         const octet* send_buffer,
         uint32_t send_buffer_size,
         eProsimaUDPSocket& socket,
-        const Locator& remote_locator,
+        const Locator_t& remote_locator,
         bool only_multicast_purpose,
         const std::chrono::microseconds& timeout)
 {
     if (packet_should_drop(send_buffer, send_buffer_size))
     {
-        statistics_info_.set_statistics_message_data(remote_locator, send_buffer, send_buffer_size);
         log_drop(send_buffer, send_buffer_size);
         return true;
     }

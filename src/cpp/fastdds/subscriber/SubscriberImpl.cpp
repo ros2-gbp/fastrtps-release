@@ -77,7 +77,6 @@ static void set_qos_from_attributes(
     qos.time_based_filter() = attr.qos.m_timeBasedFilter;
     qos.history() = attr.topic.historyQos;
     qos.resource_limits() = attr.topic.resourceLimitsQos;
-    qos.data_sharing() = attr.qos.data_sharing;
 }
 
 SubscriberImpl::SubscriberImpl(
@@ -201,22 +200,13 @@ ReturnCode_t SubscriberImpl::set_listener(
     return ReturnCode_t::RETCODE_OK;
 }
 
-DataReaderImpl* SubscriberImpl::create_datareader_impl(
-        const TypeSupport& type,
-        TopicDescription* topic,
-        const DataReaderQos& qos,
-        DataReaderListener* listener)
-{
-    return new DataReaderImpl(this, type, topic, qos, listener);
-}
-
 DataReader* SubscriberImpl::create_datareader(
         TopicDescription* topic,
         const DataReaderQos& qos,
         DataReaderListener* listener,
         const StatusMask& mask)
 {
-    logInfo(SUBSCRIBER, "CREATING SUBSCRIBER IN TOPIC: " << topic->get_name());
+    logInfo(SUBSCRIBER, "CREATING SUBSCRIBER IN TOPIC: " << topic->get_name())
     //Look for the correct type registration
     TypeSupport type_support = participant_->find_type(topic->get_type_name());
 
@@ -235,7 +225,13 @@ DataReader* SubscriberImpl::create_datareader(
 
     topic->get_impl()->reference();
 
-    DataReaderImpl* impl = create_datareader_impl(type_support, topic, qos, listener);
+    DataReaderImpl* impl = new DataReaderImpl(
+        this,
+        type_support,
+        topic,
+        qos,
+        listener);
+
     DataReader* reader = new DataReader(impl, mask);
     impl->user_datareader_ = reader;
 
@@ -275,7 +271,7 @@ DataReader* SubscriberImpl::create_datareader_with_profile(
 }
 
 ReturnCode_t SubscriberImpl::delete_datareader(
-        const DataReader* reader)
+        DataReader* reader)
 {
     if (user_subscriber_ != reader->get_subscriber())
     {
@@ -290,11 +286,6 @@ ReturnCode_t SubscriberImpl::delete_datareader(
         {
             //First extract the reader from the maps to free the mutex
             DataReaderImpl* reader_impl = *dr_it;
-            if (!reader_impl->can_be_deleted())
-            {
-                return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
-            }
-
             reader_impl->set_listener(nullptr);
             it->second.erase(dr_it);
             if (it->second.empty())
@@ -444,7 +435,7 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
         DataReaderQos& qos) const
 {
     SubscriberAttributes attr;
-    if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr, false))
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr))
     {
         qos = default_datareader_qos_;
         set_qos_from_attributes(qos, attr);
@@ -466,7 +457,7 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
 
 const DomainParticipant* SubscriberImpl::get_participant() const
 {
-    return const_cast<const DomainParticipantImpl*>(participant_)->get_participant();
+    return participant_->get_participant();
 }
 
 void SubscriberImpl::SubscriberReaderListener::on_data_available(

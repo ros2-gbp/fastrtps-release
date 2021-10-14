@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*!
+/*! 
  * @file deadlinepayload.cpp
  * This source file contains the definition of the described types in the IDL file.
  *
@@ -21,10 +21,8 @@
 
 #ifdef _WIN32
 // Remove linker warning LNK4221 on Visual Studio
-namespace {
-char dummy;
-} // namespace
-#endif // ifdef _WIN32
+namespace { char dummy; }
+#endif
 
 #include "KeyedHelloWorld.h"
 
@@ -45,67 +43,57 @@ KeyedHelloWorld::~KeyedHelloWorld()
 {
 }
 
-KeyedHelloWorld::KeyedHelloWorld(
-        const KeyedHelloWorld& x)
+KeyedHelloWorld::KeyedHelloWorld(const KeyedHelloWorld &x)
 {
     m_index = x.m_index;
     m_key = x.m_key;
     m_message = x.m_message;
 }
 
-KeyedHelloWorld::KeyedHelloWorld(
-        KeyedHelloWorld&& x)
+KeyedHelloWorld::KeyedHelloWorld(KeyedHelloWorld &&x)
 {
     m_index = x.m_index;
     m_key = x.m_key;
     m_message = std::move(x.m_message);
 }
 
-KeyedHelloWorld& KeyedHelloWorld::operator =(
-        const KeyedHelloWorld& x)
+KeyedHelloWorld& KeyedHelloWorld::operator=(const KeyedHelloWorld &x)
 {
     m_index = x.m_index;
     m_key = x.m_key;
     m_message = x.m_message;
-
+    
     return *this;
 }
 
-KeyedHelloWorld& KeyedHelloWorld::operator =(
-        KeyedHelloWorld&& x)
+KeyedHelloWorld& KeyedHelloWorld::operator=(KeyedHelloWorld &&x)
 {
     m_index = x.m_index;
     m_key = x.m_key;
     m_message = std::move(x.m_message);
-
+    
     return *this;
 }
 
-bool KeyedHelloWorld::operator ==(
-        const KeyedHelloWorld& x) const
+bool KeyedHelloWorld::operator==(const KeyedHelloWorld &x) const
 {
-    if (m_index == x.m_index &&
+    if(m_index == x.m_index &&
             m_message == x.m_message &&
             m_key == x.m_key)
-    {
         return true;
-    }
 
     return false;
 }
 
-size_t KeyedHelloWorld::getMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t KeyedHelloWorld::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
     current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 128 + 1;
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 256 + 1;
     return current_alignment - initial_alignment;
 }
 
-size_t KeyedHelloWorld::getCdrSerializedSize(
-        const KeyedHelloWorld& data,
-        size_t current_alignment)
+size_t KeyedHelloWorld::getCdrSerializedSize(const KeyedHelloWorld& data, size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
     current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
@@ -113,13 +101,12 @@ size_t KeyedHelloWorld::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void KeyedHelloWorld::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void KeyedHelloWorld::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
     scdr << m_key;
     scdr << m_index;
 
-    if (m_message.length() <= 128)
+    if(m_message.length() <= 256)
     {
         scdr << m_message;
     }
@@ -129,18 +116,16 @@ void KeyedHelloWorld::serialize(
     }
 }
 
-void KeyedHelloWorld::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void KeyedHelloWorld::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
     dcdr >> m_key;
     dcdr >> m_index;
     dcdr >> m_message;
 }
 
-size_t KeyedHelloWorld::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t KeyedHelloWorld::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
-    size_t current_align = current_alignment;
+	size_t current_align = current_alignment;
     current_align += 2 + eprosima::fastcdr::Cdr::alignment(current_align, 2);
     return current_align;
 }
@@ -150,8 +135,7 @@ bool KeyedHelloWorld::isKeyDefined()
     return true;
 }
 
-void KeyedHelloWorld::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void KeyedHelloWorld::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
-    scdr << m_key;
+     scdr << m_key;
 }

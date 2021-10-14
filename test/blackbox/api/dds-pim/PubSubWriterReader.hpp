@@ -325,22 +325,6 @@ public:
         t << topic_name << "_" << asio::ip::host_name() << "_" << GET_PID();
         topic_name_ = t.str();
 
-        if (enable_datasharing)
-        {
-            datareader_qos_.data_sharing().automatic();
-            datawriter_qos_.data_sharing().automatic();
-        }
-        else
-        {
-            datareader_qos_.data_sharing().off();
-            datawriter_qos_.data_sharing().off();
-        }
-
-        if (use_pull_mode)
-        {
-            datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
-        }
-
         // By default, memory mode is preallocated (the most restritive)
         datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
         datareader_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
@@ -370,9 +354,6 @@ public:
             bool avoid_multicast = true,
             uint32_t initial_pdp_count = 5)
     {
-        matched_readers_.clear();
-        matched_writers_.clear();
-
         //Create participant
         participant_qos_.wire_protocol().builtin.avoid_builtin_multicast = avoid_multicast;
         participant_qos_.wire_protocol().builtin.discovery_config.initial_announcements.count = initial_pdp_count;
@@ -415,23 +396,21 @@ public:
     }
 
     bool create_additional_topics(
-            size_t num_topics,
-            const char* suffix)
+            size_t num_topics)
     {
         bool ret_val = initialized_;
         if (ret_val)
         {
             std::string topic_name = topic_name_;
-            size_t vector_size = entities_extra_.size();
 
-            for (size_t i = 0; i < vector_size; i++)
+            for (size_t i = 0; i < entities_extra_.size(); i++)
             {
-                topic_name += suffix;
+                topic_name += "/";
             }
 
             for (size_t i = 0; ret_val && (i < num_topics); i++)
             {
-                topic_name += suffix;
+                topic_name += "/";
                 eprosima::fastdds::dds::Topic* topic = participant_->create_topic(topic_name,
                                 type_->getName(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
                 ret_val &= (nullptr != topic);
@@ -456,9 +435,7 @@ public:
                     break;
                 }
 
-                mutex_.lock();
                 entities_extra_.push_back({topic, datawriter, datareader});
-                mutex_.unlock();
             }
         }
 
@@ -787,7 +764,7 @@ private:
             ASSERT_LT(last_seq, info.sample_identity.sequence_number());
             last_seq = info.sample_identity.sequence_number();
 
-            if (info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
+            if (info.instance_state == eprosima::fastdds::dds::ALIVE)
             {
                 auto it = std::find(total_msgs_.begin(), total_msgs_.end(), data);
                 ASSERT_NE(it, total_msgs_.end());

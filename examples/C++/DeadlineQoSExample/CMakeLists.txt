@@ -35,6 +35,17 @@ endif()
 
 if(NOT Asio_FOUND)
     find_package(Asio QUIET)
+
+    if(Asio_FOUND)
+        message(STATUS "Found Asio")
+    else()
+        find_path(ASIO_INCLUDE_DIR NAMES asio.hpp)
+        if(ASIO_INCLUDE_DIR)
+            message(STATUS "Found Asio in ${ASIO_INCLUDE_DIR}")
+        else()
+            message(FATAL_ERROR "Asio not found!")
+        endif()
+    endif()
 endif()
 
 #Check C++11
@@ -50,16 +61,16 @@ endif()
 message(STATUS "Configuring DeadlineQoS example...")
 file(GLOB DEADLINEQOS_EXAMPLE_SOURCES "*.cxx")
 
-add_executable(DeadlineQoSExample ${DEADLINEQOS_EXAMPLE_SOURCES})
-target_compile_definitions(DeadlineQoSExample PRIVATE
-    BOOST_ASIO_STANDALONE
-    ASIO_STANDALONE
-    $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-    $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+add_definitions(
+  -DBOOST_ASIO_STANDALONE
+  -DASIO_STANDALONE
 )
-target_include_directories(DeadlineQoSExample PRIVATE ${Asio_INCLUDE_DIR})
+
+include_directories(${ASIO_INCLUDE_DIR})
+
+add_executable(DeadlineQoSExample ${DEADLINEQOS_EXAMPLE_SOURCES})
 target_link_libraries(DeadlineQoSExample fastrtps fastcdr foonathan_memory)
-if(UNIX AND NOT(QNXNTO))
+if(UNIX)
   target_link_libraries(DeadlineQoSExample pthread)
 endif()
 

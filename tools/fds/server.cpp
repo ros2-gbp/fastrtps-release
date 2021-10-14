@@ -126,10 +126,6 @@ int main (
             return 1;
         }
 
-        // Clear the stringstream state and reset it to an empty string
-        is.clear();
-        is.str("");
-
         // Set Participant Name
         is << "eProsima Default Server number " << server_id;
         rtps.setName(is.str().c_str());
@@ -231,7 +227,6 @@ int main (
 
         // Print running server attributes
         cout << "### Server is running ###" << endl;
-        cout << "  Participant Type:   " << rtps.builtin.discovery_config.discoveryProtocol << endl;
         cout << "  Server ID:          " << server_id << endl;
         cout << "  Server GUID prefix: " << pServer->getGuid().guidPrefix << endl;
         cout << "  Server Addresses:   ";

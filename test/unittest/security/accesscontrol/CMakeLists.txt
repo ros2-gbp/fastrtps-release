@@ -13,13 +13,18 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    if(GTest_FOUND)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
+    check_gtest()
+
+    if(GTEST_FOUND)
         if(WIN32)
             add_definitions(
                 -D_WIN32_WINNT=0x0601
                 -D_CRT_SECURE_NO_WARNINGS
                 )
         endif()
+
+        include_directories(${ASIO_INCLUDE_DIR})
 
         set(COMMON_SOURCES_ACCESS_CONTROL_TEST_SOURCE
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
@@ -46,9 +51,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 ${TINYXML2_SOURCE_DIR}/tinyxml2.cpp
             )
         endif()
-
+        
         include_directories(${TINYXML2_INCLUDE_DIR})
-
+            
         add_executable(AccessControlTests ${COMMON_SOURCES_ACCESS_CONTROL_TEST_SOURCE}
             ${PROJECT_SOURCE_DIR}/src/cpp/security/authentication/PKIDH.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/security/authentication/PKIIdentityHandle.cpp
@@ -64,16 +69,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/StringMatching.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/publisher/qos/WriterQos.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/AccessControlTests.cpp)
-
-        target_compile_definitions(AccessControlTests PRIVATE FASTRTPS_NO_LIB
-            BOOST_ASIO_STANDALONE
-            ASIO_STANDALONE
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+            
+        target_compile_definitions(AccessControlTests PRIVATE FASTRTPS_NO_LIB)
 
         target_include_directories(AccessControlTests PRIVATE
-            ${Asio_INCLUDE_DIR}
+            ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/NetworkFactory/
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/PDPSimple
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/EDP
@@ -85,10 +85,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-
-        target_link_libraries(AccessControlTests
-            GTest::gmock
-            ${OPENSSL_LIBRARIES}
+            
+        target_link_libraries(AccessControlTests 
+            ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES}
             fastcdr
             foonathan_memory
             $<$<BOOL:${WIN32}>:ws2_32>

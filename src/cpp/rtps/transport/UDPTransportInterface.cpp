@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/UDPTransportInterface.h>
+#include <fastdds/rtps/transport/TransportInterface.h>
+#include <fastdds/rtps/transport/UDPTransportInterface.h>
+#include <fastdds/rtps/messages/CDRMessage.h>
+#include <rtps/transport/UDPSenderResource.hpp>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/utils/Semaphore.h>
+#include <fastrtps/utils/IPLocator.h>
 
 #include <utility>
 #include <cstring>
 #include <algorithm>
 #include <chrono>
-
-#include <fastdds/rtps/transport/TransportInterface.h>
-#include <fastdds/rtps/messages/CDRMessage.h>
-#include <fastdds/dds/log/Log.hpp>
-#include <fastrtps/utils/IPLocator.h>
-#include <rtps/transport/UDPSenderResource.hpp>
-#include <statistics/rtps/messages/RTPSStatisticsMessages.hpp>
 
 using namespace std;
 using namespace asio;
@@ -33,6 +32,8 @@ namespace eprosima {
 namespace fastdds {
 namespace rtps {
 
+using Locator_t = fastrtps::rtps::Locator_t;
+using LocatorList_t = fastrtps::rtps::LocatorList_t;
 using IPLocator = fastrtps::rtps::IPLocator;
 using LocatorSelectorEntry = fastrtps::rtps::LocatorSelectorEntry;
 using LocatorSelector = fastrtps::rtps::LocatorSelector;
@@ -42,18 +43,31 @@ using PortParameters = fastrtps::rtps::PortParameters;
 using SenderResource = fastrtps::rtps::SenderResource;
 using Log = fastdds::dds::Log;
 
+struct MultiUniLocatorsLinkage
+{
+    MultiUniLocatorsLinkage(
+            LocatorList_t&& m,
+            LocatorList_t&& u)
+        : multicast(std::move(m))
+        , unicast(std::move(u))
+    {
+    }
+
+    LocatorList_t multicast;
+    LocatorList_t unicast;
+};
+
 UDPTransportDescriptor::UDPTransportDescriptor()
     : SocketTransportDescriptor(s_maximumMessageSize, s_maximumInitialPeersRange)
     , m_output_udp_socket(0)
 {
 }
 
-bool UDPTransportDescriptor::operator ==(
-        const UDPTransportDescriptor& t) const
+UDPTransportDescriptor::UDPTransportDescriptor(
+        const UDPTransportDescriptor& t)
+    : SocketTransportDescriptor(t)
+    , m_output_udp_socket(t.m_output_udp_socket)
 {
-    return (this->m_output_udp_socket == t.m_output_udp_socket &&
-           this->non_blocking_send == t.non_blocking_send &&
-           SocketTransportDescriptor::operator ==(t));
 }
 
 UDPTransportInterface::UDPTransportInterface(
@@ -74,7 +88,7 @@ void UDPTransportInterface::clean()
 }
 
 bool UDPTransportInterface::CloseInputChannel(
-        const Locator& locator)
+        const Locator_t& locator)
 {
     std::vector<UDPChannelResource*> channel_resources;
     {
@@ -109,8 +123,8 @@ void UDPTransportInterface::CloseOutputChannel(
 }
 
 bool UDPTransportInterface::DoInputLocatorsMatch(
-        const Locator& left,
-        const Locator& right) const
+        const Locator_t& left,
+        const Locator_t& right) const
 {
     return IPLocator::getPhysicalPort(left) == IPLocator::getPhysicalPort(right);
 }
@@ -175,7 +189,7 @@ bool UDPTransportInterface::init()
 }
 
 bool UDPTransportInterface::IsInputChannelOpen(
-        const Locator& locator) const
+        const Locator_t& locator) const
 {
     std::unique_lock<std::recursive_mutex> scopedLock(mInputMapMutex);
     return IsLocatorSupported(locator) && (mInputSockets.find(IPLocator::getPhysicalPort(
@@ -183,13 +197,13 @@ bool UDPTransportInterface::IsInputChannelOpen(
 }
 
 bool UDPTransportInterface::IsLocatorSupported(
-        const Locator& locator) const
+        const Locator_t& locator) const
 {
     return locator.kind == transport_kind_;
 }
 
 bool UDPTransportInterface::OpenAndBindInputSockets(
-        const Locator& locator,
+        const Locator_t& locator,
         TransportReceiverInterface* receiver,
         bool is_multicast,
         uint32_t maxMsgSize)
@@ -220,7 +234,7 @@ bool UDPTransportInterface::OpenAndBindInputSockets(
 
 UDPChannelResource* UDPTransportInterface::CreateInputChannelResource(
         const std::string& sInterface,
-        const Locator& locator,
+        const Locator_t& locator,
         bool is_multicast,
         uint32_t maxMsgSize,
         TransportReceiverInterface* receiver)
@@ -256,7 +270,7 @@ eProsimaUDPSocket UDPTransportInterface::OpenAndBindUnicastOutputSocket(
 
 bool UDPTransportInterface::OpenOutputChannel(
         SendResourceList& sender_resource_list,
-        const Locator& locator)
+        const Locator_t& locator)
 {
     if (!IsLocatorSupported(locator))
     {
@@ -272,7 +286,6 @@ bool UDPTransportInterface::OpenOutputChannel(
 
         if (udp_sender_resource)
         {
-            statistics_info_.add_entry(locator);
             return true;
         }
     }
@@ -396,27 +409,26 @@ bool UDPTransportInterface::OpenOutputChannel(
         return false;
     }
 
-    statistics_info_.add_entry(locator);
     return true;
 }
 
-Locator UDPTransportInterface::RemoteToMainLocal(
-        const Locator& remote) const
+Locator_t UDPTransportInterface::RemoteToMainLocal(
+        const Locator_t& remote) const
 {
     if (!IsLocatorSupported(remote))
     {
         return false;
     }
 
-    Locator mainLocal(remote);
+    Locator_t mainLocal(remote);
     //memset(mainLocal.address, 0x00, sizeof(mainLocal.address));
     mainLocal.set_Invalid_Address();
     return mainLocal;
 }
 
 bool UDPTransportInterface::transform_remote_locator(
-        const Locator& remote_locator,
-        Locator& result_locator) const
+        const Locator_t& remote_locator,
+        Locator_t& result_locator) const
 {
     if (IsLocatorSupported(remote_locator))
     {
@@ -435,7 +447,7 @@ bool UDPTransportInterface::transform_remote_locator(
         }
 
         // The locator is in the whitelist (or the whitelist is empty)
-        Locator loopbackLocator;
+        Locator_t loopbackLocator;
         fill_local_ip(loopbackLocator);
         if (is_locator_allowed(loopbackLocator))
         {
@@ -486,12 +498,10 @@ bool UDPTransportInterface::send(
         const octet* send_buffer,
         uint32_t send_buffer_size,
         eProsimaUDPSocket& socket,
-        const Locator& remote_locator,
+        const fastrtps::rtps::Locator_t& remote_locator,
         bool only_multicast_purpose,
         const std::chrono::microseconds& timeout)
 {
-    using namespace eprosima::fastdds::statistics::rtps;
-
     if (send_buffer_size > configuration()->sendBufferSize)
     {
         return false;
@@ -518,7 +528,6 @@ bool UDPTransportInterface::send(
 #endif // ifndef _WIN32
 
             asio::error_code ec;
-            statistics_info_.set_statistics_message_data(remote_locator, send_buffer, send_buffer_size);
             bytesSent = getSocketPtr(socket)->send_to(asio::buffer(send_buffer,
                             send_buffer_size), destinationEndpoint, 0, ec);
             if (!!ec)
@@ -567,7 +576,7 @@ bool UDPTransportInterface::send(
 static bool check_and_invalidate(
         fastrtps::ResourceLimitedVector<LocatorSelectorEntry*>& entries,
         size_t index,
-        const Locator& locator)
+        const Locator_t& locator)
 {
     bool ret_val = false;
     for (; index < entries.size(); ++index)
@@ -575,7 +584,7 @@ static bool check_and_invalidate(
         LocatorSelectorEntry* entry = entries[index];
         if (entry->transport_should_process)
         {
-            for (const Locator& loc : entry->multicast)
+            for (const Locator_t& loc : entry->multicast)
             {
                 if (loc == locator)
                 {
@@ -643,7 +652,7 @@ void UDPTransportInterface::select_locators(
 }
 
 bool UDPTransportInterface::fillMetatrafficMulticastLocator(
-        Locator& locator,
+        Locator_t& locator,
         uint32_t metatraffic_multicast_port) const
 {
     if (locator.port == 0)
@@ -654,7 +663,7 @@ bool UDPTransportInterface::fillMetatrafficMulticastLocator(
 }
 
 bool UDPTransportInterface::fillMetatrafficUnicastLocator(
-        Locator& locator,
+        Locator_t& locator,
         uint32_t metatraffic_unicast_port) const
 {
     if (locator.port == 0)
@@ -665,16 +674,16 @@ bool UDPTransportInterface::fillMetatrafficUnicastLocator(
 }
 
 bool UDPTransportInterface::configureInitialPeerLocator(
-        Locator& locator,
+        Locator_t& locator,
         const PortParameters& port_params,
         uint32_t domainId,
-        LocatorList& list) const
+        LocatorList_t& list) const
 {
     if (locator.port == 0)
     {
         for (uint32_t i = 0; i < configuration()->maxInitialPeersRange; ++i)
         {
-            Locator auxloc(locator);
+            Locator_t auxloc(locator);
             auxloc.port = port_params.getUnicastPort(domainId, i);
 
             list.push_back(auxloc);
@@ -689,7 +698,7 @@ bool UDPTransportInterface::configureInitialPeerLocator(
 }
 
 bool UDPTransportInterface::fillUnicastLocator(
-        Locator& locator,
+        Locator_t& locator,
         uint32_t well_known_port) const
 {
     if (locator.port == 0)

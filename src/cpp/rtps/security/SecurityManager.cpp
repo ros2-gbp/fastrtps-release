@@ -455,10 +455,6 @@ void SecurityManager::destroy()
 
         SecurityException exception;
 
-        // AuthUniquePtr must be removed after unlock SecurityManager's mutex.
-        // This is to avoid a deadlock with TimedEvents.
-        std::vector<DiscoveredParticipantInfo::AuthUniquePtr> auths_to_remove;
-
         for (auto& dp_it : discovered_participants_)
         {
             ParticipantCryptoHandle* participant_crypto_handle = dp_it.second.get_participant_crypto();
@@ -479,9 +475,7 @@ void SecurityManager::destroy()
                 authentication_plugin_->return_sharedsecret_handle(shared_secret_handle, exception);
             }
 
-            DiscoveredParticipantInfo::AuthUniquePtr remote_participant_info = dp_it.second.get_auth();
-            remove_discovered_participant_info(remote_participant_info);
-            auths_to_remove.push_back(std::move(remote_participant_info));
+            remove_discovered_participant_info(dp_it.second.get_auth());
         }
 
         discovered_participants_.clear();
@@ -505,8 +499,6 @@ void SecurityManager::destroy()
         }
 
         mutex_.unlock();
-
-        auths_to_remove.clear();
 
         delete_entities();
 
@@ -536,7 +528,7 @@ void SecurityManager::destroy()
 }
 
 void SecurityManager::remove_discovered_participant_info(
-        const DiscoveredParticipantInfo::AuthUniquePtr& auth_ptr)
+        DiscoveredParticipantInfo::AuthUniquePtr&& auth_ptr)
 {
     SecurityException exception;
 
@@ -570,11 +562,7 @@ bool SecurityManager::restore_discovered_participant_info(
     }
     else
     {
-        // AuthUniquePtr must be removed after unlock SecurityManager's mutex.
-        // This is to avoid a deadlock with TimedEvents.
-        DiscoveredParticipantInfo::AuthUniquePtr remote_participant_info = std::move(auth_ptr);
-        remove_discovered_participant_info(remote_participant_info);
-        lock.unlock();
+        remove_discovered_participant_info(std::move(auth_ptr));
     }
 
     return returned_value;
@@ -748,13 +736,9 @@ void SecurityManager::remove_participant(
             authentication_plugin_->return_sharedsecret_handle(shared_secret_handle, exception);
         }
 
-        // AuthUniquePtr must be removed after unlock SecurityManager's mutex.
-        // This is to avoid a deadlock with TimedEvents.
-        DiscoveredParticipantInfo::AuthUniquePtr remote_participant_info = dp_it->second.get_auth();
-        remove_discovered_participant_info(remote_participant_info);
+        remove_discovered_participant_info(dp_it->second.get_auth());
 
         discovered_participants_.erase(dp_it);
-        lock.unlock();
     }
 }
 
@@ -1035,7 +1019,7 @@ void SecurityManager::delete_participant_stateless_message_pool()
         PoolConfig reader_cfg = PoolConfig::from_history_attributes(participant_stateless_message_reader_hattr_);
         participant_stateless_message_pool_->release_history(reader_cfg, true);
 
-        participant_stateless_message_pool_.reset();
+        TopicPayloadPoolRegistry::release(participant_stateless_message_pool_);
     }
 }
 
@@ -1183,7 +1167,7 @@ void SecurityManager::delete_participant_volatile_message_secure_pool()
         PoolConfig pool_cfg = PoolConfig::from_history_attributes(participant_volatile_message_secure_hattr_);
         participant_volatile_message_secure_pool_->release_history(pool_cfg, true);
         participant_volatile_message_secure_pool_->release_history(pool_cfg, false);
-        participant_volatile_message_secure_pool_.reset();
+        TopicPayloadPoolRegistry::release(participant_volatile_message_secure_pool_);
     }
 }
 
@@ -2265,34 +2249,6 @@ bool SecurityManager::register_local_writer(
         const PropertyPolicy& writer_properties,
         EndpointSecurityAttributes& security_attributes)
 {
-    SecurityException exception;
-    bool returned_value = get_datawriter_sec_attributes(writer_properties, security_attributes);
-
-    if (returned_value && crypto_plugin_ != nullptr && (security_attributes.is_submessage_protected ||
-            security_attributes.is_payload_protected))
-    {
-        DatawriterCryptoHandle* writer_handle = crypto_plugin_->cryptokeyfactory()->register_local_datawriter(
-            *local_participant_crypto_handle_, writer_properties.properties(), security_attributes, exception);
-
-        if (writer_handle != nullptr && !writer_handle->nil())
-        {
-            std::unique_lock<std::mutex> lock(mutex_);
-            writer_handles_.emplace(writer_guid, writer_handle);
-        }
-        else
-        {
-            logError(SECURITY, "Cannot register local writer in crypto plugin. (" << exception.what() << ")");
-            returned_value = false;
-        }
-    }
-
-    return returned_value;
-}
-
-bool SecurityManager::get_datawriter_sec_attributes(
-        const PropertyPolicy& writer_properties,
-        EndpointSecurityAttributes& security_attributes)
-{
     bool returned_value = true;
     SecurityException exception;
 
@@ -2336,13 +2292,13 @@ bool SecurityManager::get_datawriter_sec_attributes(
                 if ((returned_value = access_plugin_->get_datawriter_sec_attributes(*local_permissions_handle_,
                         topic_name, partitions, security_attributes, exception)) == false)
                 {
-                    logError(SECURITY, "Error getting security attributes of local writer " <<
+                    logError(SECURITY, "Error getting security attributes of local writer " << writer_guid <<
                             " (" << exception.what() << ")" << std::endl);
                 }
             }
             else
             {
-                logError(SECURITY, "Error checking creation of local writer " <<
+                logError(SECURITY, "Error checking creation of local writer " << writer_guid <<
                         " (" << exception.what() << ")" << std::endl);
                 returned_value = false;
             }
@@ -2377,6 +2333,24 @@ bool SecurityManager::get_datawriter_sec_attributes(
             security_attributes.plugin_endpoint_attributes |=
                     PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID |
                     PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_PAYLOAD_ENCRYPTED;
+        }
+    }
+
+    if (returned_value && crypto_plugin_ != nullptr && (security_attributes.is_submessage_protected ||
+            security_attributes.is_payload_protected))
+    {
+        DatawriterCryptoHandle* writer_handle = crypto_plugin_->cryptokeyfactory()->register_local_datawriter(
+            *local_participant_crypto_handle_, writer_properties.properties(), security_attributes, exception);
+
+        if (writer_handle != nullptr && !writer_handle->nil())
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            writer_handles_.emplace(writer_guid, writer_handle);
+        }
+        else
+        {
+            logError(SECURITY, "Cannot register local writer in crypto plugin. (" << exception.what() << ")");
+            returned_value = false;
         }
     }
 
@@ -2448,35 +2422,6 @@ bool SecurityManager::register_local_reader(
         const PropertyPolicy& reader_properties,
         EndpointSecurityAttributes& security_attributes)
 {
-    SecurityException exception;
-    bool returned_value = get_datareader_sec_attributes(reader_properties, security_attributes);
-
-    if (returned_value && crypto_plugin_ != nullptr && (security_attributes.is_submessage_protected ||
-            security_attributes.is_payload_protected))
-    {
-
-        DatareaderCryptoHandle* reader_handle = crypto_plugin_->cryptokeyfactory()->register_local_datareader(
-            *local_participant_crypto_handle_, reader_properties.properties(), security_attributes, exception);
-
-        if (reader_handle != nullptr && !reader_handle->nil())
-        {
-            std::unique_lock<std::mutex> lock(mutex_);
-            reader_handles_.emplace(reader_guid, reader_handle);
-        }
-        else
-        {
-            logError(SECURITY, "Cannot register local reader in crypto plugin. (" << exception.what() << ")");
-            returned_value = false;
-        }
-    }
-
-    return returned_value;
-}
-
-bool SecurityManager::get_datareader_sec_attributes(
-        const PropertyPolicy& reader_properties,
-        EndpointSecurityAttributes& security_attributes)
-{
     bool returned_value = true;
     SecurityException exception;
 
@@ -2520,13 +2465,13 @@ bool SecurityManager::get_datareader_sec_attributes(
                 if ((returned_value = access_plugin_->get_datareader_sec_attributes(*local_permissions_handle_,
                         topic_name, partitions, security_attributes, exception)) == false)
                 {
-                    logError(SECURITY, "Error getting security attributes of local reader " <<
+                    logError(SECURITY, "Error getting security attributes of local reader " << reader_guid <<
                             " (" << exception.what() << ")" << std::endl);
                 }
             }
             else
             {
-                logError(SECURITY, "Error checking creation of local reader " <<
+                logError(SECURITY, "Error checking creation of local reader " << reader_guid <<
                         " (" << exception.what() << ")" << std::endl);
                 returned_value = false;
             }
@@ -2561,6 +2506,25 @@ bool SecurityManager::get_datareader_sec_attributes(
             security_attributes.plugin_endpoint_attributes |=
                     PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID |
                     PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_PAYLOAD_ENCRYPTED;
+        }
+    }
+
+    if (returned_value && crypto_plugin_ != nullptr && (security_attributes.is_submessage_protected ||
+            security_attributes.is_payload_protected))
+    {
+
+        DatareaderCryptoHandle* reader_handle = crypto_plugin_->cryptokeyfactory()->register_local_datareader(
+            *local_participant_crypto_handle_, reader_properties.properties(), security_attributes, exception);
+
+        if (reader_handle != nullptr && !reader_handle->nil())
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            reader_handles_.emplace(reader_guid, reader_handle);
+        }
+        else
+        {
+            logError(SECURITY, "Cannot register local reader in crypto plugin. (" << exception.what() << ")");
+            returned_value = false;
         }
     }
 

@@ -78,7 +78,6 @@ static void set_qos_from_attributes(
     qos.publish_mode() = attr.qos.m_publishMode;
     qos.history() = attr.topic.historyQos;
     qos.resource_limits() = attr.topic.resourceLimitsQos;
-    qos.data_sharing() = attr.qos.data_sharing;
 }
 
 PublisherImpl::PublisherImpl(
@@ -233,15 +232,6 @@ void PublisherImpl::PublisherWriterListener::on_offered_deadline_missed(
     }
 }
 
-DataWriterImpl* PublisherImpl::create_datawriter_impl(
-        const TypeSupport& type,
-        Topic* topic,
-        const DataWriterQos& qos,
-        DataWriterListener* listener)
-{
-    return new DataWriterImpl(this, type, topic, qos, listener);
-}
-
 DataWriter* PublisherImpl::create_datawriter(
         Topic* topic,
         const DataWriterQos& qos,
@@ -265,16 +255,14 @@ DataWriter* PublisherImpl::create_datawriter(
         return nullptr;
     }
 
-    DataWriterImpl* impl = create_datawriter_impl(type_support, topic, qos, listener);
-    return create_datawriter(topic, impl, mask);
-}
-
-DataWriter* PublisherImpl::create_datawriter(
-        Topic* topic,
-        DataWriterImpl* impl,
-        const StatusMask& mask)
-{
     topic->get_impl()->reference();
+
+    DataWriterImpl* impl = new DataWriterImpl(
+        this,
+        type_support,
+        topic,
+        qos,
+        listener);
 
     DataWriter* writer = new DataWriter(impl, mask);
     impl->user_datawriter_ = writer;
@@ -315,7 +303,7 @@ DataWriter* PublisherImpl::create_datawriter_with_profile(
 }
 
 ReturnCode_t PublisherImpl::delete_datawriter(
-        const DataWriter* writer)
+        DataWriter* writer)
 {
     if (user_publisher_ != writer->get_publisher())
     {
@@ -330,11 +318,6 @@ ReturnCode_t PublisherImpl::delete_datawriter(
         {
             //First extract the writer from the maps to free the mutex
             DataWriterImpl* writer_impl = *dw_it;
-            ReturnCode_t ret_code = writer_impl->check_delete_preconditions();
-            if (!ret_code)
-            {
-                return ret_code;
-            }
             writer_impl->set_listener(nullptr);
             vit->second.erase(dw_it);
             if (vit->second.empty())
@@ -475,7 +458,7 @@ const ReturnCode_t PublisherImpl::get_datawriter_qos_from_profile(
         DataWriterQos& qos) const
 {
     PublisherAttributes attr;
-    if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(profile_name, attr, false))
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(profile_name, attr))
     {
         qos = default_datawriter_qos_;
         set_qos_from_attributes(qos, attr);
@@ -524,7 +507,7 @@ ReturnCode_t PublisherImpl::wait_for_acknowledgments(
 
 const DomainParticipant* PublisherImpl::get_participant() const
 {
-    return const_cast<const DomainParticipantImpl*>(participant_)->get_participant();
+    return participant_->get_participant();
 }
 
 const Publisher* PublisherImpl::get_publisher() const

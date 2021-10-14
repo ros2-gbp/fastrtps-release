@@ -22,10 +22,10 @@
 
 #include <fastdds/rtps/common/GuidPrefix_t.hpp>
 
-#include <rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.hpp>
+#include "./DiscoveryParticipantsAckStatus.hpp"
 
 #include <json.hpp>
-#include <rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp>
+#include "backup/SharedBackupFunctions.hpp"
 
 namespace eprosima {
 namespace fastdds {

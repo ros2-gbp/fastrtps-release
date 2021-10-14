@@ -27,50 +27,28 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-enum communication_type
-{
-    TRANSPORT,
-    INTRAPROCESS,
-    DATASHARING
-};
-
-class LifespanQos : public testing::TestWithParam<communication_type>
+class LifespanQos : public testing::TestWithParam<bool>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = true;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
+
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = false;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
     }
 
@@ -124,10 +102,9 @@ TEST_P(LifespanQos, LongLifespan)
 
     // On the reader side we should be able to take the data
     HelloWorldType::type msg;
-    for (uint32_t i = 0; i < writer_samples; ++i)
-    {
-        EXPECT_EQ(reader.take_first_data(&msg), true);
-    }
+    EXPECT_EQ(reader.takeNextData(&msg), true);
+    EXPECT_EQ(reader.takeNextData(&msg), true);
+    EXPECT_EQ(reader.takeNextData(&msg), true);
 }
 
 TEST_P(LifespanQos, ShortLifespan)
@@ -172,10 +149,9 @@ TEST_P(LifespanQos, ShortLifespan)
 
     // On the reader side we should not be able to take the data
     HelloWorldType::type msg;
-    for (uint32_t i = 0; i < writer_samples; ++i)
-    {
-        EXPECT_EQ(reader.take_first_data(&msg), false);
-    }
+    EXPECT_EQ(reader.takeNextData(&msg), false);
+    EXPECT_EQ(reader.takeNextData(&msg), false);
+    EXPECT_EQ(reader.takeNextData(&msg), false);
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P
@@ -186,20 +162,13 @@ TEST_P(LifespanQos, ShortLifespan)
 
 GTEST_INSTANTIATE_TEST_MACRO(LifespanQos,
         LifespanQos,
-        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
+        testing::Values(false, true),
         [](const testing::TestParamInfo<LifespanQos::ParamType>& info)
         {
-            switch (info.param)
+            if (info.param)
             {
-                case INTRAPROCESS:
-                    return "Intraprocess";
-                    break;
-                case DATASHARING:
-                    return "Datasharing";
-                    break;
-                case TRANSPORT:
-                default:
-                    return "Transport";
+                return "Intraprocess";
             }
-
+            return "NonIntraprocess";
         });
+

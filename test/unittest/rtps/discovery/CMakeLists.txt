@@ -13,7 +13,11 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    if(GTest_FOUND)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
+    check_gtest()
+    check_gmock()
+
+    if(GTEST_FOUND AND GMOCK_FOUND)
         find_package(Threads REQUIRED)
 
         set(EDPTESTS_SOURCE EdpTests.cpp
@@ -28,7 +32,6 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/StringMatching.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/string_convert.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/FlowControllerConsts.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/AnnotationDescriptor.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicData.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicDataFactory.cpp
@@ -51,7 +54,6 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeNamesGenerator.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypesBase.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/BuiltinAnnotationsTypeObject.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
             )
 
@@ -60,11 +62,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         endif()
 
         add_executable(EdpTests ${EDPTESTS_SOURCE})
-        target_compile_definitions(EdpTests PRIVATE FASTRTPS_NO_LIB
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+        target_compile_definitions(EdpTests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(EdpTests PRIVATE
+            ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/PDP
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
@@ -83,8 +83,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
         target_link_libraries(EdpTests foonathan_memory
-            GTest::gmock
-            ${CMAKE_DL_LIBS})
+            ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+            ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
         if(MSVC OR MSVC_IDE)
             target_link_libraries(EdpTests ${PRIVACY} fastcdr iphlpapi Shlwapi ws2_32)
         else()

@@ -39,9 +39,6 @@
                 <durability>
                     <kind>VOLATILE</kind>
                 </durability>
-                <data_sharing>
-                    <kind>OFF</kind>
-                </data_sharing>
             </qos>
         </publisher>
         <subscriber profile_name="pub_subscriber_profile">
@@ -57,9 +54,6 @@
                 <durability>
                     <kind>VOLATILE</kind>
                 </durability>
-                <data_sharing>
-                    <kind>OFF</kind>
-                </data_sharing>
             </qos>
         </subscriber>
 
@@ -97,9 +91,6 @@
                 <durability>
                     <kind>VOLATILE</kind>
                 </durability>
-                <data_sharing>
-                    <kind>OFF</kind>
-                </data_sharing>
             </qos>
         </publisher>
         <subscriber profile_name="sub_subscriber_profile">
@@ -115,9 +106,6 @@
                 <durability>
                     <kind>VOLATILE</kind>
                 </durability>
-                <data_sharing>
-                    <kind>OFF</kind>
-                </data_sharing>
             </qos>
         </subscriber>
     </profiles>

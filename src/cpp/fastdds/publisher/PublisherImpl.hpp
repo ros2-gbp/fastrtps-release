@@ -58,7 +58,6 @@ class DomainParticipant;
 class Publisher;
 class DataWriterImpl;
 class Topic;
-class TypeSupport;
 
 /**
  * Class PublisherImpl, contains the actual implementation of the behaviour of the Publisher.
@@ -98,11 +97,6 @@ public:
 
     DataWriter* create_datawriter(
             Topic* topic,
-            DataWriterImpl* impl,
-            const StatusMask& mask);
-
-    DataWriter* create_datawriter(
-            Topic* topic,
             const DataWriterQos& qos,
             DataWriterListener* listener,
             const StatusMask& mask = StatusMask::all());
@@ -114,7 +108,7 @@ public:
             const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_datawriter(
-            const DataWriter* writer);
+            DataWriter* writer);
 
     DataWriter* lookup_datawriter(
             const std::string& topic_name) const;
@@ -244,12 +238,6 @@ protected:
     DataWriterQos default_datawriter_qos_;
 
     fastrtps::rtps::InstanceHandle_t handle_;
-
-    virtual DataWriterImpl* create_datawriter_impl(
-            const TypeSupport& type,
-            Topic* topic,
-            const DataWriterQos& qos,
-            DataWriterListener* listener);
 
     static void set_qos(
             PublisherQos& to,

@@ -25,14 +25,7 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-enum communication_type
-{
-    TRANSPORT,
-    INTRAPROCESS,
-    DATASHARING
-};
-
-class PersistenceLargeData : public testing::TestWithParam<communication_type>
+class PersistenceLargeData : public testing::TestWithParam<bool>
 {
 public:
 
@@ -48,18 +41,10 @@ protected:
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = true;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
 
         // Get info about current test
@@ -79,18 +64,10 @@ protected:
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = false;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
         std::remove(db_file_name_.c_str());
     }
@@ -108,7 +85,6 @@ protected:
 
         writer
                 .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-                .resource_limits_max_samples(100)
                 .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
                 .make_persistent(db_file_name(), "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64")
                 .disable_builtin_transport()
@@ -167,169 +143,6 @@ TEST_P(PersistenceLargeData, PubSubAsReliablePubPersistentNoFrag)
     fragment_data(false);
 }
 
-TEST_P(PersistenceLargeData, PubSubAsReliablePubPersistentWithLifespanBefore)
-{
-    PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
-    PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
-
-    writer
-            .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-            .resource_limits_max_samples(100)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .make_persistent(db_file_name(), "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64")
-            .lifespan_period({1, 0})
-            .init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    auto data = default_data16kb_data_generator();
-    auto unreceived_data = data;
-
-    // Send data
-    writer.send(data);
-    // All data should be sent
-    ASSERT_TRUE(data.empty());
-    // Destroy the DataWriter
-    writer.destroy();
-    // Load the persistent DataWriter with the changes saved in the database
-    writer.init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    // Sleep waiting samples to exceed the lifespan
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    reader
-            .history_kind(eprosima::fastrtps::KEEP_LAST_HISTORY_QOS)
-            .history_depth(10)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
-    // Wait for discovery.
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    reader.startReception(unreceived_data);
-
-    // Wait expecting not receiving data.
-    ASSERT_EQ(0u, reader.block_for_all(std::chrono::seconds(1)));
-}
-
-TEST_P(PersistenceLargeData, PubSubAsReliablePubPersistentWithLifespanSendingBefore)
-{
-    PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
-    PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
-
-    writer
-            .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-            .resource_limits_max_samples(100)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .make_persistent(db_file_name(), "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64")
-            .lifespan_period({0, 100})
-            .init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    auto data = default_data16kb_data_generator();
-    auto unreceived_data = data;
-
-    // Send data
-    writer.send(data);
-    // All data should be sent
-    ASSERT_TRUE(data.empty());
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    // Destroy the DataWriter
-    writer.destroy();
-    // Load the persistent DataWriter with the changes saved in the database
-    writer.init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    data = default_data16kb_data_generator(1);
-    unreceived_data.insert(unreceived_data.end(), data.begin(), data.end());
-    // Send data
-    writer.send(data);
-    // All data should be sent
-    ASSERT_TRUE(data.empty());
-
-    // Sleep waiting samples to exceed the lifespan
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    reader
-            .history_kind(eprosima::fastrtps::KEEP_LAST_HISTORY_QOS)
-            .history_depth(10)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
-    // Wait for discovery.
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    reader.startReception(unreceived_data);
-
-    // Wait expecting not receiving data.
-    ASSERT_EQ(0u, reader.block_for_all(std::chrono::seconds(1)));
-}
-
-TEST_P(PersistenceLargeData, PubSubAsReliablePubPersistentWithLifespanAfter)
-{
-    PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
-    PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
-
-    writer
-            .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-            .resource_limits_max_samples(100)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .make_persistent(db_file_name(), "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64")
-            .lifespan_period({1, 0})
-            .init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    auto data = default_data16kb_data_generator();
-    auto unreceived_data = data;
-
-    // Send data
-    writer.send(data);
-    // All data should be sent
-    ASSERT_TRUE(data.empty());
-    // Destroy the DataWriter
-    writer.destroy();
-
-    reader
-            .history_kind(eprosima::fastrtps::KEEP_LAST_HISTORY_QOS)
-            .history_depth(10)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
-    // Sleep waiting samples to exceed the lifespan
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    // Load the persistent DataWriter with the changes saved in the database
-    writer.init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    // Wait for discovery.
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    reader.startReception(unreceived_data);
-
-    // Wait expecting not receiving data.
-    ASSERT_EQ(0u, reader.block_for_all(std::chrono::seconds(1)));
-}
-
-
 #ifdef INSTANTIATE_TEST_SUITE_P
 #define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
 #else
@@ -338,20 +151,12 @@ TEST_P(PersistenceLargeData, PubSubAsReliablePubPersistentWithLifespanAfter)
 
 GTEST_INSTANTIATE_TEST_MACRO(PersistenceLargeData,
         PersistenceLargeData,
-        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
+        testing::Values(false, true),
         [](const testing::TestParamInfo<PersistenceLargeData::ParamType>& info)
         {
-            switch (info.param)
+            if (info.param)
             {
-                case INTRAPROCESS:
-                    return "Intraprocess";
-                    break;
-                case DATASHARING:
-                    return "Datasharing";
-                    break;
-                case TRANSPORT:
-                default:
-                    return "Transport";
+                return "Intraprocess";
             }
-
+            return "NonIntraprocess";
         });

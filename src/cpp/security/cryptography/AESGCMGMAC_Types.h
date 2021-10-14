@@ -61,7 +61,7 @@ constexpr CryptoTransformKind c_transfrom_kind_aes256_gmac = CRYPTO_TRANSFORMATI
 constexpr CryptoTransformKind c_transfrom_kind_aes256_gcm = CRYPTO_TRANSFORMATION_KIND_AES256_GCM;
 
 constexpr std::array<uint8_t, 32> c_empty_key_material =
-{ {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} };
+{ {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, } };
 
 /* Key Storage
  * -----------
@@ -86,7 +86,6 @@ struct KeyMaterial_AES_GCM_GMAC
 };
 
 typedef std::vector<KeyMaterial_AES_GCM_GMAC> KeyMaterial_AES_GCM_GMAC_Seq;
-
 /* SecureSubMessageElements
  * ------------------------
  */
@@ -135,13 +134,30 @@ struct SecureDataTag
 
 struct KeySessionData
 {
-    uint32_t session_id = std::numeric_limits<uint32_t>::max();
-    std::array<uint8_t, 32> SessionKey = c_empty_key_material;
-    uint64_t session_block_counter = 0;
+    uint32_t session_id;
+    std::array<uint8_t, 32> SessionKey;
+    uint64_t session_block_counter;
+
+    KeySessionData()
+        : session_id(std::numeric_limits<uint32_t>::max())
+        , session_block_counter(0)
+    {
+    }
+
 };
 
-struct EntityKeyHandle
+class EntityKeyHandle
 {
+public:
+
+    EntityKeyHandle()
+    {
+    }
+
+    ~EntityKeyHandle()
+    {
+    }
+
     static const char* const class_id_;
 
     //Plugin security options
@@ -164,13 +180,23 @@ struct EntityKeyHandle
     uint64_t max_blocks_per_session = 0;
     std::mutex mutex_;
 };
-
 typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_WriterCryptoHandle;
 typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_ReaderCryptoHandle;
 typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_EntityCryptoHandle;
 
-struct ParticipantKeyHandle
+
+class ParticipantKeyHandle
 {
+public:
+
+    ParticipantKeyHandle()
+    {
+    }
+
+    ~ParticipantKeyHandle()
+    {
+    }
+
     static const char* const class_id_;
 
     //Plugin security options
@@ -189,7 +215,9 @@ struct ParticipantKeyHandle
     std::vector<DatareaderCryptoHandle*> Readers;
 
     //Data used to store the current session keys and to determine when it has to be updated
-    KeySessionData Session;
+    uint32_t session_id = std::numeric_limits<uint32_t>::max();
+    std::array<uint8_t, 32> SessionKey;
+    uint64_t session_block_counter = 0;
     uint64_t max_blocks_per_session = 0;
     std::mutex mutex_;
 };

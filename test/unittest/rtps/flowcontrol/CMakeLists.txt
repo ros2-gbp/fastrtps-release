@@ -13,10 +13,15 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    if(GTest_FOUND)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
+    check_gtest()
+
+    if(GTEST_FOUND)
         if(WIN32)
             add_definitions(-D_WIN32_WINNT=0x0601)
         endif()
+
+        include_directories(${ASIO_INCLUDE_DIR})
 
         set(THROUGHPUTCONTROLLERTESTS_SOURCE
             ThroughputControllerTests.cpp
@@ -26,14 +31,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp)
 
         add_executable(ThroughputControllerTests ${THROUGHPUTCONTROLLERTESTS_SOURCE})
-        target_compile_definitions(ThroughputControllerTests PRIVATE FASTRTPS_NO_LIB
-            BOOST_ASIO_STANDALONE
-            ASIO_STANDALONE
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
-        target_include_directories(ThroughputControllerTests PRIVATE
-            ${Asio_INCLUDE_DIR}
+        target_compile_definitions(ThroughputControllerTests PRIVATE FASTRTPS_NO_LIB)
+        target_include_directories(ThroughputControllerTests PRIVATE ${GTEST_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/AsyncWriterThread
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
@@ -42,7 +41,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(ThroughputControllerTests GTest::gtest GTest::gmock)
+        target_link_libraries(ThroughputControllerTests ${GTEST_LIBRARIES} ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES})
         if(MSVC OR MSVC_IDE)
             target_link_libraries(ThroughputControllerTests ${PRIVACY}
                 iphlpapi Shlwapi

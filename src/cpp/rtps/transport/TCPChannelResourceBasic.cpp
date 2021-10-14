@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/TCPChannelResourceBasic.h>
+#include <asio.hpp>
+#include <fastdds/rtps/transport/TCPChannelResource.h>
+#include <fastdds/rtps/transport/TCPTransportInterface.h>
+#include <fastrtps/utils/IPLocator.h>
 
 #include <future>
 #include <array>
-
-#include <asio.hpp>
-#include <fastrtps/utils/IPLocator.h>
-#include <rtps/transport/TCPTransportInterface.h>
 
 using namespace asio;
 
@@ -27,6 +26,7 @@ namespace eprosima {
 namespace fastdds {
 namespace rtps {
 
+using Locator_t = fastrtps::rtps::Locator_t;
 using octet = fastrtps::rtps::octet;
 using IPLocator = fastrtps::rtps::IPLocator;
 using Log = fastdds::dds::Log;
@@ -34,7 +34,7 @@ using Log = fastdds::dds::Log;
 TCPChannelResourceBasic::TCPChannelResourceBasic(
         TCPTransportInterface* parent,
         asio::io_service& service,
-        const Locator& locator,
+        const Locator_t& locator,
         uint32_t maxMsgSize)
     : TCPChannelResource(parent, locator, maxMsgSize)
     , service_(service)
@@ -84,14 +84,14 @@ void TCPChannelResourceBasic::connect(
                 , ip::tcp::endpoint
 #else
                 , ip::tcp::resolver::iterator
-#endif // if ASIO_VERSION >= 101200
+#endif
                 )
-                {
-                    if (!channel_weak_ptr.expired())
-                    {
-                        parent_->SocketConnected(channel_weak_ptr, ec);
-                    }
-                }
+                        {
+                            if (!channel_weak_ptr.expired())
+                            {
+                                parent_->SocketConnected(channel_weak_ptr, ec);
+                            }
+                        }
                 );
         }
         catch (const std::system_error& error)
@@ -108,23 +108,23 @@ void TCPChannelResourceBasic::disconnect()
         auto socket = socket_;
 
         service_.post([&, socket]()
-                {
-                    try
                     {
-                        std::error_code ec;
-                        socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-                        socket->cancel();
+                        try
+                        {
+                            std::error_code ec;
+                            socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+                            socket->cancel();
 
-                        // This method was added on the version 1.12.0
+                            // This method was added on the version 1.12.0
 #if ASIO_VERSION >= 101200 && (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0603)
-                        socket->release();
-#endif // if ASIO_VERSION >= 101200 && (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0603)
-                        socket->close();
-                    }
-                    catch (std::exception&)
-                    {
-                    }
-                });
+                            socket->release();
+#endif
+                            socket->close();
+                        }
+                        catch (std::exception&)
+                        {
+                        }
+                    });
 
     }
 }
@@ -155,7 +155,6 @@ size_t TCPChannelResourceBasic::send(
 
     if (eConnecting < connection_status_)
     {
-        std::lock_guard<std::mutex> send_guard(send_mutex_);
         if (header_size > 0)
         {
             std::array<asio::const_buffer, 2> buffers;

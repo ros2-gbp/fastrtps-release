@@ -129,7 +129,7 @@ void LifespanSubscriber::SubListener::on_data_available(
     SampleInfo info;
     if (reader->read_next_sample(&hello, &info) == ReturnCode_t::RETCODE_OK)
     {
-        if (info.valid_data)
+        if (info.instance_state == eprosima::fastdds::dds::ALIVE)
         {
             this->n_samples++;
             // Print your structure data here.

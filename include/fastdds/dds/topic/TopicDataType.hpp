@@ -19,25 +19,14 @@
 #ifndef _FASTDDS_TOPICDATATYPE_HPP_
 #define _FASTDDS_TOPICDATATYPE_HPP_
 
+#include <fastrtps/fastrtps_dll.h>
+#include <fastdds/dds/core/policy/QosPolicies.hpp>
+
 #include <string>
 #include <functional>
 
-#include <fastdds/dds/core/policy/QosPolicies.hpp>
-#include <fastdds/rtps/common/InstanceHandle.h>
-
-#include <fastrtps/fastrtps_dll.h>
-#include <fastrtps/utils/md5.h>
-
-// This version of TypeSupport has `is_bounded()`
-#define TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-// This version of TypeSupport has `is_plain()`
-#define TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-// This version of TypeSupport has `construct_sample()`
-#define TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
 namespace eprosima {
+
 namespace fastrtps {
 
 namespace rtps {
@@ -273,36 +262,6 @@ public:
             std::shared_ptr<xtypes::TypeInformation> info)
     {
         type_information_ = std::move(info);
-    }
-
-    /**
-     * Checks if the type is bounded.
-     */
-    RTPS_DllAPI virtual inline bool is_bounded() const
-    {
-        return false;
-    }
-
-    /**
-     * Checks if the type is plain.
-     */
-    RTPS_DllAPI virtual inline bool is_plain() const
-    {
-        return false;
-    }
-
-    /**
-     * Construct a sample on a memory location.
-     *
-     * @param memory Pointer to the memory location where the sample should be constructed.
-     *
-     * @return whether this type supports in-place construction or not.
-     */
-    RTPS_DllAPI virtual inline bool construct_sample(
-            void* memory) const
-    {
-        static_cast<void>(memory);
-        return false;
     }
 
     //! Maximum serialized size of the type in bytes.

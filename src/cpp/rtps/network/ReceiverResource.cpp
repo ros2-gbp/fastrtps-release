@@ -17,25 +17,25 @@
 #include <cassert>
 #include <fastdds/dds/log/Log.hpp>
 
-#define IDSTRING "(ID:" << std::this_thread::get_id() << ") " <<
+#define IDSTRING "(ID:" << std::this_thread::get_id() <<") "<<
 
 using namespace std;
 using namespace eprosima::fastdds::rtps;
 
-namespace eprosima {
-namespace fastrtps {
-namespace rtps {
+namespace eprosima{
+namespace fastrtps{
+namespace rtps{
 
 ReceiverResource::ReceiverResource(
-        TransportInterface& transport,
-        const Locator_t& locator,
-        uint32_t max_recv_buffer_size)
-    : Cleanup(nullptr)
-    , LocatorMapsToManagedChannel(nullptr)
-    , mValid(false)
-    , mtx()
-    , receiver(nullptr)
-    , max_message_size_(max_recv_buffer_size)
+			TransportInterface& transport,
+			const Locator_t& locator,
+			uint32_t max_recv_buffer_size)
+        : Cleanup(nullptr)
+        , LocatorMapsToManagedChannel(nullptr)
+        , mValid(false)
+        , mtx()
+        , receiver(nullptr)
+        , max_message_size_(max_recv_buffer_size)
 {
     // Internal channel is opened and assigned to this resource.
     mValid = transport.OpenInputChannel(locator, this, max_message_size_);
@@ -45,18 +45,12 @@ ReceiverResource::ReceiverResource(
     }
 
     // Implementation functions are bound to the right transport parameters
-    Cleanup = [&transport, locator]()
-            {
-                transport.CloseInputChannel(locator);
-            };
+    Cleanup = [&transport, locator]() { transport.CloseInputChannel(locator); };
     LocatorMapsToManagedChannel = [&transport, locator](const Locator_t& locatorToCheck) -> bool
-            {
-                return locator.kind == locatorToCheck.kind && transport.DoInputLocatorsMatch(locator, locatorToCheck);
-            };
+    { return transport.DoInputLocatorsMatch(locator, locatorToCheck); };
 }
 
-ReceiverResource::ReceiverResource(
-        ReceiverResource&& rValueResource)
+ReceiverResource::ReceiverResource(ReceiverResource&& rValueResource)
 {
     Cleanup.swap(rValueResource.Cleanup);
     LocatorMapsToManagedChannel.swap(rValueResource.LocatorMapsToManagedChannel);
@@ -67,8 +61,7 @@ ReceiverResource::ReceiverResource(
     max_message_size_ = rValueResource.max_message_size_;
 }
 
-bool ReceiverResource::SupportsLocator(
-        const Locator_t& localLocator)
+bool ReceiverResource::SupportsLocator(const Locator_t& localLocator)
 {
     if (LocatorMapsToManagedChannel)
     {
@@ -77,31 +70,22 @@ bool ReceiverResource::SupportsLocator(
     return false;
 }
 
-void ReceiverResource::RegisterReceiver(
-        MessageReceiver* rcv)
+void ReceiverResource::RegisterReceiver(MessageReceiver* rcv)
 {
     std::unique_lock<std::mutex> lock(mtx);
     if (receiver == nullptr)
-    {
         receiver = rcv;
-    }
 }
 
-void ReceiverResource::UnregisterReceiver(
-        MessageReceiver* rcv)
+void ReceiverResource::UnregisterReceiver(MessageReceiver* rcv)
 {
     std::unique_lock<std::mutex> lock(mtx);
     if (receiver == rcv)
-    {
         receiver = nullptr;
-    }
 }
 
-void ReceiverResource::OnDataReceived(
-        const octet* data,
-        const uint32_t size,
-        const Locator_t& localLocator,
-        const Locator_t& remoteLocator)
+void ReceiverResource::OnDataReceived(const octet * data, const uint32_t size,
+    const Locator_t & localLocator, const Locator_t & remoteLocator)
 {
     (void)localLocator;
 
@@ -118,7 +102,7 @@ void ReceiverResource::OnDataReceived(
         msg.reserved_size = size;
 
         // TODO: Should we unlock in case UnregisterReceiver is called from callback ?
-        rcv->processCDRMsg(remoteLocator, localLocator, &msg);
+        rcv->processCDRMsg(remoteLocator, &msg);
     }
 
 }

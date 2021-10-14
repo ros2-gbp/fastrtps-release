@@ -17,6 +17,10 @@
  *
  */
 
+#include <fastdds/rtps/builtin/discovery/participant/timedevent/DSClientEvent.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPClient.h>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDPClient.h>
+
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 
 #include <fastdds/rtps/resources/ResourceEvent.h>
@@ -25,12 +29,9 @@
 
 #include <fastdds/dds/log/Log.hpp>
 
-#include <rtps/builtin/discovery/participant/timedevent/DSClientEvent.h>
-#include <rtps/builtin/discovery/participant/PDPClient.h>
-#include <rtps/builtin/discovery/endpoint/EDPClient.h>
 
 namespace eprosima {
-namespace fastdds {
+namespace fastrtps {
 namespace rtps {
 
 
@@ -58,7 +59,6 @@ bool DSClientEvent::event()
 
     // Iterate over remote servers to check for new unmatched servers
     ParticipantProxyData* part_proxy_data;
-    std::unique_lock<std::recursive_mutex> lock(*mp_PDP->getMutex());
     for (auto server: mp_PDP->remote_server_attributes())
     {
         // Get the participant proxy data of the server

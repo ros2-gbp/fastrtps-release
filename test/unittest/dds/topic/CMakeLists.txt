@@ -13,7 +13,11 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    if(GTest_FOUND)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
+    check_gtest()
+    check_gmock()
+
+    if(GTEST_FOUND AND GMOCK_FOUND)
         find_package(Threads REQUIRED)
 
         configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../profiles/test_xml_profiles.xml
@@ -21,23 +25,21 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             COPYONLY)
 
         set(TOPICTESTS_SOURCE TopicTests.cpp)
-
+        
         if(WIN32)
             add_definitions(-D_WIN32_WINNT=0x0601)
         endif()
 
         add_executable(TopicTests ${TOPICTESTS_SOURCE})
-        target_compile_definitions(TopicTests PRIVATE FASTRTPS_NO_LIB
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+        target_compile_definitions(TopicTests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(TopicTests PRIVATE
+            ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
         target_link_libraries(TopicTests fastrtps fastcdr foonathan_memory
-            GTest::gmock
-            ${CMAKE_DL_LIBS})
+            ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
+            ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
         add_gtest(TopicTests SOURCES ${TOPICTESTS_SOURCE})
 
     endif()

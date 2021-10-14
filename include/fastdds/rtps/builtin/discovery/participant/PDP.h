@@ -37,7 +37,20 @@ namespace eprosima {
 namespace fastdds {
 namespace rtps {
 
-class PDPServerListener;
+class PDPServerListener2;
+
+/**
+ * Struct to define participant types to set participant type parameter property
+ *@ingroup DISCOVERY_MODULE
+ */
+struct ParticipantType
+{
+    static const char SIMPLE[];
+    static const char SERVER[];
+    static const char CLIENT[];
+    static const char BACKUP[];
+    static const char SUPER_CLIENT[];
+};
 
 } // namespace rtps
 } // namespace fastdds
@@ -71,7 +84,7 @@ class PDP
 {
     friend class PDPListener;
     friend class PDPServerListener;
-    friend class fastdds::rtps::PDPServerListener;
+    friend class fastdds::rtps::PDPServerListener2;
 
 public:
 

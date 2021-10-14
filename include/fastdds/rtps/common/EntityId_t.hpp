@@ -73,7 +73,7 @@ struct RTPS_DllAPI EntityId_t
 {
     static constexpr unsigned int size = 4;
     octet value[size];
-    //! Default constructor. Unknown entity.
+    //! Default constructor. Uknown entity.
     EntityId_t()
     {
         *this = ENTITYID_UNKNOWN;
@@ -153,24 +153,6 @@ struct RTPS_DllAPI EntityId_t
     }
 
 #endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
-
-    /*!
-     * @brief conversion to uint32_t
-     * @return uint32_t representation
-     */
-    uint32_t to_uint32() const
-    {
-        uint32_t res = *reinterpret_cast<const uint32_t*>(value);
-
-#if !FASTDDS_IS_BIG_ENDIAN_TARGET
-        res = ( res >> 24 ) |
-                (0x0000ff00 & ( res >> 8)) |
-                (0x00ff0000 & ( res << 8)) |
-                ( res << 24 );
-#endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
-
-        return res;
-    }
 
     static EntityId_t unknown()
     {
@@ -349,9 +331,21 @@ struct hash<eprosima::fastrtps::rtps::EntityId_t>
     std::size_t operator ()(
             const eprosima::fastrtps::rtps::EntityId_t& k) const
     {
-        return (static_cast<size_t>(k.value[0]) << 16) |
-               (static_cast<size_t>(k.value[1]) << 8) |
-               static_cast<size_t>(k.value[2]);
+        // recover the participant entity counter
+        eprosima::fastrtps::rtps::octet value[4];
+
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
+        value[3] = k.value[2];
+        value[2] = k.value[1];
+        value[1] = k.value[0];
+        value[0] = 0;
+#else
+        value[3] = 0;
+        value[2] = k.value[0];
+        value[1] = k.value[1];
+        value[0] = k.value[2];
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
+        return static_cast<std::size_t>(*reinterpret_cast<const uint32_t*>(&value));
     }
 
 };

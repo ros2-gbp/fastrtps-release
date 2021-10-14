@@ -77,27 +77,18 @@ if(GST_FOUND)
         main_VideoTest.cpp
     )
     add_executable(VideoTest ${VIDEOTEST_SOURCE})
-
-    target_compile_definitions(VideoTest PRIVATE
-        BOOST_ASIO_STANDALONE
-        ASIO_STANDALONE
-        $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-        $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-        )
     target_compile_options(VideoTest PUBLIC ${GST_CFLAGS})
 
     if(NOT WIN32)
         target_include_directories(
             VideoTest
             PUBLIC
-            ${Asio_INCLUDE_DIR}
             ${GST_INCLUDE_DIRS}
         )
     else()
         target_include_directories(
             VideoTest
             PUBLIC
-            ${Asio_INCLUDE_DIR}
             $ENV{GSTREAMER_1_0_ROOT_X86_64}/include
             $ENV{GSTREAMER_1_0_ROOT_X86_64}/include/glib-2.0
             $ENV{GSTREAMER_1_0_ROOT_X86_64}/include/gstreamer-1.0
@@ -109,7 +100,6 @@ if(GST_FOUND)
         target_link_libraries(
             VideoTest
             fastrtps
-            fastcdr
             foonathan_memory
             ${CMAKE_THREAD_LIBS_INIT}
             ${CMAKE_DL_LIBS}
@@ -124,7 +114,6 @@ if(GST_FOUND)
         target_link_libraries(
             VideoTest
             fastrtps
-            fastcdr
             foonathan_memory
             ${CMAKE_THREAD_LIBS_INIT}
             ${CMAKE_DL_LIBS}
@@ -180,26 +169,14 @@ if(GST_FOUND)
                     TEST performance.video.${video_test_name}
                     APPEND PROPERTY ENVIRONMENT "VIDEO_TEST_BIN=$<TARGET_FILE:VideoTest>"
                 )
-
-                # Add environment
                 if(WIN32)
                     set(WIN_PATH "$ENV{PATH}")
-                    get_target_property(LINK_LIBRARIES_ ${PROJECT_NAME} LINK_LIBRARIES)
-                    if(NOT "${LINK_LIBRARIES_}" STREQUAL "LINK_LIBRARIES_-NOTFOUND")
-                    list(APPEND LINK_LIBRARIES_ ${PROJECT_NAME})
-                        foreach(LIBRARY_LINKED ${LINK_LIBRARIES_})
-                            if(TARGET ${LIBRARY_LINKED})
-                                # Check if is a real target or a target interface
-                                get_target_property(dependency_type ${LIBRARY_LINKED} TYPE)
-                                if(NOT dependency_type STREQUAL "INTERFACE_LIBRARY")
-                                    set(WIN_PATH "$<TARGET_FILE_DIR:${LIBRARY_LINKED}>;${WIN_PATH}")
-                                endif()
-                                unset(dependency_type)
-                            endif()
-                        endforeach()
-                    endif()
+                    set(WIN_PATH "$<TARGET_FILE_DIR:${PROJECT_NAME}>;$ENV{PATH}")
                     string(REPLACE ";" "\\;" WIN_PATH "${WIN_PATH}")
-                    set_property(TEST performance.video.${video_test_name} APPEND PROPERTY ENVIRONMENT "PATH=${WIN_PATH}")
+                    set_property(
+                        TEST performance.video.${video_test_name}
+                        APPEND PROPERTY ENVIRONMENT "PATH=${WIN_PATH}"
+                    )
                 endif()
 
                 # If there is security, add a secure test as well
@@ -221,9 +198,14 @@ if(GST_FOUND)
                         TEST performance.video.${video_test_name}_security
                         APPEND PROPERTY ENVIRONMENT "VIDEO_TEST_BIN=$<TARGET_FILE:VideoTest>"
                     )
-
                     if(WIN32)
-                        set_property(TEST performance.video.${video_test_name}_security APPEND PROPERTY ENVIRONMENT "PATH=${WIN_PATH}")
+                        set(WIN_PATH "$ENV{PATH}")
+                        set(WIN_PATH "$<TARGET_FILE_DIR:${PROJECT_NAME}>;$ENV{PATH}")
+                        string(REPLACE ";" "\\;" WIN_PATH "${WIN_PATH}")
+                        set_property(
+                            TEST performance.video.${video_test_name}_security
+                            APPEND PROPERTY ENVIRONMENT "PATH=${WIN_PATH}"
+                        )
                     endif()
                 endif()
             endforeach(video_test_name)

@@ -8,8 +8,6 @@ int main(
 {
     int arg_count = 1;
     bool notexit = false;
-    bool fixed_type = false;
-    bool die_on_data_received = false;
     uint32_t seed = 7800;
     uint32_t samples = 4;
     uint32_t publishers = 1;
@@ -21,11 +19,6 @@ int main(
         if (strcmp(argv[arg_count], "--notexit") == 0)
         {
             notexit = true;
-        }
-        else if (strcmp(argv[arg_count], "--fixed_type") == 0)
-        {
-            std::cout << "--fixed_type set: using FixedSizedType" << std::endl;
-            fixed_type = true;
         }
         else if (strcmp(argv[arg_count], "--seed") == 0)
         {
@@ -77,15 +70,6 @@ int main(
 
             publishers = strtol(argv[arg_count], nullptr, 10);
         }
-        else if (strcmp(argv[arg_count], "--die_on_data_received") == 0)
-        {
-            die_on_data_received = true;
-        }
-        else
-        {
-            std::cout << "Wrong argument " << argv[arg_count] << std::endl;
-            return -1;
-        }
 
         ++arg_count;
     }
@@ -95,9 +79,9 @@ int main(
         eprosima::fastrtps::Domain::loadXMLProfilesFile(xml_file);
     }
 
-    Subscriber subscriber(publishers, samples, die_on_data_received);
+    Subscriber subscriber(publishers, samples);
 
-    if (subscriber.init(seed, magic, fixed_type))
+    if (subscriber.init(seed, magic))
     {
         return subscriber.run(notexit) ? 0 : -1;
     }

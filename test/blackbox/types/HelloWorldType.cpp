@@ -24,107 +24,67 @@
 
 using namespace eprosima::fastrtps::rtps;
 
-HelloWorldType::HelloWorldType()
-{
+HelloWorldType::HelloWorldType() {
     setName("HelloWorldType");
     m_typeSize = (uint32_t)HelloWorld::getMaxCdrSerializedSize() + 4 /*encapsulation*/;
     m_isGetKeyDefined = false;
 
 }
 
-HelloWorldType::~HelloWorldType()
-{
+HelloWorldType::~HelloWorldType() {
     // TODO Auto-generated destructor stub
 }
 
-bool HelloWorldType::serialize(
-        void* data,
-        SerializedPayload_t* payload)
+bool HelloWorldType::serialize(void* data, SerializedPayload_t* payload)
 {
-    bool ret_value = false;
-    HelloWorld* hw = (HelloWorld*) data;
-
-    try
-    {
-        // Object that manages the raw buffer.
-        eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->max_size);
-        // Object that serializes the data.
-        eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                eprosima::fastcdr::Cdr::DDS_CDR);
-        payload->encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-        // Serialize encapsulation
-        ser.serialize_encapsulation();
-        //serialize the object:
-        hw->serialize(ser);
-        payload->length = (uint32_t)ser.getSerializedDataLength();
-        ret_value = true;
-    }
-    catch (eprosima::fastcdr::exception::Exception&)
-    {
-    }
-    return ret_value;
+    HelloWorld* hw = (HelloWorld*) data;	
+    // Object that manages the raw buffer.
+    eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->max_size);
+    // Object that serializes the data.
+    eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
+            eprosima::fastcdr::Cdr::DDS_CDR);
+    payload->encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+    // Serialize encapsulation
+    ser.serialize_encapsulation();
+    //serialize the object:
+    hw->serialize(ser);
+    payload->length = (uint32_t)ser.getSerializedDataLength();
+    return true;
 }
 
-bool HelloWorldType::deserialize(
-        SerializedPayload_t* payload,
-        void* data)
+bool HelloWorldType::deserialize(SerializedPayload_t* payload, void* data)
 {
-    bool ret_value = false;
     HelloWorld* hw = (HelloWorld*) data;
-    try
-    {
-        // Object that manages the raw buffer.
-        eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->length);
-        // Object that serializes the data.
-        eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
-        // Deserialize encapsulation.
-        deser.read_encapsulation();
-        payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-        //serialize the object:
-        hw->deserialize(deser);
-        ret_value = true;
-    }
-    catch (eprosima::fastcdr::exception::Exception&)
-    {
-    }
-    return ret_value;
+    // Object that manages the raw buffer.
+    eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->length);
+    // Object that serializes the data.
+    eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
+    // Deserialize encapsulation.
+    deser.read_encapsulation();
+    payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+    //serialize the object:
+    hw->deserialize(deser);
+    return true;
 }
 
-std::function<uint32_t()> HelloWorldType::getSerializedSizeProvider(
-        void* data)
+std::function<uint32_t()> HelloWorldType::getSerializedSizeProvider(void *data)
 {
-    return [data]() -> uint32_t
-           {
-               return (uint32_t)type::getCdrSerializedSize(*static_cast<HelloWorld*>(data)) + 4 /*encapsulation*/;
-           };
+    return [data]() -> uint32_t { 
+        return (uint32_t)type::getCdrSerializedSize(*static_cast<HelloWorld*>(data)) + 4 /*encapsulation*/;
+    };
 }
 
 void* HelloWorldType::createData()
 {
     return (void*)new HelloWorld();
 }
-
-void HelloWorldType::deleteData(
-        void* data)
+void HelloWorldType::deleteData(void* data)
 {
     delete((HelloWorld*)data);
 }
 
-bool HelloWorldType::getKey(
-        void* /*data*/,
-        InstanceHandle_t* /*ihandle*/,
-        bool /*force_md5*/)
-{
-    return false;
-}
-
-bool HelloWorldType::is_bounded() const
-{
-    return true;
-}
-
-bool HelloWorldType::is_plain() const
+bool HelloWorldType::getKey(void* /*data*/, InstanceHandle_t* /*ihandle*/, bool /*force_md5*/)
 {
     return false;
 }

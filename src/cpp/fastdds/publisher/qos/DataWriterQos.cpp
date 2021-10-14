@@ -18,7 +18,6 @@
  */
 
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
-#include <fastdds/core/policy/QosPolicyUtils.hpp>
 
 using namespace eprosima::fastdds::dds;
 
@@ -53,13 +52,5 @@ WriterQos DataWriterQos::get_writerqos(
     qos.m_topicData = tqos.topic_data();
     qos.m_userData = user_data();
     qos.representation = representation();
-    qos.data_sharing = data_sharing();
-
-    if (qos.data_sharing.kind() != OFF &&
-            qos.data_sharing.domain_ids().empty())
-    {
-        qos.data_sharing.add_domain_id(utils::default_domain_id());
-    }
-
     return qos;
 }

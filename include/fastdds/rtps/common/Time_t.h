@@ -88,7 +88,7 @@ class RTPS_DllAPI Time_t
 public:
 
     //! Default constructor. Sets values to zero.
-    Time_t() = default;
+    Time_t();
 
     /**
      * @param sec Seconds
@@ -114,12 +114,6 @@ public:
      *  Returns stored time as nanoseconds (including seconds)
      */
     int64_t to_ns() const;
-
-    /**
-     *  @param nanosecs Stores given time as nanoseconds (including seconds)
-     */
-    void from_ns(
-            int64_t nanosecs);
 
     /**
      * Retrieve the seconds field.
@@ -175,13 +169,13 @@ public:
 private:
 
     //!Seconds
-    int32_t seconds_ = 0;
+    int32_t seconds_;
 
     //!Fraction of second (1 fraction = 1/(2^32) seconds)
-    uint32_t fraction_ = 0;
+    uint32_t fraction_;
 
     //!Nanoseconds
-    uint32_t nanosec_ = 0;
+    uint32_t nanosec_;
 
     void set_fraction(
             uint32_t frac);
@@ -266,10 +260,10 @@ static inline bool operator <(
 }
 
 /**
- * Checks if a Time_t is greater than other.
+ * Checks if a Time_t is greather than other.
  * @param t1 First Time_t to compare
  * @param t2 Second Time_t to compare
- * @return True if the first Time_t is greater than the second
+ * @return True if the first Time_t is greather than the second
  */
 static inline bool operator >(
         const Time_t& t1,
@@ -328,10 +322,10 @@ static inline bool operator <=(
 }
 
 /**
- * Checks if a Time_t is greater or equal than other.
+ * Checks if a Time_t is greather or equal than other.
  * @param t1 First Time_t to compare
  * @param t2 Second Time_t to compare
- * @return True if the first Time_t is greater or equal than the second
+ * @return True if the first Time_t is greather or equal than the second
  */
 static inline bool operator >=(
         const Time_t& t1,
@@ -422,9 +416,9 @@ static inline Time_t operator +(
 }
 
 /**
- * Subtracts two Time_t.
- * @param ta First Time_t to subtract
- * @param tb Second Time_t to subtract
+ * Substracts two Time_t.
+ * @param ta First Time_t to substract
+ * @param tb Second Time_t to substract
  * @return A new Time_t with the result.
  */
 static inline Time_t operator -(
@@ -441,9 +435,9 @@ static inline Time_t operator -(
 
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-const Time_t c_RTPSTimeInfinite{0x7fffffff, 0xffffffff};
-const Time_t c_RTPSTimeZero{0, 0};
-const Time_t c_RTPSTimeInvalid{-1, 0xffffffff};
+const Time_t c_RTPSTimeInfinite(0x7fffffff, 0xffffffff);
+const Time_t c_RTPSTimeZero(0, 0);
+const Time_t c_RTPSTimeInvalid(-1, 0xffffffff);
 
 } // namespace rtps
 
@@ -523,10 +517,10 @@ static inline bool operator <(
 }
 
 /**
- * Checks if a Time_t is greater than other.
+ * Checks if a Time_t is greather than other.
  * @param t1 First Time_t to compare
  * @param t2 Second Time_t to compare
- * @return True if the first Time_t is greater than the second
+ * @return True if the first Time_t is greather than the second
  */
 static inline bool operator >(
         const Time_t& t1,
@@ -585,10 +579,10 @@ static inline bool operator <=(
 }
 
 /**
- * Checks if a Time_t is greater or equal than other.
+ * Checks if a Time_t is greather or equal than other.
  * @param t1 First Time_t to compare
  * @param t2 Second Time_t to compare
- * @return True if the first Time_t is greater or equal than the second
+ * @return True if the first Time_t is greather or equal than the second
  */
 static inline bool operator >=(
         const Time_t& t1,
@@ -642,9 +636,9 @@ static inline Time_t operator +(
 }
 
 /**
- * Subtracts two Time_t.
- * @param ta First Time_t to subtract
- * @param tb Second Time_t to subtract
+ * Substracts two Time_t.
+ * @param ta First Time_t to substract
+ * @param tb Second Time_t to substract
  * @return A new Time_t with the result.
  */
 static inline Time_t operator -(
@@ -662,11 +656,11 @@ static inline Time_t operator -(
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 //! Time_t (Duration_t) representing an infinite time. DONT USE IT IN CONSTRUCTORS
-const Time_t c_TimeInfinite{TIME_T_INFINITE_SECONDS, TIME_T_INFINITE_NANOSECONDS};
+const Time_t c_TimeInfinite(TIME_T_INFINITE_SECONDS, TIME_T_INFINITE_NANOSECONDS);
 //! Time_t (Duration_t) representing a zero time. DONT USE IT IN CONSTRUCTORS
-const Time_t c_TimeZero{0, 0};
+const Time_t c_TimeZero(0, 0);
 //! Time_t (Duration_t) representing an invalid time. DONT USE IT IN CONSTRUCTORS
-const Time_t c_TimeInvalid{-1, TIME_T_INFINITE_NANOSECONDS};
+const Time_t c_TimeInvalid(-1, TIME_T_INFINITE_NANOSECONDS);
 
 } // namespace fastrtps
 } // namespace eprosima

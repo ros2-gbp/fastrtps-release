@@ -62,33 +62,11 @@ public:
         return true;
     }
 
-#ifdef FASTDDS_STATISTICS
-
-    template<typename T>
-    bool add_statistics_listener(
-            T /*listener*/)
-    {
-        return true;
-    }
-
-    template<typename T>
-    bool remove_statistics_listener(
-            T /*listener*/)
-    {
-        return true;
-    }
-
-#endif // FASTDDS_STATISTICS
-
     // *INDENT-OFF* Uncrustify makes a mess with MOCK_METHOD macros
     MOCK_CONST_METHOD0(getGuid, const GUID_t& ());
 
     MOCK_METHOD3(new_change, CacheChange_t* (
             const std::function<uint32_t()>&,
-            ChangeKind_t,
-            InstanceHandle_t));
-
-    MOCK_METHOD2(new_change, CacheChange_t* (
             ChangeKind_t,
             InstanceHandle_t));
 
@@ -123,14 +101,6 @@ public:
     }
 
     virtual bool try_remove_change(
-            const std::chrono::steady_clock::time_point&,
-            std::unique_lock<RecursiveTimedMutex>&)
-    {
-        return true;
-    }
-
-    virtual bool wait_for_acknowledgement(
-            const SequenceNumber_t&,
             const std::chrono::steady_clock::time_point&,
             std::unique_lock<RecursiveTimedMutex>&)
     {

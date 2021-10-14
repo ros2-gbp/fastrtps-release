@@ -81,17 +81,6 @@ public:
             const SequenceNumber_t& initial_sequence);
 
     /**
-     * Activate this proxy associating it to a remote writer.
-     * @param attributes WriterProxyData of the writer for which to keep state.
-     * @param initial_sequence Sequence number of last acknowledged change.
-     * @param is_datasharing Whether the writer is datasharing with us or not.
-     */
-    void start(
-            const WriterProxyData& attributes,
-            const SequenceNumber_t& initial_sequence,
-            bool is_datasharing);
-
-    /**
      * Update information on the remote writer.
      * @param attributes WriterProxyData with updated information of the writer.
      */
@@ -332,11 +321,6 @@ public:
         return is_on_same_process_;
     }
 
-    bool is_datasharing_writer() const
-    {
-        return is_datasharing_writer_;
-    }
-
 private:
 
     /**
@@ -368,7 +352,7 @@ private:
     bool is_alive_;
 
     using pool_allocator_t =
-            foonathan::memory::memory_pool<foonathan::memory::node_pool, foonathan::memory::heap_allocator>;
+                    foonathan::memory::memory_pool<foonathan::memory::node_pool, foonathan::memory::heap_allocator>;
 
     //! Memory pool allocator for changes_received_
     pool_allocator_t changes_pool_;
@@ -394,8 +378,6 @@ private:
     GUID_t persistence_guid_;
     //! Taken from proxy data
     LocatorSelectorEntry locators_entry_;
-    //! Is the writer datasharing
-    bool is_datasharing_writer_;
 
     using ChangeIterator = decltype(changes_received_)::iterator;
 
@@ -403,12 +385,12 @@ private:
     int get_mutex_owner() const;
 
     int get_thread_id() const;
-#endif // if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__linux__)
+#endif
 };
 
 } /* namespace rtps */
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+#endif
 #endif /* FASTRTPS_RTPS_READER_WRITERPROXY_H_ */

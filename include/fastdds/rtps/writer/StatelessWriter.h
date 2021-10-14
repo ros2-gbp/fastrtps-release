@@ -28,10 +28,8 @@
 #include <fastdds/rtps/writer/RTPSWriter.h>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
 
-#include <condition_variable>
 #include <list>
 #include <memory>
-#include <mutex>
 
 namespace eprosima {
 namespace fastrtps {
@@ -150,11 +148,6 @@ public:
             const std::chrono::steady_clock::time_point&,
             std::unique_lock<RecursiveTimedMutex>&) override;
 
-    bool wait_for_acknowledgement(
-            const SequenceNumber_t& seq,
-            const std::chrono::steady_clock::time_point& max_blocking_time_point,
-            std::unique_lock<RecursiveTimedMutex>& lock) override;
-
     void add_flow_controller(
             std::unique_ptr<FlowController> controller) override;
 
@@ -167,18 +160,6 @@ public:
     bool send(
             CDRMessage_t* message,
             std::chrono::steady_clock::time_point& max_blocking_time_point) const override;
-
-    /**
-     * Get the number of matched readers
-     * @return Number of the matched readers
-     */
-    inline size_t getMatchedReadersSize() const
-    {
-        std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
-        return matched_remote_readers_.size()
-               + matched_local_readers_.size()
-               + matched_datasharing_readers_.size();
-    }
 
 private:
 
@@ -193,9 +174,6 @@ private:
     void update_reader_info(
             bool create_sender_resources);
 
-    bool datasharing_delivery(
-            CacheChange_t* change);
-
     bool intraprocess_delivery(
             CacheChange_t* change,
             ReaderLocator& reader_locator);
@@ -206,21 +184,16 @@ private:
 
     bool is_inline_qos_expected_ = false;
     LocatorList_t fixed_locators_;
-    ResourceLimitedVector<std::unique_ptr<ReaderLocator>> matched_remote_readers_;
+    ResourceLimitedVector<ReaderLocator> matched_readers_;
 
     ResourceLimitedVector<GUID_t> late_joiner_guids_;
     SequenceNumber_t first_seq_for_all_readers_;
     bool ignore_fixed_locators_ = false;
 
     ResourceLimitedVector<ChangeForReader_t, std::true_type> unsent_changes_;
-    std::condition_variable_any unsent_changes_cond_;
     std::vector<std::unique_ptr<FlowController>> flow_controllers_;
     uint64_t last_intraprocess_sequence_number_;
     bool there_are_remote_readers_ = false;
-    ResourceLimitedVector<std::unique_ptr<ReaderLocator>> matched_local_readers_;
-    ResourceLimitedVector<std::unique_ptr<ReaderLocator>> matched_datasharing_readers_;
-    ResourceLimitedVector<std::unique_ptr<ReaderLocator>> matched_readers_pool_;
-
 };
 
 } /* namespace rtps */

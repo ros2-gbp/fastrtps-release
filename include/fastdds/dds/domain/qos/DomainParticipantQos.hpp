@@ -22,7 +22,6 @@
 
 #include <fastrtps/fastrtps_dll.h>
 #include <fastdds/dds/core/policy/QosPolicies.hpp>
-#include <fastdds/rtps/flowcontrol/FlowControllerDescriptor.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -35,8 +34,6 @@ namespace dds {
  */
 class DomainParticipantQos
 {
-    using FlowControllerDescriptorList = std::vector<std::shared_ptr<fastdds::rtps::FlowControllerDescriptor>>;
-
 public:
 
     /**
@@ -62,8 +59,7 @@ public:
                (this->properties_ == b.properties()) &&
                (this->wire_protocol_ == b.wire_protocol()) &&
                (this->transport_ == b.transport()) &&
-               (this->name_ == b.name()) &&
-               (this->flow_controllers_ == b.flow_controllers());
+               (this->name_ == b.name());
     }
 
     /**
@@ -262,16 +258,6 @@ public:
         name_ = value;
     }
 
-    FlowControllerDescriptorList& flow_controllers()
-    {
-        return flow_controllers_;
-    }
-
-    const FlowControllerDescriptorList& flow_controllers() const
-    {
-        return flow_controllers_;
-    }
-
 private:
 
     //!UserData Qos, implemented in the library.
@@ -294,10 +280,6 @@ private:
 
     //!Name of the participant.
     fastrtps::string_255 name_ = "RTPSParticipant";
-
-    //! User defined flow controller to use alongside.
-    //! @since Functionality not implemented yet. Coming soon.
-    FlowControllerDescriptorList flow_controllers_;
 
 };
 

@@ -34,13 +34,8 @@
 #include <unistd.h>
 #endif // if defined(_WIN32)
 
-#include <rtps/messages/RTPSMessageGroup_t.hpp>
-#include <rtps/messages/SendBuffersManager.hpp>
-
-#include <fastdds/rtps/common/Guid.h>
-
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-
+#include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/builtin/discovery/endpoint/EDPSimple.h>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
@@ -48,13 +43,12 @@
 #include <fastdds/rtps/network/NetworkFactory.h>
 #include <fastdds/rtps/network/ReceiverResource.h>
 #include <fastdds/rtps/network/SenderResource.h>
-
 #include <fastdds/rtps/messages/MessageReceiver.h>
-
 #include <fastdds/rtps/resources/ResourceEvent.h>
 #include <fastdds/rtps/resources/AsyncWriterThread.h>
 
-#include <statistics/rtps/StatisticsBase.hpp>
+#include "../messages/RTPSMessageGroup_t.hpp"
+#include "../messages/SendBuffersManager.hpp"
 
 #if HAVE_SECURITY
 #include <fastdds/rtps/Endpoint.h>
@@ -106,7 +100,6 @@ class WLP;
  * @ingroup RTPS_MODULE
  */
 class RTPSParticipantImpl
-    : public fastdds::statistics::StatisticsParticipantImpl
 {
     /*
        Receiver Control block is a struct we use to encapsulate the resources that take part in message reception.
@@ -256,7 +249,6 @@ public:
     /**
      * Send a message to several locations
      * @param msg Message to send.
-     * @param sender_guid GUID of the producer of the message.
      * @param destination_locators_begin Iterator at the first destination locator.
      * @param destination_locators_end Iterator at the end destination locator.
      * @param max_blocking_time_point execution time limit timepoint.
@@ -265,7 +257,6 @@ public:
     template<class LocatorIteratorT>
     bool sendSync(
             CDRMessage_t* msg,
-            const GUID_t& sender_guid,
             const LocatorIteratorT& destination_locators_begin,
             const LocatorIteratorT& destination_locators_end,
             std::chrono::steady_clock::time_point& max_blocking_time_point)
@@ -284,21 +275,6 @@ public:
                 send_resource->send(msg->buffer, msg->length, &locators_begin, &locators_end,
                         max_blocking_time_point);
             }
-
-            lock.unlock();
-
-            // notify statistics module
-            on_rtps_send(
-                sender_guid,
-                destination_locators_begin,
-                destination_locators_end,
-                msg->length);
-
-            // checkout if sender is a discovery endpoint
-            on_discovery_packet(
-                sender_guid,
-                destination_locators_begin,
-                destination_locators_end);
         }
 
         return ret_code;
@@ -391,20 +367,6 @@ public:
             const GUID_t& local_reader,
             const WriterProxyData& remote_writer_data);
 
-    /**
-     * @brief Checks whether the writer has security attributes enabled
-     * @param writer_attributes Attibutes of the writer as given to the create_writer
-     */
-    bool is_security_enabled_for_writer(
-            const WriterAttributes& writer_attributes);
-
-    /**
-     * @brief Checks whether the reader has security attributes enabled
-     * @param reader_attributes Attibutes of the reader as given to the create_reader
-     */
-    bool is_security_enabled_for_reader(
-            const ReaderAttributes& reader_attributes);
-
 #endif // if HAVE_SECURITY
 
     PDPSimple* pdpsimple();
@@ -432,14 +394,6 @@ public:
     {
         return m_network_Factory.get_min_send_buffer_size();
     }
-
-    /**
-     * Get the list of locators from which this participant may send data.
-     *
-     * @param [out] locators  LocatorList_t where the list of locators will be stored.
-     */
-    void get_sending_locators(
-            rtps::LocatorList_t& locators) const;
 
     AsyncWriterThread& async_thread()
     {
@@ -586,16 +540,10 @@ private:
 
     /** Create the new ReceiverResources needed for a new Locator, contains the calls to assignEndpointListenResources
         and consequently assignEndpoint2LocatorList
-        @param pend - Pointer to the endpoint which triggered the creation of the Receivers.
-        @param unique_flows - Whether unique listening ports should be created for this endpoint.
-        @param initial_unique_port - First unique listening port to try.
-        @param final_unique_port - Unique listening port that will not be tried.
+        @param pend - Pointer to the endpoint which triggered the creation of the Receivers
      */
     bool createAndAssociateReceiverswithEndpoint(
-            Endpoint* pend,
-            bool unique_flows = false,
-            uint16_t initial_unique_port = 0,
-            uint16_t final_unique_port = 0);
+            Endpoint* pend);
 
     /** Create non-existent SendResources based on the Locator list of the entity
         @param pend - Pointer to the endpoint whose SenderResources are to be created
@@ -655,6 +603,7 @@ private:
      * using endpoint attributes (or participant
      * attributes if endpoint does not define a persistence service config)
      *
+     * @param [in]  debug_label Label indicating enpoint kind (reader or writer) for logs.
      * @param [in]  is_builtin  Whether the enpoint being created is a builtin one.
      * @param [in]  param       Attributes of the endpoint being created.
      * @param [out] service     Pointer to the persistence service.
@@ -664,12 +613,14 @@ private:
      * @return true if persistence service is created
      */
     bool get_persistence_service(
+            const char* debug_label,
             bool is_builtin,
             const EndpointAttributes& param,
             IPersistenceService*& service);
 
     template <EndpointKind_t kind, octet no_key, octet with_key>
     bool preprocess_endpoint_attributes(
+            const char* debug_label,
             const EntityId_t& entity_id,
             EndpointAttributes& att,
             EntityId_t& entId);
@@ -889,7 +840,7 @@ public:
      * @param ApplyMutation - True if we want to create a Resource with a "similar" locator if the one we provide is unavailable
      * @param RegisterReceiver - True if we want the receiver to be registered. Useful for receivers created after participant is enabled.
      */
-    bool createReceiverResources(
+    void createReceiverResources(
             LocatorList_t& Locator_list,
             bool ApplyMutation,
             bool RegisterReceiver);
@@ -911,43 +862,6 @@ public:
     }
 
 #endif // if HAVE_SECURITY
-
-#ifdef FASTDDS_STATISTICS
-
-    /** Register a listener in participant RTPSWriter entities.
-     * @param listener, smart pointer to the listener interface to register
-     * @param guid, RTPSWriter identifier. If unknown the listener is registered in all enable ones
-     * @return true on success
-     */
-    bool register_in_writer(
-            std::shared_ptr<fastdds::statistics::IListener> listener,
-            GUID_t guid = GUID_t::unknown()) override;
-
-    /** Register a listener in participant RTPSReader entities.
-     * @param listener, smart pointer to the listener interface to register
-     * @param guid, RTPSReader identifier. If unknown the listener is registered in all enable ones
-     * @return true on success
-     */
-    bool register_in_reader(
-            std::shared_ptr<fastdds::statistics::IListener> listener,
-            GUID_t guid = GUID_t::unknown()) override;
-
-    /** Unregister a listener in participant RTPSWriter entities.
-     * @param listener, smart pointer to the listener interface to unregister
-     * @return true on success
-     */
-    bool unregister_in_writer(
-            std::shared_ptr<fastdds::statistics::IListener> listener) override;
-
-    /** Unregister a listener in participant RTPSReader entities.
-     * @param listener, smart pointer to the listener interface to unregister
-     * @return true on success
-     */
-    bool unregister_in_reader(
-            std::shared_ptr<fastdds::statistics::IListener> listener) override;
-
-#endif // FASTDDS_STATISTICS
-
 };
 } // namespace rtps
 } /* namespace rtps */

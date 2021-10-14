@@ -19,12 +19,11 @@
 #include <mutex>
 #include <memory>
 
-#include <utils/shared_memory/SharedMemSegment.hpp>
-#include <utils/shared_memory/RobustExclusiveLock.hpp>
-#include <utils/shared_memory/RobustSharedLock.hpp>
-#include <utils/shared_memory/SharedMemWatchdog.hpp>
-
+#include <rtps/transport/shared_mem/SharedMemSegment.hpp>
 #include <rtps/transport/shared_mem/MultiProducerConsumerRingBuffer.hpp>
+#include <rtps/transport/shared_mem/RobustExclusiveLock.hpp>
+#include <rtps/transport/shared_mem/RobustSharedLock.hpp>
+#include <rtps/transport/shared_mem/SharedMemWatchdog.hpp>
 
 #define THREADID "(ID:" << std::this_thread::get_id() << ") "
 
@@ -73,7 +72,7 @@ public:
     typedef MultiProducerConsumerRingBuffer<BufferDescriptor>::Listener Listener;
     typedef MultiProducerConsumerRingBuffer<BufferDescriptor>::Cell PortCell;
 
-    static const uint32_t CURRENT_ABI_VERSION = 5;
+    static const uint32_t CURRENT_ABI_VERSION = 4;
 
     struct PortNode
     {
@@ -100,31 +99,13 @@ public:
         SharedMemSegment::condition_variable empty_cv;
         SharedMemSegment::mutex empty_cv_mutex;
 
-        // Number of listeners this port supports
         static constexpr size_t LISTENERS_STATUS_SIZE = 1024;
-
-        // Status of each listener
         struct ListenerStatus
         {
-            // True if this slot is taken by an active listener
-            uint8_t is_in_use               : 1;
-
-            // True if the listener is waiting for a notification of new message
             uint8_t is_waiting              : 1;
-
-            // True if the listener has taken a new message and is still processing it
-            uint8_t is_processing           : 1;
-
-            // Break bit packing, next field will start in a new byte
-            uint8_t                         : 0;
-
-            // These are used to detect listeners frozen while waiting for a notification
-            uint8_t counter                 : 4;
-            uint8_t last_verified_counter   : 4;
-
-            // Descriptor of the message the listener is processing
-            // Valid only if is_processing is true.
-            BufferDescriptor descriptor;
+            uint8_t counter                 : 3;
+            uint8_t last_verified_counter   : 3;
+            uint8_t is_in_use               : 1;
         };
         ListenerStatus listeners_status[LISTENERS_STATUS_SIZE];
 
@@ -301,6 +282,8 @@ public:
                     // Most probably has not, so the check is done without locking empty_cv_mutex.
                     if (timeout_elapsed(now, *(*port_it)))
                     {
+                        std::vector<const BufferDescriptor*> descriptors_enqueued;
+
                         try
                         {
                             std::unique_lock<SharedMemSegment::mutex> lock_port((*port_it)->node->empty_cv_mutex);
@@ -668,7 +651,6 @@ public:
             {
                 *listener_index = i;
                 node_->listeners_status[i].is_in_use = true;
-                node_->listeners_status[i].is_processing = false;
                 node_->num_listeners++;
                 listener = buffer_->register_listener();
             }
@@ -695,7 +677,6 @@ public:
                 (*listener).reset();
                 node_->num_listeners--;
                 node_->listeners_status[listener_index].is_in_use = false;
-                node_->listeners_status[listener_index].is_processing = false;
             }
             catch (const std::exception&)
             {
@@ -705,65 +686,6 @@ public:
 
                 throw;
             }
-        }
-
-        /**
-         * @brief Look for a listener processing a buffer and return the buffer descriptor being processed
-         *
-         * Iterates over all the listeners, and upon finding the first one that is marked as \c is_processing:
-         *  - Marks it as not processing
-         *  - Copies the buffer descriptor that was being processed in the provided buffer
-         *  - Finishes iterating
-         *
-         * The intention of this method is to locate all buffer descriptors that are being processed
-         * and apply necessary operations on these buffers when the port is found to be zombie.
-         * This method should be called iteratively until the return value is false
-         * (there is no processing listener remaining).
-         * The calling method has the chance to apply necessary actions on the buffer descriptor.
-         *
-         * \pre Current port is zombie, as reported by is_zombie()
-         *
-         * @param[OUT] buffer_descriptor Descriptor of the buffer that was being processed by the first processing listener
-         * @return True if there was at least one processing listener. False if not.
-         */
-        bool get_and_remove_blocked_processing(
-                BufferDescriptor& buffer_descriptor)
-        {
-            std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
-            for (uint32_t i = 0; i < PortNode::LISTENERS_STATUS_SIZE; i++)
-            {
-                if (node_->listeners_status[i].is_in_use &&
-                        node_->listeners_status[i].is_processing)
-                {
-                    buffer_descriptor = node_->listeners_status[i].descriptor;
-                    listener_processing_stop(i);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Marks the listener as processing a buffer
-         * @param listener_index The index of the listener as returned by create_listener.
-         * @param buffer_descriptor The descriptor of the buffer that the listener is processing
-         */
-        void listener_processing_start(
-                uint32_t listener_index,
-                const BufferDescriptor& buffer_descriptor)
-        {
-            node_->listeners_status[listener_index].descriptor = buffer_descriptor;
-            node_->listeners_status[listener_index].is_processing = true;
-        }
-
-        /**
-         * Marks the listener as finished processing a buffer
-         * @param listener_index The index of the listener as returned by create_listener.
-         */
-        void listener_processing_stop(
-                uint32_t listener_index)
-        {
-            node_->listeners_status[listener_index].is_processing = false;
         }
 
         /**

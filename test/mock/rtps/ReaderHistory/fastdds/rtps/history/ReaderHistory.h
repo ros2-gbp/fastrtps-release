@@ -38,15 +38,8 @@ class ReaderHistory
 
 public:
 
-    using iterator = std::vector<CacheChange_t*>::iterator;
-    using const_iterator = std::vector<CacheChange_t*>::const_iterator;
-
     ReaderHistory(
             const HistoryAttributes& /*att*/)
-    {
-    }
-
-    virtual ~ReaderHistory()
     {
     }
 
@@ -72,13 +65,6 @@ public:
         return ret;
     }
 
-    virtual bool received_change(
-            CacheChange_t*,
-            size_t)
-    {
-        return true;
-    }
-
     bool remove_change(
             CacheChange_t* change)
     {
@@ -92,30 +78,6 @@ public:
         return mp_mutex;
     }
 
-    const_iterator find_change_nts(
-            CacheChange_t* change)
-    {
-        return std::find(m_changes.cbegin(), m_changes.cend(), change);
-    }
-
-    const_iterator changesBegin() const
-    {
-        return m_changes.cbegin();
-    }
-
-    const_iterator changesEnd() const
-    {
-        return m_changes.cend();
-    }
-
-    virtual iterator remove_change_nts(
-            const_iterator removal,
-            bool release = true)
-    {
-        (void)release;
-        return m_changes.erase(removal);
-    }
-
     HistoryAttributes m_att;
 
 protected:
@@ -127,13 +89,6 @@ protected:
     std::mutex samples_number_mutex_;
     unsigned int samples_number_;
     SequenceNumber_t last_sequence_number_;
-
-    iterator get_first_change_with_minimum_ts(
-            const Time_t& /* timestamp */)
-    {
-        return m_changes.end();
-    }
-
 };
 
 } // namespace rtps

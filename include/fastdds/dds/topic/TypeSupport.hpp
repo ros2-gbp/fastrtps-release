@@ -31,12 +31,6 @@ namespace eprosima {
 namespace fastdds {
 namespace dds {
 
-//! Handle to identiy different instances of the same Topic of a certain type.
-using InstanceHandle_t = eprosima::fastrtps::rtps::InstanceHandle_t;
-
-//! The NIL instance handle.
-extern RTPS_DllAPI const InstanceHandle_t HANDLE_NIL;
-
 class DomainParticipant;
 
 /**
@@ -57,39 +51,25 @@ public:
     using Base::operator ->;
     using Base::operator *;
     using Base::operator bool;
+    using Base::operator =;
 
     /**
      * @brief Constructor
      */
-    RTPS_DllAPI TypeSupport() noexcept = default;
+    RTPS_DllAPI TypeSupport()
+        : std::shared_ptr<fastdds::dds::TopicDataType>(nullptr)
+    {
+    }
 
     /**
      * @brief Copy Constructor
      * @param type Another instance of TypeSupport
      */
     RTPS_DllAPI TypeSupport(
-            const TypeSupport& type) noexcept = default;
-
-    /**
-     * @brief Move Constructor
-     * @param type Another instance of TypeSupport
-     */
-    RTPS_DllAPI TypeSupport(
-            TypeSupport&& type) noexcept = default;
-
-    /**
-     * @brief Copy Assignment
-     * @param type Another instance of TypeSupport
-     */
-    RTPS_DllAPI TypeSupport& operator = (
-            const TypeSupport& type) noexcept = default;
-
-    /**
-     * @brief Move Assignment
-     * @param type Another instance of TypeSupport
-     */
-    RTPS_DllAPI TypeSupport& operator = (
-            TypeSupport&& type) noexcept = default;
+            const TypeSupport& type)
+        : std::shared_ptr<fastdds::dds::TopicDataType>(type)
+    {
+    }
 
     /*!
      * \brief TypeSupport constructor that receives a TopicDataType pointer.
@@ -152,7 +132,10 @@ public:
      */
     RTPS_DllAPI virtual bool serialize(
             void* data,
-            fastrtps::rtps::SerializedPayload_t* payload);
+            fastrtps::rtps::SerializedPayload_t* payload)
+    {
+        return get()->serialize(data, payload);
+    }
 
     /**
      * @brief Deserializes the data
@@ -162,7 +145,10 @@ public:
      */
     RTPS_DllAPI virtual bool deserialize(
             fastrtps::rtps::SerializedPayload_t* payload,
-            void* data);
+            void* data)
+    {
+        return get()->deserialize(payload, data);
+    }
 
     /**
      * @brief Getter for the SerializedSizeProvider
@@ -203,7 +189,7 @@ public:
      */
     RTPS_DllAPI virtual bool get_key(
             void* data,
-            InstanceHandle_t* i_handle,
+            fastrtps::rtps::InstanceHandle_t* i_handle,
             bool force_md5 = false)
     {
         return get()->getKey(data, i_handle, force_md5);
@@ -227,34 +213,6 @@ public:
     RTPS_DllAPI bool empty() const
     {
         return get() == nullptr;
-    }
-
-    /**
-     * Checks if the type is bounded.
-     */
-    RTPS_DllAPI virtual inline bool is_bounded() const
-    {
-        return get()->is_bounded();
-    }
-
-    /**
-     * Checks if the type is plain.
-     */
-    RTPS_DllAPI virtual inline bool is_plain() const
-    {
-        return get()->is_plain();
-    }
-
-    RTPS_DllAPI bool operator !=(
-            std::nullptr_t) const
-    {
-        return bool(*this);
-    }
-
-    RTPS_DllAPI bool operator ==(
-            std::nullptr_t) const
-    {
-        return !*this;
     }
 
 };

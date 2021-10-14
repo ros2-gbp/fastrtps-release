@@ -19,18 +19,14 @@
 #ifndef _FASTDDS_RTPS_READER_RTPSREADER_H_
 #define _FASTDDS_RTPS_READER_RTPSREADER_H_
 
-#include <functional>
-
 #include <fastdds/rtps/Endpoint.h>
 #include <fastdds/rtps/attributes/ReaderAttributes.h>
-#include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/common/SequenceNumber.h>
-#include <fastdds/rtps/common/Time_t.h>
-#include <fastdds/rtps/history/ReaderHistory.h>
 #include <fastrtps/qos/LivelinessChangedStatus.h>
+#include <fastdds/rtps/common/Time_t.h>
+#include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/utils/TimedConditionVariable.hpp>
-
-#include <fastdds/statistics/rtps/StatisticsCommon.hpp>
+#include "../history/ReaderHistory.h"
 
 namespace eprosima {
 namespace fastrtps {
@@ -43,15 +39,12 @@ class WriterProxy;
 struct CacheChange_t;
 struct ReaderHistoryState;
 class WriterProxyData;
-class IDataSharingListener;
 
 /**
  * Class RTPSReader, manages the reception of data from its matched writers.
  * @ingroup READER_MODULE
  */
-class RTPSReader
-    : public Endpoint
-    , public fastdds::statistics::StatisticsReaderImpl
+class RTPSReader : public Endpoint
 {
     friend class ReaderHistory;
     friend class RTPSParticipantImpl;
@@ -180,7 +173,7 @@ public:
             WriterProxy* prox = nullptr) = 0;
 
     /**
-     * Get the associated listener, secondary attached Listener in case it is of compound type
+     * Get the associated listener, secondary attached Listener in case it is of coumpound type
      * @return Pointer to the associated reader listener.
      */
     RTPS_DllAPI ReaderListener* getListener() const;
@@ -275,86 +268,6 @@ public:
         m_trustedWriterEntityId = writer;
     }
 
-    /**
-     * Assert the liveliness of a matched writer.
-     * @param writer GUID of the writer to assert.
-     */
-    virtual void assert_writer_liveliness(
-            const GUID_t& writer) = 0;
-
-    /**
-     * Called just before a change is going to be deserialized.
-     * @param [in]  change            Pointer to the change being accessed.
-     * @param [out] wp                Writer proxy the @c change belongs to.
-     * @param [out] is_future_change  Whether the change is in the future (i.e. there are
-     *                                earlier unreceived changes from the same writer).
-     *
-     * @return Whether the change is still valid or not.
-     */
-    virtual bool begin_sample_access_nts(
-            CacheChange_t* change,
-            WriterProxy*& wp,
-            bool& is_future_change) = 0;
-
-    /**
-     * Called after the change has been deserialized.
-     * @param [in] change        Pointer to the change being accessed.
-     * @param [in] wp            Writer proxy the @c change belongs to.
-     * @param [in] mark_as_read  Whether the @c change should be marked as read or not.
-     */
-    virtual void end_sample_access_nts(
-            CacheChange_t* change,
-            WriterProxy*& wp,
-            bool mark_as_read) = 0;
-
-    /**
-     * Called when the user has retrieved a change from the history.
-     * @param change Pointer to the change to ACK
-     * @param writer Writer proxy of the \c change.
-     * @param mark_as_read Whether the \c change should be marked as read or not
-     */
-    virtual void change_read_by_user(
-            CacheChange_t* change,
-            const WriterProxy* writer,
-            bool mark_as_read = true) = 0;
-
-    /**
-     * Checks whether the sample is still valid or is corrupted
-     * @param data Pointer to the sample data to check
-     * @param writer GUID of the writer that sent \c data
-     * @param sn Sequence number related to \c data
-     * @return true if the sample is valid
-     */
-    RTPS_DllAPI bool is_sample_valid(
-            const void* data,
-            const GUID_t& writer,
-            const SequenceNumber_t& sn) const;
-
-    const std::unique_ptr<IDataSharingListener>& datasharing_listener() const
-    {
-        return datasharing_listener_;
-    }
-
-#ifdef FASTDDS_STATISTICS
-
-    /*
-     * Add a listener to receive statistics backend callbacks
-     * @param listener
-     * @return true if successfully added
-     */
-    RTPS_DllAPI bool add_statistics_listener(
-            std::shared_ptr<fastdds::statistics::IListener> listener);
-
-    /*
-     * Remove a listener from receiving statistics backend callbacks
-     * @param listener
-     * @return true if successfully removed
-     */
-    RTPS_DllAPI bool remove_statistics_listener(
-            std::shared_ptr<fastdds::statistics::IListener> listener);
-
-#endif // FASTDDS_STATISTICS
-
 protected:
 
     virtual bool may_remove_history_record(
@@ -428,18 +341,6 @@ protected:
             CacheChange_t** change,
             History::const_iterator hint) const;
 
-    /**
-     * Creates the listener for the datasharing notifications
-     *
-     * @param limits Resource limits for the number of matched datasharing writers
-     */
-    void create_datasharing_listener(
-            ResourceLimitedContainerConfig limits);
-
-    bool is_datasharing_compatible_with(
-            const WriterProxyData& wdata);
-
-
     //!ReaderHistory
     ReaderHistory* mp_history;
     //!Listener
@@ -465,11 +366,6 @@ protected:
     //! The liveliness lease duration of this reader
     Duration_t liveliness_lease_duration_;
 
-    //! Whether the writer is datasharing compatible or not
-    bool is_datasharing_compatible_ = false;
-    //! The listener for the datasharing notifications
-    std::unique_ptr<IDataSharingListener> datasharing_listener_;
-
 private:
 
     RTPSReader& operator =(
@@ -477,8 +373,7 @@ private:
 
     void init(
             const std::shared_ptr<IPayloadPool>& payload_pool,
-            const std::shared_ptr<IChangePool>& change_pool,
-            const ReaderAttributes& att);
+            const std::shared_ptr<IChangePool>& change_pool);
 
 };
 

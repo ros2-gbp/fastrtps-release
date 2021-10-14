@@ -102,6 +102,7 @@ SubscriberImpl::~SubscriberImpl()
     std::string topic_name = m_att.topic.getTopicName().to_string();
     PoolConfig pool_cfg = PoolConfig::from_history_attributes(m_history.m_att);
     payload_pool_->release_history(pool_cfg, true);
+    TopicPayloadPoolRegistry::release(payload_pool_);
 }
 
 bool SubscriberImpl::wait_for_unread_samples(
@@ -340,7 +341,7 @@ bool SubscriberImpl::onNewCacheChangeAdded(
     {
         if (earliest_change == change)
         {
-            // The new change has been added at the beginning of the the history
+            // The new change has been added at the begining of the the history
             // As the history is sorted by timestamp, this means that the new change has the smallest timestamp
             // We have to stop the timer as this will be the next change to expire
             lifespan_timer_->cancel_timer();
@@ -480,14 +481,6 @@ void SubscriberImpl::get_liveliness_changed_status(
 std::shared_ptr<rtps::IPayloadPool> SubscriberImpl::payload_pool()
 {
     return payload_pool_;
-}
-
-void SubscriberImpl::get_listening_locators(
-        rtps::LocatorList_t& locators) const
-{
-    assert(mp_reader != nullptr);
-    locators.assign(mp_reader->getAttributes().unicastLocatorList);
-    locators.push_back(mp_reader->getAttributes().multicastLocatorList);
 }
 
 } /* namespace fastrtps */

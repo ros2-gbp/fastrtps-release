@@ -17,39 +17,21 @@
  *
  */
 
-#include <algorithm>
+#include <fastdds/rtps/messages/RTPSMessageGroup.h>
+#include <fastdds/rtps/messages/RTPSMessageCreator.h>
+#include <fastdds/rtps/writer/RTPSWriter.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/flowcontrol/FlowController.h>
+#include "RTPSGapBuilder.hpp"
+#include "RTPSMessageGroup_t.hpp"
 
 #include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/messages/RTPSMessageCreator.h>
-#include <fastdds/rtps/messages/RTPSMessageGroup.h>
-#include <fastdds/rtps/reader/RTPSReader.h>
-#include <fastdds/rtps/writer/RTPSWriter.h>
 
-#include <rtps/flowcontrol/FlowController.h>
-#include <rtps/messages/RTPSGapBuilder.hpp>
-#include <rtps/messages/RTPSMessageGroup_t.hpp>
-#include <rtps/participant/RTPSParticipantImpl.h>
-
-#include <statistics/rtps/messages/RTPSStatisticsMessages.hpp>
+#include <algorithm>
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
-
-static bool append_message(
-        CDRMessage_t* full_msg,
-        CDRMessage_t* submsg)
-{
-#ifndef FASTDDS_STATISTICS
-    return CDRMessage::appendMsg(full_msg, submsg);
-#else
-    // Keep room for the statistics submessage by reducing max_size while appending submessage
-    full_msg->max_size -= eprosima::fastdds::statistics::rtps::statistics_submessage_length;
-    bool ret_val = CDRMessage::appendMsg(full_msg, submsg);
-    full_msg->max_size += eprosima::fastdds::statistics::rtps::statistics_submessage_length;
-    return ret_val;
-#endif // FASTDDS_STATISTICS
-}
 
 bool sort_changes_group (
         CacheChange_t* c1,
@@ -230,8 +212,6 @@ void RTPSMessageGroup::send()
         }
 #endif // if HAVE_SECURITY
 
-        eprosima::fastdds::statistics::rtps::add_statistics_submessage(msgToSend);
-
         if (!sender_.send(msgToSend, max_blocking_time_point_))
         {
             throw timeout();
@@ -265,13 +245,20 @@ bool RTPSMessageGroup::insert_submessage(
         const GuidPrefix_t& destination_guid_prefix,
         bool is_big_submessage)
 {
-    if (!append_message(full_msg_, submessage_msg_))
+    if (!CDRMessage::appendMsg(full_msg_, submessage_msg_))
     {
         // Retry
-        flush_and_reset();
-        add_info_dst_in_buffer(full_msg_, destination_guid_prefix);
+        flush();
 
-        if (!append_message(full_msg_, submessage_msg_))
+        current_dst_ = c_GuidPrefix_Unknown;
+
+        if (!add_info_dst_in_buffer(full_msg_, destination_guid_prefix))
+        {
+            logError(RTPS_WRITER, "Cannot add INFO_DST submessage to the CDRMessage. Buffer too small");
+            return false;
+        }
+
+        if (!CDRMessage::appendMsg(full_msg_, submessage_msg_))
         {
             logError(RTPS_WRITER, "Cannot add RTPS submesage to the CDRMessage. Buffer too small");
             return false;
@@ -293,7 +280,7 @@ bool RTPSMessageGroup::add_info_dst_in_buffer(
 {
 #if HAVE_SECURITY
     // Add INFO_SRC when we are at the beginning of the message and RTPS protection is enabled
-    if ((full_msg_->length == RTPSMESSAGE_HEADER_SIZE) &&
+    if ( (full_msg_->length == RTPSMESSAGE_HEADER_SIZE) &&
             participant_->security_attributes().is_rtps_protected && endpoint_->supports_rtps_protection())
     {
         RTPSMessageCreator::addSubmessageInfoSRC(buffer, c_ProtocolVersion, c_VendorId_eProsima,
@@ -685,10 +672,6 @@ bool RTPSMessageGroup::create_gap_submessage(
     }
 #endif // if HAVE_SECURITY
 
-    // Notify the statistics module, note that only writers add gaps
-    assert(nullptr != dynamic_cast<RTPSWriter*>(endpoint_));
-    static_cast<RTPSWriter*>(endpoint_)->on_gap();
-
     return true;
 }
 
@@ -744,10 +727,6 @@ bool RTPSMessageGroup::add_acknack(
     }
 #endif // if HAVE_SECURITY
 
-    // Notify the statistics module, note that only readers add acknacks
-    assert(nullptr != dynamic_cast<RTPSReader*>(endpoint_));
-    static_cast<fastdds::statistics::StatisticsReaderImpl*>(static_cast<RTPSReader*>(endpoint_))->on_acknack(count);
-
     return insert_submessage(false);
 }
 
@@ -797,10 +776,6 @@ bool RTPSMessageGroup::add_nackfrag(
         }
     }
 #endif // if HAVE_SECURITY
-
-    // Notify the statistics module, note that only readers add NACKFRAGs
-    assert(nullptr != dynamic_cast<RTPSReader*>(endpoint_));
-    static_cast<RTPSReader*>(endpoint_)->on_nackfrag(count);
 
     return insert_submessage(false);
 }

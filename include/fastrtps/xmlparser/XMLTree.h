@@ -3,7 +3,6 @@
 
 #include <map>
 #include <memory>
-#include <string>
 #include <vector>
 
 namespace eprosima {
@@ -27,70 +26,50 @@ enum class NodeType
     TYPES,
     LOG,
     REQUESTER,
-    REPLIER,
-    LIBRARY_SETTINGS
+    REPLIER
 };
 
 class BaseNode
 {
-public:
-
-    BaseNode(
-            NodeType type)
-        : data_type_(type)
-        , parent_(nullptr)
-    {
-    }
-
+  public:
+    BaseNode(NodeType type) : data_type_(type), parent_(nullptr){};
     virtual ~BaseNode() = default;
 
-    BaseNode(
-            const BaseNode&) = delete;
-    BaseNode& operator =(
-            const BaseNode&) = delete;
+    BaseNode(const BaseNode&) = delete;
+    BaseNode& operator=(const BaseNode&) = delete;
 
-    // C++11 defaulted functions
-    // Vs2013 partly support defaulted functions. Defaulted move constructors and move assignment operators are not
-    // supported.
+// C++11 defaulted functions
+// Vs2013 partly support defaulted functions. Defaulted move constructors and move assignment operators are not
+// supported.
 #if !defined(HAVE_CXX0X) || (defined(_MSC_VER) && _MSC_VER <= 1800)
-    BaseNode(
-            BaseNode&& other)
-        : data_type_(std::move(other.data_type_))
-        , parent_(std::move(other.parent_))
-        , children(std::move(other.children))
+    BaseNode(BaseNode&& other)
+        : data_type_(std::move(other.data_type_)), parent_(std::move(other.parent_)), children(std::move(children))
     {
     }
-
-    BaseNode& operator =(
-            BaseNode&& other)
+    BaseNode& operator=(BaseNode&& other)
     {
         data_type_ = std::move(other.data_type_);
         parent_    = std::move(other.parent_);
         children   = std::move(other.children);
         return *this;
     }
-
 #else
-    BaseNode(
-            BaseNode&&) = default;
-    BaseNode& operator =(
-            BaseNode&&) = default;
-#endif // if !defined(HAVE_CXX0X) || (defined(_MSC_VER) && _MSC_VER <= 1800)
+    BaseNode(BaseNode&&) = default;
+    BaseNode& operator=(BaseNode&&) = default;
+#endif
 
     NodeType getType() const
     {
         return data_type_;
     }
 
-    void addChild(
-            std::unique_ptr<BaseNode> child)
+    void addChild(std::unique_ptr<BaseNode> child)
     {
         child->setParent(this);
         children.push_back(std::move(child));
     }
 
-    bool removeChild(
-            const size_t& index)
+    bool removeChild(const size_t& index)
     {
         if (children.size() > index)
         {
@@ -103,8 +82,7 @@ public:
         }
     }
 
-    BaseNode* getChild(
-            const size_t& index) const
+    BaseNode* getChild(const size_t& index) const
     {
         if (children.empty())
         {
@@ -118,8 +96,7 @@ public:
         return parent_;
     }
 
-    void setParent(
-            BaseNode* parent)
+    void setParent(BaseNode* parent)
     {
         parent_ = parent;
     }
@@ -134,8 +111,7 @@ public:
         return children;
     }
 
-private:
-
+  private:
     NodeType data_type_;
     BaseNode* parent_;
     std::vector<std::unique_ptr<BaseNode>> children;
@@ -144,80 +120,53 @@ private:
 template <class T>
 class DataNode : public BaseNode
 {
-public:
-
-    DataNode(
-            NodeType type);
-    DataNode(
-            NodeType type,
-            std::unique_ptr<T> data);
+  public:
+    DataNode(NodeType type);
+    DataNode(NodeType type, std::unique_ptr<T> data);
     virtual ~DataNode();
 
-    DataNode(
-            const DataNode&) = delete;
-    DataNode& operator =(
-            const DataNode&) = delete;
+    DataNode(const DataNode&) = delete;
+    DataNode& operator=(const DataNode&) = delete;
 
-    // C++11 defaulted functions
-    // Vs2013 partly support defaulted functions. Defaulted move constructors and move assignment operators are not
-    // supported.
+// C++11 defaulted functions
+// Vs2013 partly support defaulted functions. Defaulted move constructors and move assignment operators are not
+// supported.
 #if !defined(HAVE_CXX0X) || (defined(_MSC_VER) && _MSC_VER <= 1800)
-    DataNode(
-            DataNode&& other)
-        : BaseNode(std::move(other))
-        , attributes_(std::move(other.attributes_))
-        , data_(std::move(other.data_))
+    DataNode(DataNode&& other)
+        : BaseNode(std::move(other)), attributes_(std::move(other.attributes_)), data_(std::move(other.data_))
     {
     }
-
-    DataNode& operator =(
-            DataNode&& other)
+    DataNode& operator=(DataNode&& other)
     {
-        BaseNode::operator =(std::move(other));
-        attributes_      = std::move(other.attributes_);
+        BaseNode::operator=(std::move(other));
+        attributes__      = std::move(other.attributes_);
         data_             = std::move(other.data_);
         return *this;
     }
-
 #else
-    DataNode(
-            DataNode&&)            = default;
-    DataNode& operator =(
-            DataNode&&) = default;
-#endif // if !defined(HAVE_CXX0X) || (defined(_MSC_VER) && _MSC_VER <= 1800)
+    DataNode(DataNode&&)            = default;
+    DataNode& operator=(DataNode&&) = default;
+#endif
 
     T* get() const;
     std::unique_ptr<T> getData();
-    void setData(
-            std::unique_ptr<T> data);
+    void setData(std::unique_ptr<T> data);
 
-    void addAttribute(
-            const std::string& name,
-            const std::string& value);
+    void addAttribute(const std::string& name, const std::string& value);
     const std::map<std::string, std::string>& getAttributes();
 
-private:
-
+  private:
     std::map<std::string, std::string> attributes_;
     std::unique_ptr<T> data_;
 };
 
 template <class T>
-DataNode<T>::DataNode(
-        NodeType type)
-    : BaseNode(type)
-    , attributes_()
-    , data_(nullptr)
+DataNode<T>::DataNode(NodeType type) : BaseNode(type), attributes_(), data_(nullptr)
 {
 }
 
 template <class T>
-DataNode<T>::DataNode(
-        NodeType type,
-        std::unique_ptr<T> data)
-    : BaseNode(type)
-    , attributes_()
-    , data_(std::move(data))
+DataNode<T>::DataNode(NodeType type, std::unique_ptr<T> data) : BaseNode(type), attributes_(), data_(std::move(data))
 {
 }
 
@@ -239,16 +188,13 @@ std::unique_ptr<T> DataNode<T>::getData()
 }
 
 template <class T>
-void DataNode<T>::setData(
-        std::unique_ptr<T> data)
+void DataNode<T>::setData(std::unique_ptr<T> data)
 {
     data_ = std::move(data);
 }
 
 template <class T>
-void DataNode<T>::addAttribute(
-        const std::string& name,
-        const std::string& value)
+void DataNode<T>::addAttribute(const std::string& name, const std::string& value)
 {
     attributes_[name] = value;
 }

@@ -28,7 +28,6 @@
 
 #include <fastdds/dds/log/Log.hpp>
 
-#include <limits>
 #include <mutex>
 
 namespace eprosima {
@@ -43,7 +42,6 @@ static HistoryAttributes to_history_attributes(
 {
     auto initial_samples = topic_att.resourceLimitsQos.allocated_samples;
     auto max_samples = topic_att.resourceLimitsQos.max_samples;
-    auto extra_samples = topic_att.resourceLimitsQos.extra_samples;
 
     if (topic_att.historyQos.kind != KEEP_ALL_HISTORY_QOS)
     {
@@ -56,7 +54,7 @@ static HistoryAttributes to_history_attributes(
         initial_samples = std::min(initial_samples, max_samples);
     }
 
-    return HistoryAttributes(mempolicy, payloadMaxSize, initial_samples, max_samples, extra_samples);
+    return HistoryAttributes(mempolicy, payloadMaxSize, initial_samples, max_samples);
 }
 
 PublisherHistory::PublisherHistory(
@@ -68,15 +66,6 @@ PublisherHistory::PublisherHistory(
     , resource_limited_qos_(topic_att.resourceLimitsQos)
     , topic_att_(topic_att)
 {
-    if (resource_limited_qos_.max_instances == 0)
-    {
-        resource_limited_qos_.max_instances = std::numeric_limits<int32_t>::max();
-    }
-
-    if (resource_limited_qos_.max_samples_per_instance == 0)
-    {
-        resource_limited_qos_.max_samples_per_instance = std::numeric_limits<int32_t>::max();
-    }
 }
 
 PublisherHistory::~PublisherHistory()
@@ -143,76 +132,8 @@ bool PublisherHistory::add_pub_change(
 
     bool returnedValue = false;
 
-    // For NO_KEY we can directly add the change
-    bool add = (topic_att_.getTopicKind() == NO_KEY);
-    if (topic_att_.getTopicKind() == WITH_KEY)
-    {
-        t_m_Inst_Caches::iterator vit;
-
-        // For WITH_KEY, we take into account the limits on the instance
-        // In case we wait for a sequence to be acknowledged, we try several times
-        // until we reach the max blocking timepoint
-        while (!add)
-        {
-            // We should have the instance
-            if (!find_or_add_key(change->instanceHandle, &vit))
-            {
-                break;
-            }
-
-            if (history_qos_.kind == KEEP_LAST_HISTORY_QOS)
-            {
-                if (vit->second.cache_changes.size() < static_cast<size_t>(history_qos_.depth))
-                {
-                    add = true;
-                }
-                else
-                {
-                    add = remove_change_pub(vit->second.cache_changes.front());
-                }
-            }
-            else if (history_qos_.kind == KEEP_ALL_HISTORY_QOS)
-            {
-                if (vit->second.cache_changes.size() <
-                        static_cast<size_t>(resource_limited_qos_.max_samples_per_instance))
-                {
-                    add = true;
-                }
-                else
-                {
-                    SequenceNumber_t seq_to_remove = vit->second.cache_changes.front()->sequenceNumber;
-                    if (!mp_writer->wait_for_acknowledgement(seq_to_remove, max_blocking_time, lock))
-                    {
-                        // Timeout waiting. Will not add change to history.
-                        break;
-                    }
-
-                    // vit may have been invalidated
-                    if (!find_or_add_key(change->instanceHandle, &vit))
-                    {
-                        break;
-                    }
-
-                    // If the change we were trying to remove was already removed, try again
-                    if (vit->second.cache_changes.empty() ||
-                            vit->second.cache_changes.front()->sequenceNumber != seq_to_remove)
-                    {
-                        continue;
-                    }
-
-                    // Remove change if still present
-                    add = remove_change_pub(vit->second.cache_changes.front());
-                }
-            }
-        }
-
-        if (add)
-        {
-            vit->second.cache_changes.push_back(change);
-        }
-    }
-
-    if (add)
+    //NO KEY HISTORY
+    if (topic_att_.getTopicKind() == NO_KEY)
     {
 #if HAVE_STRICT_REALTIME
         if (this->add_change_(change, wparams, max_blocking_time))
@@ -220,13 +141,63 @@ bool PublisherHistory::add_pub_change(
         if (this->add_change_(change, wparams))
 #endif // if HAVE_STRICT_REALTIME
         {
-            logInfo(RTPS_HISTORY,
-                    topic_att_.getTopicDataType()
-                    << " Change " << change->sequenceNumber << " added with key: " << change->instanceHandle
-                    << " and " << change->serializedPayload.length << " bytes");
             returnedValue = true;
         }
     }
+    //HISTORY WITH KEY
+    else if (topic_att_.getTopicKind() == WITH_KEY)
+    {
+        t_m_Inst_Caches::iterator vit;
+        if (find_or_add_key(change->instanceHandle, &vit))
+        {
+            logInfo(RTPS_HISTORY, "Found key: " << vit->first);
+            bool add = false;
+            if (history_qos_.kind == KEEP_ALL_HISTORY_QOS)
+            {
+                if (static_cast<int32_t>(vit->second.cache_changes.size()) <
+                        resource_limited_qos_.max_samples_per_instance)
+                {
+                    add = true;
+                }
+                else
+                {
+                    logWarning(RTPS_HISTORY, "Change not added due to maximum number of samples per instance");
+                }
+            }
+            else if (history_qos_.kind == KEEP_LAST_HISTORY_QOS)
+            {
+                if (vit->second.cache_changes.size() < static_cast<size_t>(history_qos_.depth))
+                {
+                    add = true;
+                }
+                else
+                {
+                    if (remove_change_pub(vit->second.cache_changes.front()))
+                    {
+                        add = true;
+                    }
+                }
+            }
+
+            if (add)
+            {
+                vit->second.cache_changes.push_back(change);
+#if HAVE_STRICT_REALTIME
+                if (this->add_change_(change, wparams, max_blocking_time))
+#else
+                if (this->add_change_(change, wparams))
+#endif // if HAVE_STRICT_REALTIME
+                {
+                    logInfo(RTPS_HISTORY,
+                            topic_att_.getTopicDataType()
+                            << " Change " << change->sequenceNumber << " added with key: " << change->instanceHandle
+                            << " and " << change->serializedPayload.length << " bytes");
+                    returnedValue =  true;
+                }
+            }
+        }
+    }
+
 
     return returnedValue;
 }

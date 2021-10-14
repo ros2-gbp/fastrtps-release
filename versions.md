@@ -1,29 +1,3 @@
-Forthcoming
------------
-
-Version 2.3.0
--------------
-
-* New Fast DDS Statistics module
-* New discovery "super-client" kind
-* Added methods to get sending locators for writers and listening locators for readers (ABI break)
-* Added support for unique network flows
-* Added reception_timestamp to `eprosima::fastdds::dds::SampleInfo` (ABI break)
-* Added `eprosima::fastdds::dds::DataReader::get_unread_count` (ABI break)
-* Refactor `eprosima::fastrtps::type::ReturnCode_t`. Now the constant global objects are no longer available (ABI break)
-* Performance tests refactored to use DDS-PIM high-level API
-
-Version 2.2.0
--------------
-
-* TopicDataType interface extended (ABI break)
-* Upgrade to Quality Level 1
-* New DataWriter API for loaning samples (extends DataWriter API, implies ABI break)
-* New template classes for loanable sequences
-* Added DataReader read and take APIs (implies ABI break)
-* Complete DDS traditional C++ API (implies ABI breaks)
-* Data sharing delivery (ABI breaks)
-
 Version 2.1.0
 -------------
 

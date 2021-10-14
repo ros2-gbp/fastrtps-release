@@ -140,8 +140,6 @@ public:
 
     void init()
     {
-        matched_ = 0;
-
         eprosima::fastrtps::rtps::RTPSParticipantAttributes pattr;
         pattr.builtin.discovery_config.discoveryProtocol = eprosima::fastrtps::rtps::DiscoveryProtocol::SIMPLE;
         pattr.builtin.use_WriterLivelinessProtocol = true;
@@ -201,16 +199,10 @@ public:
     }
 
     void expected_data(
-            const std::list<type>& msgs,
-            bool reset_seq = false)
+            const std::list<type>& msgs)
     {
         std::unique_lock<std::mutex> lock(mutex_);
         total_msgs_ = msgs;
-
-        if (reset_seq)
-        {
-            last_seq_ = eprosima::fastrtps::rtps::SequenceNumber_t();
-        }
     }
 
     void expected_data(

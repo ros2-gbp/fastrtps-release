@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/TCPAcceptorBasic.h>
-
+#include <fastdds/rtps/transport/TCPAcceptorBasic.h>
+#include <fastdds/rtps/transport/TCPTransportInterface.h>
 #include <fastrtps/utils/IPLocator.h>
-#include <rtps/transport/TCPTransportInterface.h>
 
-namespace eprosima {
-namespace fastdds {
-namespace rtps {
+namespace eprosima{
+namespace fastdds{
+namespace rtps{
 
+using Locator_t = fastrtps::rtps::Locator_t;
 using IPLocator = fastrtps::rtps::IPLocator;
 
 TCPAcceptorBasic::TCPAcceptorBasic(
         asio::io_service& io_service,
         TCPTransportInterface* parent,
-        const Locator& locator)
+        const Locator_t& locator)
     : TCPAcceptor(io_service, parent, locator)
     , socket_(*io_service_)
 {
@@ -36,30 +36,29 @@ TCPAcceptorBasic::TCPAcceptorBasic(
 TCPAcceptorBasic::TCPAcceptorBasic(
         asio::io_service& io_service,
         const std::string& interface,
-        const Locator& locator)
+        const Locator_t& locator)
     : TCPAcceptor(io_service, interface, locator)
     , socket_(*io_service_)
 {
     endpoint_ = asio::ip::tcp::endpoint(asio::ip::address_v4::from_string(interface),
-                    IPLocator::getPhysicalPort(locator_));
+        IPLocator::getPhysicalPort(locator_));
 }
 
-void TCPAcceptorBasic::accept(
-        TCPTransportInterface* parent)
+void TCPAcceptorBasic::accept(TCPTransportInterface* parent)
 {
     using asio::ip::tcp;
 
-    const Locator locator = locator_;
+    const Locator_t locator = locator_;
 
     acceptor_.async_accept(socket_,
-            [parent, locator, this](const std::error_code& error)
+        [parent, locator, this](const std::error_code& error)
+        {
+            if (!error)
             {
-                if (!error)
-                {
-                    auto socket = std::make_shared<tcp::socket>(std::move(socket_));
-                    parent->SocketAccepted(socket, locator, error);
-                }
-            });
+                auto socket = std::make_shared<tcp::socket>(std::move(socket_));
+                parent->SocketAccepted(socket, locator, error);
+            }
+        });
 }
 
 } // namespace rtps

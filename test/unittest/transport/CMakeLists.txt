@@ -13,13 +13,18 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    if(GTest_FOUND)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
+    check_gtest()
+
+    if(GTEST_FOUND)
         if(WIN32)
             add_definitions(
                 -D_WIN32_WINNT=0x0601
                 -D_CRT_SECURE_NO_WARNINGS
                 )
         endif()
+
+        include_directories(${ASIO_INCLUDE_DIR})
 
         # Copy certs
         if(TLS_FOUND)
@@ -196,20 +201,15 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         include_directories(mock/)
 
         add_executable(UDPv4Tests ${UDPV4TESTS_SOURCE})
-        target_compile_definitions(UDPv4Tests PRIVATE FASTRTPS_NO_LIB
-            BOOST_ASIO_STANDALONE
-            ASIO_STANDALONE
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+        target_compile_definitions(UDPv4Tests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(UDPv4Tests PRIVATE
-            ${Asio_INCLUDE_DIR}
+            ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(UDPv4Tests GTest::gtest ${MOCKS})
+        target_link_libraries(UDPv4Tests ${GTEST_LIBRARIES} ${MOCKS})
         if(MSVC OR MSVC_IDE)
             target_link_libraries(UDPv4Tests ${PRIVACY} iphlpapi Shlwapi )
         endif()
@@ -220,20 +220,15 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
 
         if(NOT DISABLE_UDPV6_TESTS)
             add_executable(UDPv6Tests ${UDPV6TESTS_SOURCE})
-            target_compile_definitions(UDPv6Tests PRIVATE FASTRTPS_NO_LIB
-                BOOST_ASIO_STANDALONE
-                ASIO_STANDALONE
-                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-                )
+            target_compile_definitions(UDPv6Tests PRIVATE FASTRTPS_NO_LIB)
             target_include_directories(UDPv6Tests PRIVATE
-                ${Asio_INCLUDE_DIR}
+                ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
                 ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
                 ${PROJECT_SOURCE_DIR}/src/cpp
                 )
-            target_link_libraries(UDPv6Tests GTest::gtest ${MOCKS})
+            target_link_libraries(UDPv6Tests ${GTEST_LIBRARIES} ${MOCKS})
             if(MSVC OR MSVC_IDE)
                 target_link_libraries(UDPv6Tests ${PRIVACY} iphlpapi Shlwapi )
             endif()
@@ -241,14 +236,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_UDP6)
 
             add_executable(TCPv6Tests ${TCPV6TESTS_SOURCE})
-            target_compile_definitions(TCPv6Tests PRIVATE FASTRTPS_NO_LIB
-                BOOST_ASIO_STANDALONE
-                ASIO_STANDALONE
-                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-                )
+            target_compile_definitions(TCPv6Tests PRIVATE FASTRTPS_NO_LIB)
             target_include_directories(TCPv6Tests PRIVATE
-                ${Asio_INCLUDE_DIR}
+                ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
                 ${PROJECT_SOURCE_DIR}/test/mock/dds/QosPolicies
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
@@ -256,7 +246,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
                 ${PROJECT_SOURCE_DIR}/src/cpp
                 )
-            target_link_libraries(TCPv6Tests GTest::gtest ${MOCKS}
+            target_link_libraries(TCPv6Tests ${GTEST_LIBRARIES} ${MOCKS}
                 $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>)
             if(MSVC OR MSVC_IDE)
                 target_link_libraries(TCPv6Tests ${PRIVACY} fastcdr iphlpapi Shlwapi)
@@ -268,14 +258,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         endif()
 
         add_executable(test_UDPv4Tests ${TEST_UDPV4TESTS_SOURCE})
-        target_compile_definitions(test_UDPv4Tests PRIVATE FASTRTPS_NO_LIB
-            BOOST_ASIO_STANDALONE
-            ASIO_STANDALONE
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+        target_compile_definitions(test_UDPv4Tests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(test_UDPv4Tests PRIVATE
-            ${Asio_INCLUDE_DIR}
+            ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
             ${PROJECT_SOURCE_DIR}/test/mock/dds/QosPolicies
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
@@ -283,7 +268,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(test_UDPv4Tests GTest::gtest ${MOCKS})
+        target_link_libraries(test_UDPv4Tests ${GTEST_LIBRARIES} ${MOCKS})
         if(MSVC OR MSVC_IDE)
             target_link_libraries(test_UDPv4Tests ${PRIVACY} iphlpapi Shlwapi)
         else()
@@ -293,14 +278,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TEST_UDP4)
 
         add_executable(TCPv4Tests ${TCPV4TESTS_SOURCE})
-        target_compile_definitions(TCPv4Tests PRIVATE FASTRTPS_NO_LIB
-            BOOST_ASIO_STANDALONE
-            ASIO_STANDALONE
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+        target_compile_definitions(TCPv4Tests PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(TCPv4Tests PRIVATE
-            ${Asio_INCLUDE_DIR}
+            ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
             ${PROJECT_SOURCE_DIR}/test/mock/dds/QosPolicies
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
@@ -308,7 +288,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(TCPv4Tests GTest::gtest ${MOCKS}
+        target_link_libraries(TCPv4Tests ${GTEST_LIBRARIES} ${MOCKS}
             $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>)
         if(MSVC OR MSVC_IDE)
             target_link_libraries(TCPv4Tests ${PRIVACY} fastcdr iphlpapi Shlwapi)
@@ -322,26 +302,19 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             add_executable(SharedMemTests ${SHAREDMEMTESTS_SOURCE})
 
             target_compile_definitions(SharedMemTests PRIVATE FASTRTPS_NO_LIB
-                BOOST_ASIO_STANDALONE
-                ASIO_STANDALONE
-                $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
-                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-                )
+            $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>)
 
             target_include_directories(SharedMemTests PRIVATE
-                ${Asio_INCLUDE_DIR}
+                ${GTEST_INCLUDE_DIRS} ${GMOCK_INCLUDE_DIRS}
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
                 ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
                 ${PROJECT_SOURCE_DIR}/src/cpp
                 ${THIRDPARTY_BOOST_INCLUDE_DIR}
                 )
-            target_link_libraries(SharedMemTests GTest::gtest ${MOCKS}
-                $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
-                ${THIRDPARTY_BOOST_LINK_LIBS}
-                eProsima_atomic
-                )
+            target_link_libraries(SharedMemTests ${GTEST_LIBRARIES} ${MOCKS}
+                    $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
+                    ${THIRDPARTY_BOOST_LINK_LIBS})
             if(MSVC OR MSVC_IDE)
                 target_link_libraries(SharedMemTests ${PRIVACY} iphlpapi Shlwapi )
             else()

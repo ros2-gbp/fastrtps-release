@@ -140,14 +140,6 @@ public:
             WriterProxyData& remote_writer_guid,
             const EndpointSecurityAttributes& security_attributes);
 
-    bool get_datawriter_sec_attributes(
-            const PropertyPolicy& writer_properties,
-            EndpointSecurityAttributes& security_attributes);
-
-    bool get_datareader_sec_attributes(
-            const PropertyPolicy& reader_properties,
-            EndpointSecurityAttributes& security_attributes);
-
     bool get_identity_token(
             IdentityToken** identity_token);
 
@@ -426,7 +418,7 @@ private:
     void cancel_init();
 
     void remove_discovered_participant_info(
-            const DiscoveredParticipantInfo::AuthUniquePtr& auth_ptr);
+            DiscoveredParticipantInfo::AuthUniquePtr&& auth_ptr);
 
     bool restore_discovered_participant_info(
             const GUID_t& remote_participant_key,

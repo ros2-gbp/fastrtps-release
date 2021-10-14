@@ -22,19 +22,15 @@
 
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
-#include <fastdds/rtps/common/Time_t.h>
 #include <fastrtps/types/TypeIdentifier.h>
 
-#include <fastdds/dds/builtin/topic/ParticipantBuiltinTopicData.hpp>
-#include <fastdds/dds/builtin/topic/TopicBuiltinTopicData.hpp>
+#include <fastdds/rtps/common/Guid.h>
+#include <fastdds/rtps/common/SampleIdentity.h>
+#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
+#include <fastrtps/types/TypesBase.h>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastdds/dds/core/Entity.hpp>
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
-#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastdds/rtps/common/Guid.h>
-#include <fastdds/rtps/common/SampleIdentity.h>
-#include <fastrtps/types/TypesBase.h>
-
 
 #include <utility>
 
@@ -75,10 +71,6 @@ class SubscriberQos;
 class SubscriberListener;
 class TopicQos;
 
-// Not implemented classes
-class ContentFilteredTopic;
-class MultiTopic;
-
 /**
  * Class DomainParticipant used to group Publishers and Subscribers into a single working unit.
  * @ingroup FASTDDS_MODULE
@@ -86,13 +78,6 @@ class MultiTopic;
 class DomainParticipant : public Entity
 {
 public:
-
-    /**
-     * @brief Destructor
-     */
-    RTPS_DllAPI virtual ~DomainParticipant();
-
-    // Superclass methods
 
     /**
      * This operation returns the value of the DomainParticipant QoS policies
@@ -109,6 +94,12 @@ public:
     RTPS_DllAPI const DomainParticipantQos& get_qos() const;
 
     /**
+     * @brief This operation enables the DomainParticipant
+     * @return RETCODE_OK
+     */
+    RTPS_DllAPI ReturnCode_t enable() override;
+
+    /**
      * This operation sets the value of the DomainParticipant QoS policies.
      * @param qos DomainParticipantQos to be set
      * @return RETCODE_IMMUTABLE_POLICY if any of the Qos cannot be changed, RETCODE_INCONSISTENT_POLICY if the Qos is not
@@ -116,12 +107,6 @@ public:
      */
     RTPS_DllAPI ReturnCode_t set_qos(
             const DomainParticipantQos& qos) const;
-
-    /**
-     * Allows accessing the DomainParticipantListener.
-     * @return DomainParticipantListener pointer
-     */
-    RTPS_DllAPI const DomainParticipantListener* get_listener() const;
 
     /**
      * Modifies the DomainParticipantListener, sets the mask to StatusMask::all()
@@ -142,12 +127,10 @@ public:
             const StatusMask& mask);
 
     /**
-     * @brief This operation enables the DomainParticipant
-     * @return RETCODE_OK
+     * Allows accessing the DomainParticipantListener.
+     * @return DomainParticipantListener pointer
      */
-    RTPS_DllAPI ReturnCode_t enable() override;
-
-    // DomainParticipant specific methods from DDS API
+    RTPS_DllAPI const DomainParticipantListener* get_listener() const;
 
     /**
      * Create a Publisher in this Participant.
@@ -180,7 +163,7 @@ public:
      * RETCODE_OK if it is correctly deleted and RETCODE_ERROR otherwise.
      */
     RTPS_DllAPI ReturnCode_t delete_publisher(
-            const Publisher* publisher);
+            Publisher* publisher);
 
     /**
      * Create a Subscriber in this Participant.
@@ -213,7 +196,36 @@ public:
      * RETCODE_OK if it is correctly deleted and RETCODE_ERROR otherwise.
      */
     RTPS_DllAPI ReturnCode_t delete_subscriber(
-            const Subscriber* subscriber);
+            Subscriber* subscriber);
+
+    /**
+     * Register a type in this participant.
+     * @param type TypeSupport.
+     * @param type_name The name that will be used to identify the Type.
+     * @return RETCODE_BAD_PARAMETER if the size of the name is 0, RERCODE_PRECONDITION_NOT_MET if there is another TypeSupport
+     * with the same name and RETCODE_OK if it is correctly registered.
+     */
+    RTPS_DllAPI ReturnCode_t register_type(
+            TypeSupport type,
+            const std::string& type_name);
+
+    /**
+     * Register a type in this participant.
+     * @param type TypeSupport.
+     * @return RETCODE_BAD_PARAMETER if the size of the name is 0, RERCODE_PRECONDITION_NOT_MET if there is another TypeSupport
+     * with the same name and RETCODE_OK if it is correctly registered.
+     */
+    RTPS_DllAPI ReturnCode_t register_type(
+            TypeSupport type);
+
+    /**
+     * Unregister a type in this participant.
+     * @param typeName Name of the type
+     * @return RETCODE_BAD_PARAMETER if the size of the name is 0, RERCODE_PRECONDITION_NOT_MET if there are entities using that
+     * TypeSupport and RETCODE_OK if it is correctly unregistered.
+     */
+    RTPS_DllAPI ReturnCode_t unregister_type(
+            const std::string& typeName);
 
     /**
      * Create a Topic in this Participant.
@@ -251,119 +263,47 @@ public:
      * Deletes an existing Topic.
      * @param topic to be deleted.
      * @return RETCODE_BAD_PARAMETER if the topic passed is a nullptr, RETCODE_PRECONDITION_NOT_MET if the topic does not belong to
-     * this participant or if it is referenced by any entity and RETCODE_OK if the Topic was deleted.
+     * this participant or if it is referenced by any entity and ETCODE_OK if the Topic was deleted.
      */
     RTPS_DllAPI ReturnCode_t delete_topic(
-            const Topic* topic);
-
-    /**
-     * Create a ContentFilteredTopic in this Participant.
-     * @param name Name of the ContentFilteredTopic
-     * @param related_topic Related Topic to being subscribed
-     * @param filter_expression Logic expression to create filter
-     * @param expression_parameters Parameters to filter content
-     * @return Pointer to the created ContentFilteredTopic, nullptr in error case
-     */
-    RTPS_DllAPI ContentFilteredTopic* create_contentfilteredtopic(
-            const std::string& name,
-            const Topic* related_topic,
-            const std::string& filter_expression,
-            const std::vector<std::string>& expression_parameters);
-
-    /**
-     * Deletes an existing ContentFilteredTopic.
-     * @param a_contentfilteredtopic ContentFilteredTopic to be deleted
-     * @return RETCODE_BAD_PARAMETER if the topic passed is a nullptr, RETCODE_PRECONDITION_NOT_MET if the topic does not belong to
-     * this participant or if it is referenced by any entity and RETCODE_OK if the ContentFilteredTopic was deleted.
-     */
-    RTPS_DllAPI ReturnCode_t delete_contentfilteredtopic(
-            const ContentFilteredTopic* a_contentfilteredtopic);
-
-    /**
-     * Create a MultiTopic in this Participant.
-     * @param name Name of the MultiTopic
-     * @param type_name Result type of the MultiTopic
-     * @param subscription_expression Logic expression to combine filter
-     * @param expression_parameters Parameters to subscription content
-     * @return Pointer to the created ContentFilteredTopic, nullptr in error case
-     */
-    RTPS_DllAPI MultiTopic* create_multitopic(
-            const std::string& name,
-            const std::string& type_name,
-            const std::string& subscription_expression,
-            const std::vector<std::string>& expression_parameters);
-
-    /**
-     * Deletes an existing MultiTopic.
-     * @param a_multitopic MultiTopic to be deleted
-     * @return RETCODE_BAD_PARAMETER if the topic passed is a nullptr, RETCODE_PRECONDITION_NOT_MET if the topic does not belong to
-     * this participant or if it is referenced by any entity and RETCODE_OK if the Topic was deleted.
-     */
-    RTPS_DllAPI ReturnCode_t delete_multitopic(
-            const MultiTopic* a_multitopic);
-
-    /**
-     * Gives access to an existing (or ready to exist) enabled Topic.
-     * Topics obtained by this method must be destroyed by delete_topic.
-     * @param topic_name Topic name
-     * @param timeout Maximum time to wait for the Topic
-     * @return Pointer to the existing Topic, nullptr in error case
-     */
-    RTPS_DllAPI Topic* find_topic(
-            const std::string& topic_name,
-            const fastrtps::Duration_t& timeout);
+            Topic* topic);
 
     /**
      * Looks up an existing, locally created @ref TopicDescription, based on its name.
      * May be called on a disabled participant.
+     *
      * @param topic_name Name of the @ref TopicDescription to search for.
+     *
      * @return Pointer to the topic description, if it has been created locally. Otherwise, nullptr is returned.
+     *
      * @remark UNSAFE. It is unsafe to lookup a topic description while another thread is creating a topic.
      */
     RTPS_DllAPI TopicDescription* lookup_topicdescription(
             const std::string& topic_name) const;
 
-    /**
-     * Allows access to the builtin Subscriber.
-     * @return Pointer to the builtin Subscriber, nullptr in error case
+    /* TODO
+       Subscriber* get_builtin_subscriber();
      */
-    RTPS_DllAPI const Subscriber* get_builtin_subscriber() const;
 
-    /**
-     * Locally ignore a remote domain participant.
-     * @note This action is not required to be reversible.
-     * @param handle Identifier of the remote participant to ignore
-     * @return RETURN_OK code if everything correct, error code otherwise
+    /* TODO
+       bool ignore_participant(
+            const fastrtps::rtps::InstanceHandle_t& handle);
      */
-    RTPS_DllAPI ReturnCode_t ignore_participant(
-            const InstanceHandle_t& handle);
 
-    /**
-     * Locally ignore a topic.
-     * @note This action is not required to be reversible.
-     * @param handle Identifier of the topic to ignore
-     * @return RETURN_OK code if everything correct, error code otherwise
+    /* TODO
+       bool ignore_topic(
+            const fastrtps::rtps::InstanceHandle_t& handle);
      */
-    RTPS_DllAPI ReturnCode_t ignore_topic(
-            const InstanceHandle_t& handle);
 
-    /**
-     * Locally ignore a datawriter.
-     * @note This action is not required to be reversible.
-     * @param handle Identifier of the datawriter to ignore
-     * @return RETURN_OK code if everything correct, error code otherwise
+    /* TODO
+       bool ignore_publication(
+            const fastrtps::rtps::InstanceHandle_t& handle);
      */
-    RTPS_DllAPI ReturnCode_t ignore_publication(
-            const InstanceHandle_t& handle);
 
-    /**
-     * Locally ignore a datareader.
-     * @note This action is not required to be reversible.
-     * @param handle Identifier of the datareader to ignore
-     * @return RETURN_OK code if everything correct, error code otherwise
+    /* TODO
+       bool ignore_subscription(
+            const fastrtps::rtps::InstanceHandle_t& handle);
      */
-    RTPS_DllAPI ReturnCode_t ignore_subscription(
-            const InstanceHandle_t& handle);
 
     /**
      * This operation retrieves the domain_id used to create the DomainParticipant.
@@ -372,11 +312,9 @@ public:
      */
     RTPS_DllAPI DomainId_t get_domain_id() const;
 
-    /**
-     * Deletes all the entities that were created by means of the “create” methods
-     * @return RETURN_OK code if everything correct, error code otherwise
+    /* TODO
+       bool delete_contained_entities();
      */
-    RTPS_DllAPI ReturnCode_t delete_contained_entities();
 
     /**
      * This operation manually asserts the liveliness of the DomainParticipant.
@@ -544,53 +482,40 @@ public:
             const std::string& profile_name,
             TopicQos& qos) const;
 
-    /**
-     * Retrieves the list of DomainParticipants that have been discovered in the domain and are not "ignored".
-     * @param[out]  participant_handles Reference to the vector where discovered participants will be returned
-     * @return RETCODE_OK if everything correct, error code otherwise
-     */
-    RTPS_DllAPI ReturnCode_t get_discovered_participants(
-            std::vector<InstanceHandle_t>& participant_handles) const;
 
-    /**
-     * Retrieves the DomainParticipant data of a discovered not ignored participant.
-     * @param[out]  participant_data Reference to the ParticipantBuiltinTopicData object to return the data
-     * @param participant_handle InstanceHandle of DomainParticipant to retrieve the data from
-     * @return RETCODE_OK if everything correct, PRECONDITION_NOT_MET if participant does not exist
+    /* TODO
+       bool get_discovered_participants(
+            std::vector<fastrtps::rtps::InstanceHandle_t>& participant_handles) const;
      */
-    RTPS_DllAPI ReturnCode_t get_discovered_participant_data(
-            builtin::ParticipantBuiltinTopicData& participant_data,
-            const InstanceHandle_t& participant_handle) const;
 
-    /**
-     * Retrieves the list of topics that have been discovered in the domain and are not "ignored".
-     * @param[out]  topic_handles Reference to the vector where discovered topics will be returned
-     * @return RETCODE_OK if everything correct, error code otherwise
+    /* TODO
+       bool get_discovered_participant_data(
+            ParticipantBuiltinTopicData& participant_data,
+            const fastrtps::rtps::InstanceHandle_t& participant_handle) const;
      */
-    RTPS_DllAPI ReturnCode_t get_discovered_topics(
-            std::vector<InstanceHandle_t>& topic_handles) const;
 
-    /**
-     * Retrieves the Topic data of a discovered not ignored topic.
-     * @param[out]  topic_data Reference to the TopicBuiltinTopicData object to return the data
-     * @param topic_handle InstanceHandle of Topic to retrieve the data from
-     * @return RETCODE_OK if everything correct, PRECONDITION_NOT_MET if topic does not exist
+    /* TODO
+       bool get_discovered_topics(
+            std::vector<fastrtps::rtps::InstanceHandle_t>& topic_handles) const;
      */
-    RTPS_DllAPI ReturnCode_t get_discovered_topic_data(
-            builtin::TopicBuiltinTopicData& topic_data,
-            const InstanceHandle_t& topic_handle) const;
+
+    /* TODO
+       bool get_discovered_topic_data(
+            TopicBuiltinTopicData& topic_data,
+            const fastrtps::rtps::InstanceHandle_t& topic_handle) const;
+     */
 
     /**
      * This operation checks whether or not the given handle represents an Entity that was created from the
      * DomainParticipant.
-     * @param a_handle InstanceHandle of the entity to look for.
+     * @param handle InstanceHandle of the entity to look for.
      * @param recursive The containment applies recursively. That is, it applies both to entities
      * (TopicDescription, Publisher, or Subscriber) created directly using the DomainParticipant as well as
      * entities created using a contained Publisher, or Subscriber as the factory, and so forth. (default: true)
      * @return True if entity is contained. False otherwise.
      */
     RTPS_DllAPI bool contains_entity(
-            const InstanceHandle_t& a_handle,
+            const fastrtps::rtps::InstanceHandle_t& handle,
             bool recursive = true) const;
 
     /**
@@ -601,37 +526,6 @@ public:
      */
     RTPS_DllAPI ReturnCode_t get_current_time(
             fastrtps::Time_t& current_time) const;
-
-    // DomainParticipant methods specific from Fast-DDS
-
-    /**
-     * Register a type in this participant.
-     * @param type TypeSupport.
-     * @param type_name The name that will be used to identify the Type.
-     * @return RETCODE_BAD_PARAMETER if the size of the name is 0, RERCODE_PRECONDITION_NOT_MET if there is another TypeSupport
-     * with the same name and RETCODE_OK if it is correctly registered.
-     */
-    RTPS_DllAPI ReturnCode_t register_type(
-            TypeSupport type,
-            const std::string& type_name);
-
-    /**
-     * Register a type in this participant.
-     * @param type TypeSupport.
-     * @return RETCODE_BAD_PARAMETER if the size of the name is 0, RERCODE_PRECONDITION_NOT_MET if there is another TypeSupport
-     * with the same name and RETCODE_OK if it is correctly registered.
-     */
-    RTPS_DllAPI ReturnCode_t register_type(
-            TypeSupport type);
-
-    /**
-     * Unregister a type in this participant.
-     * @param typeName Name of the type
-     * @return RETCODE_BAD_PARAMETER if the size of the name is 0, RERCODE_PRECONDITION_NOT_MET if there are entities using that
-     * TypeSupport and RETCODE_OK if it is correctly unregistered.
-     */
-    RTPS_DllAPI ReturnCode_t unregister_type(
-            const std::string& typeName);
 
     /**
      * This method gives access to a registered type based on its name.
@@ -645,7 +539,7 @@ public:
      * Returns the DomainParticipant's handle.
      * @return InstanceHandle of this DomainParticipant.
      */
-    RTPS_DllAPI const InstanceHandle_t& get_instance_handle() const;
+    RTPS_DllAPI const fastrtps::rtps::InstanceHandle_t& get_instance_handle() const;
 
     // From here legacy RTPS methods.
 
@@ -721,6 +615,11 @@ public:
             std::function<void(const std::string& name, const fastrtps::types::DynamicType_ptr type)>& callback);
 
     /**
+     * @brief Destructor
+     */
+    RTPS_DllAPI virtual ~DomainParticipant();
+
+    /**
      * @brief Check if the Participant has any Publisher, Subscriber or Topic
      * @return true if any, false otherwise.
      */
@@ -729,6 +628,12 @@ public:
 protected:
 
     RTPS_DllAPI DomainParticipant(
+            const StatusMask& mask = StatusMask::all());
+
+    RTPS_DllAPI DomainParticipant(
+            DomainId_t domain_id,
+            const DomainParticipantQos& qos,
+            DomainParticipantListener* listener,
             const StatusMask& mask = StatusMask::all());
 
     DomainParticipantImpl* impl_;

@@ -19,8 +19,7 @@
 #include "RTPSWithRegistrationReader.hpp"
 #include "RTPSWithRegistrationWriter.hpp"
 #include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastrtps/transport/test_UDPv4TransportDescriptor.h>
-#include <rtps/transport/test_UDPv4Transport.h>
+#include <fastrtps/transport/test_UDPv4Transport.h>
 
 #include <gtest/gtest.h>
 
@@ -28,45 +27,28 @@
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
-using test_UDPv4Transport = eprosima::fastdds::rtps::test_UDPv4Transport;
 
-enum communication_type
-{
-    TRANSPORT,
-    INTRAPROCESS
-};
-
-class RTPS : public testing::TestWithParam<communication_type>
+class RTPS : public testing::TestWithParam<bool>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
     }
 
@@ -463,111 +445,6 @@ TEST_P(RTPS, RTPSAsReliableWithRegistrationAndHolesInHistory)
 }
 
 
-TEST_P(RTPS, RTPSAsReliableVolatileTwoWritersConsecutives)
-{
-    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-
-    reader.reliability(ReliabilityKind_t::RELIABLE).init();
-    EXPECT_TRUE(reader.isInitialized());
-
-    writer.reliability(ReliabilityKind_t::RELIABLE).init();
-    EXPECT_TRUE(writer.isInitialized());
-
-    // Wait for discovery.
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    auto complete_data = default_helloworld_data_generator();
-
-    reader.expected_data(complete_data);
-    reader.startReception();
-
-    // Send data
-    writer.send(complete_data);
-    EXPECT_TRUE(complete_data.empty());
-
-    reader.block_for_all();
-    reader.stopReception();
-
-    writer.destroy();
-
-    // Wait for undiscovery
-    reader.wait_undiscovery();
-
-    writer.reliability(ReliabilityKind_t::RELIABLE).init();
-
-    // Wait for discovery
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    complete_data = default_helloworld_data_generator();
-
-    reader.expected_data(complete_data, true);
-    reader.startReception();
-
-    writer.send(complete_data);
-    EXPECT_TRUE(complete_data.empty());
-
-    reader.block_for_all();
-
-    reader.destroy();
-    writer.destroy();
-}
-
-TEST_P(RTPS, RTPSAsReliableTransientLocalTwoWritersConsecutives)
-{
-    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
-
-    reader.reliability(ReliabilityKind_t::RELIABLE).durability(DurabilityKind_t::TRANSIENT_LOCAL).init();
-    EXPECT_TRUE(reader.isInitialized());
-
-    writer.reliability(ReliabilityKind_t::RELIABLE).init();
-
-    EXPECT_TRUE(writer.isInitialized());
-
-    // Wait for discovery.
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    auto complete_data = default_helloworld_data_generator();
-
-    reader.expected_data(complete_data);
-    reader.startReception();
-
-    // Send data
-    writer.send(complete_data);
-    EXPECT_TRUE(complete_data.empty());
-
-    reader.block_for_all();
-    reader.stopReception();
-
-    writer.destroy();
-
-    // Wait for undiscovery
-    reader.wait_undiscovery();
-
-    writer.reliability(ReliabilityKind_t::RELIABLE).init();
-
-    // Wait for discovery
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    complete_data = default_helloworld_data_generator();
-
-    reader.expected_data(complete_data, true);
-    reader.startReception();
-
-    writer.send(complete_data);
-    EXPECT_TRUE(complete_data.empty());
-
-    reader.block_for_all();
-
-    reader.destroy();
-    writer.destroy();
-}
-
 #ifdef INSTANTIATE_TEST_SUITE_P
 #define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
 #else
@@ -576,17 +453,12 @@ TEST_P(RTPS, RTPSAsReliableTransientLocalTwoWritersConsecutives)
 
 GTEST_INSTANTIATE_TEST_MACRO(RTPS,
         RTPS,
-        testing::Values(TRANSPORT, INTRAPROCESS),
+        testing::Values(false, true),
         [](const testing::TestParamInfo<RTPS::ParamType>& info)
         {
-            switch (info.param)
+            if (info.param)
             {
-                case INTRAPROCESS:
-                    return "Intraprocess";
-                    break;
-                case TRANSPORT:
-                default:
-                    return "Transport";
+                return "Intraprocess";
             }
-
+            return "NonIntraprocess";
         });

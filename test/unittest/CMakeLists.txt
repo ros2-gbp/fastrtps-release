@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_definitions(
+  -DBOOST_ASIO_STANDALONE
+  -DASIO_STANDALONE
+)
+
 add_subdirectory(rtps/common)
 add_subdirectory(rtps/builtin)
 add_subdirectory(rtps/reader)
@@ -22,8 +27,6 @@ add_subdirectory(rtps/network)
 add_subdirectory(rtps/flowcontrol)
 add_subdirectory(rtps/persistence)
 add_subdirectory(rtps/discovery)
-add_subdirectory(dds/collections)
-add_subdirectory(dds/core)
 add_subdirectory(dds/participant)
 add_subdirectory(dds/publisher)
 add_subdirectory(dds/subscriber)
@@ -35,7 +38,6 @@ add_subdirectory(logging)
 add_subdirectory(utils)
 add_subdirectory(xmlparser)
 add_subdirectory(xtypes)
-add_subdirectory(statistics/dds)
 if(SECURITY)
     add_subdirectory(security/authentication)
     add_subdirectory(security/cryptography)
@@ -43,7 +45,3 @@ if(SECURITY)
     add_subdirectory(security/logging)
     add_subdirectory(rtps/security)
 endif()
-
-if(FASTDDS_STATISTICS)
-    add_subdirectory(statistics/rtps)
-endif(FASTDDS_STATISTICS)

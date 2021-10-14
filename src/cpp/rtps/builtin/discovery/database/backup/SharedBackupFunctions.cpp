@@ -20,7 +20,7 @@
 #include <json.hpp>
 
 #include <fastdds/rtps/common/CacheChange.h>
-#include <rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp>
+#include "SharedBackupFunctions.hpp"
 
 namespace eprosima {
 namespace fastdds {

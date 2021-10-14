@@ -17,7 +17,7 @@
  *
  */
 
-#include <rtps/builtin/discovery/endpoint/EDPSimpleListeners.h>
+#include "EDPSimpleListeners.h"
 
 #include <fastdds/dds/log/Log.hpp>
 
@@ -25,6 +25,7 @@
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/builtin/discovery/endpoint/EDPSimple.h>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDPServer.h>
 #include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
 
 #include <fastdds/rtps/common/InstanceHandle.h>
@@ -75,7 +76,8 @@ void EDPBasePUBListener::add_writer_from_change(
     if (temp_writer_data_.readFromCDRMessage(&tempMsg, network,
             edp->mp_RTPSParticipant->has_shm_transport()))
     {
-        if (temp_writer_data_.guid().guidPrefix == edp->mp_RTPSParticipant->getGuid().guidPrefix)
+        if (temp_writer_data_.guid().guidPrefix == edp->mp_RTPSParticipant->getGuid().guidPrefix
+                && !ongoingDeserialization(edp))
         {
             logInfo(RTPS_EDP, "Message from own RTPSParticipant, ignoring");
             return;
@@ -168,6 +170,19 @@ bool EDPListener::computeKey(
     return ParameterList::readInstanceHandleFromCDRMsg(change, fastdds::dds::PID_ENDPOINT_GUID);
 }
 
+bool EDPListener::ongoingDeserialization(
+        EDP* edp)
+{
+    EDPServer* pServer = dynamic_cast<EDPServer*>(edp);
+
+    if (pServer)
+    {
+        return pServer->ongoingDeserialization();
+    }
+
+    return false;
+}
+
 void EDPBaseSUBListener::add_reader_from_change(
         RTPSReader* reader,
         ReaderHistory* reader_history,
@@ -181,7 +196,8 @@ void EDPBaseSUBListener::add_reader_from_change(
     if (temp_reader_data_.readFromCDRMessage(&tempMsg, network,
             edp->mp_RTPSParticipant->has_shm_transport()))
     {
-        if (temp_reader_data_.guid().guidPrefix == edp->mp_RTPSParticipant->getGuid().guidPrefix)
+        if (temp_reader_data_.guid().guidPrefix == edp->mp_RTPSParticipant->getGuid().guidPrefix
+                && !ongoingDeserialization(edp))
         {
             logInfo(RTPS_EDP, "From own RTPSParticipant, ignoring");
             return;

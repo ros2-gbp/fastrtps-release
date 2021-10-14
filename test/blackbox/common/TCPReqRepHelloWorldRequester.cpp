@@ -91,6 +91,7 @@ void TCPReqRepHelloWorldRequester::init(
 
     pattr.rtps.useBuiltinTransports = false;
     std::shared_ptr<TCPv4TransportDescriptor> descriptor = std::make_shared<TCPv4TransportDescriptor>();
+    descriptor->wait_for_tcp_negotiation = false;
     if (maxInitialPeer > 0)
     {
         descriptor->maxInitialPeersRange = maxInitialPeer;

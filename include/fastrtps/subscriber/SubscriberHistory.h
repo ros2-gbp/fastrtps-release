@@ -44,15 +44,13 @@ class SubscriberHistory : public rtps::ReaderHistory
 {
 public:
 
-    using instance_info = std::pair<rtps::InstanceHandle_t, std::vector<rtps::CacheChange_t*>*>;
-
     /**
      * Constructor. Requires information about the subscriber.
      * @param topic_att TopicAttributes.
      * @param type TopicDataType.
      * @param qos ReaderQoS policy.
      * @param payloadMax Maximum payload size per change.
-     * @param mempolicy Set whether the payloads ccan dynamically resized or not.
+     * @param mempolicy Set wether the payloads ccan dynamically resized or not.
      */
     SubscriberHistory(
             const TopicAttributes& topic_att,
@@ -61,18 +59,7 @@ public:
             uint32_t payloadMax,
             rtps::MemoryManagementPolicy_t mempolicy);
 
-    ~SubscriberHistory() override;
-
-    /**
-     * Remove a specific change from the history.
-     * No Thread Safe
-     * @param removal iterator to the CacheChange_t to remove.
-     * @param release defaults to true and hints if the CacheChange_t should return to the pool
-     * @return iterator to the next CacheChange_t or end iterator.
-     */
-    iterator remove_change_nts(
-            const_iterator removal,
-            bool release = true) override;
+    virtual ~SubscriberHistory();
 
     /**
      * Called when a change is received by the Subscriber. Will add the change to the history.
@@ -83,7 +70,7 @@ public:
      */
     bool received_change(
             rtps::CacheChange_t* change,
-            size_t unknown_missing_changes_up_to) override;
+            size_t unknown_missing_changes_up_to);
 
     /** @name Read or take data methods.
      * Methods to read or take data from the History.
@@ -121,16 +108,6 @@ public:
             rtps::CacheChange_t* change);
 
     /**
-     * This method is called to remove a change from the SubscriberHistory.
-     * @param [in]     change Pointer to the CacheChange_t.
-     * @param [in,out] it     Iterator pointing to change on input. Will point to next valid change on output.
-     * @return True if removed.
-     */
-    bool remove_change_sub(
-            rtps::CacheChange_t* change,
-            iterator& it);
-
-    /**
      * @brief A method to set the next deadline for the given instance
      * @param handle The handle to the instance
      * @param next_deadline_us The time point when the deadline will occur
@@ -149,25 +126,6 @@ public:
     bool get_next_deadline(
             rtps::InstanceHandle_t& handle,
             std::chrono::steady_clock::time_point& next_deadline_us);
-
-    /**
-     * @brief Get the list of changes corresponding to an instance handle.
-     * @param handle The handle to the instance.
-     * @param exact  Indicates if the handle should match exactly (true) or if the first instance greater than the
-     *               input handle should be returned.
-     * @return A pair where:
-     *         - @c first is a boolean indicating if an instance was found
-     *         - @c second is a pair where:
-     *           - @c first is the handle of the returned instance
-     *           - @c second is a pointer to a std::vector<rtps::CacheChange_t*> with the list of changes for the
-     *             returned instance
-     *
-     * @remarks When used on a NO_KEY topic, an instance will only be returned when called with
-     *          `handle = HANDLE_NIL` and `exact = false`.
-     */
-    std::pair<bool, instance_info> lookup_instance(
-            const rtps::InstanceHandle_t& handle,
-            bool exact);
 
 private:
 
@@ -256,6 +214,6 @@ private:
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+#endif
 
 #endif /* SUBSCRIBERHISTORY_H_ */

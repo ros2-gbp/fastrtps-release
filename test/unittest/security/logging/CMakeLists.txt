@@ -13,7 +13,10 @@
 # limitations under the License.
 
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
-    if(GTest_FOUND)
+    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
+    check_gtest()
+
+    if(GTEST_FOUND)
         if(WIN32)
             add_definitions(-D_WIN32_WINNT=0x0601)
         endif()
@@ -35,15 +38,13 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/src/cpp/security/logging/LogTopic.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinLogTopicTests.cpp)
 
-        target_compile_definitions(BuiltinLogging PRIVATE FASTRTPS_NO_LIB
-            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-            )
+        target_compile_definitions(BuiltinLogging PRIVATE FASTRTPS_NO_LIB)
         target_include_directories(BuiltinLogging PRIVATE
+            ${GTEST_INCLUDE_DIRS}
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
             )
-        target_link_libraries(BuiltinLogging fastcdr GTest::gtest ${OPENSSL_LIBRARIES})
+        target_link_libraries(BuiltinLogging fastcdr ${GTEST_LIBRARIES} ${OPENSSL_LIBRARIES})
         add_gtest(BuiltinLogging SOURCES ${COMMON_SOURCES_LOGGING_PLUGIN_TEST_SOURCE}
             ${CMAKE_CURRENT_SOURCE_DIR}/LoggingPluginTests.hpp
             ${CMAKE_CURRENT_SOURCE_DIR}/BuiltinLogTopicTests.cpp)

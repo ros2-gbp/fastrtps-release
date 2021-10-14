@@ -26,6 +26,7 @@
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
 
+using Locator_t = eprosima::fastrtps::rtps::Locator_t;
 using IPLocator = eprosima::fastrtps::rtps::IPLocator;
 
 HelloWorldSubscriber::HelloWorldSubscriber()
@@ -48,7 +49,7 @@ bool HelloWorldSubscriber::init(
     DomainParticipantQos pqos;
     int32_t kind = LOCATOR_KIND_TCPv4;
 
-    Locator initial_peer_locator;
+    Locator_t initial_peer_locator;
     initial_peer_locator.kind = kind;
 
     std::shared_ptr<TCPv4TransportDescriptor> descriptor = std::make_shared<TCPv4TransportDescriptor>();
@@ -88,6 +89,7 @@ bool HelloWorldSubscriber::init(
         descriptor->tls_config.add_option(TLSOptions::DEFAULT_WORKAROUNDS);
     }
 
+    descriptor->wait_for_tcp_negotiation = false;
     pqos.transport().user_transports.push_back(descriptor);
 
     participant_ = DomainParticipantFactory::get_instance()->create_participant(0, pqos);
@@ -178,7 +180,7 @@ void HelloWorldSubscriber::SubListener::on_data_available(
     SampleInfo info;
     if (reader->take_next_sample(&hello_, &info) == ReturnCode_t::RETCODE_OK)
     {
-        if (info.valid_data)
+        if (info.instance_state == eprosima::fastdds::dds::ALIVE)
         {
             samples_++;
             // Print your structure data here.

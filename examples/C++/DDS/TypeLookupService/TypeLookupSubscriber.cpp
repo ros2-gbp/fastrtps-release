@@ -146,7 +146,7 @@ void TypeLookupSubscriber::SubListener::on_data_available(
         SampleInfo info;
         if (reader->take_next_sample(data.get(), &info) == ReturnCode_t::RETCODE_OK)
         {
-            if (info.valid_data)
+            if (info.instance_state == eprosima::fastdds::dds::ALIVE)
             {
                 types::DynamicType_ptr type = subscriber_->readers_[reader];
                 this->n_samples++;
