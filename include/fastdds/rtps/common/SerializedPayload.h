@@ -41,6 +41,13 @@ namespace rtps {
 #define PL_CDR_BE 0x0002
 #define PL_CDR_LE 0x0003
 
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
+#define DEFAULT_ENCAPSULATION CDR_LE
+#define PL_DEFAULT_ENCAPSULATION PL_CDR_BE
+#else
+#define DEFAULT_ENCAPSULATION CDR_LE
+#define PL_DEFAULT_ENCAPSULATION PL_CDR_LE
+#endif  // FASTDDS_IS_BIG_ENDIAN_TARGET
 
 //!@brief Structure SerializedPayload_t.
 //!@ingroup COMMON_MODULE
@@ -70,7 +77,7 @@ struct RTPS_DllAPI SerializedPayload_t
     /**
      * @param len Maximum size of the payload
      */
-    SerializedPayload_t(
+    explicit SerializedPayload_t(
             uint32_t len)
         : SerializedPayload_t()
     {

@@ -33,7 +33,7 @@ class WriteParams;
  * Class WriterHistory, container of the different CacheChanges of a writer
  * @ingroup WRITER_MODULE
  */
-class WriterHistory : public History
+class WriterHistory : public rtps::History
 {
     friend class RTPSWriter;
     friend class PersistentWriter;
@@ -115,6 +115,13 @@ public:
     }
 
 protected:
+
+    RTPS_DllAPI bool do_reserve_cache(
+            CacheChange_t** change,
+            uint32_t size) override;
+
+    RTPS_DllAPI void do_release_cache(
+            CacheChange_t* ch) override;
 
     bool add_change_(
             CacheChange_t* a_change,

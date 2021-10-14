@@ -28,6 +28,7 @@
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
+#include <fastdds/rtps/attributes/HistoryAttributes.h>
 #include <fastdds/rtps/resources/TimedEvent.h>
 
 #include <map>
@@ -47,6 +48,7 @@ class StatefulWriter;
 class StatefulReader;
 class WriterHistory;
 class ReaderHistory;
+class ITopicPayloadPool;
 
 namespace security {
 
@@ -222,6 +224,8 @@ private:
         {
         public:
 
+            typedef std::unique_ptr<TimedEvent> EventUniquePtr;
+
             AuthenticationInfo(
                     AuthenticationStatus auth_status)
                 : identity_handle_(nullptr)
@@ -229,7 +233,6 @@ private:
                 , auth_status_(auth_status)
                 , expected_sequence_number_(0)
                 , change_sequence_number_(SequenceNumber_t::unknown())
-                , event_(nullptr)
             {
             }
 
@@ -254,7 +257,7 @@ private:
 
             SequenceNumber_t change_sequence_number_;
 
-            TimedEvent* event_;
+            EventUniquePtr event_;
 
         private:
 
@@ -262,24 +265,14 @@ private:
                     const AuthenticationInfo& auth) = delete;
         };
 
-        struct EmptyDelete
-        {
-            void operator ()(
-                    AuthenticationInfo*)
-            {
-            }
-
-        };
-
     public:
 
-        typedef std::unique_ptr<AuthenticationInfo, EmptyDelete> AuthUniquePtr;
+        typedef std::unique_ptr<AuthenticationInfo> AuthUniquePtr;
 
         DiscoveredParticipantInfo(
                 AuthenticationStatus auth_status,
                 const ParticipantProxyData& participant_data)
-            : auth_(auth_status)
-            , auth_ptr_(&auth_)
+            : auth_(new AuthenticationInfo(auth_status))
             , shared_secret_handle_(nullptr)
             , permissions_handle_(nullptr)
             , participant_crypto_(nullptr)
@@ -290,7 +283,6 @@ private:
         DiscoveredParticipantInfo(
                 DiscoveredParticipantInfo&& info)
             : auth_(std::move(info.auth_))
-            , auth_ptr_(&auth_)
             , shared_secret_handle_(std::move(info.shared_secret_handle_))
             , permissions_handle_(std::move(info.permissions_handle_))
             , participant_crypto_(info.participant_crypto_)
@@ -300,14 +292,13 @@ private:
 
         AuthUniquePtr get_auth()
         {
-            return std::move(auth_ptr_);
+            return std::move(auth_);
         }
 
         void set_auth(
                 AuthUniquePtr& auth)
         {
-            assert(auth.get() == &auth_);
-            auth_ptr_ = std::move(auth);
+            auth_ = std::move(auth);
         }
 
         void set_shared_secret(
@@ -348,14 +339,6 @@ private:
             return participant_crypto_;
         }
 
-        void stop_event()
-        {
-            if (auth_.event_ != nullptr)
-            {
-                auth_.event_->cancel_timer();
-            }
-        }
-
         const ParticipantProxyData& participant_data() const
         {
             return participant_data_;
@@ -366,9 +349,7 @@ private:
         DiscoveredParticipantInfo(
                 const DiscoveredParticipantInfo& info) = delete;
 
-        AuthenticationInfo auth_;
-
-        AuthUniquePtr auth_ptr_;
+        AuthUniquePtr auth_;
 
         SharedSecretHandle* shared_secret_handle_;
 
@@ -437,7 +418,7 @@ private:
     void cancel_init();
 
     void remove_discovered_participant_info(
-            DiscoveredParticipantInfo::AuthUniquePtr& auth_ptr);
+            DiscoveredParticipantInfo::AuthUniquePtr&& auth_ptr);
 
     bool restore_discovered_participant_info(
             const GUID_t& remote_participant_key,
@@ -446,12 +427,16 @@ private:
     void delete_entities();
     bool create_participant_stateless_message_entities();
     void delete_participant_stateless_message_entities();
+    void create_participant_stateless_message_pool();
+    void delete_participant_stateless_message_pool();
     bool create_participant_stateless_message_writer();
     void delete_participant_stateless_message_writer();
     bool create_participant_stateless_message_reader();
     void delete_participant_stateless_message_reader();
     bool create_participant_volatile_message_secure_entities();
     void delete_participant_volatile_message_secure_entities();
+    void create_participant_volatile_message_secure_pool();
+    void delete_participant_volatile_message_secure_pool();
     bool create_participant_volatile_message_secure_writer();
     void delete_participant_volatile_message_secure_writer();
     bool create_participant_volatile_message_secure_reader();
@@ -608,6 +593,13 @@ private:
     std::mutex temp_volatile_data_lock_;
     ReaderProxyData temp_volatile_reader_proxy_data_;
     WriterProxyData temp_volatile_writer_proxy_data_;
+
+    HistoryAttributes participant_stateless_message_writer_hattr_;
+    HistoryAttributes participant_stateless_message_reader_hattr_;
+    std::shared_ptr<ITopicPayloadPool> participant_stateless_message_pool_;
+
+    HistoryAttributes participant_volatile_message_secure_hattr_;
+    std::shared_ptr<ITopicPayloadPool> participant_volatile_message_secure_pool_;
 };
 
 } //namespace security

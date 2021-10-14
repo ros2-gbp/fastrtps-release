@@ -24,7 +24,7 @@
 
 #include "./DiscoveryParticipantInfo.hpp"
 
-#include "backup/json.hpp"
+#include <json.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -89,7 +89,8 @@ void DiscoveryParticipantInfo::remove_writer(
     }
 }
 
-void DiscoveryParticipantInfo::to_json(nlohmann::json& j) const
+void DiscoveryParticipantInfo::to_json(
+        nlohmann::json& j) const
 {
     DiscoverySharedInfo::to_json(j);
     participant_change_data_.to_json(j);

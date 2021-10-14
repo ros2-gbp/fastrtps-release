@@ -20,12 +20,16 @@
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <fastdds/rtps/writer/RTPSWriter.h>
-#include <fastdds/rtps/writer/ReaderLocator.h>
 #include <fastdds/rtps/common/Time_t.h>
+#include <fastdds/rtps/history/IChangePool.h>
+#include <fastdds/rtps/history/IPayloadPool.h>
+#include <fastdds/rtps/writer/ChangeForReader.h>
+#include <fastdds/rtps/writer/ReaderLocator.h>
+#include <fastdds/rtps/writer/RTPSWriter.h>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
 
 #include <list>
+#include <memory>
 
 namespace eprosima {
 namespace fastrtps {
@@ -44,10 +48,27 @@ protected:
 
     StatelessWriter(
             RTPSParticipantImpl* participant,
-            GUID_t& guid,
-            WriterAttributes& attributes,
+            const GUID_t& guid,
+            const WriterAttributes& attributes,
             WriterHistory* history,
             WriterListener* listener = nullptr);
+
+    StatelessWriter(
+            RTPSParticipantImpl* impl,
+            const GUID_t& guid,
+            const WriterAttributes& att,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            WriterHistory* hist,
+            WriterListener* listen = nullptr);
+
+    StatelessWriter(
+            RTPSParticipantImpl* impl,
+            const GUID_t& guid,
+            const WriterAttributes& att,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            const std::shared_ptr<IChangePool>& change_pool,
+            WriterHistory* hist,
+            WriterListener* listen = nullptr);
 
 public:
 
@@ -142,6 +163,10 @@ public:
 
 private:
 
+    void init(
+            RTPSParticipantImpl* participant,
+            const WriterAttributes& attributes);
+
     void get_builtin_guid();
 
     bool has_builtin_guid();
@@ -166,7 +191,7 @@ private:
     bool ignore_fixed_locators_ = false;
 
     ResourceLimitedVector<ChangeForReader_t, std::true_type> unsent_changes_;
-    std::vector<std::unique_ptr<FlowController> > flow_controllers_;
+    std::vector<std::unique_ptr<FlowController>> flow_controllers_;
     uint64_t last_intraprocess_sequence_number_;
     bool there_are_remote_readers_ = false;
 };
@@ -175,5 +200,5 @@ private:
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_RTPS_STATELESSWRITER_H_ */

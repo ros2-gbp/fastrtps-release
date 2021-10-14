@@ -25,6 +25,7 @@
 
 #include <rtps/participant/RTPSParticipantImpl.h>
 #include <rtps/flowcontrol/FlowController.h>
+#include <rtps/history/BasicPayloadPool.hpp>
 
 #include <fastdds/rtps/messages/RTPSMessageCreator.h>
 #include <fastdds/rtps/messages/RTPSMessageGroup.h>
@@ -41,9 +42,10 @@
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
 
+#include <rtps/RTPSDomainImpl.hpp>
+#include <rtps/history/CacheChangePool.h>
+#include <rtps/messages/RTPSGapBuilder.hpp>
 #include <rtps/writer/RTPSWriterCollector.h>
-#include "rtps/RTPSDomainImpl.hpp"
-#include "rtps/messages/RTPSGapBuilder.hpp"
 
 #include "../builtin/discovery/database/DiscoveryDataBase.hpp"
 
@@ -108,9 +110,9 @@ StatefulWriter::StatefulWriter(
         RTPSParticipantImpl* pimpl,
         const GUID_t& guid,
         const WriterAttributes& att,
-        WriterHistory* hist,
-        WriterListener* listen)
-    : RTPSWriter(pimpl, guid, att, hist, listen)
+        WriterHistory* history,
+        WriterListener* listener)
+    : RTPSWriter(pimpl, guid, att, history, listener)
     , periodic_hb_event_(nullptr)
     , nack_response_event_(nullptr)
     , ack_event_(nullptr)
@@ -131,8 +133,76 @@ StatefulWriter::StatefulWriter(
     , currentUsageSendBufferSize_(static_cast<int32_t>(pimpl->get_min_network_send_buffer_size()))
     , m_controllers()
 {
-    m_heartbeatCount = 0;
+    init(pimpl, att);
+}
 
+StatefulWriter::StatefulWriter(
+        RTPSParticipantImpl* pimpl,
+        const GUID_t& guid,
+        const WriterAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        WriterHistory* history,
+        WriterListener* listener)
+    : RTPSWriter(pimpl, guid, att, payload_pool, history, listener)
+    , periodic_hb_event_(nullptr)
+    , nack_response_event_(nullptr)
+    , ack_event_(nullptr)
+    , m_heartbeatCount(0)
+    , m_times(att.times)
+    , matched_readers_(att.matched_readers_allocation)
+    , matched_readers_pool_(att.matched_readers_allocation)
+    , next_all_acked_notify_sequence_(0, 1)
+    , all_acked_(false)
+    , may_remove_change_cond_()
+    , may_remove_change_(0)
+    , disable_heartbeat_piggyback_(att.disable_heartbeat_piggyback)
+    , disable_positive_acks_(att.disable_positive_acks)
+    , keep_duration_us_(att.keep_duration.to_ns() * 1e-3)
+    , last_sequence_number_()
+    , biggest_removed_sequence_number_()
+    , sendBufferSize_(pimpl->get_min_network_send_buffer_size())
+    , currentUsageSendBufferSize_(static_cast<int32_t>(pimpl->get_min_network_send_buffer_size()))
+    , m_controllers()
+{
+    init(pimpl, att);
+}
+
+StatefulWriter::StatefulWriter(
+        RTPSParticipantImpl* pimpl,
+        const GUID_t& guid,
+        const WriterAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+    : RTPSWriter(pimpl, guid, att, payload_pool, change_pool, hist, listen)
+    , periodic_hb_event_(nullptr)
+    , nack_response_event_(nullptr)
+    , ack_event_(nullptr)
+    , m_heartbeatCount(0)
+    , m_times(att.times)
+    , matched_readers_(att.matched_readers_allocation)
+    , matched_readers_pool_(att.matched_readers_allocation)
+    , next_all_acked_notify_sequence_(0, 1)
+    , all_acked_(false)
+    , may_remove_change_cond_()
+    , may_remove_change_(0)
+    , disable_heartbeat_piggyback_(att.disable_heartbeat_piggyback)
+    , disable_positive_acks_(att.disable_positive_acks)
+    , keep_duration_us_(att.keep_duration.to_ns() * 1e-3)
+    , last_sequence_number_()
+    , biggest_removed_sequence_number_()
+    , sendBufferSize_(pimpl->get_min_network_send_buffer_size())
+    , currentUsageSendBufferSize_(static_cast<int32_t>(pimpl->get_min_network_send_buffer_size()))
+    , m_controllers()
+{
+    init(pimpl, att);
+}
+
+void StatefulWriter::init(
+        RTPSParticipantImpl* pimpl,
+        const WriterAttributes& att)
+{
     const RTPSParticipantAttributes& part_att = pimpl->getRTPSParticipantAttributes();
 
     periodic_hb_event_ = new TimedEvent(pimpl->getEventResource(), [&]() -> bool
@@ -234,10 +304,6 @@ void StatefulWriter::unsent_change_added_to_history(
             liveliness_kind_,
             liveliness_lease_duration_);
     }
-
-#if HAVE_SECURITY
-    encrypt_cachechange(change);
-#endif // if HAVE_SECURITY
 
     if (!matched_readers_.empty())
     {
@@ -365,6 +431,7 @@ void StatefulWriter::unsent_change_added_to_history(
                 }
 
                 check_acked_status();
+
             }
             catch (const RTPSMessageGroup::timeout&)
             {
@@ -410,6 +477,7 @@ void StatefulWriter::unsent_change_added_to_history(
     {
         logInfo(RTPS_WRITER, "No reader proxy to add change.");
         check_acked_status();
+
     }
 }
 
@@ -1561,6 +1629,21 @@ bool StatefulWriter::wait_for_all_acked(
     return all_acked_;
 }
 
+void StatefulWriter::rebuild_status_after_load()
+{
+    SequenceNumber_t min_seq = get_seq_num_min();
+    if (min_seq != SequenceNumber_t::unknown())
+    {
+        biggest_removed_sequence_number_ = min_seq - 1;
+        may_remove_change_ = 1;
+    }
+
+    SequenceNumber_t next_seq = mp_history->next_sequence_number();
+    next_all_acked_notify_sequence_ = next_seq;
+    min_readers_low_mark_ = next_seq - 1;
+    all_acked_ = true;
+}
+
 void StatefulWriter::check_acked_status()
 {
     std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
@@ -1981,55 +2064,65 @@ bool StatefulWriter::process_acknack(
 {
     std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
     result = (m_guid == writer_guid);
+
     if (result)
     {
-        for (ReaderProxy* remote_reader : matched_readers_)
+        SequenceNumber_t received_sequence_number = sn_set.empty() ? sn_set.base() : sn_set.max();
+        if (received_sequence_number <= next_sequence_number())
         {
-            if (remote_reader->guid() == reader_guid)
+            for (ReaderProxy* remote_reader : matched_readers_)
             {
-                if (remote_reader->check_and_set_acknack_count(ack_count))
+                if (remote_reader->guid() == reader_guid)
                 {
-                    // Sequence numbers before Base are set as Acknowledged.
-                    remote_reader->acked_changes_set(sn_set.base());
-                    if (sn_set.base() > SequenceNumber_t(0, 0))
+                    if (remote_reader->check_and_set_acknack_count(ack_count))
                     {
-                        if (remote_reader->requested_changes_set(sn_set) || remote_reader->are_there_gaps())
+                        // Sequence numbers before Base are set as Acknowledged.
+                        remote_reader->acked_changes_set(sn_set.base());
+                        if (sn_set.base() > SequenceNumber_t(0, 0))
                         {
-                            nack_response_event_->restart_timer();
+                            if (remote_reader->requested_changes_set(sn_set) || remote_reader->are_there_gaps())
+                            {
+                                nack_response_event_->restart_timer();
+                            }
+                            else if (!final_flag)
+                            {
+                                periodic_hb_event_->restart_timer();
+                            }
                         }
-                        else if (!final_flag)
+                        else if (sn_set.empty() && !final_flag)
                         {
-                            periodic_hb_event_->restart_timer();
-                        }
-                    }
-                    else if (sn_set.empty() && !final_flag)
-                    {
-                        // This is the preemptive acknack.
-                        if (remote_reader->process_initial_acknack())
-                        {
+                            // This is the preemptive acknack.
+                            if (remote_reader->process_initial_acknack())
+                            {
+                                if (remote_reader->is_local_reader())
+                                {
+                                    mp_RTPSParticipant->async_thread().wake_up(this);
+                                }
+                                else
+                                {
+                                    // Send heartbeat if requested
+                                    send_heartbeat_to_nts(*remote_reader, false, true);
+                                }
+                            }
+
                             if (remote_reader->is_local_reader())
                             {
-                                mp_RTPSParticipant->async_thread().wake_up(this);
-                            }
-                            else
-                            {
-                                // Send heartbeat if requested
-                                send_heartbeat_to_nts(*remote_reader, false, true);
+                                intraprocess_heartbeat(remote_reader);
                             }
                         }
 
-                        if (remote_reader->is_local_reader())
-                        {
-                            intraprocess_heartbeat(remote_reader);
-                        }
+                        // Check if all CacheChange are acknowledge, because a user could be waiting
+                        // for this, of if VOLATILE should be removed CacheChanges
+                        check_acked_status();
                     }
-
-                    // Check if all CacheChange are acknowledge, because a user could be waiting
-                    // for this, of if VOLATILE should be removed CacheChanges
-                    check_acked_status();
+                    break;
                 }
-                break;
             }
+        }
+        else
+        {
+            print_inconsistent_acknack(writer_guid, reader_guid, sn_set.base(), received_sequence_number,
+                    next_sequence_number());
         }
     }
 

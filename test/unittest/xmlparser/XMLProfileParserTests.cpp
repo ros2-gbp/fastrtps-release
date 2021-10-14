@@ -13,7 +13,9 @@
 // limitations under the License.
 
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/dds/log/OStreamConsumer.hpp>
 #include <fastdds/dds/log/FileConsumer.hpp>
+#include <fastdds/dds/log/StdoutErrConsumer.hpp>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/transport/TCPTransportDescriptor.h>
@@ -26,6 +28,7 @@
 #include <chrono>
 #include <sstream>
 #include <fstream>
+#include <stdlib.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -672,7 +675,7 @@ TEST_F(XMLProfileParserTests, XMLParserSecurity)
     EXPECT_EQ(sub_bin_props[1].propagate(), false);
 }
 
-#endif
+#endif // if HAVE_SECURITY
 
 TEST_F(XMLProfileParserTests, file_xml_consumer_append)
 {
@@ -687,6 +690,83 @@ TEST_F(XMLProfileParserTests, log_inactive)
 {
     EXPECT_CALL(*log_mock, ClearConsumers()).Times(1);
     xmlparser::XMLProfileManager::loadXMLFile("log_inactive.xml");
+}
+
+/*
+ * This test registers a StdoutErrConsumer using XML and setting the `use_default` flag to FALSE. Furthermore, it sets
+ * a `stderr_threshold` to`Log::Kind::Error` using a property `stderr_threshold`. The test checks that:
+ *    1. `ClearConsumers()` is called (because `use_default` is set to FALSE).
+ *    2. `RegisterConsumer()` is called, meaning a `StdoutErrConsumer` was registered.
+ *    3. The return code of `loadXMLFile` is `XMLP_ret::XML_OK`, meaning that the property was correctly set.
+ */
+TEST_F(XMLProfileParserTests, log_register_stdouterr)
+{
+    using namespace eprosima::fastdds::dds;
+
+    EXPECT_CALL(*log_mock, ClearConsumers()).Times(1);
+    EXPECT_CALL(*log_mock, RegisterConsumer(IsStdoutErrConsumer())).Times(1);
+    eprosima::fastrtps::xmlparser::XMLP_ret ret = xmlparser::XMLProfileManager::loadXMLFile("log_stdouterr.xml");
+    ASSERT_EQ(eprosima::fastrtps::xmlparser::XMLP_ret::XML_OK, ret);
+}
+
+/*
+ * This test registers a StdoutErrConsumer using XML and setting the `use_default` flag to FALSE. Furthermore, it
+ * attempts to set a `stderr_threshold` to`Log::Kind::Error` using a property `threshold` (which is not the correct
+ * property name). The test checks that:
+ *    1. `ClearConsumers()` is called (because `use_default` is set to FALSE).
+ *    2. `RegisterConsumer()` is called, meaning a `StdoutErrConsumer` was registered.
+ *    3. The return code of `loadXMLFile` is `XMLP_ret::XML_ERROR`, meaning that the property was NOT correctly set.
+ */
+TEST_F(XMLProfileParserTests, log_register_stdouterr_wrong_property_name)
+{
+    using namespace eprosima::fastdds::dds;
+
+    EXPECT_CALL(*log_mock, ClearConsumers()).Times(1);
+    EXPECT_CALL(*log_mock, RegisterConsumer(IsStdoutErrConsumer())).Times(1);
+    eprosima::fastrtps::xmlparser::XMLP_ret ret = xmlparser::XMLProfileManager::loadXMLFile(
+        "log_stdouterr_wrong_property_name.xml");
+    ASSERT_EQ(eprosima::fastrtps::xmlparser::XMLP_ret::XML_ERROR, ret);
+}
+
+/*
+ * This test registers a StdoutErrConsumer using XML and setting the `use_default` flag to FALSE. Furthermore, it
+ * attempts to set a `stderr_threshold` to`Log::Kind::Error` using a property `stderr_threshold` with value `Error`
+ * (which is not a correct property value). The test checks that:
+ *    1. `ClearConsumers()` is called (because `use_default` is set to FALSE).
+ *    2. `RegisterConsumer()` is called, meaning a `StdoutErrConsumer` was registered.
+ *    3. The return code of `loadXMLFile` is `XMLP_ret::XML_ERROR`, meaning that the property was NOT correctly set.
+ */
+TEST_F(XMLProfileParserTests, log_register_stdouterr_wrong_property_value)
+{
+    using namespace eprosima::fastdds::dds;
+
+    EXPECT_CALL(*log_mock, ClearConsumers()).Times(1);
+    EXPECT_CALL(*log_mock, RegisterConsumer(IsStdoutErrConsumer())).Times(1);
+    eprosima::fastrtps::xmlparser::XMLP_ret ret = xmlparser::XMLProfileManager::loadXMLFile(
+        "log_stdouterr_wrong_property_value.xml");
+    ASSERT_EQ(eprosima::fastrtps::xmlparser::XMLP_ret::XML_ERROR, ret);
+}
+
+/*
+ * This test registers a StdoutErrConsumer using XML and setting the `use_default` flag to FALSE. Furthermore, it
+ * attempts to set a `stderr_threshold` to`Log::Kind::Error` using two properties `stderr_threshold` with different
+ * values. However, this operation is not permited, since only one property with name `` can be present.
+ * The test checks that:
+ *    1. `ClearConsumers()` is called (because `use_default` is set to FALSE).
+ *    2. `RegisterConsumer()` is called, meaning a `StdoutErrConsumer` was registered.
+ *    3. The return code of `loadXMLFile` is `XMLP_ret::XML_ERROR`, meaning that the property was NOT correctly set. In
+ *       this case, the first `stderr_threshold` property will be used, but the function will warn of an incorrect XML
+ *       configuration.
+ */
+TEST_F(XMLProfileParserTests, log_register_stdouterr_two_thresholds)
+{
+    using namespace eprosima::fastdds::dds;
+
+    EXPECT_CALL(*log_mock, ClearConsumers()).Times(1);
+    EXPECT_CALL(*log_mock, RegisterConsumer(IsStdoutErrConsumer())).Times(1);
+    eprosima::fastrtps::xmlparser::XMLP_ret ret = xmlparser::XMLProfileManager::loadXMLFile(
+        "log_stdouterr_two_thresholds.xml");
+    ASSERT_EQ(eprosima::fastrtps::xmlparser::XMLP_ret::XML_ERROR, ret);
 }
 
 TEST_F(XMLProfileParserTests, file_and_default)
@@ -797,7 +877,8 @@ TEST_F(XMLProfileParserTests, SHM_transport_descriptors_config)
 //! The expected return value is XMLP_ret::XML_OK.
 TEST_F(XMLProfileParserTests, extract_profiles_ok)
 {
-    const char* xml = "                                                                                                \
+    const char* xml =
+            "                                                                                                \
         <profiles>                                                                                                     \
             <participant profile_name=\"participant_prof\">                                                            \
                 <rtps></rtps>                                                                                          \
@@ -822,7 +903,8 @@ TEST_F(XMLProfileParserTests, extract_profiles_ok)
 //! The expected return value is XMLP_ret::XML_NOK.
 TEST_F(XMLProfileParserTests, extract_profiles_nok)
 {
-    const char* xml = "                                                                                                \
+    const char* xml =
+            "                                                                                                \
         <profiles>                                                                                                     \
             <!-- OK PROFILE -->                                                                                        \
             <participant profile_name=\"participant_prof\">                                                            \
@@ -857,7 +939,8 @@ TEST_F(XMLProfileParserTests, extract_profiles_nok)
 TEST_F(XMLProfileParserTests, extract_profiles_error)
 {
 
-    const char* xml = "                                                                                                \
+    const char* xml =
+            "                                                                                                \
         <profiles>                                                                                                     \
             <participant>                                                                                              \
             </participant>                                                                                             \
@@ -872,6 +955,47 @@ TEST_F(XMLProfileParserTests, extract_profiles_error)
     tinyxml2::XMLDocument xml_doc;
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     EXPECT_EQ(xmlparser::XMLP_ret::XML_ERROR, xmlparser::XMLProfileManager::loadXMLNode(xml_doc));
+}
+
+//! Tests whether the SKIP_DEFAULT_XML_FILE variable prevents the xmlparser from loading the default XML file.
+//! participant_atts_none skips the default and obtains the values from the constructors.
+//! participant_atts_default contains the attributes in the default file in this folder which should be different.
+TEST_F(XMLProfileParserTests, skip_default_xml)
+{
+    const char* xml =
+            "                                                                                                          \
+        <profiles>                                                                                                     \
+            <participant profile_name=\"test_participant_profile\" is_default_profile=\"true\">                        \
+                <domainId>2020268</domainId>                                                                           \
+                <rtps></rtps>                                                                                          \
+            </participant>                                                                                             \
+        </profiles>                                                                                                    \
+    ";
+    tinyxml2::XMLDocument xml_doc;
+    xml_doc.Parse(xml);
+    xml_doc.SaveFile("DEFAULT_FASTRTPS_PROFILES.xml");
+
+#ifdef _WIN32
+    _putenv_s("SKIP_DEFAULT_XML_FILE", "1");
+#else
+    setenv("SKIP_DEFAULT_XML_FILE", "1", 1);
+#endif // ifdef _WIN32
+    ParticipantAttributes participant_atts_none;
+    xmlparser::XMLProfileManager::loadDefaultXMLFile();
+    xmlparser::XMLProfileManager::getDefaultParticipantAttributes(participant_atts_none);
+
+#ifdef _WIN32
+    _putenv_s("SKIP_DEFAULT_XML_FILE", "");
+#else
+    unsetenv("SKIP_DEFAULT_XML_FILE");
+#endif // ifdef _WIN32
+    ParticipantAttributes participant_atts_default;
+    xmlparser::XMLProfileManager::loadDefaultXMLFile();
+    xmlparser::XMLProfileManager::getDefaultParticipantAttributes(participant_atts_default);
+
+    remove("DEFAULT_FASTRTPS_PROFILES.xml");
+
+    EXPECT_NE(participant_atts_none.domainId, participant_atts_default.domainId);
 }
 
 int main(

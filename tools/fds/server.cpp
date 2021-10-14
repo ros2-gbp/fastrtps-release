@@ -22,12 +22,30 @@
 #include <regex>
 #include <vector>
 
+#include <mutex>
+#include <condition_variable>
+#include <csignal>
+
 #include <fastrtps/Domain.h>
+#include <fastrtps/participant/Participant.h>
 #include <fastdds/dds/log/Log.hpp>
 
 using namespace eprosima;
 using namespace fastrtps;
 using namespace std;
+
+volatile sig_atomic_t g_signal_status = 0;
+mutex g_signal_mutex;
+condition_variable g_signal_cv;
+
+void sigint_handler(
+        int signum)
+{
+    //  locking here is counterproductive
+    //  unique_lock<mutex> lock(g_signal_mutex);
+    g_signal_status = signum;
+    g_signal_cv.notify_one();
+}
 
 int main (
         int argc,
@@ -74,12 +92,15 @@ int main (
         return 0;
     }
 
-    ParticipantAttributes att;
-    rtps::RTPSParticipantAttributes& rtps = att.rtps;
+    // auto att = make_unique<ParticipantAttributes>();
+    // C++11 constrains
+    unique_ptr<ParticipantAttributes> att(new ParticipantAttributes());
+    rtps::RTPSParticipantAttributes& rtps = att->rtps;
 
     // Retrieve server Id: is mandatory and only specified once
     // Note there is a specific cast to pointer if the Option is valid
     option::Option* pOp = options[SERVERID];
+    int server_id;
 
     if ( nullptr == pOp )
     {
@@ -93,7 +114,6 @@ int main (
     }
     else
     {
-        int server_id;
         stringstream is;
         is << pOp->arg;
 
@@ -117,12 +137,30 @@ int main (
 
     // Set up listening locators.
     // If the number of specify ports doesn't match the number of IPs the last port is used.
-    rtps::Locator_t locator(fastdds::rtps::DEFAULT_ROS2_SERVER_PORT);
+    // If at least one port specified replace the default one
+    rtps::Locator_t locator(eprosima::fastdds::rtps::DEFAULT_ROS2_SERVER_PORT);
+
+    // retrieve first UDP port
+    option::Option* pO_port = options[PORT];
+    if ( nullptr != pO_port )
+    {
+        stringstream is;
+        is << pO_port->arg;
+        uint16_t id;
+
+        if ( !(is >> id
+                && is.eof()
+                && rtps::IPLocator::setPhysicalPort(locator, id)))
+        {
+            cout << "Invalid listening locator port specified:" << id << endl;
+            return 1;
+        }
+    }
+
     rtps::IPLocator::setIPv4(locator, 0, 0, 0, 0);
 
-    option::Option* pO_port = options[PORT];
+    // retrieve first IP address
     pOp = options[IPADDRESS];
-
     if ( nullptr == pOp )
     {
         // add default locator
@@ -173,7 +211,7 @@ int main (
 
     // Create the server
     int return_value = 0;
-    Participant* pServer = Domain::createParticipant(att, nullptr);
+    Participant* pServer = Domain::createParticipant(*att, nullptr);
 
     if ( nullptr == pServer )
     {
@@ -182,17 +220,38 @@ int main (
     }
     else
     {
-        // Wait for user command
-        cout << "\n### Server is running, press any key to quit ###" << std::endl;
-        cout.flush();
-        cin.ignore();
+        unique_lock<mutex> lock(g_signal_mutex);
 
-        // Remove the server
-        Domain::removeParticipant(pServer);
+        // handle signal SIGINT for every thread
+        signal(SIGINT, sigint_handler);
+
+        // Print running server attributes
+        cout << "### Server is running ###" << endl;
+        cout << "  Server ID:          " << server_id << endl;
+        cout << "  Server GUID prefix: " << pServer->getGuid().guidPrefix << endl;
+        cout << "  Server Addresses:   ";
+        for (auto locator_it = att->rtps.builtin.metatrafficUnicastLocatorList.begin();
+                locator_it != att->rtps.builtin.metatrafficUnicastLocatorList.end();)
+        {
+            cout << *locator_it;
+            if (++locator_it != att->rtps.builtin.metatrafficUnicastLocatorList.end())
+            {
+                cout << std::endl << "                      ";
+            }
+        }
+        cout << std::endl;
+
+        g_signal_cv.wait(lock, []
+                {
+                    return 0 != g_signal_status;
+                });
+
+        cout << endl << "### Server shut down ###" << endl;
     }
 
-    // Properly close the library
+    att.reset();
     fastdds::dds::Log::Flush();
+    cout.flush();
     Domain::stopAll();
 
     return return_value;

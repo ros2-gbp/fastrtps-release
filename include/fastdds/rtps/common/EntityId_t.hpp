@@ -87,9 +87,9 @@ struct RTPS_DllAPI EntityId_t
             uint32_t id)
     {
         memcpy(value, &id, size);
-#if !__BIG_ENDIAN__
+#if !FASTDDS_IS_BIG_ENDIAN_TARGET
         reverse();
-#endif // if !__BIG_ENDIAN__
+#endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
     }
 
     /*!
@@ -132,14 +132,14 @@ struct RTPS_DllAPI EntityId_t
             uint32_t id)
     {
         memcpy(value, &id, size);
-#if !__BIG_ENDIAN__
+#if !FASTDDS_IS_BIG_ENDIAN_TARGET
         reverse();
-#endif // if !__BIG_ENDIAN__
+#endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
         return *this;
         //return id;
     }
 
-#if !__BIG_ENDIAN__
+#if !FASTDDS_IS_BIG_ENDIAN_TARGET
     //!
     void reverse()
     {
@@ -152,7 +152,7 @@ struct RTPS_DllAPI EntityId_t
         value[1] = oaux;
     }
 
-#endif // if !__BIG_ENDIAN__
+#endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
 
     static EntityId_t unknown()
     {
@@ -173,13 +173,13 @@ inline bool operator ==(
         EntityId_t& id1,
         const uint32_t id2)
 {
-#if !__BIG_ENDIAN__
+#if !FASTDDS_IS_BIG_ENDIAN_TARGET
     id1.reverse();
-#endif // if !__BIG_ENDIAN__
+#endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
     const bool result = 0 == memcmp(id1.value, &id2, sizeof(id2));
-#if !__BIG_ENDIAN__
+#if !FASTDDS_IS_BIG_ENDIAN_TARGET
     id1.reverse();
-#endif // if !__BIG_ENDIAN__
+#endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
     return result;
 }
 
@@ -334,7 +334,7 @@ struct hash<eprosima::fastrtps::rtps::EntityId_t>
         // recover the participant entity counter
         eprosima::fastrtps::rtps::octet value[4];
 
-#if __BIG_ENDIAN__
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
         value[3] = k.value[2];
         value[2] = k.value[1];
         value[1] = k.value[0];
@@ -344,7 +344,7 @@ struct hash<eprosima::fastrtps::rtps::EntityId_t>
         value[2] = k.value[0];
         value[1] = k.value[1];
         value[0] = k.value[2];
-#endif // if __BIG_ENDIAN__
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
         return static_cast<std::size_t>(*reinterpret_cast<const uint32_t*>(&value));
     }
 

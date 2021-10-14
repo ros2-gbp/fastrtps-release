@@ -28,8 +28,10 @@ namespace rtps {
 
 
 PersistentWriter::PersistentWriter(
-        GUID_t& guid,
-        WriterAttributes& att,
+        const GUID_t& guid,
+        const WriterAttributes& att,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
         WriterHistory* hist,
         IPersistenceService* persistence)
     : persistence_(persistence)
@@ -41,15 +43,13 @@ PersistentWriter::PersistentWriter(
     ss << p_guid;
     persistence_guid_ = ss.str();
 
-    if (persistence_->load_writer_from_storage(persistence_guid_, guid, hist->m_changes, &(hist->m_changePool),
-            &(hist->m_lastCacheChangeSeqNum)))
-    {
-        CacheChange_t* max_change;
-        if (hist->get_max_change(&max_change))
-        {
-            hist->m_lastCacheChangeSeqNum = max_change->sequenceNumber;
-        }
-    }
+    persistence_->load_writer_from_storage(persistence_guid_, guid, hist->m_changes,
+            change_pool, payload_pool, hist->m_lastCacheChangeSeqNum);
+
+    // Update history state after loading from DB
+    hist->m_isHistoryFull =
+            hist->m_att.maximumReservedCaches > 0 &&
+            static_cast<int32_t>(hist->m_changes.size()) == hist->m_att.maximumReservedCaches;
 }
 
 PersistentWriter::~PersistentWriter()
@@ -73,6 +73,6 @@ void PersistentWriter::remove_persistent_change(
     persistence_->remove_writer_change_from_storage(persistence_guid_, *change);
 }
 
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
 } // namespace eprosima

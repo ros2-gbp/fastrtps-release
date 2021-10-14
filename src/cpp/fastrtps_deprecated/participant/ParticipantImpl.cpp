@@ -211,9 +211,11 @@ Publisher* ParticipantImpl::createPublisher(
     {
         property.name("partitions");
         std::string partitions;
+        bool is_first_partition = true;
         for (auto partition : att.qos.m_partition.names())
         {
-            partitions += partition + ";";
+            partitions += (is_first_partition ? "" : ";") + partition;
+            is_first_partition = false;
         }
         property.value(std::move(partitions));
         watt.endpoint.properties.properties().push_back(std::move(property));
@@ -227,7 +229,7 @@ Publisher* ParticipantImpl::createPublisher(
 
     RTPSWriter* writer = RTPSDomain::createRTPSWriter(
         this->mp_rtpsParticipant,
-        watt,
+        watt, pubimpl->payload_pool(),
         (WriterHistory*)&pubimpl->m_history,
         (WriterListener*)&pubimpl->m_writerListener);
     if (writer == nullptr)
@@ -237,6 +239,10 @@ Publisher* ParticipantImpl::createPublisher(
         return nullptr;
     }
     pubimpl->mp_writer = writer;
+
+    // In case it has been loaded from the persistence DB, rebuild instances on history
+    pubimpl->m_history.rebuild_instances();
+
     //SAVE THE PUBLISHER PAIR
     t_p_PublisherPair pubpair;
     pubpair.first = pub;
@@ -339,9 +345,11 @@ Subscriber* ParticipantImpl::createSubscriber(
     {
         property.name("partitions");
         std::string partitions;
+        bool is_first_partition = true;
         for (auto partition : att.qos.m_partition.names())
         {
-            partitions += partition + ";";
+            partitions += (is_first_partition ? "" : ";") + partition;
+            is_first_partition = false;
         }
         property.value(std::move(partitions));
         ratt.endpoint.properties.properties().push_back(std::move(property));
@@ -352,7 +360,7 @@ Subscriber* ParticipantImpl::createSubscriber(
     }
 
     RTPSReader* reader = RTPSDomain::createRTPSReader(this->mp_rtpsParticipant,
-                    ratt,
+                    ratt, subimpl->payload_pool(),
                     (ReaderHistory*)&subimpl->m_history,
                     (ReaderListener*)&subimpl->m_readerListener);
     if (reader == nullptr)
@@ -484,7 +492,7 @@ void ParticipantImpl::MyRTPSParticipantListener::onParticipantAuthentication(
     }
 }
 
-#endif //if HAVE_SECURITY
+#endif // if HAVE_SECURITY
 
 void ParticipantImpl::MyRTPSParticipantListener::onReaderDiscovery(
         RTPSParticipant*,

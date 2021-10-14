@@ -20,10 +20,11 @@
 
 #include <fastdds/rtps/history/History.h>
 
+#include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/common/CacheChange.h>
 
-
-#include <fastdds/dds/log/Log.hpp>
+#include <rtps/history/BasicPayloadPool.hpp>
+#include <rtps/history/CacheChangePool.h>
 
 #include <mutex>
 
@@ -34,23 +35,14 @@ namespace rtps {
 History::History(
         const HistoryAttributes& att)
     : m_att(att)
-    , m_isHistoryFull(false)
-    , m_changePool(att.initialReservedCaches, att.payloadMaxSize, att.maximumReservedCaches, att.memoryPolicy)
-    , mp_mutex(nullptr)
-
 {
-    m_changes.reserve((uint32_t)abs(att.initialReservedCaches));
+    uint32_t initial_size = static_cast<uint32_t>(att.initialReservedCaches < 0 ? 0 : att.initialReservedCaches);
+    m_changes.reserve(static_cast<size_t>(initial_size));
 }
 
 History::~History()
 {
     logInfo(RTPS_HISTORY, "");
-}
-
-void History::do_release_cache(
-        CacheChange_t* ch)
-{
-    m_changePool.release_Cache(ch);
 }
 
 History::const_iterator History::find_change_nts(
@@ -64,7 +56,7 @@ History::const_iterator History::find_change_nts(
 
     return std::find_if(changesBegin(), changesEnd(), [this, ch](const CacheChange_t* chi)
                    {
-                       // use the derived classes comparison criteria for searching
+                       // use the derived classes comparisson criteria for searching
                        return this->matches_change(chi, ch);
                    });
 }
@@ -123,7 +115,6 @@ bool History::remove_change(
 
 bool History::remove_all_changes()
 {
-
     if (mp_mutex == nullptr)
     {
         logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");

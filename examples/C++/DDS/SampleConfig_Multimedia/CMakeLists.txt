@@ -33,14 +33,12 @@ if(NOT fastrtps_FOUND)
     find_package(fastrtps REQUIRED)
 endif()
 
-# Set C++11
+#Check C++11
 include(CheckCXXCompilerFlag)
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG OR
         CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     check_cxx_compiler_flag(-std=c++11 SUPPORTS_CXX11)
-    if(SUPPORTS_CXX11)
-        add_compile_options(-std=c++11)
-    else()
+    if(NOT SUPPORTS_CXX11)
         message(FATAL_ERROR "Compiler doesn't support C++11")
     endif()
 endif()
@@ -48,8 +46,8 @@ endif()
 message(STATUS "Configuring DDS SampleCondig_Multimedia example...")
 file(GLOB DDS_SAMPLECONFIG_MULTIMEDIA_EXAMPLE_SOURCES "*.cxx")
 
-add_executable(DDSSampleConfigMultimedia ${DDS_SAMPLECONFIG_MULTIMEDIA_EXAMPLE_SOURCES} sampleconfig_fastest.cpp)
-target_link_libraries(DDSSampleConfigMultimedia fastrtps fastcdr foonathan_memory)
-install(TARGETS DDSSampleConfigMultimedia
+add_executable(DDSSampleConfig_Multimedia ${DDS_SAMPLECONFIG_MULTIMEDIA_EXAMPLE_SOURCES} sampleconfig_fastest.cpp)
+target_link_libraries(DDSSampleConfig_Multimedia fastrtps fastcdr foonathan_memory)
+install(TARGETS DDSSampleConfig_Multimedia
     RUNTIME DESTINATION examples/C++/DDS/SampleConfig_Multimedia/${BIN_INSTALL_DIR}
     )

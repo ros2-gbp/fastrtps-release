@@ -119,12 +119,20 @@ public:
 
 protected:
 
+    RTPS_DllAPI bool do_reserve_cache(
+            CacheChange_t** change,
+            uint32_t size) override;
+
+    RTPS_DllAPI void do_release_cache(
+            CacheChange_t* ch) override;
+
     //!Pointer to the reader
     RTPSReader* mp_reader;
+
 };
 
-} // namespace rtps
-} /* namespace rtps */
-} /* namespace eprosima */
+}  // namespace rtps
+}  // namespace fastrtps
+}  // namespace eprosima
 
 #endif /* _FASTDDS_RTPS_READERHISTORY_H_ */

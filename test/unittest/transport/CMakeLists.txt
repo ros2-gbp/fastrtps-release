@@ -55,7 +55,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             mock/MockReceiverResource.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPTransportInterface.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
@@ -70,7 +72,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             mock/MockReceiverResource.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPv6Transport.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPTransportInterface.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
@@ -85,7 +89,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             mock/MockReceiverResource.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/messages/RTPSMessageCreator.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/policy/ParameterList.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
@@ -122,7 +128,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             mock/MockReceiverResource.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/messages/RTPSMessageCreator.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/policy/ParameterList.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
@@ -157,7 +165,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             test_UDPv4Tests.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/messages/RTPSMessageCreator.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/policy/ParameterList.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
@@ -175,7 +185,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             SharedMemTests.cpp
             mock/MockReceiverResource.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+            ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/shared_mem/SharedMemTransport.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
@@ -202,6 +214,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             target_link_libraries(UDPv4Tests ${PRIVACY} iphlpapi Shlwapi )
         endif()
         add_gtest(UDPv4Tests SOURCES ${UDPV4TESTS_SOURCE})
+        set(TRANSPORT_XFAIL_LIST XFAIL_UDP4)
 
         option(DISABLE_UDPV6_TESTS "Disable UDPv6 tests because fails in some systems" OFF)
 
@@ -220,6 +233,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 target_link_libraries(UDPv6Tests ${PRIVACY} iphlpapi Shlwapi )
             endif()
             add_gtest(UDPv6Tests SOURCES ${UDPV6TESTS_SOURCE})
+            set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_UDP6)
 
             add_executable(TCPv6Tests ${TCPV6TESTS_SOURCE})
             target_compile_definitions(TCPv6Tests PRIVATE FASTRTPS_NO_LIB)
@@ -240,6 +254,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 target_link_libraries(TCPv6Tests ${PRIVACY} fastcdr)
             endif()
             add_gtest(TCPv6Tests SOURCES ${TCPV6TESTS_SOURCE})
+            set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TCP6)
         endif()
 
         add_executable(test_UDPv4Tests ${TEST_UDPV4TESTS_SOURCE})
@@ -260,6 +275,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             target_link_libraries(test_UDPv4Tests ${PRIVACY})
         endif()
         add_gtest(test_UDPv4Tests SOURCES ${TEST_UDPV4TESTS_SOURCE})
+        set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TEST_UDP4)
 
         add_executable(TCPv4Tests ${TCPV4TESTS_SOURCE})
         target_compile_definitions(TCPv4Tests PRIVATE FASTRTPS_NO_LIB)
@@ -280,7 +296,7 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             target_link_libraries(TCPv4Tests ${PRIVACY} fastcdr)
         endif()
         add_gtest(TCPv4Tests SOURCES ${TCPV4TESTS_SOURCE})
-
+        set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TCP4)
 
         if(IS_THIRDPARTY_BOOST_OK)
             add_executable(SharedMemTests ${SHAREDMEMTESTS_SOURCE})
@@ -305,6 +321,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 target_link_libraries(SharedMemTests ${PRIVACY} )
             endif()
             add_gtest(SharedMemTests SOURCES ${SHAREDMEMTESTS_SOURCE})
+            set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_SHM)
         endif()
+
+        foreach(TRANSPORT_XFAIL_TEST ${TRANSPORT_XFAIL_LIST})
+            add_xfail_label(${CMAKE_CURRENT_SOURCE_DIR}/${TRANSPORT_XFAIL_TEST}.list)
+        endforeach()
     endif()
 endif()

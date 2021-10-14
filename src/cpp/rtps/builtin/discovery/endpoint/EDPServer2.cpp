@@ -48,7 +48,7 @@ bool EDPServer2::createSEDPEndpoints()
     RTPSReader* raux = nullptr;
     set_builtin_reader_history_attributes(reader_history_att);
     set_builtin_reader_attributes(ratt);
-    ratt.endpoint.durabilityKind = _durability;
+    ratt.endpoint.durabilityKind = durability_;
 
 #if HAVE_SQLITE3
     ratt.endpoint.properties.properties().push_back(Property("dds.persistence.plugin", "builtin.SQLITE3"));
@@ -69,7 +69,7 @@ bool EDPServer2::createSEDPEndpoints()
             get_pdp()->get_writer_persistence_file_name()));
 #endif // if HAVE_SQLITE3
 
-    watt.endpoint.durabilityKind = _durability;
+    watt.endpoint.durabilityKind = durability_;
     watt.mode = ASYNCHRONOUS_WRITER;
 
     /* EDP Listeners */
@@ -89,7 +89,7 @@ bool EDPServer2::createSEDPEndpoints()
 
         // 1. Set publications writer history and create the writer. Set `created` to the result.
         publications_writer_.second = new WriterHistory(writer_history_att);
-        
+
         created &= this->mp_RTPSParticipant->createWriter(&waux, watt, publications_writer_.second,
                         publications_listener_, c_EntityId_SEDPPubWriter, true);
 
@@ -120,7 +120,7 @@ bool EDPServer2::createSEDPEndpoints()
 
         // 2. Set subscriptions reader history and create the reader. Set `created` to the result.
         subscriptions_reader_.second = new ReaderHistory(reader_history_att);
-        
+
         created &= this->mp_RTPSParticipant->createReader(&raux, ratt, subscriptions_reader_.second,
                         subscriptions_listener_, c_EntityId_SEDPSubReader, true, false);
 
@@ -174,7 +174,7 @@ bool EDPServer2::createSEDPEndpoints()
             subscriptions_writer_.first->set_separate_sending(true);
             logInfo(RTPS_EDP, "SEDP Subscriptions Writer created");
 
-             // TODO check if this should be done here or below
+            // TODO check if this should be done here or below
             subscriptions_writer_.second->remove_all_changes();
         }
         else
@@ -267,7 +267,7 @@ bool EDPServer2::removeLocalReader(
             else
             {
                 // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-                get_pdp()->mp_PDPWriterHistory->release_Cache(change);
+                get_pdp()->mp_PDPWriter->release_change(change);
             }
             return true;
         }
@@ -327,7 +327,7 @@ bool EDPServer2::removeLocalWriter(
             else
             {
                 // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-                get_pdp()->mp_PDPWriterHistory->release_Cache(change);
+                get_pdp()->mp_PDPWriter->release_change(change);
             }
             return true;
         }
@@ -374,14 +374,14 @@ bool EDPServer2::processLocalWriterProxyData(
         else
         {
             // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-            get_pdp()->mp_PDPWriterHistory->release_Cache(change);
+            get_pdp()->mp_PDPWriter->release_change(change);
         }
         // Return whether the DATA(w) was generated correctly
         return ret_val;
     }
 
     // Return the change to the pool and return false
-    get_pdp()->mp_PDPWriterHistory->release_Cache(change);
+    get_pdp()->mp_PDPWriter->release_change(change);
     return false;
 }
 
@@ -424,14 +424,14 @@ bool EDPServer2::processLocalReaderProxyData(
         else
         {
             // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-            get_pdp()->mp_PDPWriterHistory->release_Cache(change);
+            get_pdp()->mp_PDPWriter->release_change(change);
         }
         // Return whether the DATA(w) was generated correctly
         return ret_val;
     }
 
     // Return the change to the pool and return false
-    get_pdp()->mp_PDPWriterHistory->release_Cache(change);
+    get_pdp()->mp_PDPWriter->release_change(change);
     return false;
 }
 

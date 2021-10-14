@@ -26,7 +26,7 @@
 
 #include "./DiscoveryParticipantsAckStatus.hpp"
 
-#include "backup/json.hpp"
+#include <json.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -98,7 +98,8 @@ public:
         return relevant_participants_builtin_ack_status_.is_acked_by_all();
     }
 
-    virtual void to_json(nlohmann::json& j) const;
+    virtual void to_json(
+            nlohmann::json& j) const;
 
 private:
 
