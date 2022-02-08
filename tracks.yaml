@@ -253,4 +253,5 @@ tracks:
     ros_distro: rolling
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-DDS.git
-    version: :{auto}
+    version: 2.3.4
+    version_saved: :{auto}
