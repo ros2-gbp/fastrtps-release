@@ -37,7 +37,9 @@ override_dh_auto_configure:
 	dh_auto_configure -- \
 		-DCMAKE_INSTALL_PREFIX="@(InstallationPrefix)" \
 		-DCMAKE_PREFIX_PATH="@(InstallationPrefix)" \
-		$(BUILD_TESTING_ARG)
+		$(BUILD_TESTING_ARG) \
+		-DINSTALL_EXAMPLES=OFF \
+		-DSECURITY=ON
 
 override_dh_auto_build:
 	# In case we're installing to a non-standard location, look for a setup.sh
