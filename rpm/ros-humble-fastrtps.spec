@@ -20,7 +20,6 @@ Requires:       ros-humble-fastcdr
 Requires:       ros-humble-foonathan-memory-vendor
 Requires:       tinyxml2-devel
 Requires:       ros-humble-ros-workspace
-BuildRequires:  asio-devel
 BuildRequires:  cmake3
 BuildRequires:  openssl-devel
 BuildRequires:  python%{python3_pkgversion}-devel
@@ -67,6 +66,7 @@ mkdir -p .obj-%{_target_platform} && cd .obj-%{_target_platform}
     -DINSTALL_EXAMPLES=OFF \
     -DSECURITY=ON \
     -DAPPEND_PROJECT_NAME_TO_INCLUDEDIR=ON \
+    -DTHIRDPARTY_Asio=ON \
     ..
 
 %make_build
