@@ -1,0 +1,70 @@
+From 1d20d1be9c022ba121fec99558c782267b20ba6a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?=
+ <nuclearsandwich@users.noreply.github.com>
+Date: Tue, 15 Feb 2022 17:09:05 -0500
+Subject: [PATCH] Re-apply patches to RHEL 8 builds.
+
+---
+ cmake/common/eprosima_libraries.cmake | 4 ++--
+ package.xml                           | 2 --
+ rpm/ros-rolling-fastrtps.spec         | 2 +-
+ 3 files changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/cmake/common/eprosima_libraries.cmake b/cmake/common/eprosima_libraries.cmake
+index eac75f6b..3fb4cb6a 100644
+--- a/cmake/common/eprosima_libraries.cmake
++++ b/cmake/common/eprosima_libraries.cmake
+@@ -98,7 +98,7 @@ macro(eprosima_find_package package)
+             # Update submodule
+             message(STATUS "Updating submodule thirdparty/${package}")
+             execute_process(
+-                COMMAND git submodule update --recursive --init "thirdparty/${package}"
++                COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
+                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                 RESULT_VARIABLE EXECUTE_RESULT
+                 )
+@@ -225,7 +225,7 @@ macro(eprosima_find_thirdparty package thirdparty_name)
+             # Update submodule
+             message(STATUS "Updating submodule thirdparty/${thirdparty_name}")
+             execute_process(
+-                COMMAND git submodule update --recursive --init "thirdparty/${thirdparty_name}"
++                COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
+                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                 RESULT_VARIABLE EXECUTE_RESULT
+                 )
+diff --git a/package.xml b/package.xml
+index 6b2390da..1370ad56 100644
+--- a/package.xml
++++ b/package.xml
+@@ -14,8 +14,6 @@
+   <url type="bugtracker">https://github.com/eProsima/Fast-DDS/issues</url>
+   <url type="repository">https://github.com/eProsima/Fast-DDS</url>
+ 
+-  <build_depend>asio</build_depend>
+-
+   <depend>fastcdr</depend>
+   <depend>foonathan_memory_vendor</depend>
+   <depend>libssl-dev</depend>
+diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
+index b065106d..dcf3fbb2 100644
+--- a/rpm/ros-rolling-fastrtps.spec
++++ b/rpm/ros-rolling-fastrtps.spec
+@@ -19,7 +19,6 @@ Requires:       ros-rolling-fastcdr
+ Requires:       ros-rolling-foonathan-memory-vendor
+ Requires:       tinyxml2-devel
+ Requires:       ros-rolling-ros-workspace
+-BuildRequires:  asio-devel
+ BuildRequires:  cmake3
+ BuildRequires:  openssl-devel
+ BuildRequires:  ros-rolling-fastcdr
+@@ -61,6 +60,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
+     -DSETUPTOOLS_DEB_LAYOUT=OFF \
+     -DINSTALL_EXAMPLES=OFF \
+     -DSECURITY=ON \
++    -DTHIRDPARTY_Asio=ON \
+     ..
+ 
+ %make_build
+-- 
+2.35.1
+
