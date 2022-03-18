@@ -82,8 +82,7 @@ bool HelloWorldSubscriber::init(
         using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
         using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
         descriptor->apply_security = true;
-        descriptor->tls_config.password = "test";
-        descriptor->tls_config.verify_file = "ca.pem";
+        descriptor->tls_config.verify_file = "cacert.pem";
         descriptor->tls_config.verify_mode = TLSVerifyMode::VERIFY_PEER;
         descriptor->tls_config.add_option(TLSOptions::DEFAULT_WORKAROUNDS);
     }
@@ -197,7 +196,7 @@ void HelloWorldSubscriber::run(
         uint32_t number)
 {
     std::cout << "[RTCP] Subscriber running until " << number << "samples have been received" << std::endl;
-    while (number < this->listener_.samples_)
+    while (number > this->listener_.samples_)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }

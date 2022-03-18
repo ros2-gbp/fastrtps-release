@@ -83,8 +83,8 @@ TEST_P(DeadlineQos, NoKeyTopicLongDeadline)
     // not missed
     // Uses a topic with no key
 
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 10;
@@ -127,8 +127,8 @@ TEST_P(DeadlineQos, NoKeyTopicShortDeadline)
     // makes the writer send a few samples and checks that the deadline was missed every time
     // Uses a topic with no key
 
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 1000;
@@ -172,8 +172,8 @@ TEST_P(DeadlineQos, KeyedTopicLongDeadline)
     // makes the writer send a few samples and checks that the deadline was met
     // Uses a topic with key
 
-    PubSubReader<KeyedHelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<KeyedHelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 10;
@@ -217,8 +217,8 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
     // makes the writer send a few samples and checks that the deadline was missed every time
     // Uses a topic with key
 
-    PubSubReader<KeyedHelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<KeyedHelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     // Number of samples to send
     uint32_t writer_samples = 4;
@@ -254,6 +254,61 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
 
     EXPECT_GE(writer.missed_deadlines(), writer_samples);
     EXPECT_GE(reader.missed_deadlines(), writer_samples);
+}
+
+/**
+ * This test creates a volatile writer with a deadline of 10 ms and no readers.
+ * The writer is used to send one sample, and after the deadline period has elapsed, a check is
+ * performed to verify that one offered deadline was missed.
+ */
+TEST_P(DeadlineQos, KeyedTopicNoReaderVolatileWriterSetDeadline)
+{
+    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+
+    writer.durability_kind(VOLATILE_DURABILITY_QOS);
+
+    uint32_t deadline_period_ms = 50;
+
+    writer.deadline_period(deadline_period_ms * 1e-3).init();
+    ASSERT_TRUE(writer.isInitialized());
+
+    auto data = default_keyedhelloworld_data_generator(1);
+
+    writer.send_sample(data.front());
+    std::this_thread::sleep_for(std::chrono::milliseconds(deadline_period_ms * 2));
+
+    EXPECT_GE(writer.missed_deadlines(), 1u);
+}
+
+/**
+ * This test creates a volatile writer with a deadline of 10 ms and a best effort reader.
+ * The writer is used to send one sample, and after the deadline period has elapsed, a check is
+ * performed to verify that one offered deadline was missed.
+ */
+TEST_P(DeadlineQos, KeyedTopicBestEffortReaderVolatileWriterSetDeadline)
+{
+    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<KeyedHelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+
+    writer.durability_kind(VOLATILE_DURABILITY_QOS);
+
+    uint32_t deadline_period_ms = 50;
+
+    writer.deadline_period(deadline_period_ms * 1e-3).init();
+    reader.init();
+
+    ASSERT_TRUE(reader.isInitialized());
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    auto data = default_keyedhelloworld_data_generator(1);
+
+    writer.send_sample(data.front());
+    std::this_thread::sleep_for(std::chrono::milliseconds(deadline_period_ms * 2));
+
+    EXPECT_GE(writer.missed_deadlines(), 1u);
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P

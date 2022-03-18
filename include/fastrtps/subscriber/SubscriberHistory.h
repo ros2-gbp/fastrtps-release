@@ -44,8 +44,6 @@ class SubscriberHistory : public rtps::ReaderHistory
 {
 public:
 
-    using instance_info = std::pair<rtps::InstanceHandle_t, std::vector<rtps::CacheChange_t*>*>;
-
     /**
      * Constructor. Requires information about the subscriber.
      * @param topic_att TopicAttributes.
@@ -75,6 +73,26 @@ public:
             bool release = true) override;
 
     /**
+     * Check if a new change can be added to this history.
+     *
+     * @param [in]  writer_guid                    GUID of the writer where the change came from.
+     * @param [in]  total_payload_size             Total payload size of the incoming change.
+     * @param [in]  unknown_missing_changes_up_to  The number of changes from the same writer with a lower sequence
+     *                                             number that could potentially be received in the future.
+     * @param [out] will_never_be_accepted         When the method returns @c false, this parameter will inform
+     *                                             whether the change could be accepted in the future or not.
+     *
+     * @pre change should not be present in the history
+     *
+     * @return Whether a call to received_change will succeed when called with the same arguments.
+     */
+    bool can_change_be_added_nts(
+            const rtps::GUID_t& writer_guid,
+            uint32_t total_payload_size,
+            size_t unknown_missing_changes_up_to,
+            bool& will_never_be_accepted) const override;
+
+    /**
      * Called when a change is received by the Subscriber. Will add the change to the history.
      * @pre Change should not be already present in the history.
      * @param[in] change The received change
@@ -84,6 +102,15 @@ public:
     bool received_change(
             rtps::CacheChange_t* change,
             size_t unknown_missing_changes_up_to) override;
+
+    /**
+     * Called when a fragmented change is received completely by the Subscriber. Will find its instance and store it.
+     * @pre Change should be already present in the history.
+     * @param[in] change The received change
+     * @return
+     */
+    bool completed_change(
+            rtps::CacheChange_t* change) override;
 
     /** @name Read or take data methods.
      * Methods to read or take data from the History.
@@ -150,25 +177,6 @@ public:
             rtps::InstanceHandle_t& handle,
             std::chrono::steady_clock::time_point& next_deadline_us);
 
-    /**
-     * @brief Get the list of changes corresponding to an instance handle.
-     * @param handle The handle to the instance.
-     * @param exact  Indicates if the handle should match exactly (true) or if the first instance greater than the
-     *               input handle should be returned.
-     * @return A pair where:
-     *         - @c first is a boolean indicating if an instance was found
-     *         - @c second is a pair where:
-     *           - @c first is the handle of the returned instance
-     *           - @c second is a pointer to a std::vector<rtps::CacheChange_t*> with the list of changes for the
-     *             returned instance
-     *
-     * @remarks When used on a NO_KEY topic, an instance will only be returned when called with
-     *          `handle = HANDLE_NIL` and `exact = false`.
-     */
-    std::pair<bool, instance_info> lookup_instance(
-            const rtps::InstanceHandle_t& handle,
-            bool exact);
-
 private:
 
     using t_m_Inst_Caches = std::map<rtps::InstanceHandle_t, KeyedChanges>;
@@ -194,15 +202,18 @@ private:
     /// Function processing a received change
     std::function<bool(rtps::CacheChange_t*, size_t)> receive_fn_;
 
+    /// Function processing a completed fragmented change
+    std::function<bool(rtps::CacheChange_t*)> complete_fn_;
+
     /**
      * @brief Method that finds a key in m_keyedChanges or tries to add it if not found
      * @param a_change The change to get the key from
-     * @param map_it A map iterator to the given key
+     * @param[out] map_it A map iterator to the given key
      * @return True if it was found or could be added to the map
      */
     bool find_key(
             rtps::CacheChange_t* a_change,
-            t_m_Inst_Caches::iterator* map_it);
+            t_m_Inst_Caches::iterator& map_it);
 
     /**
      * @brief Method that finds a key in m_keyedChanges or tries to add it if not found
@@ -237,6 +248,12 @@ private:
     bool received_change_keep_last_with_key(
             rtps::CacheChange_t* change,
             size_t unknown_missing_changes_up_to);
+
+    bool completed_change_keep_all_with_key(
+            rtps::CacheChange_t* change);
+
+    bool completed_change_keep_last_with_key(
+            rtps::CacheChange_t* change);
     ///@}
 
     bool add_received_change(

@@ -66,9 +66,9 @@ bool SubscriberModule::init(
             << StatusMask::data_available()
             << StatusMask::liveliness_changed();
 
-    DomainParticipantQos participant_qos;
     participant_ =
-            DomainParticipantFactory::get_instance()->create_participant(seed % 230, participant_qos, this, mask);
+            DomainParticipantFactory::get_instance()->create_participant(seed % 230, PARTICIPANT_QOS_DEFAULT, this,
+                    mask);
 
     if (participant_ == nullptr)
     {
@@ -79,11 +79,11 @@ bool SubscriberModule::init(
     // Construct a FixedSizedType if fixed type is required, defult HelloWro
     if (fixed_type_)
     {
-        type_.reset(new FixedSizedType());
+        type_.reset(new FixedSizedPubSubType());
     }
     else
     {
-        type_.reset(new HelloWorldType());
+        type_.reset(new HelloWorldPubSubType());
     }
     type_.register_type(participant_);
 

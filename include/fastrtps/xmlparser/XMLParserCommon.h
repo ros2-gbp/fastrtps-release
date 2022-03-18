@@ -19,9 +19,6 @@ namespace eprosima {
 namespace fastrtps {
 namespace xmlparser {
 
-#define draw(ident, text, ...) for (uint8_t i = ident + 1; i > 0; --i)(i == 1) ? printf(text, ## __VA_ARGS__) : printf( \
-        "\t")
-
 /**
  * Enum class XMLP_ret, used to provide a strongly typed result from the operations within this module.
  * @ingroup XMLPARSER_MODULE
@@ -36,6 +33,7 @@ enum class XMLP_ret
 
 extern const char* DEFAULT_FASTRTPS_ENV_VARIABLE;
 extern const char* DEFAULT_FASTRTPS_PROFILES;
+extern const char* SKIP_DEFAULT_XML_FILE;
 
 extern const char* ROOT;
 extern const char* PROFILES;
@@ -207,6 +205,7 @@ extern const char* TOPIC_DATA;
 extern const char* GROUP_DATA;
 extern const char* PUB_MODE;
 extern const char* DISABLE_POSITIVE_ACKS;
+extern const char* DISABLE_HEARTBEAT_PIGGYBACK;
 extern const char* DATA_SHARING;
 
 extern const char* SYNCHRONOUS;

@@ -47,6 +47,7 @@ class TopicImpl;
 /**
  * Class TopicDescription, represents the fact that both publications
  * and subscriptions are tied to a single data-type
+ *
  * @ingroup FASTDDS_MODULE
  */
 class Topic : public DomainEntity, public TopicDescription
@@ -58,13 +59,13 @@ class Topic : public DomainEntity, public TopicDescription
      * Create a topic, assigning its pointer to the associated implementation.
      * Don't use directly, create Topic using create_topic from DomainParticipant.
      */
-    RTPS_DllAPI Topic(
+    Topic(
             const std::string& topic_name,
             const std::string& type_name,
             TopicImpl* p,
             const StatusMask& mask = StatusMask::all());
 
-    RTPS_DllAPI Topic(
+    Topic(
             DomainParticipant* dp,
             const std::string& topic_name,
             const std::string& type_name,
@@ -77,16 +78,18 @@ public:
     /**
      * @brief Destructor
      */
-    RTPS_DllAPI virtual ~Topic();
+    virtual ~Topic();
 
     /**
      * @brief Getter for the DomainParticipant
+     *
      * @return DomainParticipant pointer
      */
     virtual DomainParticipant* get_participant() const override;
 
     /**
      * Allows the application to retrieve the INCONSISTENT_TOPIC_STATUS status of a Topic.
+     *
      * @param status [out] Status to be retrieved.
      * @return RETCODE_OK
      */
@@ -95,12 +98,14 @@ public:
 
     /**
      * Allows accessing the Topic Qos.
+     *
      * @return reference to TopicQos
      */
     RTPS_DllAPI const TopicQos& get_qos() const;
 
     /**
      * Retrieves the Topic Qos.
+     *
      * @param qos TopicQos where the qos is returned
      * @return RETCODE_OK
      */
@@ -110,6 +115,7 @@ public:
     /**
      * Allows modifying the Topic Qos.
      * The given Qos must be supported by the Topic.
+     *
      * @param qos new TopicQos value to set for the Topic.
      * @retval RETCODE_IMMUTABLE_POLICY if a change was not allowed.
      * @retval RETCODE_INCONSISTENT_POLICY if new qos has inconsistent values.
@@ -120,12 +126,14 @@ public:
 
     /**
      * Retrieves the attached TopicListener.
+     *
      * @return pointer to TopicListener
      */
     RTPS_DllAPI const TopicListener* get_listener() const;
 
     /**
      * Modifies the TopicListener.
+     *
      * @param listener new value for the TopicListener
      * @param mask StatusMask that holds statuses the listener responds to (default: all).
      * @return RETCODE_OK
@@ -136,6 +144,7 @@ public:
 
     /**
      * @brief Getter for the TopicDescriptionImpl
+     *
      * @return pointer to TopicDescriptionImpl
      */
     TopicDescriptionImpl* get_impl() const override;
