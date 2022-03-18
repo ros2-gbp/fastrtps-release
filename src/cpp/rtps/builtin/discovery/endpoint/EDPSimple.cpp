@@ -59,6 +59,32 @@ static const Duration_t edp_heartbeat_response_delay{0, 10 * 1000}; // 10 millis
 static const int32_t edp_reader_initial_reserved_caches = 1;
 static const int32_t edp_writer_initial_reserved_caches = 20;
 
+static void delete_reader(
+        RTPSParticipantImpl* participant,
+        std::pair<StatefulReader*, ReaderHistory*>& reader_pair,
+        std::shared_ptr<ITopicPayloadPool>& pool)
+{
+    if (nullptr != reader_pair.first)
+    {
+        participant->deleteUserEndpoint(reader_pair.first);
+        EDPUtils::release_payload_pool(pool, reader_pair.second->m_att, true);
+        delete(reader_pair.second);
+    }
+}
+
+static void delete_writer(
+        RTPSParticipantImpl* participant,
+        std::pair<StatefulWriter*, WriterHistory*>& writer_pair,
+        std::shared_ptr<ITopicPayloadPool>& pool)
+{
+    if (nullptr != writer_pair.first)
+    {
+        participant->deleteUserEndpoint(writer_pair.first);
+        EDPUtils::release_payload_pool(pool, writer_pair.second->m_att, false);
+        delete(writer_pair.second);
+    }
+}
+
 EDPSimple::EDPSimple(
         PDP* p,
         RTPSParticipantImpl* part)
@@ -68,7 +94,8 @@ EDPSimple::EDPSimple(
     , temp_reader_proxy_data_(
         part->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         part->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
-        part->getRTPSParticipantAttributes().allocation.data_limits)
+        part->getRTPSParticipantAttributes().allocation.data_limits,
+        part->getRTPSParticipantAttributes().allocation.content_filter)
     , temp_writer_proxy_data_(
         part->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         part->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
@@ -79,75 +106,18 @@ EDPSimple::EDPSimple(
 EDPSimple::~EDPSimple()
 {
 #if HAVE_SECURITY
-    if (this->publications_secure_reader_.first != nullptr)
-    {
-        this->mp_RTPSParticipant->deleteUserEndpoint(publications_secure_reader_.first);
-        EDPUtils::release_payload_pool(sec_pub_reader_payload_pool_, publications_secure_writer_.second->m_att, true);
-        delete(publications_secure_reader_.second);
-    }
+    delete_reader(mp_RTPSParticipant, publications_secure_reader_, sec_pub_reader_payload_pool_);
+    delete_reader(mp_RTPSParticipant, subscriptions_secure_reader_, sec_sub_reader_payload_pool_);
 
-    if (this->subscriptions_secure_reader_.first != nullptr)
-    {
-        this->mp_RTPSParticipant->deleteUserEndpoint(subscriptions_secure_reader_.first);
-        EDPUtils::release_payload_pool(sec_sub_reader_payload_pool_, subscriptions_secure_reader_.second->m_att, true);
-        delete(subscriptions_secure_reader_.second);
-    }
-
-    if (this->publications_secure_writer_.first != nullptr)
-    {
-        this->mp_RTPSParticipant->deleteUserEndpoint(publications_secure_writer_.first);
-        EDPUtils::release_payload_pool(sec_pub_writer_payload_pool_, publications_secure_writer_.second->m_att, false);
-        delete(publications_secure_writer_.second);
-    }
-
-    if (this->subscriptions_secure_writer_.first != nullptr)
-    {
-        this->mp_RTPSParticipant->deleteUserEndpoint(subscriptions_secure_writer_.first);
-        EDPUtils::release_payload_pool(sec_sub_writer_payload_pool_, subscriptions_secure_writer_.second->m_att, true);
-        delete(subscriptions_secure_writer_.second);
-    }
+    delete_writer(mp_RTPSParticipant, publications_secure_writer_, sec_pub_writer_payload_pool_);
+    delete_writer(mp_RTPSParticipant, subscriptions_secure_writer_, sec_sub_writer_payload_pool_);
 #endif // if HAVE_SECURITY
 
-    if (this->publications_reader_.first != nullptr)
-    {
-        this->mp_RTPSParticipant->deleteUserEndpoint(publications_reader_.first);
-        // This payload is created outside the constructor, so it could not be created
-        if (nullptr != pub_reader_payload_pool_)
-        {
-            EDPUtils::release_payload_pool(pub_reader_payload_pool_, publications_reader_.second->m_att, true);
-        }
-        delete(publications_reader_.second);
-    }
-    if (this->subscriptions_reader_.first != nullptr)
-    {
-        this->mp_RTPSParticipant->deleteUserEndpoint(subscriptions_reader_.first);
-        // This payload is created outside the constructor, so it could not be created
-        if (nullptr != sub_reader_payload_pool_)
-        {
-            EDPUtils::release_payload_pool(sub_reader_payload_pool_, subscriptions_reader_.second->m_att, true);
-        }
-        delete(subscriptions_reader_.second);
-    }
-    if (this->publications_writer_.first != nullptr)
-    {
-        this->mp_RTPSParticipant->deleteUserEndpoint(publications_writer_.first);
-        // This payload is created outside the constructor, so it could not be created
-        if (nullptr != pub_writer_payload_pool_)
-        {
-            EDPUtils::release_payload_pool(pub_writer_payload_pool_, publications_writer_.second->m_att, false);
-        }
-        delete(publications_writer_.second);
-    }
-    if (this->subscriptions_writer_.first != nullptr)
-    {
-        this->mp_RTPSParticipant->deleteUserEndpoint(subscriptions_writer_.first);
-        // This payload is created outside the constructor, so it could not be created
-        if (nullptr != sub_writer_payload_pool_)
-        {
-            EDPUtils::release_payload_pool(sub_writer_payload_pool_, subscriptions_writer_.second->m_att, false);
-        }
-        delete(subscriptions_writer_.second);
-    }
+    delete_reader(mp_RTPSParticipant, publications_reader_, pub_reader_payload_pool_);
+    delete_reader(mp_RTPSParticipant, subscriptions_reader_, sub_reader_payload_pool_);
+
+    delete_writer(mp_RTPSParticipant, publications_writer_, pub_writer_payload_pool_);
+    delete_writer(mp_RTPSParticipant, subscriptions_writer_, sub_writer_payload_pool_);
 
     if (nullptr != publications_listener_)
     {
@@ -318,7 +288,7 @@ void EDPSimple::processPersistentData(
                     return;
                 }
 
-                if (!reader.first->change_received(change_to_add, nullptr))
+                if (!reader.first->change_received(change_to_add, nullptr, 0))
                 {
                     logInfo(RTPS_EDP, "EDPServer couldn't process database data not add change "
                         << change_to_add->sequenceNumber);
@@ -434,13 +404,6 @@ void EDPSimple::set_builtin_writer_attributes(
     attributes.endpoint.reliabilityKind = RELIABLE;
     attributes.endpoint.durabilityKind = TRANSIENT_LOCAL;
     attributes.endpoint.topicKind = WITH_KEY;
-
-    // Set as asynchronous if there is a throughput controller installed
-    if (mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-    {
-        attributes.mode = ASYNCHRONOUS_WRITER;
-    }
 }
 
 bool EDPSimple::createSEDPEndpoints()

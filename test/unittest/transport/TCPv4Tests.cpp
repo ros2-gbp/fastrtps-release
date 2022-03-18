@@ -18,6 +18,7 @@
 #include <asio.hpp>
 #include <gtest/gtest.h>
 #include <MockReceiverResource.h>
+#include "mock/MockTCPChannelResource.h"
 #include "mock/MockTCPv4Transport.h"
 #include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
@@ -533,11 +534,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_client_verifies)
                                     (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                     while (!sent)
                     {
-                        Locators input_begin(locator_list.begin());
-                        Locators input_end(locator_list.end());
+                        Locators l_input_begin(locator_list.begin());
+                        Locators l_input_end(locator_list.end());
 
                         sent =
-                                send_resource_list.at(0)->send(message, 5, &input_begin, &input_end,
+                                send_resource_list.at(0)->send(message, 5, &l_input_begin, &l_input_end,
                                         (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     }
@@ -633,11 +634,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_server_verifies)
                                     (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                     while (!sent)
                     {
-                        Locators input_begin(locator_list.begin());
-                        Locators input_end(locator_list.end());
+                        Locators l_input_begin(locator_list.begin());
+                        Locators l_input_end(locator_list.end());
 
                         sent =
-                                send_resource_list.at(0)->send(message, 5,  &input_begin, &input_end,
+                                send_resource_list.at(0)->send(message, 5,  &l_input_begin, &l_input_end,
                                         (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     }
@@ -735,11 +736,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports)
                                     (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                     while (!sent)
                     {
-                        Locators input_begin(locator_list.begin());
-                        Locators input_end(locator_list.end());
+                        Locators l_input_begin(locator_list.begin());
+                        Locators l_input_end(locator_list.end());
 
                         sent =
-                                send_resource_list.at(0)->send(message, 5, &input_begin, &input_end,
+                                send_resource_list.at(0)->send(message, 5, &l_input_begin, &l_input_end,
                                         (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     }
@@ -839,11 +840,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_both_secure_ports_untrusted)
                     int count = 0;
                     while (!sent && count < 30)
                     {
-                        Locators input_begin(locator_list.begin());
-                        Locators input_end(locator_list.end());
+                        Locators l_input_begin(locator_list.begin());
+                        Locators l_input_end(locator_list.end());
 
                         sent =
-                                send_resource_list.at(0)->send(message, 5, &input_begin, &input_end,
+                                send_resource_list.at(0)->send(message, 5, &l_input_begin, &l_input_end,
                                         (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                         ++count;
@@ -943,11 +944,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_clients_1)
                                     (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                     while (!sent)
                     {
-                        Locators input_begin(locator_list.begin());
-                        Locators input_end(locator_list.end());
+                        Locators l_input_begin(locator_list.begin());
+                        Locators l_input_end(locator_list.end());
 
                         sent =
-                                send_resource_list.at(0)->send(message, 5, &input_begin, &input_end,
+                                send_resource_list.at(0)->send(message, 5, &l_input_begin, &l_input_end,
                                         (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     }
@@ -1132,10 +1133,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_untrusted_server)
                     int count = 0;
                     while (!sent && count < 30)
                     {
-                        Locators input_begin(locator_list.begin());
-                        Locators input_end(locator_list.end());
+                        Locators l_input_begin(locator_list.begin());
+                        Locators l_input_end(locator_list.end());
                         sent =
-                                send_resource_list.at(0)->send(message, 5, &input_begin, &input_end,
+                                send_resource_list.at(0)->send(message, 5, &l_input_begin, &l_input_end,
                                         (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                         ++count;
@@ -1462,6 +1463,49 @@ TEST_F(TCPv4Tests, receive_unordered_data)
     EXPECT_EQ(expected_number, receiver.num_received);
 
     EXPECT_TRUE(uut.CloseInputChannel(input_locator));
+}
+
+// This test verifies that disabling a TCPChannelResource in the middle of a Receive call (invoked in
+// perform_listen_operation) does not result in a hungup state [13721].
+TEST_F(TCPv4Tests, header_read_interrumption)
+{
+    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+    std::regex filter("RTCP(?!_SEQ)");
+    eprosima::fastdds::dds::Log::SetCategoryFilter(filter);
+
+    TCPv4TransportDescriptor test_descriptor;
+    test_descriptor.add_listener_port(g_default_port);
+    TCPv4Transport transportUnderTest(test_descriptor);
+    transportUnderTest.init();
+
+    Locator_t locator;
+    locator.kind = LOCATOR_KIND_TCPv4;
+    locator.port = g_default_port;
+    IPLocator::setIPv4(locator, 127, 0, 0, 1);
+    IPLocator::setLogicalPort(locator, 7410);
+
+    std::weak_ptr<eprosima::fastdds::rtps::RTCPMessageManager> rtcp_manager =
+            std::make_shared<eprosima::fastdds::rtps::RTCPMessageManager>(&transportUnderTest);
+    std::shared_ptr<TCPChannelResource> channel = std::make_shared<MockTCPChannelResource>(&transportUnderTest, locator,
+                    32767);
+    octet* buffer = {};
+    uint32_t receive_buffer_capacity = 65500;
+    uint32_t receive_buffer_size = 0;
+
+    // Simulate channel connection
+    channel->connect(nullptr);
+
+    // Simulate channel disconnection after a second
+    std::thread thread([&channel]
+            {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                channel->disable();
+            });
+
+    // Start TCP segment reception
+    // Should get stuck in receive_header until channel is disabled
+    transportUnderTest.Receive(rtcp_manager, channel, buffer, receive_buffer_capacity, receive_buffer_size, locator);
+    thread.join();
 }
 
 void TCPv4Tests::HELPER_SetDescriptorDefaults()

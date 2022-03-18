@@ -208,6 +208,7 @@ ReaderListener* RTPSReader::getListener() const
 bool RTPSReader::setListener(
         ReaderListener* target)
 {
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
     mp_listener = target;
     return true;
 }
@@ -232,10 +233,30 @@ void RTPSReader::add_persistence_guid(
         const GUID_t& guid,
         const GUID_t& persistence_guid)
 {
-    GUID_t persistence_guid_to_store = (c_Guid_Unknown == persistence_guid) ? guid : persistence_guid;
-    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
-    history_state_->persistence_guid_map[guid] = persistence_guid_to_store;
-    history_state_->persistence_guid_count[persistence_guid_to_store]++;
+    if (c_Guid_Unknown == persistence_guid || persistence_guid == guid)
+    {
+        std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+        history_state_->persistence_guid_map[guid] = guid;
+        history_state_->persistence_guid_count[guid]++;
+    }
+    else
+    {
+        std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+        history_state_->persistence_guid_map[guid] = persistence_guid;
+        history_state_->persistence_guid_count[persistence_guid]++;
+
+        // Could happen that a value has already been stored in the record with the guid and not the persistence guid
+        // This is because received_change is called before Proxy is created
+        // In this case, we substitute the guid for the persistence (in case they are not equal)
+        auto spourious_record = history_state_->history_record.find(guid);
+        if (spourious_record != history_state_->history_record.end())
+        {
+            logInfo(RTPS_READER, "Sporious record found, changing guid "
+                    << guid << " for persistence guid " << persistence_guid);
+            update_last_notified(guid, spourious_record->second);
+            history_state_->history_record.erase(spourious_record);
+        }
+    }
 }
 
 bool RTPSReader::may_remove_history_record(
@@ -375,8 +396,11 @@ bool RTPSReader::is_sample_valid(
 {
     if (is_datasharing_compatible_ && datasharing_listener_->writer_is_matched(writer))
     {
-        //Check if the payload is dirty
-        if (!DataSharingPayloadPool::check_sequence_number(static_cast<const octet*>(data), sn))
+        // Check if the payload is dirty
+        // Note the Payloads used in loans include a mandatory RTPS 2.3 extra header
+        if (!DataSharingPayloadPool::check_sequence_number(
+                    static_cast<const octet*>(data) - SerializedPayload_t::representation_header_size,
+                    sn))
         {
             return false;
         }

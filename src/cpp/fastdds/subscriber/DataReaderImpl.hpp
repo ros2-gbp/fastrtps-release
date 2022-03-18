@@ -36,7 +36,6 @@
 #include <fastdds/rtps/reader/ReaderListener.h>
 
 #include <fastrtps/attributes/TopicAttributes.h>
-#include <fastrtps/subscriber/SubscriberHistory.h>
 #include <fastrtps/qos/LivelinessChangedStatus.h>
 #include <fastrtps/types/TypesBase.h>
 
@@ -45,6 +44,8 @@
 #include <fastdds/subscriber/DataReaderImpl/SampleLoanManager.hpp>
 #include <fastdds/subscriber/SubscriberImpl.hpp>
 #include <rtps/history/ITopicPayloadPool.h>
+
+#include <fastdds/subscriber/history/DataReaderHistory.hpp>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -218,6 +219,9 @@ public:
      */
     const TopicDescription* get_topicdescription() const;
 
+    ReturnCode_t get_subscription_matched_status(
+            SubscriptionMatchedStatus& status);
+
     ReturnCode_t get_requested_deadline_missed_status(
             fastrtps::RequestedDeadlineMissedStatus& status);
 
@@ -309,6 +313,9 @@ public:
     ReturnCode_t get_listening_locators(
             rtps::LocatorList& locators) const;
 
+
+    ReturnCode_t delete_contained_entities();
+
 protected:
 
     //!Subscriber
@@ -325,10 +332,12 @@ protected:
     DataReaderQos qos_;
 
     //!History
-    fastrtps::SubscriberHistory history_;
+    detail::DataReaderHistory history_;
 
     //!Listener
     DataReaderListener* listener_ = nullptr;
+
+    fastrtps::rtps::GUID_t guid_;
 
     class InnerDataReaderListener : public fastrtps::rtps::ReaderListener
     {
@@ -372,6 +381,9 @@ protected:
 
     //! The current timer owner, i.e. the instance which started the deadline timer
     fastrtps::rtps::InstanceHandle_t timer_owner_;
+
+    //! Subscription matched status
+    SubscriptionMatchedStatus subscription_matched_status_;
 
     //! Liveliness changed status
     LivelinessChangedStatus liveliness_changed_status_;
@@ -423,6 +435,12 @@ protected:
             SampleInfo* info,
             bool should_take);
 
+    void set_read_communication_status(
+            bool trigger_value);
+
+    void update_subscription_matched_status(
+            const SubscriptionMatchedStatus& status);
+
     /**
      * @brief A method called when a new cache change is added
      * @param change The cache change that has been added
@@ -470,6 +488,7 @@ protected:
     ReturnCode_t check_datasharing_compatible(
             const fastrtps::rtps::ReaderAttributes& reader_attributes,
             bool& is_datasharing_compatible) const;
+
 
 };
 

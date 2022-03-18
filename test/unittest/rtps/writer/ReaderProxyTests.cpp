@@ -17,14 +17,12 @@
 
 #include <fastrtps/rtps/writer/ReaderProxy.h>
 #include <fastrtps/rtps/writer/StatefulWriter.h>
+#include <rtps/messages/RTPSGapBuilder.hpp>
 
 //using namespace eprosima::fastrtps::rtps;
-namespace eprosima
-{
-namespace fastrtps
-{
-namespace rtps
-{
+namespace eprosima {
+namespace fastrtps {
+namespace rtps {
 
 TEST(ReaderProxyTests, find_change_test)
 {
@@ -33,14 +31,19 @@ TEST(ReaderProxyTests, find_change_test)
     WriterTimes wTimes;
     RemoteLocatorsAllocationAttributes alloc;
     ReaderProxy rproxy(wTimes, alloc, &writerMock);
+    CacheChange_t seq1; seq1.sequenceNumber = {0, 1};
+    CacheChange_t seq2; seq2.sequenceNumber = {0, 2};
+    CacheChange_t seq3; seq3.sequenceNumber = {0, 3};
+    CacheChange_t seq6; seq6.sequenceNumber = {0, 6};
+    CacheChange_t seq7; seq7.sequenceNumber = {0, 7};
 
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 1)), false);
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 2)), false);
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 3)), false);
-    //rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 4)), false); // GAP
-    //rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 5)), false); // GAP
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 6)), false);
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 7)), false);
+    rproxy.add_change(ChangeForReader_t(&seq1), true, false);
+    rproxy.add_change(ChangeForReader_t(&seq2), true, false);
+    rproxy.add_change(ChangeForReader_t(&seq3), true, false);
+    //rproxy.add_change(ChangeForReader_t(&seq4), false); // GAP
+    //rproxy.add_change(ChangeForReader_t(&seq5), false); // GAP
+    rproxy.add_change(ChangeForReader_t(&seq6), true, false);
+    rproxy.add_change(ChangeForReader_t(&seq7), true, false);
 
     ASSERT_FALSE(rproxy.change_is_acked(SequenceNumber_t(0, 1)));
     ASSERT_FALSE(rproxy.change_is_acked(SequenceNumber_t(0, 2)));
@@ -85,13 +88,17 @@ TEST(ReaderProxyTests, find_change_removed_test)
     WriterTimes wTimes;
     RemoteLocatorsAllocationAttributes alloc;
     ReaderProxy rproxy(wTimes, alloc, &writerMock);
+    CacheChange_t seq1; seq1.sequenceNumber = {0, 1};
+    CacheChange_t seq2; seq2.sequenceNumber = {0, 2};
+    CacheChange_t seq3; seq3.sequenceNumber = {0, 3};
+    CacheChange_t seq4; seq4.sequenceNumber = {0, 4};
 
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 1)), false);
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 2)), false);
+    rproxy.add_change(ChangeForReader_t(&seq1), true, false);
+    rproxy.add_change(ChangeForReader_t(&seq2), true, false);
     rproxy.change_has_been_removed(SequenceNumber_t(0, 1));
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 3)), false);
+    rproxy.add_change(ChangeForReader_t(&seq3), true, false);
     rproxy.change_has_been_removed(SequenceNumber_t(0, 2));
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 4)), false);
+    rproxy.add_change(ChangeForReader_t(&seq4), true, false);
 
     ASSERT_TRUE(rproxy.change_is_acked(SequenceNumber_t(0, 1)));
     ASSERT_TRUE(rproxy.change_is_acked(SequenceNumber_t(0, 2)));
@@ -105,39 +112,49 @@ TEST(ReaderProxyTests, find_change_removed_test)
     ASSERT_FALSE(rproxy.change_is_acked(SequenceNumber_t(0, 4)));
 }
 
-/*
- * Regression test
- * Error because async thread is not wake up for sending a GAP.
- * This is because requested_changes_set and perform_acknack_response functions only return true when some change is
- * change. Now we added are_there_gaps function to check when there are gaps in the places are needed.
- */
-TEST(ReaderProxyTests, are_there_gaps)
+// Regression test for #13556 (Github #2423)
+TEST(ReaderProxyTests, requested_changes_set_test)
 {
     StatefulWriter writerMock;
     WriterTimes wTimes;
     RemoteLocatorsAllocationAttributes alloc;
     ReaderProxy rproxy(wTimes, alloc, &writerMock);
+    CacheChange_t seq1; seq1.sequenceNumber = {0, 1};
+    CacheChange_t seq2; seq2.sequenceNumber = {0, 2};
+    CacheChange_t seq3; seq3.sequenceNumber = {0, 3};
+    CacheChange_t seq4; seq4.sequenceNumber = {0, 4};
+    RTPSMessageGroup message_group(nullptr, false);
+    RTPSGapBuilder gap_builder(message_group);
 
-    ASSERT_FALSE(rproxy.are_there_gaps());
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 1)), false);
-    ASSERT_FALSE(rproxy.are_there_gaps());
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 2)), false);
-    ASSERT_FALSE(rproxy.are_there_gaps());
-    rproxy.add_change(ChangeForReader_t(SequenceNumber_t(0, 3)), false);
-    ASSERT_FALSE(rproxy.are_there_gaps());
-    rproxy.change_has_been_removed(SequenceNumber_t(0, 2));
-    ASSERT_TRUE(rproxy.are_there_gaps());
-    rproxy.change_has_been_removed(SequenceNumber_t(0, 1));
-    ASSERT_TRUE(rproxy.are_there_gaps());
-    rproxy.change_has_been_removed(SequenceNumber_t(0, 3));
-    ASSERT_FALSE(rproxy.are_there_gaps());
+    ReaderProxyData reader_attributes(0, 0);
+    reader_attributes.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+    rproxy.start(reader_attributes);
+
+
+    rproxy.add_change(ChangeForReader_t(&seq1), false, false);
+    rproxy.add_change(ChangeForReader_t(&seq2), true, false);
+    rproxy.add_change(ChangeForReader_t(&seq3), true, false);
+    rproxy.add_change(ChangeForReader_t(&seq4), false, false);
+
+    SequenceNumberSet_t set({0, 1});
+    set.add({0, 1});
+    set.add({0, 2});
+    set.add({0, 3});
+    set.add({0, 4});
+
+    EXPECT_CALL(gap_builder, add(SequenceNumber_t(0, 1))).Times(1).WillOnce(testing::Return(true));
+    EXPECT_CALL(gap_builder, add(SequenceNumber_t(0, 4))).Times(1).WillOnce(testing::Return(true));
+
+    rproxy.requested_changes_set(set, gap_builder, {0, 1});
 }
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
 
-int main(int argc, char **argv)
+int main(
+        int argc,
+        char** argv)
 {
     testing::InitGoogleMock(&argc, argv);
     return RUN_ALL_TESTS();

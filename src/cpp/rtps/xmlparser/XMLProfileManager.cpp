@@ -177,7 +177,7 @@ void XMLProfileManager::loadDefaultXMLFile()
     size = 2;
 
     // Try to load the default XML file if variable does not exist or is not set to '1'
-    if (!(getenv_s(&size, skip_xml, size, "SKIP_DEFAULT_XML_FILE") == 0 && skip_xml[0] == '1'))
+    if (!(getenv_s(&size, skip_xml, size, SKIP_DEFAULT_XML_FILE) == 0 && skip_xml[0] == '1'))
     {
         loadXMLFile(DEFAULT_FASTRTPS_PROFILES);
     }
@@ -188,7 +188,7 @@ void XMLProfileManager::loadDefaultXMLFile()
         loadXMLFile(file_path);
     }
 
-    const char* skip_xml = std::getenv("SKIP_DEFAULT_XML_FILE");
+    const char* skip_xml = std::getenv(SKIP_DEFAULT_XML_FILE);
 
     // Try to load the default XML file if variable does not exist or is not set to '1'
     if (!(skip_xml != nullptr && skip_xml[0] == '1'))
@@ -321,6 +321,37 @@ XMLP_ret XMLProfileManager::loadXMLFile(
     else if (NodeType::PROFILES == root_node->getType())
     {
         return XMLProfileManager::extractProfiles(std::move(root_node), filename);
+    }
+
+    return loaded_ret;
+}
+
+XMLP_ret XMLProfileManager::loadXMLString(
+        const char* data,
+        size_t length)
+{
+    up_base_node_t root_node;
+    XMLP_ret loaded_ret = XMLParser::loadXML(data, length, root_node);
+    if (!root_node || loaded_ret != XMLP_ret::XML_OK)
+    {
+        logError(XMLPARSER, "Error parsing string");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    if (NodeType::ROOT == root_node->getType())
+    {
+        for (auto&& child: root_node->getChildren())
+        {
+            if (NodeType::PROFILES == child.get()->getType())
+            {
+                return XMLProfileManager::extractProfiles(std::move(child), "inmem");
+            }
+        }
+        return loaded_ret;
+    }
+    else if (NodeType::PROFILES == root_node->getType())
+    {
+        return XMLProfileManager::extractProfiles(std::move(root_node), "inmem");
     }
 
     return loaded_ret;

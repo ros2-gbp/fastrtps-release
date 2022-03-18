@@ -126,7 +126,7 @@ void LoanableHelloWorldSubscriber::SubListener::on_subscription_matched(
 void LoanableHelloWorldSubscriber::SubListener::on_data_available(
         DataReader* reader)
 {
-    FASTDDS_SEQUENCE(DataSeq, LoanableHelloWorld);
+    FASTDDS_CONST_SEQUENCE(DataSeq, LoanableHelloWorld);
 
     DataSeq data;
     SampleInfoSeq infos;
@@ -138,9 +138,10 @@ void LoanableHelloWorldSubscriber::SubListener::on_data_available(
             {
                 // Print your structure data here.
                 const LoanableHelloWorld& sample = data[i];
-                
+
                 ++samples;
-                std::cout << "Sample received (count=" << samples << ") at address " << &sample << std::endl
+                std::cout << "Sample received (count=" << samples << ") at address " << &sample
+                          << (reader->is_sample_valid(&sample, &infos[i]) ? " is valid" : " was replaced" ) << std::endl
                           << "  index=" << sample.index() << std::endl
                           << "  message=" << sample.message().data() << std::endl;
             }
