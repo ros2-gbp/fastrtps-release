@@ -179,6 +179,7 @@ Publisher* ParticipantImpl::createPublisher(
     watt.mode = att.qos.m_publishMode.kind ==
             eprosima::fastrtps::SYNCHRONOUS_PUBLISH_MODE ? SYNCHRONOUS_WRITER : ASYNCHRONOUS_WRITER;
     watt.endpoint.properties = att.properties;
+    watt.flow_controller_name = att.qos.m_publishMode.flow_controller_name;
     if (att.getEntityID() > 0)
     {
         watt.endpoint.setEntityID((uint8_t)att.getEntityID());
@@ -192,6 +193,7 @@ Publisher* ParticipantImpl::createPublisher(
     watt.liveliness_lease_duration = att.qos.m_liveliness.lease_duration;
     watt.liveliness_announcement_period = att.qos.m_liveliness.announcement_period;
     watt.matched_readers_allocation = att.matched_subscriber_allocation;
+    watt.disable_heartbeat_piggyback = att.qos.disable_heartbeat_piggyback;
 
     // TODO(Ricardo) Remove in future
     // Insert topic_name and partitions

@@ -17,40 +17,38 @@
  */
 
 #include <rtps/security/SecurityManager.h>
-#include <security/OpenSSLInit.hpp>
-
-// TODO Include relative path and fix SecurityTest
-//#include <fastrtps_deprecated/participant/ParticipantImpl.h>
-#include <rtps/participant/RTPSParticipantImpl.h>
-
-#include <fastdds/rtps/security/authentication/Authentication.h>
-#include <fastdds/rtps/security/accesscontrol/AccessControl.h>
-#include <fastdds/rtps/security/accesscontrol/SecurityMaskUtilities.h>
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/participant/RTPSParticipantListener.h>
-#include <fastdds/rtps/network/NetworkFactory.h>
-
-#include <fastdds/rtps/writer/StatelessWriter.h>
-#include <fastdds/rtps/reader/StatelessReader.h>
-#include <fastdds/rtps/writer/StatefulWriter.h>
-#include <fastdds/rtps/reader/StatefulReader.h>
-#include <fastdds/rtps/history/WriterHistory.h>
-#include <fastdds/rtps/history/ReaderHistory.h>
-#include <fastdds/rtps/attributes/HistoryAttributes.h>
-#include <fastdds/rtps/builtin/data/WriterProxyData.h>
-#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
-#include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
-#include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
-#include <fastdds/rtps/messages/CDRMessage.h>
-#include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
-#include <fastdds/rtps/security/accesscontrol/EndpointSecurityAttributes.h>
-
-#include <rtps/history/TopicPayloadPoolRegistry.hpp>
 
 #include <cassert>
 #include <chrono>
 #include <thread>
 #include <mutex>
+
+#include <fastdds/dds/log/Log.hpp>
+
+#include <fastdds/rtps/attributes/HistoryAttributes.h>
+#include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
+#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
+#include <fastdds/rtps/builtin/data/WriterProxyData.h>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/history/WriterHistory.h>
+#include <fastdds/rtps/messages/CDRMessage.h>
+#include <fastdds/rtps/network/NetworkFactory.h>
+#include <fastdds/rtps/participant/RTPSParticipantListener.h>
+#include <fastdds/rtps/reader/StatefulReader.h>
+#include <fastdds/rtps/reader/StatelessReader.h>
+#include <fastdds/rtps/security/accesscontrol/AccessControl.h>
+#include <fastdds/rtps/security/accesscontrol/EndpointSecurityAttributes.h>
+#include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
+#include <fastdds/rtps/security/accesscontrol/SecurityMaskUtilities.h>
+#include <fastdds/rtps/security/authentication/Authentication.h>
+#include <fastdds/rtps/writer/StatefulWriter.h>
+#include <fastdds/rtps/writer/StatelessWriter.h>
+
+#include <rtps/history/TopicPayloadPoolRegistry.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <security/OpenSSLInit.hpp>
 
 #define BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_SECURE_WRITER (1 << 20)
 #define BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_SECURE_READER (1 << 21)
@@ -102,7 +100,8 @@ SecurityManager::SecurityManager(
     , temp_stateless_reader_proxy_data_(
         participant->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         participant->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
-        participant->getRTPSParticipantAttributes().allocation.data_limits)
+        participant->getRTPSParticipantAttributes().allocation.data_limits,
+        participant->getRTPSParticipantAttributes().allocation.content_filter)
     , temp_stateless_writer_proxy_data_(
         participant->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         participant->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
@@ -110,7 +109,8 @@ SecurityManager::SecurityManager(
     , temp_volatile_reader_proxy_data_(
         participant->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         participant->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
-        participant->getRTPSParticipantAttributes().allocation.data_limits)
+        participant->getRTPSParticipantAttributes().allocation.data_limits,
+        participant->getRTPSParticipantAttributes().allocation.content_filter)
     , temp_volatile_writer_proxy_data_(
         participant->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         participant->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
@@ -506,7 +506,7 @@ void SecurityManager::destroy()
 
         mutex_.unlock();
 
-        auths_to_remove.clear();
+        auths_to_remove.clear(); // AuthUniquePtr must be destroyed without SecurityManager's mutex locked.
 
         delete_entities();
 
@@ -550,6 +550,12 @@ void SecurityManager::remove_discovered_participant_info(
 
         authentication_plugin_->return_identity_handle(auth_ptr->identity_handle_, exception);
         auth_ptr->identity_handle_ = nullptr;
+
+        if (auth_ptr->change_sequence_number_ != SequenceNumber_t::unknown())
+        {
+            participant_stateless_message_writer_history_->remove_change(auth_ptr->change_sequence_number_);
+            auth_ptr->change_sequence_number_ = SequenceNumber_t::unknown();
+        }
     }
 }
 
@@ -574,7 +580,7 @@ bool SecurityManager::restore_discovered_participant_info(
         // This is to avoid a deadlock with TimedEvents.
         DiscoveredParticipantInfo::AuthUniquePtr remote_participant_info = std::move(auth_ptr);
         remove_discovered_participant_info(remote_participant_info);
-        lock.unlock();
+        lock.unlock(); // AuthUniquePtr must be destroyed without SecurityManager's mutex locked.
     }
 
     return returned_value;
@@ -728,6 +734,40 @@ void SecurityManager::remove_participant(
     {
         SecurityException exception;
 
+        for (auto& local_reader : reader_handles_)
+        {
+            for (auto wit = local_reader.second.associated_writers.begin();
+                    local_reader.second.associated_writers.end() != wit;
+                    )
+            {
+                if (wit->first.guidPrefix == participant_data.m_guid.guidPrefix)
+                {
+                    wit = local_reader.second.associated_writers.erase(wit);
+                }
+                else
+                {
+                    ++wit;
+                }
+            }
+        }
+
+        for (auto& local_writer : writer_handles_)
+        {
+            for (auto rit = local_writer.second.associated_readers.begin();
+                    local_writer.second.associated_readers.end() != rit;
+                    )
+            {
+                if (rit->first.guidPrefix == participant_data.m_guid.guidPrefix)
+                {
+                    rit = local_writer.second.associated_readers.erase(rit);
+                }
+                else
+                {
+                    ++rit;
+                }
+            }
+        }
+
         ParticipantCryptoHandle* participant_crypto_handle =
                 dp_it->second.get_participant_crypto();
         if (participant_crypto_handle != nullptr)
@@ -754,7 +794,7 @@ void SecurityManager::remove_participant(
         remove_discovered_participant_info(remote_participant_info);
 
         discovered_participants_.erase(dp_it);
-        lock.unlock();
+        lock.unlock(); // AuthUniquePtr must be destroyed without SecurityManager's mutex locked.
     }
 }
 
@@ -1049,12 +1089,6 @@ bool SecurityManager::create_participant_stateless_message_writer()
     watt.endpoint.topicKind = NO_KEY;
     watt.matched_readers_allocation = participant_->getRTPSParticipantAttributes().allocation.participants;
 
-    if (participant_->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            participant_->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-    {
-        watt.mode = ASYNCHRONOUS_WRITER;
-    }
-
     RTPSWriter* wout = nullptr;
     if (participant_->createWriter(&wout, watt, participant_stateless_message_pool_,
             participant_stateless_message_writer_history_, nullptr,
@@ -1204,13 +1238,6 @@ bool SecurityManager::create_participant_volatile_message_secure_writer()
     watt.endpoint.security_attributes().plugin_endpoint_attributes =
             PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
     watt.matched_readers_allocation = participant_->getRTPSParticipantAttributes().allocation.participants;
-    // TODO(Ricardo) Study keep_all
-
-    if (participant_->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            participant_->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-    {
-        watt.mode = ASYNCHRONOUS_WRITER;
-    }
 
     RTPSWriter* wout = nullptr;
     if (participant_->createWriter(&wout, watt, participant_volatile_message_secure_pool_,

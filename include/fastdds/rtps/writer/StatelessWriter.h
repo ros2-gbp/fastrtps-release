@@ -23,6 +23,7 @@
 #include <fastdds/rtps/common/Time_t.h>
 #include <fastdds/rtps/history/IChangePool.h>
 #include <fastdds/rtps/history/IPayloadPool.h>
+#include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
 #include <fastdds/rtps/writer/ChangeForReader.h>
 #include <fastdds/rtps/writer/ReaderLocator.h>
 #include <fastdds/rtps/writer/RTPSWriter.h>
@@ -52,6 +53,7 @@ protected:
             RTPSParticipantImpl* participant,
             const GUID_t& guid,
             const WriterAttributes& attributes,
+            fastdds::rtps::FlowController* flow_controller,
             WriterHistory* history,
             WriterListener* listener = nullptr);
 
@@ -60,6 +62,7 @@ protected:
             const GUID_t& guid,
             const WriterAttributes& att,
             const std::shared_ptr<IPayloadPool>& payload_pool,
+            fastdds::rtps::FlowController* flow_controller,
             WriterHistory* hist,
             WriterListener* listen = nullptr);
 
@@ -69,6 +72,7 @@ protected:
             const WriterAttributes& att,
             const std::shared_ptr<IPayloadPool>& payload_pool,
             const std::shared_ptr<IChangePool>& change_pool,
+            fastdds::rtps::FlowController* flow_controller,
             WriterHistory* hist,
             WriterListener* listen = nullptr);
 
@@ -118,9 +122,29 @@ public:
             const GUID_t& reader_guid) override;
 
     /**
-     * Method to indicate that there are changes not sent in some of all ReaderProxy.
+     * @brief Set a content filter to perform content filtering on this writer.
+     *
+     * This method sets a content filter that will be used to check whether a cache change is relevant
+     * for a reader or not.
+     *
+     * @param filter  The content filter to use on this writer. May be @c nullptr to remove the content filter
+     *                (i.e. treat all samples as relevant).
      */
-    void send_any_unsent_changes() override;
+    virtual void reader_data_filter(
+            fastdds::rtps::IReaderDataFilter* filter) final
+    {
+        static_cast<void>(filter);
+    }
+
+    /**
+     * @brief Get the content filter used to perform content filtering on this writer.
+     *
+     * @return The content filter used on this writer.
+     */
+    virtual const fastdds::rtps::IReaderDataFilter* reader_data_filter() const final
+    {
+        return nullptr;
+    }
 
     /**
      * Update the Attributes of the Writer.
@@ -135,10 +159,6 @@ public:
 
     bool set_fixed_locators(
             const LocatorList_t& locator_list);
-
-    void update_unsent_changes(
-            const SequenceNumber_t& seq_num,
-            const FragmentNumber_t& frag_num);
 
     //!Reset the unsent changes.
     void unsent_changes_reset();
@@ -155,17 +175,17 @@ public:
             const std::chrono::steady_clock::time_point& max_blocking_time_point,
             std::unique_lock<RecursiveTimedMutex>& lock) override;
 
-    void add_flow_controller(
-            std::unique_ptr<FlowController> controller) override;
-
     /**
      * Send a message through this interface.
      *
      * @param message Pointer to the buffer with the message already serialized.
+     * @param locator_selector RTPSMessageSenderInterface reference uses for selecting locators. The reference has to
+     * be a member of this RTPSWriter object.
      * @param max_blocking_time_point Future timepoint where blocking send should end.
      */
-    bool send(
+    bool send_nts(
             CDRMessage_t* message,
+            const LocatorSelectorSender& locator_selector,
             std::chrono::steady_clock::time_point& max_blocking_time_point) const override;
 
     /**
@@ -178,6 +198,34 @@ public:
         return matched_remote_readers_.size()
                + matched_local_readers_.size()
                + matched_datasharing_readers_.size();
+    }
+
+    /*!
+     * Tells writer the sample can be sent to the network.
+     * This function should be used by a fastdds::rtps::FlowController.
+     *
+     * @param cache_change Pointer to the CacheChange_t that represents the sample which can be sent.
+     * @param group RTPSMessageGroup reference uses for generating the RTPS message.
+     * @param locator_selector RTPSMessageSenderInterface reference uses for selecting locators. The reference has to
+     * be a member of this RTPSWriter object.
+     * @param max_blocking_time Future timepoint where blocking send should end.
+     * @return Return code.
+     * @note Must be non-thread safe.
+     */
+    DeliveryRetCode deliver_sample_nts(
+            CacheChange_t* cache_change,
+            RTPSMessageGroup& group,
+            LocatorSelectorSender& locator_selector,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) override;
+
+    LocatorSelectorSender& get_general_locator_selector() override
+    {
+        return locator_selector_;
+    }
+
+    LocatorSelectorSender& get_async_locator_selector() override
+    {
+        return locator_selector_;
     }
 
 private:
@@ -200,30 +248,26 @@ private:
             CacheChange_t* change,
             ReaderLocator& reader_locator);
 
-    void send_all_unsent_changes();
-
-    void send_unsent_changes_with_flow_control();
-
     bool is_inline_qos_expected_ = false;
     LocatorList_t fixed_locators_;
     ResourceLimitedVector<std::unique_ptr<ReaderLocator>> matched_remote_readers_;
 
-    ResourceLimitedVector<GUID_t> late_joiner_guids_;
-    SequenceNumber_t first_seq_for_all_readers_;
-    bool ignore_fixed_locators_ = false;
-
-    ResourceLimitedVector<ChangeForReader_t, std::true_type> unsent_changes_;
     std::condition_variable_any unsent_changes_cond_;
-    std::vector<std::unique_ptr<FlowController>> flow_controllers_;
-    uint64_t last_intraprocess_sequence_number_;
-    bool there_are_remote_readers_ = false;
+
+    uint64_t current_sequence_number_sent_ = 0;
+
+    FragmentNumber_t current_fragment_sent_ = 0;
+
+    uint64_t last_sequence_number_sent_ = 0;
+
     ResourceLimitedVector<std::unique_ptr<ReaderLocator>> matched_local_readers_;
     ResourceLimitedVector<std::unique_ptr<ReaderLocator>> matched_datasharing_readers_;
     ResourceLimitedVector<std::unique_ptr<ReaderLocator>> matched_readers_pool_;
 
+    LocatorSelectorSender locator_selector_;
 };
 
-} /* namespace rtps */
+}        /* namespace rtps */
 } /* namespace fastrtps */
 } /* namespace eprosima */
 

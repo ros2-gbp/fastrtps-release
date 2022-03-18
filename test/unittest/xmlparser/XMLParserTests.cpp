@@ -50,6 +50,15 @@ using eprosima::fastrtps::xmlparser::XMLParser;
 using eprosima::fastdds::dds::Log;
 using eprosima::fastdds::dds::LogConsumer;
 
+TEST_F(XMLParserTests, regressions)
+{
+    std::unique_ptr<BaseNode> root;
+
+    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/12736.xml", root));
+    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/13418.xml", root));
+    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/13454.xml", root));
+}
+
 TEST_F(XMLParserTests, NoFile)
 {
     std::unique_ptr<BaseNode> root;
@@ -406,6 +415,7 @@ TEST_F(XMLParserTests, Data)
     EXPECT_EQ(rtps_atts.throughputController.periodMillisecs, 45u);
     EXPECT_EQ(rtps_atts.useBuiltinTransports, true);
     EXPECT_EQ(std::string(rtps_atts.getName()), "test_name");
+    EXPECT_EQ(rtps_atts.userData, std::vector<octet>({0x56, 0x30, 0x0, 0xce}));
 }
 
 TEST_F(XMLParserTests, DataBuffer)
@@ -499,6 +509,7 @@ TEST_F(XMLParserTests, DataBuffer)
     EXPECT_EQ(rtps_atts.throughputController.periodMillisecs, 45u);
     EXPECT_EQ(rtps_atts.useBuiltinTransports, true);
     EXPECT_EQ(std::string(rtps_atts.getName()), "test_name");
+    EXPECT_EQ(rtps_atts.userData, std::vector<octet>({0x56, 0x30, 0x0, 0xce}));
 }
 
 /*
@@ -1365,6 +1376,7 @@ TEST_F(XMLParserTests, fillDataNodeParticipantNegativeClauses)
             "<userTransports><bad_element></bad_element></userTransports>",
             "<useBuiltinTransports><bad_element></bad_element></useBuiltinTransports>",
             "<propertiesPolicy><bad_element></bad_element></propertiesPolicy>",
+            "<userData><bad_element></bad_element></userData>",
             "<allocation><bad_element></bad_element></allocation>",
             "<bad_element></bad_element>"
         };
@@ -1379,54 +1391,6 @@ TEST_F(XMLParserTests, fillDataNodeParticipantNegativeClauses)
 
         }
     }
-
-}
-
-/*
- * This test checks the return of the unsupported cases of the fillDataNode given a ParticipantAttributes DataNode
- * 1. Check passing a a UserData parameter.
- * 2. Check that it outputs a Log Error when reading an unsupported element.
- */
-TEST_F(XMLParserTests, fillDataNodeParticipantUnsupported)
-{
-    tinyxml2::XMLDocument xml_doc;
-    tinyxml2::XMLElement* titleElement;
-
-    up_participant_t participant_atts{new ParticipantAttributes};
-    up_node_participant_t participant_node{new node_participant_t{NodeType::PARTICIPANT, std::move(participant_atts)}};
-
-    mock_consumer = new eprosima::fastdds::dds::MockConsumer();
-    Log::RegisterConsumer(std::unique_ptr<LogConsumer>(mock_consumer));
-    Log::SetCategoryFilter(std::regex("(XMLPARSER)"));
-
-    // Unsupported fields
-    const char* xml =
-            "\
-            <participant profile_name=\"domainparticipant_profile_name\">\
-                <rtps>\
-                    <userData>data</userData>\
-                </rtps>\
-            </participant>\
-            ";
-
-    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-    titleElement = xml_doc.RootElement();
-    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::fillDataNode_wrapper(titleElement, *participant_node));
-
-    helper_block_for_at_least_entries(1);
-    auto consumed_entries = mock_consumer->ConsumedEntries();
-    // Expect 1 log error.
-    uint32_t num_errors = 0;
-    for (const auto& entry : consumed_entries)
-    {
-        if (entry.kind == Log::Kind::Error)
-        {
-            num_errors++;
-        }
-    }
-
-    EXPECT_EQ(num_errors, 1u);
-
 }
 
 /*

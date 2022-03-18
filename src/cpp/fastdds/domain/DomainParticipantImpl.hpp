@@ -28,11 +28,15 @@
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
 #include <fastdds/dds/topic/qos/TopicQos.hpp>
+#include <fastdds/dds/topic/ContentFilteredTopic.hpp>
+#include <fastdds/dds/topic/IContentFilterFactory.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
 
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastrtps/types/TypesBase.h>
+
+#include "fastdds/topic/DDSSQLFilter/DDSFilterFactory.hpp"
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -121,6 +125,20 @@ public:
 
     /**
      * Create a Publisher in this Participant.
+     * @param qos QoS of the Publisher.
+     * @param[out] impl Return a pointer to the created Publisher's implementation.
+     * @param listenerer Pointer to the listener.
+     * @param mask StatusMask
+     * @return Pointer to the created Publisher.
+     */
+    Publisher* create_publisher(
+            const PublisherQos& qos,
+            PublisherImpl** impl,
+            PublisherListener* listener = nullptr,
+            const StatusMask& mask = StatusMask::all());
+
+    /**
+     * Create a Publisher in this Participant.
      * @param profile_name Publisher profile name.
      * @param listener Pointer to the listener.
      * @param mask StatusMask
@@ -196,6 +214,26 @@ public:
     ReturnCode_t delete_topic(
             const Topic* topic);
 
+    ContentFilteredTopic* create_contentfilteredtopic(
+            const std::string& name,
+            Topic* related_topic,
+            const std::string& filter_expression,
+            const std::vector<std::string>& expression_parameters,
+            const char* filter_class_name);
+
+    ReturnCode_t delete_contentfilteredtopic(
+            const ContentFilteredTopic* topic);
+
+    ReturnCode_t register_content_filter_factory(
+            const char* filter_class_name,
+            IContentFilterFactory* const filter_factory);
+
+    IContentFilterFactory* lookup_content_filter_factory(
+            const char* filter_class_name);
+
+    ReturnCode_t unregister_content_filter_factory(
+            const char* filter_class_name);
+
     /**
      * Looks up an existing, locally created @ref TopicDescription, based on its name.
      * May be called on a disabled participant.
@@ -253,7 +291,7 @@ public:
 
     DomainId_t get_domain_id() const;
 
-    // TODO bool delete_contained_entities();
+    ReturnCode_t delete_contained_entities();
 
     ReturnCode_t assert_liveliness();
 
@@ -390,6 +428,11 @@ public:
     DomainParticipantListener* get_listener_for(
             const StatusMask& status);
 
+    uint32_t& id_counter()
+    {
+        return id_counter_;
+    }
+
 protected:
 
     //!Domain id
@@ -437,6 +480,9 @@ protected:
     //!Topic map
     std::map<std::string, TopicImpl*> topics_;
     std::map<InstanceHandle_t, Topic*> topics_by_handle_;
+    std::map<std::string, std::unique_ptr<ContentFilteredTopic>> filtered_topics_;
+    std::map<std::string, IContentFilterFactory*> filter_factories_;
+    DDSSQLFilter::DDSFilterFactory dds_sql_filter_factory_;
     mutable std::mutex mtx_topics_;
 
     TopicQos default_topic_qos_;
@@ -455,6 +501,8 @@ protected:
 
     // All parent's child requests
     std::map<fastrtps::rtps::SampleIdentity, std::vector<fastrtps::rtps::SampleIdentity>> parent_requests_;
+
+    uint32_t id_counter_ = 0;
 
     class MyRTPSParticipantListener : public fastrtps::rtps::RTPSParticipantListener
     {
@@ -559,7 +607,20 @@ protected:
     std::string get_inner_type_name(
             const fastrtps::rtps::SampleIdentity& id) const;
 
-    static void set_qos(
+    IContentFilterFactory* find_content_filter_factory(
+            const char* filter_class_name);
+
+    /**
+     * Set the DomainParticipantQos checking if the Qos can be updated or not
+     *
+     * @param to DomainParticipantQos to be updated
+     * @param from DomainParticipantQos desired
+     * @param first_time Whether the DomainParticipant has been already initialized or not
+     *
+     * @return true if there has been a changed in one of the attributes that can be updated.
+     * false otherwise.
+     */
+    static bool set_qos(
             DomainParticipantQos& to,
             const DomainParticipantQos& from,
             bool first_time);
