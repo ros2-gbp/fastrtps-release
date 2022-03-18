@@ -1,4 +1,4 @@
-From 1d20d1be9c022ba121fec99558c782267b20ba6a Mon Sep 17 00:00:00 2001
+From 6f8e2ecb7a409a9a7ea8dcd42ce8ae4453e428dd Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?=
  <nuclearsandwich@users.noreply.github.com>
 Date: Tue, 15 Feb 2022 17:09:05 -0500
@@ -46,7 +46,7 @@ index 6b2390da..1370ad56 100644
    <depend>foonathan_memory_vendor</depend>
    <depend>libssl-dev</depend>
 diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
-index b065106d..dcf3fbb2 100644
+index 3417342a..829e942b 100644
 --- a/rpm/ros-rolling-fastrtps.spec
 +++ b/rpm/ros-rolling-fastrtps.spec
 @@ -19,7 +19,6 @@ Requires:       ros-rolling-fastcdr
