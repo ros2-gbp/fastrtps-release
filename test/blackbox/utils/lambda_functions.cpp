@@ -32,7 +32,7 @@ const std::function<void(const KeyedHelloWorld&)>  default_keyedhelloworld_print
             std::cout << hello.message() << " " << hello.key();
         };
 
-const std::function<void(const String&)> default_string_print = [](const String& str)
+const std::function<void(const StringTest&)> default_string_print = [](const StringTest& str)
         {
             std::cout << str.message()[str.message().size() - 2]
                       << str.message()[str.message().size() - 1] << " ";
@@ -46,4 +46,9 @@ const std::function<void(const Data64kb&)> default_data64kb_print = [](const Dat
 const std::function<void(const Data1mb&)> default_data300kb_print = [](const Data1mb& data)
         {
             std::cout << (uint16_t)data.data()[0] << " ";
+        };
+
+const std::function<void(const KeyedData1mb&)> default_keyeddata300kb_print = [](const KeyedData1mb& data)
+        {
+            std::cout << data.key() << " " << (uint16_t)data.data()[0] << " ";
         };

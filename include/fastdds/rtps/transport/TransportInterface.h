@@ -23,6 +23,7 @@
 #include <fastdds/rtps/transport/TransportDescriptorInterface.h>
 #include <fastdds/rtps/transport/TransportReceiverInterface.h>
 #include <fastdds/rtps/network/SenderResource.h>
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
 
 namespace eprosima {
 namespace fastdds {
@@ -48,7 +49,7 @@ using SendResourceList = std::vector<std::unique_ptr<fastrtps::rtps::SenderResou
  * locators can map to the same port, and hence the same channel.
  * @ingroup TRANSPORT_MODULE
  * */
-class TransportInterface
+class RTPS_DllAPI TransportInterface
 {
 public:
 
@@ -82,9 +83,11 @@ public:
 
     /**
      * Initialize this transport. This method will prepare all the internals of the transport.
-     * @return True when the transport was correctly intialized.
+     * @param properties Optional policy to specify additional parameters of the created transport.
+     * @return True when the transport was correctly initialized.
      */
-    virtual bool init() = 0;
+    virtual bool init(
+            const fastrtps::rtps::PropertyPolicy* properties = nullptr) = 0;
 
     /**
      * Must report whether the input channel associated to this locator is open. Channels must either be
@@ -131,7 +134,7 @@ public:
             SendResourceList& sender_resource_list,
             const Locator&) = 0;
 
-    /** Opens an input channel to receive incomming connections.
+    /** Opens an input channel to receive incoming connections.
      *   If there is an existing channel it registers the receiver interface.
      */
     virtual bool OpenInputChannel(
@@ -200,7 +203,7 @@ public:
             Locator& locator,
             uint32_t metatraffic_multicast_port) const = 0;
 
-    //! Assign port to the given matatraffic unicast locator if not already defined
+    //! Assign port to the given metatraffic unicast locator if not already defined
     virtual bool fillMetatrafficUnicastLocator(
             Locator& locator,
             uint32_t metatraffic_unicast_port) const = 0;
@@ -226,6 +229,13 @@ public:
      * Shutdown method to close the connections of the transports.
      */
     virtual void shutdown()
+    {
+    }
+
+    /**
+     * @brief Update network interfaces.
+     */
+    virtual void update_network_interfaces()
     {
     }
 

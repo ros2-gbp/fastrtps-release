@@ -60,17 +60,20 @@ std::list<FixedSized> default_fixed_sized_data_generator(
 }
 
 std::list<KeyedHelloWorld> default_keyedhelloworld_data_generator(
-        size_t max)
+        size_t max,
+        bool unique_key)
 {
     uint16_t index = 0;
     size_t maximum = max ? max : 10;
     std::list<KeyedHelloWorld> returnedValue(maximum);
 
-    std::generate(returnedValue.begin(), returnedValue.end(), [&index]
+    std::generate(returnedValue.begin(), returnedValue.end(), [&index, unique_key]
             {
                 KeyedHelloWorld hello;
                 hello.index(index);
-                hello.key(index % 2 + 1);
+                hello.key(unique_key
+                        ? (index + 1)
+                        : (index % 2 + 1));
                 std::stringstream ss;
                 ss << "HelloWorld " << index;
                 hello.message(ss.str());
@@ -81,16 +84,16 @@ std::list<KeyedHelloWorld> default_keyedhelloworld_data_generator(
     return returnedValue;
 }
 
-std::list<String> default_large_string_data_generator(
+std::list<StringTest> default_large_string_data_generator(
         size_t max)
 {
     uint16_t index = 1;
     size_t maximum = max ? max : 10;
-    std::list<String> returnedValue(maximum);
+    std::list<StringTest> returnedValue(maximum);
 
     std::generate(returnedValue.begin(), returnedValue.end(), [&index]
             {
-                String str;
+                StringTest str;
                 std::stringstream ss;
                 ss << std::string(998, 'a') << std::setw(2) << std::setfill('0') << index;
                 str.message(ss.str());
@@ -212,6 +215,30 @@ std::list<Data1mb> default_data96kb_data300kb_data_generator(
                 data.data().resize(length);
                 data.data()[0] = index;
                 for (size_t i = 1; i < length; ++i)
+                {
+                    data.data()[i] = static_cast<unsigned char>(i + data.data()[0]);
+                }
+                ++index;
+                return data;
+            });
+
+    return returnedValue;
+}
+
+std::list<KeyedData1mb> default_keyeddata300kb_data_generator(
+        size_t max)
+{
+    uint16_t index = 1;
+    size_t maximum = max ? max : 10;
+    std::list<KeyedData1mb> returnedValue(maximum);
+
+    std::generate(returnedValue.begin(), returnedValue.end(), [&index]
+            {
+                KeyedData1mb data;
+                data.key(index % 2 + 1);
+                data.data().resize(data300kb_length);
+                data.data()[0] = static_cast<unsigned char>(index);
+                for (size_t i = 1; i < data300kb_length; ++i)
                 {
                     data.data()[i] = static_cast<unsigned char>(i + data.data()[0]);
                 }

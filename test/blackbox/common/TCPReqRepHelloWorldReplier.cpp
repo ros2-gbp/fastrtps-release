@@ -17,6 +17,7 @@
  *
  */
 
+#include "BlackboxTests.hpp"
 #include "TCPReqRepHelloWorldReplier.hpp"
 
 #include <fastrtps/Domain.h>
@@ -29,6 +30,7 @@
 #include <fastrtps/publisher/Publisher.h>
 
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
+#include <fastrtps/transport/TCPv6TransportDescriptor.h>
 #include <fastrtps/utils/IPLocator.h>
 
 #include <gtest/gtest.h>
@@ -77,8 +79,16 @@ void TCPReqRepHelloWorldReplier::init(
     //uint32_t kind = LOCATOR_KIND_TCPv4;
 
     pattr.rtps.useBuiltinTransports = false;
+    std::shared_ptr<TCPTransportDescriptor> descriptor;
+    if (use_ipv6)
+    {
+        descriptor = std::make_shared<TCPv6TransportDescriptor>();
+    }
+    else
+    {
+        descriptor = std::make_shared<TCPv4TransportDescriptor>();
+    }
 
-    std::shared_ptr<TCPv4TransportDescriptor> descriptor = std::make_shared<TCPv4TransportDescriptor>();
     descriptor->sendBufferSize = 0;
     descriptor->receiveBufferSize = 0;
     if (maxInitialPeer > 0)
@@ -113,14 +123,14 @@ void TCPReqRepHelloWorldReplier::init(
 
     //Create subscriber
     sattr.topic.topicKind = NO_KEY;
-    sattr.topic.topicDataType = "HelloWorldType";
+    sattr.topic.topicDataType = type_.getName();
     configSubscriber("Request");
     request_subscriber_ = Domain::createSubscriber(participant_, sattr, &request_listener_);
     ASSERT_NE(request_subscriber_, nullptr);
 
     //Create publisher
     puattr.topic.topicKind = NO_KEY;
-    puattr.topic.topicDataType = "HelloWorldType";
+    puattr.topic.topicDataType = type_.getName();
     puattr.topic.topicName = "HelloWorldTopicReply";
     configPublisher("Reply");
     reply_publisher_ = Domain::createPublisher(participant_, puattr, &reply_listener_);
@@ -166,11 +176,46 @@ void TCPReqRepHelloWorldReplier::wait_discovery(
     std::cout << "Replier discovery phase finished" << std::endl;
 }
 
+void TCPReqRepHelloWorldReplier::wait_unmatched(
+        std::chrono::seconds timeout)
+{
+    std::unique_lock<std::mutex> lock(mutexDiscovery_);
+
+    std::cout << "Replier waiting until being unmatched..." << std::endl;
+
+    if (timeout == std::chrono::seconds::zero())
+    {
+        cvDiscovery_.wait(lock, [&]()
+                {
+                    return !is_matched();
+                });
+    }
+    else
+    {
+        cvDiscovery_.wait_for(lock, timeout, [&]()
+                {
+                    return !is_matched();
+                });
+    }
+
+    std::cout << "Replier unmatched" << std::endl;
+}
+
 void TCPReqRepHelloWorldReplier::matched()
 {
     std::unique_lock<std::mutex> lock(mutexDiscovery_);
     ++matched_;
     if (matched_ > 1)
+    {
+        cvDiscovery_.notify_one();
+    }
+}
+
+void TCPReqRepHelloWorldReplier::unmatched()
+{
+    std::unique_lock<std::mutex> lock(mutexDiscovery_);
+    --matched_;
+    if (!is_matched())
     {
         cvDiscovery_.notify_one();
     }

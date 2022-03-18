@@ -18,6 +18,7 @@
 #include <functional>
 
 #include <asio.hpp>
+#include <fastrtps/utils/IPLocator.h>
 
 using namespace std;
 
@@ -153,6 +154,28 @@ void test_UDPv4Transport::get_ips(
     }
 }
 
+LocatorList test_UDPv4Transport::NormalizeLocator(
+        const Locator& locator)
+{
+    if (!simulate_no_interfaces)
+    {
+        return UDPv4Transport::NormalizeLocator(locator);
+    }
+
+    LocatorList list;
+    if (fastrtps::rtps::IPLocator::isAny(locator))
+    {
+        Locator newloc(locator);
+        fastrtps::rtps::IPLocator::setIPv4(newloc, "127.0.0.1");
+        list.push_back(newloc);
+    }
+    else
+    {
+        list.push_back(locator);
+    }
+    return list;
+}
+
 bool test_UDPv4Transport::send(
         const octet* send_buffer,
         uint32_t send_buffer_size,
@@ -160,6 +183,7 @@ bool test_UDPv4Transport::send(
         fastrtps::rtps::LocatorsIterator* destination_locators_begin,
         fastrtps::rtps::LocatorsIterator* destination_locators_end,
         bool only_multicast_purpose,
+        bool whitelisted,
         const std::chrono::steady_clock::time_point& max_blocking_time_point)
 {
     fastrtps::rtps::LocatorsIterator& it = *destination_locators_begin;
@@ -177,6 +201,7 @@ bool test_UDPv4Transport::send(
                             socket,
                             *it,
                             only_multicast_purpose,
+                            whitelisted,
                             std::chrono::duration_cast<std::chrono::microseconds>(now - max_blocking_time_point));
 
             ++it;
@@ -197,9 +222,14 @@ bool test_UDPv4Transport::send(
         eProsimaUDPSocket& socket,
         const Locator& remote_locator,
         bool only_multicast_purpose,
+        bool whitelisted,
         const std::chrono::microseconds& timeout)
 {
-    if (packet_should_drop(send_buffer, send_buffer_size))
+    if (packet_should_drop(send_buffer, send_buffer_size) ||
+            // If there are no interfaces (simulate_no_interfaces), only multicast and localhost traffic is sent
+            (simulate_no_interfaces &&
+            !fastrtps::rtps::IPLocator::isMulticast(remote_locator) &&
+            !fastrtps::rtps::IPLocator::isLocal(remote_locator)))
     {
         statistics_info_.set_statistics_message_data(remote_locator, send_buffer, send_buffer_size);
         log_drop(send_buffer, send_buffer_size);
@@ -208,7 +238,7 @@ bool test_UDPv4Transport::send(
     else
     {
         return UDPv4Transport::send(send_buffer, send_buffer_size, socket, remote_locator, only_multicast_purpose,
-                       timeout);
+                       whitelisted, timeout);
     }
 }
 

@@ -15,8 +15,9 @@
 #ifndef TYPES_TYPE_DESCRIPTOR_H
 #define TYPES_TYPE_DESCRIPTOR_H
 
-#include <fastrtps/types/TypesBase.h>
+#include <fastrtps/types/AnnotationDescriptor.h>
 #include <fastrtps/types/DynamicTypePtr.h>
+#include <fastrtps/types/TypesBase.h>
 
 class MemberDescriptor;
 class DynamicType;
@@ -40,8 +41,8 @@ protected:
 
     void clean();
 
-    bool is_type_name_consistent(
-            const std::string& sName) const;
+    static bool is_type_name_consistent(
+            const std::string& sName);
 
     friend class DynamicTypeBuilderFactory;
     friend class TypeObjectFactory;
