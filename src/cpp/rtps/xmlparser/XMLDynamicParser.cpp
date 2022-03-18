@@ -606,6 +606,10 @@ XMLP_ret XMLParser::parseXMLBitmaskDynamicType(
     }
 
     const char* name = p_root->Attribute(NAME);
+    if (nullptr == name)
+    {
+        return XMLP_ret::XML_ERROR;
+    }
     p_dynamictypebuilder_t typeBuilder =
             types::DynamicTypeBuilderFactory::get_instance()->create_bitmask_builder(bit_bound);
     typeBuilder->set_name(name);
@@ -977,7 +981,15 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
         uint32_t length = types::MAX_ELEMENTS_COUNT;
         if (lengthStr != nullptr)
         {
-            length = static_cast<uint32_t>(std::stoi(lengthStr));
+            try
+            {
+                length = static_cast<uint32_t>(std::stoi(lengthStr));
+            }
+            catch (const std::exception&)
+            {
+                logError(XMLPARSER, "Error parsing member sequence length in line " << p_root->GetLineNum());
+                return nullptr;
+            }
         }
 
         if (!isArray)
@@ -1053,7 +1065,15 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
         uint32_t length = types::MAX_ELEMENTS_COUNT;
         if (lengthStr != nullptr)
         {
-            length = static_cast<uint32_t>(std::stoi(lengthStr));
+            try
+            {
+                length = static_cast<uint32_t>(std::stoi(lengthStr));
+            }
+            catch (const std::exception&)
+            {
+                logError(XMLPARSER, "Error parsing map member sequence length in line " << p_root->GetLineNum())
+                return nullptr;
+            }
         }
 
         if (!isArray)
@@ -1332,12 +1352,13 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
     {
         if (!isArray)
         {
-            logError(XMLPARSER, "Failed creating " << memberType << ": " << memberName);
+            logError(XMLPARSER, "Failed creating " << memberType << ": " << (memberName ? memberName : ""));
         }
         else
         {
-            logError(XMLPARSER, "Failed creating " << memberType << " array: " << memberName);
+            logError(XMLPARSER, "Failed creating " << memberType << " array: " << (memberName ? memberName : ""));
         }
+        return nullptr;
     }
 
     const char* memberTopicKey = p_root->Attribute(KEY);

@@ -45,6 +45,7 @@
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
+#include <fastdds/rtps/flowcontrol/FlowControllerSchedulerPolicy.hpp>
 
 using eprosima::fastrtps::rtps::IPLocator;
 using eprosima::fastrtps::rtps::UDPTransportDescriptor;
@@ -674,6 +675,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& disable_heartbeat_piggyback(
+            bool value)
+    {
+        publisher_attr_.qos.disable_heartbeat_piggyback = value;
+        return *this;
+    }
+
     PubSubWriter& max_blocking_time(
             const eprosima::fastrtps::Duration_t time)
     {
@@ -682,6 +690,7 @@ public:
     }
 
     PubSubWriter& add_throughput_controller_descriptor_to_pparams(
+            eprosima::fastdds::rtps::FlowControllerSchedulerPolicy,
             uint32_t bytesPerPeriod,
             uint32_t periodInMs)
     {
@@ -1144,6 +1153,11 @@ public:
     bool is_matched() const
     {
         return matched_ > 0;
+    }
+
+    unsigned int get_matched() const
+    {
+        return matched_;
     }
 
     unsigned int missed_deadlines() const

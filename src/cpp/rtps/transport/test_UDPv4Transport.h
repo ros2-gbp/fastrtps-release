@@ -17,10 +17,10 @@
 
 #include <vector>
 
-#include <fastdds/rtps/transport/test_UDPv4TransportDescriptor.h>
+#include <fastdds/rtps/common/SequenceNumber.h>
 #include <fastdds/rtps/messages/RTPS_messages.h>
 #include <fastdds/rtps/messages/CDRMessage.h>
-#include <fastdds/rtps/common/SequenceNumber.h>
+#include <fastdds/rtps/transport/test_UDPv4TransportDescriptor.h>
 #include <rtps/transport/UDPv4Transport.h>
 
 
@@ -47,7 +47,11 @@ public:
             fastrtps::rtps::LocatorsIterator* destination_locators_begin,
             fastrtps::rtps::LocatorsIterator* destination_locators_end,
             bool only_multicast_purpose,
+            bool whitelisted,
             const std::chrono::steady_clock::time_point& max_blocking_time_point) override;
+
+    virtual LocatorList NormalizeLocator(
+            const Locator& locator) override;
 
     RTPS_DllAPI static bool test_UDPv4Transport_ShutdownAllNetwork;
     // Handle to a persistent log of dropped packets. Defaults to length 0 (no logging) to prevent wasted resources.
@@ -113,6 +117,7 @@ private:
             eProsimaUDPSocket& socket,
             const Locator& remote_locator,
             bool only_multicast_purpose,
+            bool whitelisted,
             const std::chrono::microseconds& timeout);
 };
 

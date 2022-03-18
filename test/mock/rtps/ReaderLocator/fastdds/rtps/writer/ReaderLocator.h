@@ -28,6 +28,7 @@
 #include <fastrtps/rtps/common/SequenceNumber.h>
 #include <fastrtps/rtps/messages/RTPSMessageGroup.h>
 #include <fastrtps/rtps/common/LocatorSelectorEntry.hpp>
+#include <fastrtps/rtps/messages/RTPSMessageSenderInterface.hpp>
 
 
 namespace eprosima {
@@ -188,7 +189,7 @@ public:
      */
     bool send(
             CDRMessage_t* /*message*/,
-            std::chrono::steady_clock::time_point& /*max_blocking_time_point*/) const override
+            std::chrono::steady_clock::time_point /*max_blocking_time_point*/) const override
     {
         return true;
     }
@@ -231,6 +232,14 @@ public:
     size_t locators_size() const
     {
         return 0;
+    }
+
+    void lock() override
+    {
+    }
+
+    void unlock() override
+    {
     }
 
 private:
