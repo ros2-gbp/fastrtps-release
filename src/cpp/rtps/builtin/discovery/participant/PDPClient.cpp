@@ -17,31 +17,27 @@
  *
  */
 
-#include <fastdds/rtps/builtin/BuiltinProtocols.h>
-#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <rtps/builtin/discovery/participant/PDPClient.h>
 
-#include <fastdds/rtps/participant/RTPSParticipantListener.h>
-#include <fastdds/rtps/reader/StatefulReader.h>
-#include <fastdds/rtps/writer/StatefulWriter.h>
-
-#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-
-#include <fastdds/rtps/writer/ReaderProxy.h>
-
-#include <fastdds/rtps/history/WriterHistory.h>
-#include <fastdds/rtps/history/ReaderHistory.h>
-
-#include <fastrtps/utils/TimeConversion.h>
-
-#include <rtps/builtin/discovery/participant/DirectMessageSender.hpp>
-#include <rtps/participant/RTPSParticipantImpl.h>
-#include <fastdds/rtps/builtin/discovery/participant/PDPListener.h>
+#include <string>
 
 #include <fastdds/dds/log/Log.hpp>
-
-#include <rtps/builtin/discovery/participant/PDPClient.h>
-#include <rtps/builtin/discovery/participant/timedevent/DSClientEvent.h>
+#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
+#include <fastdds/rtps/builtin/BuiltinProtocols.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPListener.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/history/WriterHistory.h>
+#include <fastdds/rtps/participant/RTPSParticipantListener.h>
+#include <fastdds/rtps/reader/StatefulReader.h>
+#include <fastdds/rtps/writer/ReaderProxy.h>
+#include <fastdds/rtps/writer/StatefulWriter.h>
+#include <fastrtps/utils/TimeConversion.h>
 #include <rtps/builtin/discovery/endpoint/EDPClient.h>
+#include <rtps/builtin/discovery/participant/DirectMessageSender.hpp>
+#include <rtps/builtin/discovery/participant/timedevent/DSClientEvent.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <utils/SystemInfo.hpp>
 
 using namespace eprosima::fastrtps;
 
@@ -166,12 +162,9 @@ ParticipantProxyData* PDPClient::createParticipantProxyData(
         }
     }
 
-    ParticipantProxyData* pdata = add_participant_proxy_data(participant_data.m_guid, is_server);
+    ParticipantProxyData* pdata = add_participant_proxy_data(participant_data.m_guid, is_server, &participant_data);
     if (pdata != nullptr)
     {
-        pdata->copy(participant_data);
-        pdata->isAlive = true;
-
         // Clients only assert its server lifeliness, other clients liveliness is provided
         // through server's PDP discovery data
         if (is_server)
@@ -187,8 +180,6 @@ ParticipantProxyData* PDPClient::createParticipantProxyData(
 bool PDPClient::createPDPEndpoints()
 {
     logInfo(RTPS_PDP, "Beginning PDPClient Endpoints creation");
-
-    const NetworkFactory& network = mp_RTPSParticipant->network_factory();
 
     HistoryAttributes hatt;
     hatt.payloadMaxSize = mp_builtin->m_att.readerPayloadSize;
@@ -215,19 +206,14 @@ bool PDPClient::createPDPEndpoints()
         //        mp_RTPSParticipant->set_endpoint_rtps_protection_supports(rout, false);
         //#endif
         // Initial peer list doesn't make sense in server scenario. Client should match its server list
-        for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
-            std::lock_guard<std::mutex> data_guard(temp_data_lock_);
-            temp_writer_data_.clear();
-            temp_writer_data_.guid(it.GetPDPWriter());
-            temp_writer_data_.set_multicast_locators(it.metatrafficMulticastLocatorList, network);
-            temp_writer_data_.set_remote_unicast_locators(it.metatrafficUnicastLocatorList, network);
-            temp_writer_data_.m_qos.m_durability.kind = TRANSIENT_DURABILITY_QOS;  // Server Information must be persistent
-            temp_writer_data_.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+            std::lock_guard<std::recursive_mutex> lock(*getMutex());
 
-            mp_PDPReader->matched_writer_add(temp_writer_data_);
+            for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
+            {
+                match_pdp_writer_nts_(it);
+            }
         }
-
     }
     else
     {
@@ -267,19 +253,14 @@ bool PDPClient::createPDPEndpoints()
         //#if HAVE_SECURITY
         //        mp_RTPSParticipant->set_endpoint_rtps_protection_supports(wout, false);
         //#endif
-        for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
-            std::lock_guard<std::mutex> data_guard(temp_data_lock_);
-            temp_reader_data_.clear();
-            temp_reader_data_.guid(it.GetPDPReader());
-            temp_reader_data_.set_multicast_locators(it.metatrafficMulticastLocatorList, network);
-            temp_reader_data_.set_remote_unicast_locators(it.metatrafficUnicastLocatorList, network);
-            temp_reader_data_.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
-            temp_reader_data_.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+            std::lock_guard<std::recursive_mutex> lock(*getMutex());
 
-            mp_PDPWriter->matched_reader_add(temp_reader_data_);
+            for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
+            {
+                match_pdp_reader_nts_(it);
+            }
         }
-
     }
     else
     {
@@ -429,129 +410,132 @@ void PDPClient::announceParticipantState(
         bool dispose,
         WriteParams& )
 {
-    /*
-       Protect writer sequence number. Make sure in order to prevent AB BA deadlock that the
-       writer mutex is systematically lock before the PDP one (if needed):
-        - transport callbacks on PDPListener
-        - initialization and removal on BuiltinProtocols::initBuiltinProtocols and ~BuiltinProtocols
-        - DSClientEvent (own thread)
-        - ResendParticipantProxyDataPeriod (participant event thread)
-     */
-    std::lock_guard<RecursiveTimedMutex> wlock(mp_PDPWriter->getMutex());
-
-    WriteParams wp;
-    SampleIdentity local;
-    local.writer_guid(mp_PDPWriter->getGuid());
-    local.sequence_number(mp_PDPWriterHistory->next_sequence_number());
-    wp.sample_identity(local);
-    wp.related_sample_identity(local);
-
-    // Add the write params to the sample
-    if (dispose)
+    if (enabled_)
     {
-        // we must assure when the server is dying that all client are send at least a DATA(p)
-        // note here we can no longer receive and DATA or ACKNACK from clients.
-        // In order to avoid that we send the message directly as in the standard stateless PDP
+        /*
+           Protect writer sequence number. Make sure in order to prevent AB BA deadlock that the
+           writer mutex is systematically lock before the PDP one (if needed):
+            - transport callbacks on PDPListener
+            - initialization and removal on BuiltinProtocols::initBuiltinProtocols and ~BuiltinProtocols
+            - DSClientEvent (own thread)
+            - ResendParticipantProxyDataPeriod (participant event thread)
+         */
+        std::lock_guard<RecursiveTimedMutex> wlock(mp_PDPWriter->getMutex());
 
-        fastrtps::rtps::StatefulWriter* pW = dynamic_cast<fastrtps::rtps::StatefulWriter*>(mp_PDPWriter);
-        assert(pW);
+        WriteParams wp;
+        SampleIdentity local;
+        local.writer_guid(mp_PDPWriter->getGuid());
+        local.sequence_number(mp_PDPWriterHistory->next_sequence_number());
+        wp.sample_identity(local);
+        wp.related_sample_identity(local);
 
-        CacheChange_t* change = nullptr;
-
-        if ((change = pW->new_change(
-                    [this]() -> uint32_t
-                    {
-                        return mp_builtin->m_att.writerPayloadSize;
-                    },
-                    NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key)))
+        // Add the write params to the sample
+        if (dispose)
         {
-            // update the sequence number
-            change->sequenceNumber = mp_PDPWriterHistory->next_sequence_number();
-            change->write_params = wp;
+            // we must assure when the server is dying that all client are send at least a DATA(p)
+            // note here we can no longer receive and DATA or ACKNACK from clients.
+            // In order to avoid that we send the message directly as in the standard stateless PDP
 
-            std::vector<GUID_t> remote_readers;
-            LocatorList locators;
+            fastrtps::rtps::StatefulWriter* pW = dynamic_cast<fastrtps::rtps::StatefulWriter*>(mp_PDPWriter);
+            assert(pW);
 
-            //  TODO: modify announcement mechanism to allow direct message sending
-            //for (auto it = pW->matchedReadersBegin(); it != pW->matchedReadersEnd(); ++it)
-            //{
-            //    RemoteReaderAttributes & att = (*it)->m_att;
-            //    remote_readers.push_back(att.guid);
+            CacheChange_t* change = nullptr;
 
-            //    EndpointAttributes & ep = att.endpoint;
-            //    locators.push_back(ep.unicastLocatorList);
-            //    //locators.push_back(ep.multicastLocatorList);
-            //}
+            if ((change = pW->new_change(
+                        [this]() -> uint32_t
+                        {
+                            return mp_builtin->m_att.writerPayloadSize;
+                        },
+                        NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key)))
             {
-                // temporary workaround
-                std::lock_guard<std::recursive_mutex> lock(*getMutex());
-
-                for (auto& svr : mp_builtin->m_DiscoveryServers)
-                {
-                    // if we are matched to a server report demise
-                    if (svr.proxy != nullptr)
-                    {
-                        remote_readers.push_back(svr.GetPDPReader());
-                        //locators.push_back(svr.metatrafficMulticastLocatorList);
-                        locators.push_back(svr.metatrafficUnicastLocatorList);
-                    }
-                }
-            }
-
-            DirectMessageSender sender(getRTPSParticipant(), &remote_readers, &locators);
-            RTPSMessageGroup group(getRTPSParticipant(), mp_PDPWriter, sender);
-            if (!group.add_data(*change, false))
-            {
-                logError(RTPS_PDP, "Error sending announcement from client to servers");
-            }
-        }
-
-        // free change
-        mp_PDPWriter->release_change(change);
-    }
-    else
-    {
-        PDP::announceParticipantState(new_change, dispose, wp);
-
-        if (!new_change)
-        {
-            // retrieve the participant discovery data
-            CacheChange_t* pPD;
-            if (mp_PDPWriterHistory->get_min_change(&pPD))
-            {
-                std::lock_guard<std::recursive_mutex> lock(*getMutex());
+                // update the sequence number
+                change->sequenceNumber = mp_PDPWriterHistory->next_sequence_number();
+                change->write_params = wp;
 
                 std::vector<GUID_t> remote_readers;
                 LocatorList locators;
 
-                for (auto& svr : mp_builtin->m_DiscoveryServers)
+                //  TODO: modify announcement mechanism to allow direct message sending
+                //for (auto it = pW->matchedReadersBegin(); it != pW->matchedReadersEnd(); ++it)
+                //{
+                //    RemoteReaderAttributes & att = (*it)->m_att;
+                //    remote_readers.push_back(att.guid);
+
+                //    EndpointAttributes & ep = att.endpoint;
+                //    locators.push_back(ep.unicastLocatorList);
+                //    //locators.push_back(ep.multicastLocatorList);
+                //}
                 {
-                    // non-pinging announcements like lease duration ones must be
-                    // broadcast to all servers
-                    if (svr.proxy == nullptr || !_serverPing)
+                    // temporary workaround
+                    std::lock_guard<std::recursive_mutex> lock(*getMutex());
+
+                    for (auto& svr : mp_builtin->m_DiscoveryServers)
                     {
-                        remote_readers.push_back(svr.GetPDPReader());
-                        locators.push_back(svr.metatrafficMulticastLocatorList);
-                        locators.push_back(svr.metatrafficUnicastLocatorList);
+                        // if we are matched to a server report demise
+                        if (svr.proxy != nullptr)
+                        {
+                            remote_readers.push_back(svr.GetPDPReader());
+                            //locators.push_back(svr.metatrafficMulticastLocatorList);
+                            locators.push_back(svr.metatrafficUnicastLocatorList);
+                        }
                     }
                 }
 
                 DirectMessageSender sender(getRTPSParticipant(), &remote_readers, &locators);
-                RTPSMessageGroup group(getRTPSParticipant(), mp_PDPWriter, sender);
-
-                if (!group.add_data(*pPD, false))
+                RTPSMessageGroup group(getRTPSParticipant(), mp_PDPWriter, &sender);
+                if (!group.add_data(*change, false))
                 {
                     logError(RTPS_PDP, "Error sending announcement from client to servers");
                 }
-
-                // ping done independtly of which triggered the announcement
-                // note all event callbacks are currently serialized
-                _serverPing = false;
             }
-            else
+
+            // free change
+            mp_PDPWriter->release_change(change);
+        }
+        else
+        {
+            PDP::announceParticipantState(new_change, dispose, wp);
+
+            if (!new_change)
             {
-                logError(RTPS_PDP, "ParticipantProxy data should have been added to client PDP history "
-                        "cache by a previous call to announceParticipantState()");
+                // retrieve the participant discovery data
+                CacheChange_t* pPD;
+                if (mp_PDPWriterHistory->get_min_change(&pPD))
+                {
+                    std::lock_guard<std::recursive_mutex> lock(*getMutex());
+
+                    std::vector<GUID_t> remote_readers;
+                    LocatorList locators;
+
+                    for (auto& svr : mp_builtin->m_DiscoveryServers)
+                    {
+                        // non-pinging announcements like lease duration ones must be
+                        // broadcast to all servers
+                        if (svr.proxy == nullptr || !_serverPing)
+                        {
+                            remote_readers.push_back(svr.GetPDPReader());
+                            locators.push_back(svr.metatrafficMulticastLocatorList);
+                            locators.push_back(svr.metatrafficUnicastLocatorList);
+                        }
+                    }
+
+                    DirectMessageSender sender(getRTPSParticipant(), &remote_readers, &locators);
+                    RTPSMessageGroup group(getRTPSParticipant(), mp_PDPWriter, &sender);
+
+                    if (!group.add_data(*pPD, false))
+                    {
+                        logError(RTPS_PDP, "Error sending announcement from client to servers");
+                    }
+
+                    // ping done independtly of which triggered the announcement
+                    // note all event callbacks are currently serialized
+                    _serverPing = false;
+                }
+                else
+                {
+                    logError(RTPS_PDP, "ParticipantProxy data should have been added to client PDP history "
+                            "cache by a previous call to announceParticipantState()");
+                }
             }
         }
     }
@@ -581,17 +565,63 @@ bool PDPClient::match_servers_EDP_endpoints()
     return all;
 }
 
+void PDPClient::update_remote_servers_list()
+{
+    if (!mp_PDPReader || !mp_PDPWriter)
+    {
+        logError(SERVER_CLIENT_DISCOVERY, "Cannot update server list within an uninitialized Client");
+        return;
+    }
+
+    std::lock_guard<std::recursive_mutex> lock(*getMutex());
+
+    for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
+    {
+        if (!mp_PDPReader->matched_writer_is_matched(it.GetPDPWriter()))
+        {
+            match_pdp_writer_nts_(it);
+        }
+
+        if (!mp_PDPWriter->matched_reader_is_matched(it.GetPDPReader()))
+        {
+            match_pdp_reader_nts_(it);
+        }
+    }
+    mp_sync->restart_timer();
+}
+
+void PDPClient::match_pdp_writer_nts_(
+        const eprosima::fastdds::rtps::RemoteServerAttributes& server_att)
+{
+    std::lock_guard<std::mutex> data_guard(temp_data_lock_);
+    const NetworkFactory& network = mp_RTPSParticipant->network_factory();
+    temp_writer_data_.clear();
+    temp_writer_data_.guid(server_att.GetPDPWriter());
+    temp_writer_data_.set_multicast_locators(server_att.metatrafficMulticastLocatorList, network);
+    temp_writer_data_.set_remote_unicast_locators(server_att.metatrafficUnicastLocatorList, network);
+    temp_writer_data_.m_qos.m_durability.kind = TRANSIENT_DURABILITY_QOS;
+    temp_writer_data_.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+    mp_PDPReader->matched_writer_add(temp_writer_data_);
+}
+
+void PDPClient::match_pdp_reader_nts_(
+        const eprosima::fastdds::rtps::RemoteServerAttributes& server_att)
+{
+    std::lock_guard<std::mutex> data_guard(temp_data_lock_);
+    const NetworkFactory& network = mp_RTPSParticipant->network_factory();
+    temp_reader_data_.clear();
+    temp_reader_data_.guid(server_att.GetPDPReader());
+    temp_reader_data_.set_multicast_locators(server_att.metatrafficMulticastLocatorList, network);
+    temp_reader_data_.set_remote_unicast_locators(server_att.metatrafficUnicastLocatorList, network);
+    temp_reader_data_.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+    temp_reader_data_.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+    mp_PDPWriter->matched_reader_add(temp_reader_data_);
+}
+
 const std::string& ros_discovery_server_env()
 {
     static std::string servers;
-    {
-#pragma warning(suppress:4996)
-        const char* data = std::getenv(DEFAULT_ROS2_MASTER_URI);
-        if (nullptr != data)
-        {
-            servers = data;
-        }
-    }
+    SystemInfo::get_env(DEFAULT_ROS2_MASTER_URI, servers);
     return servers;
 }
 
@@ -605,19 +635,21 @@ bool load_environment_server_info(
         std::string list,
         RemoteServerList_t& attributes)
 {
+    attributes.clear();
     if (list.empty())
     {
-        return false;
+        return true;
     }
 
-    // parsing ancillary regex
-    const std::regex ROS2_IPV4_PATTERN(R"(^((?:[0-9]{1,3}\.){3}[0-9]{1,3})?:?(?:(\d+))?$)");
+    /* Parsing ancillary regex */
+    // Address should be <letter,numbers,dots>:<number>. We do not need to verify that the first part
+    // is an IPv4 address, as it is done latter.
+    const std::regex ROS2_ADDRESS_PATTERN(R"(^([A-Za-z0-9-.]+)?:?(?:(\d+))?$)");
     const std::regex ROS2_SERVER_LIST_PATTERN(R"(([^;]*);?)");
 
     try
     {
         // Do the parsing and populate the list
-        attributes.clear();
         RemoteServerAttributes server_att;
         Locator_t server_locator(LOCATOR_KIND_UDPv4, DEFAULT_ROS2_SERVER_PORT);
         int server_id = 0;
@@ -637,16 +669,30 @@ bool load_environment_server_info(
                 // now we must parse the inner expression
                 std::smatch mr;
                 std::string locator(sm);
-                if (std::regex_match(locator, mr, ROS2_IPV4_PATTERN, std::regex_constants::match_not_null))
+                if (std::regex_match(locator, mr, ROS2_ADDRESS_PATTERN, std::regex_constants::match_not_null))
                 {
                     std::smatch::iterator it = mr.cbegin();
 
                     while (++it != mr.cend())
                     {
-                        if (!IPLocator::setIPv4(server_locator, it->str()))
+                        std::string address = it->str();
+
+                        // Check whether the address is IPv4
+                        if (!IPLocator::isIPv4(address))
+                        {
+                            auto response = rtps::IPLocator::resolveNameDNS(address);
+
+                            // Add the first valid IPv4 address that we can find
+                            if (response.first.size() > 0)
+                            {
+                                address = response.first.begin()->data();
+                            }
+                        }
+
+                        if (!IPLocator::setIPv4(server_locator, address))
                         {
                             std::stringstream ss;
-                            ss << "Wrong ipv4 address passed into the server's list " << it->str();
+                            ss << "Wrong ipv4 address passed into the server's list " << address;
                             throw std::invalid_argument(ss.str());
                         }
 
@@ -661,17 +707,17 @@ bool load_environment_server_info(
                             // reset the locator to default
                             IPLocator::setPhysicalPort(server_locator, DEFAULT_ROS2_SERVER_PORT);
 
-                            if ( it->matched)
+                            if (it->matched)
                             {
                                 // note stoi throws also an invalid_argument
                                 int port = stoi(it->str());
 
-                                if ( port > std::numeric_limits<uint16_t>::max())
+                                if (port > std::numeric_limits<uint16_t>::max())
                                 {
-                                    throw std::out_of_range("Too larget udp port passed into the server's list");
+                                    throw std::out_of_range("Too large udp port passed into the server's list");
                                 }
 
-                                if ( !IPLocator::setPhysicalPort(server_locator, static_cast<uint16_t>(port)))
+                                if (!IPLocator::setPhysicalPort(server_locator, static_cast<uint16_t>(port)))
                                 {
                                     std::stringstream ss;
                                     ss << "Wrong udp port passed into the server's list " << it->str();
@@ -684,7 +730,7 @@ bool load_environment_server_info(
                     // add the server to the list
                     if (!get_server_client_default_guidPrefix(server_id, server_att.guidPrefix))
                     {
-                        throw std::invalid_argument("The maximum number of default discovery servers have been reached");
+                        throw std::invalid_argument("The maximum number of default discovery servers has been reached");
                     }
 
                     server_att.metatrafficUnicastLocatorList.clear();
@@ -713,7 +759,7 @@ bool load_environment_server_info(
             throw std::invalid_argument("No default server locators were provided.");
         }
     }
-    catch ( std::exception& e )
+    catch (std::exception& e)
     {
         logError(SERVER_CLIENT_DISCOVERY, e.what());
         attributes.clear();
@@ -751,6 +797,32 @@ bool get_server_client_default_guidPrefix(
 
         return true;
     }
+
+    return false;
+}
+
+bool PDPClient::remove_remote_participant(
+        const GUID_t& partGUID,
+        ParticipantDiscoveryInfo::DISCOVERY_STATUS reason)
+{
+    if (PDP::remove_remote_participant(partGUID, reason))
+    {
+        // If it works fine, return
+        return true;
+    }
+
+    // Erase Proxies created before having the Participant
+    GUID_t wguid;
+    wguid.guidPrefix = partGUID.guidPrefix;
+    wguid.entityId = c_EntityId_SPDPWriter;
+    mp_PDPReader->matched_writer_remove(wguid);
+
+    GUID_t rguid;
+    rguid.guidPrefix = partGUID.guidPrefix;
+    rguid.entityId = c_EntityId_SPDPReader;
+    mp_PDPWriter->matched_reader_remove(rguid);
+
+    update_remote_servers_list();
 
     return false;
 }

@@ -33,7 +33,7 @@
 #include "rtps/RTPSDomainImpl.hpp"
 #include "utils/collections/node_size_helpers.hpp"
 
-#if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__linux__)
+#if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__unix__)
 #define SHOULD_DEBUG_LINUX
 #endif // SHOULD_DEBUG_LINUX
 
@@ -487,7 +487,7 @@ SequenceNumber_t WriterProxy::next_cache_change_to_be_notified()
     return SequenceNumber_t::unknown();
 }
 
-void WriterProxy::perform_initial_ack_nack() const
+void WriterProxy::perform_initial_ack_nack()
 {
     // Send initial NACK.
     SequenceNumberSet_t sns(SequenceNumber_t(0, 0));
@@ -502,13 +502,13 @@ void WriterProxy::perform_initial_ack_nack() const
     }
     else
     {
-        reader_->send_acknack(this, sns, *this, false);
+        reader_->send_acknack(this, sns, this, false);
     }
 }
 
-void WriterProxy::perform_heartbeat_response() const
+void WriterProxy::perform_heartbeat_response()
 {
-    reader_->send_acknack(this, *this, heartbeat_final_flag_.load());
+    reader_->send_acknack(this, this, heartbeat_final_flag_.load());
 }
 
 bool WriterProxy::process_heartbeat(
@@ -579,7 +579,7 @@ void WriterProxy::update_heartbeat_response_interval(
 
 bool WriterProxy::send(
         CDRMessage_t* message,
-        std::chrono::steady_clock::time_point& max_blocking_time_point) const
+        std::chrono::steady_clock::time_point max_blocking_time_point) const
 {
     if (is_on_same_process_)
     {

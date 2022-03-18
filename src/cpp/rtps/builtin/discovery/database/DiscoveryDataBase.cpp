@@ -18,6 +18,7 @@
  */
 
 #include <mutex>
+#include <set>
 
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/common/EntityId_t.hpp>
@@ -37,7 +38,7 @@ namespace ddb {
 
 DiscoveryDataBase::DiscoveryDataBase(
         fastrtps::rtps::GuidPrefix_t server_guid_prefix,
-        std::vector<fastrtps::rtps::GuidPrefix_t> servers)
+        std::set<fastrtps::rtps::GuidPrefix_t> servers)
     : server_guid_prefix_(server_guid_prefix)
     , server_acked_by_all_(servers.size() == 0)
     , servers_(servers)
@@ -65,7 +66,7 @@ void DiscoveryDataBase::add_server(
         fastrtps::rtps::GuidPrefix_t server)
 {
     logInfo(DISCOVERY_DATABASE, "Server " << server << " added");
-    servers_.push_back(server);
+    servers_.insert(server);
 }
 
 std::vector<fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::clear()
@@ -338,7 +339,7 @@ bool DiscoveryDataBase::update(
         return false;
     }
     logInfo(DISCOVERY_DATABASE, "Adding DATA(p|Up) to the queue: " << change->instanceHandle);
-    //  Add the DATA(p|Up) to the PDP queue to process
+    // Add the DATA(p|Up) to the PDP queue to process
     pdp_data_queue_.Push(eprosima::fastdds::rtps::ddb::DiscoveryPDPDataQueueInfo(change, participant_change_data));
     return true;
 }
@@ -619,6 +620,9 @@ void DiscoveryDataBase::create_virtual_endpoints_(
     virtual_writer_writer_params.sample_identity(virtual_writer_sample_id);
     virtual_writer_writer_params.related_sample_identity(virtual_writer_sample_id);
     virtual_writer_change->write_params = std::move(virtual_writer_writer_params);
+    virtual_writer_change->writer_info.previous = nullptr;
+    virtual_writer_change->writer_info.next = nullptr;
+    virtual_writer_change->writer_info.num_sent_submessages = 0;
     // Create the virtual writer
     create_writers_from_change_(virtual_writer_change, virtual_topic_);
 
@@ -642,6 +646,9 @@ void DiscoveryDataBase::create_virtual_endpoints_(
     virtual_reader_writer_params.sample_identity(virtual_reader_sample_id);
     virtual_reader_writer_params.related_sample_identity(virtual_reader_sample_id);
     virtual_reader_change->write_params = std::move(virtual_reader_writer_params);
+    virtual_reader_change->writer_info.previous = nullptr;
+    virtual_reader_change->writer_info.next = nullptr;
+    virtual_reader_change->writer_info.num_sent_submessages = 0;
     // Create the virtual reader
     create_readers_from_change_(virtual_reader_change, virtual_topic_);
 }
@@ -863,7 +870,7 @@ void DiscoveryDataBase::create_writers_from_change_(
         }
         else
         {
-            logError(DISCOVERY_DATABASE, "Writer " << writer_guid << " as no associated participant. Skipping");
+            logError(DISCOVERY_DATABASE, "Writer " << writer_guid << " has no associated participant. Skipping");
             return;
         }
 
@@ -980,7 +987,7 @@ void DiscoveryDataBase::create_readers_from_change_(
         }
         else
         {
-            logError(DISCOVERY_DATABASE, "Writer " << reader_guid << " as no associated participant. Skipping");
+            logError(DISCOVERY_DATABASE, "Reader " << reader_guid << " has no associated participant. Skipping");
             return;
         }
 
@@ -1710,14 +1717,19 @@ void DiscoveryDataBase::AckedFunctor::operator () (
         {
             // If the reader proxy is from a server that we are pinging, we may not want to wait
             // for it to be acked as the routine will not stop
-            for (auto it = db_->servers_.begin(); it < db_->servers_.end(); ++it)
+            for (auto it = db_->servers_.begin(); it != db_->servers_.end(); ++it)
             {
                 if (reader_proxy->guid().guidPrefix == *it)
                 {
-                    // If the participant is already in the DB it means it has answered to the pinging
-                    // or that is pinging us and we have already received its DATA(p)
-                    // If neither of both has happenned we should not wait for it to ack this data, so we
-                    // skip it and leave it as acked
+                    /*
+                     * If the participant is already in the DB it means it has answered to the pinging
+                     * or that is pinging us and we have already received its DATA(p)
+                     * If neither has happenned (participant is not in DB)
+                     * we should not wait for it to ack this data, or it could get stucked in an endless loop
+                     * (this Remote Server could not exist and/or never be discovered)
+                     * Nevertheless, the ack is still pending for this participant and once it is discovered this
+                     * data will be sent again
+                     */
                     auto remote_server_it = db_->participants_.find(*it);
                     if (remote_server_it == db_->participants_.end())
                     {
@@ -1725,6 +1737,8 @@ void DiscoveryDataBase::AckedFunctor::operator () (
                                 "check as acked for " << reader_proxy->guid() << " as it has not answered pinging yet");
                         return;
                     }
+
+                    break;
                 }
             }
 
@@ -1741,32 +1755,20 @@ void DiscoveryDataBase::unmatch_participant_(
 {
     logInfo(DISCOVERY_DATABASE, "unmatching participant: " << guid_prefix);
 
-    auto pit = participants_.find(guid_prefix);
-    if (pit == participants_.end())
+    // For each participant remove it
+    // IMPORTANT: This is not for every relevant participant, as participant A could be in other participant's B info
+    // and B not be relevant for A. So it must be done for every Participant.
+    for (auto& participant_it : participants_)
     {
-        logWarning(DISCOVERY_DATABASE,
-                "Attempting to unmatch an unexisting participant: " << guid_prefix);
+        participant_it.second.remove_participant(guid_prefix);
     }
-
-    // For each relevant participant make not relevant
-    for (eprosima::fastrtps::rtps::GuidPrefix_t relevant_participant : pit->second.relevant_participants())
+    for (auto& writer_it : writers_)
     {
-        if (relevant_participant != guid_prefix)
-        {
-            auto rpit = participants_.find(relevant_participant);
-            if (rpit == participants_.end())
-            {
-                // This is not an error. Remote participants will try to unmatch with participants even
-                // when the match is not reciprocal
-                logInfo(DISCOVERY_DATABASE,
-                        "Participant " << relevant_participant << " matched with an unexisting participant: " <<
-                        guid_prefix);
-            }
-            else
-            {
-                rpit->second.remove_participant(guid_prefix);
-            }
-        }
+        writer_it.second.remove_participant(guid_prefix);
+    }
+    for (auto& reader_it : readers_)
+    {
+        reader_it.second.remove_participant(guid_prefix);
     }
 }
 

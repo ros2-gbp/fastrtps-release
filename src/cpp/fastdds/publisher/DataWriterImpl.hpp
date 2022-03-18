@@ -104,6 +104,14 @@ protected:
             const DataWriterQos& qos,
             DataWriterListener* listener = nullptr);
 
+    DataWriterImpl(
+            PublisherImpl* p,
+            TypeSupport type,
+            Topic* topic,
+            const DataWriterQos& qos,
+            const fastrtps::rtps::EntityId_t& entity_id,
+            DataWriterListener* listener = nullptr);
+
 public:
 
     virtual ~DataWriterImpl();
@@ -221,6 +229,14 @@ public:
     ReturnCode_t wait_for_acknowledgments(
             const fastrtps::Duration_t& max_wait);
 
+    ReturnCode_t wait_for_acknowledgments(
+            void* instance,
+            const InstanceHandle_t& handle,
+            const fastrtps::Duration_t& max_wait);
+
+    ReturnCode_t get_publication_matched_status(
+            PublicationMatchedStatus& status);
+
     ReturnCode_t get_offered_deadline_missed_status(
             fastrtps::OfferedDeadlineMissedStatus& status);
 
@@ -332,8 +348,6 @@ protected:
     }
     writer_listener_;
 
-    uint32_t high_mark_for_frag_;
-
     //! A timer used to check for deadlines
     fastrtps::rtps::TimedEvent* deadline_timer_ = nullptr;
 
@@ -342,6 +356,9 @@ protected:
 
     //! The current timer owner, i.e. the instance which started the deadline timer
     InstanceHandle_t timer_owner_;
+
+    //! The publication matched status
+    PublicationMatchedStatus publication_matched_status_;
 
     //! The offered deadline missed status
     fastrtps::OfferedDeadlineMissedStatus deadline_missed_status_;
@@ -365,12 +382,7 @@ protected:
 
     std::unique_ptr<LoanCollection> loans_;
 
-    virtual fastrtps::rtps::RTPSWriter* create_rtps_writer(
-            fastrtps::rtps::RTPSParticipant* p,
-            fastrtps::rtps::WriterAttributes& watt,
-            const std::shared_ptr<IPayloadPool>& payload_pool,
-            fastrtps::rtps::WriterHistory* hist,
-            fastrtps::rtps::WriterListener* listen);
+    fastrtps::rtps::GUID_t guid_;
 
     /**
      *
@@ -413,6 +425,9 @@ protected:
      * @return True if correct.
      */
     bool remove_min_seq_change();
+
+    void update_publication_matched_status(
+            const PublicationMatchedStatus& status);
 
     /**
      * @brief A method called when an instance misses the deadline

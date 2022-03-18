@@ -80,7 +80,7 @@ public:
 // Test created to check bug #3020 (Github ros2/demos #238)
 TEST_P(Volatile, PubSubAsReliableVolatilePubRemoveWithoutSubs)
 {
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     writer.history_depth(10).
             durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).init();
@@ -101,8 +101,8 @@ TEST_P(Volatile, PubSubAsReliableVolatilePubRemoveWithoutSubs)
 // Test created to check bug #3087 (Github #230)
 TEST_P(Volatile, AsyncPubSubAsNonReliableVolatileHelloworld)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     reader.init();
 
@@ -133,8 +133,8 @@ TEST_P(Volatile, AsyncPubSubAsNonReliableVolatileHelloworld)
 // Test created to check bug #3290 (ROS2 #539)
 TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
 {
-    PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
+    PubSubReader<Data1mbPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<Data1mbPubSubType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -153,7 +153,8 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
             resource_limits_allocated_samples(9).
             resource_limits_max_samples(9).
             asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).
-            add_throughput_controller_descriptor_to_pparams(bytesPerPeriod, periodInMs).
+            add_throughput_controller_descriptor_to_pparams(
+        eprosima::fastdds::rtps::FlowControllerSchedulerPolicy::FIFO, bytesPerPeriod, periodInMs).
             init();
 
     ASSERT_TRUE(writer.isInitialized());
@@ -176,8 +177,8 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
 // Test created to check bug #3290 (ROS2 #539)
 TEST_P(Volatile, VolatileKeepAllPubReliableSubNonReliableHelloWorld)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -212,8 +213,8 @@ TEST_P(Volatile, VolatileKeepAllPubReliableSubNonReliableHelloWorld)
 // Test created to check bug #3290 (ROS2 #539)
 TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliableHelloWorld)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -261,8 +262,8 @@ TEST_P(Volatile, ReqRepVolatileHelloworldRequesterCheckWriteParams)
 // Test created to check bug #5423, github ros2/ros2 #703
 TEST_P(Volatile, AsyncVolatileSubBetweenPubs)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
@@ -303,8 +304,8 @@ TEST_P(Volatile, AsyncVolatileSubBetweenPubs)
 
 TEST_P(Volatile, VolatileSubBetweenPubs)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
@@ -345,8 +346,8 @@ TEST_P(Volatile, VolatileSubBetweenPubs)
 
 TEST_P(Volatile, AsyncVolatileSubBetweenTransientPubs)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     writer
             .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
@@ -388,8 +389,8 @@ TEST_P(Volatile, AsyncVolatileSubBetweenTransientPubs)
 
 TEST_P(Volatile, VolatileSubBetweenTransientPubs)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     writer
             .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
@@ -431,9 +432,9 @@ TEST_P(Volatile, VolatileSubBetweenTransientPubs)
 
 TEST_P(Volatile, VolatileLateJoinerSubGapLost)
 {
-    PubSubReader<HelloWorldType> reader1(TEST_TOPIC_NAME);
-    PubSubReader<HelloWorldType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader1(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
 
     reader1.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
@@ -505,8 +506,8 @@ TEST_P(Volatile, VolatileLateJoinerSubGapLost)
 // Regression test for redmine bug #11306
 TEST_P(Volatile, VolatileWithLostAcks)
 {
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
