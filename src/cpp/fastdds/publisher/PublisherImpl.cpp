@@ -29,6 +29,7 @@
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
 
+#include <fastdds/rtps/common/Property.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/dds/log/Log.hpp>
 
@@ -45,6 +46,7 @@ namespace dds {
 using fastrtps::xmlparser::XMLProfileManager;
 using fastrtps::xmlparser::XMLP_ret;
 using fastrtps::rtps::InstanceHandle_t;
+using fastrtps::rtps::Property;
 using fastrtps::Duration_t;
 using fastrtps::PublisherAttributes;
 
@@ -79,6 +81,24 @@ static void set_qos_from_attributes(
     qos.history() = attr.topic.historyQos;
     qos.resource_limits() = attr.topic.resourceLimitsQos;
     qos.data_sharing() = attr.qos.data_sharing;
+    qos.reliable_writer_qos().disable_heartbeat_piggyback = attr.qos.disable_heartbeat_piggyback;
+
+    if (attr.qos.m_partition.size() > 0 )
+    {
+        Property property;
+        property.name("partitions");
+        std::string partitions;
+        bool is_first_partition = true;
+
+        for (auto partition : attr.qos.m_partition.names())
+        {
+            partitions += (is_first_partition ? "" : ";") + partition;
+            is_first_partition = false;
+        }
+
+        property.value(std::move(partitions));
+        qos.properties().properties().push_back(std::move(property));
+    }
 }
 
 PublisherImpl::PublisherImpl(
@@ -532,13 +552,71 @@ const Publisher* PublisherImpl::get_publisher() const
     return user_publisher_;
 }
 
-/* TODO
-   bool PublisherImpl::delete_contained_entities()
-   {
-    logError(PUBLISHER, "Operation not implemented");
-    return false;
-   }
- */
+ReturnCode_t PublisherImpl::delete_contained_entities()
+{
+    // Let's be optimistic
+    ReturnCode_t result = ReturnCode_t::RETCODE_OK;
+
+    bool can_be_deleted = true;
+
+    std::lock_guard<std::mutex> lock(mtx_writers_);
+    for (auto writer: writers_)
+    {
+        for (DataWriterImpl* dw: writer.second)
+        {
+            can_be_deleted = dw->check_delete_preconditions() == ReturnCode_t::RETCODE_OK;
+            if (!can_be_deleted)
+            {
+                return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+            }
+        }
+    }
+
+    // We traverse the map trying to delete all writers;
+    auto writer_iterator = writers_.begin();
+    while (writer_iterator != writers_.end())
+    {
+        //First extract the writer from the maps to free the mutex
+        auto it = writer_iterator->second.begin();
+        DataWriterImpl* writer_impl = *it;
+        ReturnCode_t ret_code = writer_impl->check_delete_preconditions();
+        if (!ret_code)
+        {
+            return ReturnCode_t::RETCODE_ERROR;
+        }
+        writer_impl->set_listener(nullptr);
+        it = writer_iterator->second.erase(it);
+        if (writer_iterator->second.empty())
+        {
+            writer_iterator = writers_.erase(writer_iterator);
+        }
+
+        writer_impl->get_topic()->get_impl()->dereference();
+        delete (writer_impl);
+    }
+    return result;
+}
+
+bool PublisherImpl::can_be_deleted()
+{
+    bool can_be_deleted = true;
+
+    std::lock_guard<std::mutex> lock(mtx_writers_);
+    for (auto topic_writers : writers_)
+    {
+        for (DataWriterImpl* dw : topic_writers.second)
+        {
+            can_be_deleted = can_be_deleted && (dw->check_delete_preconditions() == ReturnCode_t::RETCODE_OK);
+            if (!can_be_deleted)
+            {
+                return can_be_deleted;
+            }
+        }
+
+    }
+
+    return can_be_deleted;
+}
 
 const InstanceHandle_t& PublisherImpl::get_instance_handle() const
 {

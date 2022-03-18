@@ -21,6 +21,7 @@
 #define _FASTDDS_RTPS_PDP_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
+#include <atomic>
 #include <mutex>
 #include <functional>
 
@@ -97,6 +98,11 @@ public:
     bool initPDP(
             RTPSParticipantImpl* part);
 
+    /**
+     * @brief Enable the Participant Discovery Protocol
+     *
+     * @return true if enabled correctly, or if already enabled; false otherwise
+     */
     bool enable();
 
     virtual bool init(
@@ -401,6 +407,8 @@ protected:
     std::recursive_mutex* mp_mutex;
     //!To protect callbacks (ParticipantProxyData&)
     std::mutex callback_mtx_;
+    //!Tell if object is enabled
+    std::atomic<bool> enabled_ {false};
 
     /**
      * Adds an entry to the collection of participant proxy information.
@@ -408,12 +416,14 @@ protected:
      *
      * @param participant_guid GUID of the participant for which to create the proxy object.
      * @param with_lease_duration indicates whether lease duration event should be created.
+     * @param participant_proxy_data The participant proxy data from which the copy is made (if provided)
      *
      * @return pointer to the currently inserted entry, nullptr if allocation limits were reached.
      */
     ParticipantProxyData* add_participant_proxy_data(
             const GUID_t& participant_guid,
-            bool with_lease_duration);
+            bool with_lease_duration,
+            const ParticipantProxyData* participant_proxy_data = nullptr);
 
     /**
      * Gets the key of a participant proxy data.

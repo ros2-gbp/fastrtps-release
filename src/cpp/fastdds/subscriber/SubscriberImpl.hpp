@@ -135,10 +135,6 @@ public:
 
     ReturnCode_t notify_datareaders() const;
 
-    /* TODO
-       bool delete_contained_entities();
-     */
-
     ReturnCode_t set_default_datareader_qos(
             const DataReaderQos& qos);
 
@@ -159,6 +155,11 @@ public:
      */
 
     const DomainParticipant* get_participant() const;
+
+    DomainParticipantImpl* get_participant_impl()
+    {
+        return participant_;
+    }
 
     const fastrtps::rtps::RTPSParticipant* rtps_participant() const
     {
@@ -219,6 +220,10 @@ public:
      */
     SubscriberListener* get_listener_for(
             const StatusMask& status);
+
+    ReturnCode_t delete_contained_entities();
+
+    bool can_be_deleted() const;
 
 protected:
 

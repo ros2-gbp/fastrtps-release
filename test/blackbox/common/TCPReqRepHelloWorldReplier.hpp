@@ -20,7 +20,7 @@
 #ifndef _TEST_BLACKBOX_TCPReqRepHelloWorldReplier_HPP_
 #define _TEST_BLACKBOX_TCPReqRepHelloWorldReplier_HPP_
 
-#include "../types/HelloWorldType.h"
+#include "../types/HelloWorldPubSubTypes.h"
 
 #include <fastrtps/fastrtps_fwd.h>
 #include <fastrtps/subscriber/SubscriberListener.h>
@@ -68,6 +68,10 @@ public:
             if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
             {
                 replier_.matched();
+            }
+            else if (info.status == eprosima::fastrtps::rtps::REMOVED_MATCHING)
+            {
+                replier_.unmatched();
             }
         }
 
@@ -132,7 +136,10 @@ public:
             uint16_t number);
     void wait_discovery(
             std::chrono::seconds timeout = std::chrono::seconds::zero());
+    void wait_unmatched(
+            std::chrono::seconds timeout = std::chrono::seconds::zero());
     void matched();
+    void unmatched();
     bool is_matched();
 
     virtual void configSubscriber(
@@ -181,7 +188,7 @@ private:
     std::mutex mutexDiscovery_;
     std::condition_variable cvDiscovery_;
     std::atomic<unsigned int> matched_;
-    HelloWorldType type_;
+    HelloWorldPubSubType type_;
 };
 
 #endif // _TEST_BLACKBOX_TCPReqRepHelloWorldReplier_HPP_

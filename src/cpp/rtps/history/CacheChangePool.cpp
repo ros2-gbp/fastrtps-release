@@ -97,11 +97,11 @@ void CacheChangePool::return_cache_to_pool(
     ch->sequenceNumber.high = 0;
     ch->sequenceNumber.low = 0;
     ch->writerGUID = c_Guid_Unknown;
-    memset(ch->instanceHandle.value, 0, 16);
+    ch->instanceHandle.clear();
     ch->isRead = 0;
     ch->sourceTimestamp.seconds(0);
     ch->sourceTimestamp.fraction(0);
-    ch->num_sent_submessages = 0;
+    ch->writer_info.num_sent_submessages = 0;
     ch->setFragmentSize(0);
     free_caches_.push_back(ch);
 }

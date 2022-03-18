@@ -20,6 +20,7 @@
 #include <thread>
 #include <mutex>
 #include <vector>
+#include <condition_variable>
 
 namespace eprosima {
 namespace fastdds {
@@ -46,7 +47,7 @@ public:
         {
             std::unique_lock<std::mutex> guard(mMutex);
             mEntriesConsumed.push_back(entry);
-            cv_.notify_one();
+            cv_.notify_all();
         }
         StdoutConsumer::Consume(entry);
     }
@@ -57,20 +58,28 @@ public:
         return mEntriesConsumed;
     }
 
-    size_t ConsumedEntriesSize_nts() const
+    template<typename Pred>
+    void wait(
+            Pred pred)
     {
-        return mEntriesConsumed.size();
+        std::unique_lock<std::mutex> lock(mMutex);
+        cv_.wait(lock, pred);
     }
 
-    std::condition_variable& cv()
+    void wait_for_at_least_entries(
+            size_t num_entries)
     {
-        return cv_;
+        return wait([this, num_entries]() -> bool
+                       {
+                           return mEntriesConsumed.size() >= num_entries;
+                       });
     }
 
     void clear_entries()
     {
         std::unique_lock<std::mutex> guard(mMutex);
         mEntriesConsumed.clear();
+        cv_.notify_all();
     }
 
 private:
@@ -86,4 +95,3 @@ private:
 } // namespace eprosima
 
 #endif // ifndef MOCK_LOG_CONSUMER_H
-

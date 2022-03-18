@@ -60,9 +60,8 @@ bool PublisherModule::init(
 {
     std::cout << "Initializing Publisher" << std::endl;
 
-    DomainParticipantQos participant_qos;
     participant_ =
-            DomainParticipantFactory::get_instance()->create_participant(seed % 230, participant_qos, this);
+            DomainParticipantFactory::get_instance()->create_participant(seed % 230, PARTICIPANT_QOS_DEFAULT, this);
 
     if (participant_ == nullptr)
     {
@@ -73,11 +72,11 @@ bool PublisherModule::init(
     // Construct a FixedSizedType if fixed type is required, defult HelloWro
     if (fixed_type_)
     {
-        type_.reset(new FixedSizedType());
+        type_.reset(new FixedSizedPubSubType());
     }
     else
     {
-        type_.reset(new HelloWorldType());
+        type_.reset(new HelloWorldPubSubType());
     }
 
     type_.register_type(participant_);

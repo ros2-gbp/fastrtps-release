@@ -19,14 +19,13 @@
 #ifndef _FASTDDS_RTPS_DOMAIN_H_
 #define _FASTDDS_RTPS_DOMAIN_H_
 
-#include <fastdds/rtps/common/Types.h>
-#include <fastdds/rtps/history/IPayloadPool.h>
-
-#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-
 #include <atomic>
 #include <mutex>
 #include <set>
+
+#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
+#include <fastdds/rtps/common/Types.h>
+#include <fastdds/rtps/history/IPayloadPool.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -47,7 +46,7 @@ class RTPSDomainImpl;
 
 /**
  * Class RTPSDomain,it manages the creation and destruction of RTPSParticipant RTPSWriter and RTPSReader. It stores
- * a list of all created RTPSParticipant. Is has only static methods.
+ * a list of all created RTPSParticipant. It has only static methods.
  * @ingroup RTPS_MODULE
  */
 class RTPSDomain
@@ -182,7 +181,7 @@ public:
             ReaderListener* listen = nullptr);
 
     /**
-     * Create a RTPSWriter in a participant using a custom payload pool.
+     * Create a RTPReader in a participant using a custom payload pool.
      * @param p Pointer to the RTPSParticipant.
      * @param ratt Reader Attributes.
      * @param payload_pool Shared pointer to the IPayloadPool
@@ -195,6 +194,27 @@ public:
      */
     RTPS_DllAPI static RTPSReader* createRTPSReader(
             RTPSParticipant* p,
+            ReaderAttributes& ratt,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            ReaderHistory* hist,
+            ReaderListener* listen = nullptr);
+
+    /**
+     * Create a RTPSReader in a participant using a custom payload pool.
+     * @param p Pointer to the RTPSParticipant.
+     * @param entity_id Specific entity id to use for the created reader.
+     * @param ratt Reader Attributes.
+     * @param payload_pool Shared pointer to the IPayloadPool
+     * @param hist Pointer to the ReaderHistory.
+     * @param listen Pointer to the ReaderListener.
+     * @return Pointer to the created RTPSReader.
+     *
+     * \warning The returned pointer is invalidated after a call to removeRTPSReader() or stopAll(),
+     *          so its use may result in undefined behaviour.
+     */
+    RTPS_DllAPI static RTPSReader* createRTPSReader(
+            RTPSParticipant* p,
+            const EntityId_t& entity_id,
             ReaderAttributes& ratt,
             const std::shared_ptr<IPayloadPool>& payload_pool,
             ReaderHistory* hist,
