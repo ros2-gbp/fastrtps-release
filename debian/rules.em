@@ -39,6 +39,7 @@ override_dh_auto_configure:
 		-DCMAKE_PREFIX_PATH="@(InstallationPrefix)" \
 		-DINSTALL_EXAMPLES=OFF \
 		-DSECURITY=ON \
+		-DAPPEND_PROJECT_NAME_TO_INCLUDEDIR=ON \
 		$(BUILD_TESTING_ARG)
 
 override_dh_auto_build:
