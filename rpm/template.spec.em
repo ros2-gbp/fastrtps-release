@@ -47,6 +47,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
     -DSETUPTOOLS_DEB_LAYOUT=OFF \
     -DINSTALL_EXAMPLES=OFF \
     -DSECURITY=ON \
+    -DAPPEND_PROJECT_NAME_TO_INCLUDEDIR=ON \
     ..
 
 %make_build
