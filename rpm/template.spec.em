@@ -53,6 +53,7 @@ mkdir -p .obj-%{_target_platform} && cd .obj-%{_target_platform}
 %endif
     -DINSTALL_EXAMPLES=OFF \
     -DSECURITY=ON \
+    -DAPPEND_PROJECT_NAME_TO_INCLUDEDIR=ON \
     ..
 
 %make_build
