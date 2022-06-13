@@ -271,6 +271,10 @@ public:
         , unauthorized_(0)
 #endif // if HAVE_SECURITY
     {
+        // Load default QoS to permit testing with external XML profile files.
+        DomainParticipantFactory::get_instance()->load_profiles();
+        participant_qos_ = DomainParticipantFactory::get_instance()->get_default_participant_qos();
+
         // Generate topic name
         std::ostringstream t;
         t << topic_name << "_" << asio::ip::host_name() << "_" << GET_PID();
@@ -728,6 +732,11 @@ public:
                     int times = mapPartitionCountList_.count(partition) == 0 ? 0 : mapPartitionCountList_[partition];
                     return times == repeatedTimes;
                 });
+    }
+
+    eprosima::fastdds::dds::DataWriterQos& qos()
+    {
+        return datawriter_qos_;
     }
 
     PubSubWriter& deactivate_status_listener(
