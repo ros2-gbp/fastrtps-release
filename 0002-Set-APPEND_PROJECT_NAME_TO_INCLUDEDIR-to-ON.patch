@@ -1,4 +1,4 @@
-From b0d64cb10d7923e3f0ff8bda46eb0e991836a5af Mon Sep 17 00:00:00 2001
+From fc4fcf08a31989b3caf2e5b78cedb5fab688509b Mon Sep 17 00:00:00 2001
 From: Shane Loretz <shane.loretz@gmail.com>
 Date: Mon, 21 Mar 2022 14:16:17 -0700
 Subject: [PATCH 2/2] Set APPEND_PROJECT_NAME_TO_INCLUDEDIR to ON
@@ -22,5 +22,5 @@ index ef66ba8e..021135b6 100755
  override_dh_auto_build:
  	# In case we're installing to a non-standard location, look for a setup.sh
 -- 
-2.36.0
+2.25.1
 
