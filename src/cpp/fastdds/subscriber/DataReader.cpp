@@ -227,9 +227,7 @@ ReturnCode_t DataReader::get_key_value(
 InstanceHandle_t DataReader::lookup_instance(
         const void* instance) const
 {
-    static_cast<void> (instance);
-    logWarning(DATA_READER, "lookup_instance method not implemented")
-    return HANDLE_NIL;
+    return impl_->lookup_instance(instance);
 }
 
 ReturnCode_t DataReader::read_next_sample(
@@ -258,6 +256,11 @@ uint64_t DataReader::get_unread_count() const
 }
 
 const GUID_t& DataReader::guid()
+{
+    return impl_->guid();
+}
+
+const GUID_t& DataReader::guid() const
 {
     return impl_->guid();
 }
@@ -339,11 +342,7 @@ ReturnCode_t DataReader::get_liveliness_changed_status(
 ReturnCode_t DataReader::get_sample_lost_status(
         SampleLostStatus& status) const
 {
-    static_cast<void> (status);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-    /*
-       return impl_->get_sample_lost_status(status);
-     */
+    return impl_->get_sample_lost_status(status);
 }
 
 ReturnCode_t DataReader::get_sample_rejected_status(

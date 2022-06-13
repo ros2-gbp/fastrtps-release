@@ -45,6 +45,9 @@
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 
+#include <fastdds/rtps/history/IChangePool.h>
+#include <fastdds/rtps/history/IPayloadPool.h>
+
 #include <fastdds/rtps/network/NetworkFactory.h>
 #include <fastdds/rtps/network/ReceiverResource.h>
 #include <fastdds/rtps/network/SenderResource.h>
@@ -367,9 +370,14 @@ public:
         return security_attributes_;
     }
 
-    bool is_secure() const
+    inline bool is_security_initialized() const
     {
-        return m_is_security_active;
+        return m_security_manager.is_security_initialized();
+    }
+
+    inline bool is_secure() const
+    {
+        return m_security_manager.is_security_active();
     }
 
     bool pairing_remote_reader_with_local_writer_after_security(
@@ -553,8 +561,6 @@ private:
 #if HAVE_SECURITY
     // Security manager
     security::SecurityManager m_security_manager;
-    // Security activation flag
-    bool m_is_security_active = false;
 #endif // if HAVE_SECURITY
 
     //! Encapsulates all associated resources on a Receiving element.
@@ -757,6 +763,28 @@ public:
             RTPSWriter** Writer,
             WriterAttributes& param,
             const std::shared_ptr<IPayloadPool>& payload_pool,
+            WriterHistory* hist,
+            WriterListener* listen,
+            const EntityId_t& entityId = c_EntityId_Unknown,
+            bool isBuiltin = false);
+
+    /**
+     * Create a Writer in this RTPSParticipant with a custom payload pool.
+     * @param Writer Pointer to pointer of the Writer, used as output. Only valid if return==true.
+     * @param watt WriterAttributes to define the Writer.
+     * @param payload_pool Shared pointer to the IPayloadPool
+     * @param change_pool Shared pointer to the IChangePool
+     * @param hist Pointer to the WriterHistory.
+     * @param listen Pointer to the WriterListener.
+     * @param entityId EntityId assigned to the Writer.
+     * @param isBuiltin Bool value indicating if the Writer is builtin (Discovery or Liveliness protocol) or is created for the end user.
+     * @return True if the Writer was correctly created.
+     */
+    bool create_writer(
+            RTPSWriter** Writer,
+            WriterAttributes& watt,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            const std::shared_ptr<IChangePool>& change_pool,
             WriterHistory* hist,
             WriterListener* listen,
             const EntityId_t& entityId = c_EntityId_Unknown,

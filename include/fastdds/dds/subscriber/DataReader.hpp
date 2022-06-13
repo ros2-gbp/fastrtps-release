@@ -783,7 +783,9 @@ public:
      *
      * @param [in] instance Data pointer to the sample
      *
-     * @return handle of the given instance
+     * @return handle of the given @c instance.
+     * @return HANDLE_NIL if @c instance is nullptr.
+     * @return HANDLE_NIL if there is no instance on the DataReader's history with the same key as @c instance.
      */
     RTPS_DllAPI InstanceHandle_t lookup_instance(
             const void* instance) const;
@@ -813,6 +815,13 @@ public:
      * @return Associated GUID
      */
     RTPS_DllAPI const fastrtps::rtps::GUID_t& guid();
+
+    /**
+     * Get associated GUID.
+     *
+     * @return Associated GUID
+     */
+    RTPS_DllAPI const fastrtps::rtps::GUID_t& guid() const;
 
     /**
      * @brief Getter for the associated InstanceHandle.
@@ -1035,10 +1044,13 @@ public:
     RTPS_DllAPI ReturnCode_t delete_contained_entities();
 
     /**
-     * Checks whether the sample is still valid or is corrupted
+     * Checks whether a loaned sample is still valid or is corrupted.
+     * Calling this method on a sample which has not been loaned, or one for which the loan has been returned
+     * yields undefined behavior.
      *
      * @param data Pointer to the sample data to check
      * @param info Pointer to the SampleInfo related to \c data
+     *
      * @return true if the sample is valid
      */
     RTPS_DllAPI bool is_sample_valid(
