@@ -325,8 +325,9 @@ RTPSParticipantImpl::RTPSParticipantImpl(
 
 #if HAVE_SECURITY
     // Start security
-    if (!m_security_manager.init(security_attributes_, PParam.properties,
-            m_is_security_active))
+    if (!m_security_manager.init(
+                security_attributes_,
+                PParam.properties))
     {
         // Participant will be deleted, no need to allocate buffers or create builtin endpoints
         return;
@@ -390,12 +391,10 @@ RTPSParticipantImpl::RTPSParticipantImpl(
 
 
 #if HAVE_SECURITY
-    if (m_is_security_active)
+    if (m_security_manager.is_security_active())
     {
-        m_is_security_active = m_security_manager.create_entities();
-        if (!m_is_security_active)
+        if (!m_security_manager.create_entities())
         {
-            // Participant will be deleted, no need to create builtin endpoints
             return;
         }
     }
@@ -447,11 +446,13 @@ void RTPSParticipantImpl::enable()
 
 void RTPSParticipantImpl::disable()
 {
-    // Ensure that other participants will not accidentally discover this one
-    if (mp_builtinProtocols && mp_builtinProtocols->mp_PDP)
+    if (nullptr == mp_builtinProtocols)
     {
-        mp_builtinProtocols->stopRTPSParticipantAnnouncement();
+        return;
     }
+
+    // Ensure that other participants will not accidentally discover this one
+    stopRTPSParticipantAnnouncement();
 
     // Disable Retries on Transports
     m_network_Factory.Shutdown();
@@ -464,7 +465,16 @@ void RTPSParticipantImpl::disable()
     }
 
     {
-        std::lock_guard<std::recursive_mutex> lock(*mp_mutex);
+        // take PDP mutex to avoid ABBA deadlock, make not be avaiable on DiscoveryProtocol::NONE
+        std::unique_ptr<std::lock_guard<std::recursive_mutex>> _;
+        if (mp_builtinProtocols->mp_PDP)
+        {
+            // TODO: promote to make_unike in C++14 upgrade
+            _.reset(new std::lock_guard<std::recursive_mutex>(*mp_builtinProtocols->mp_PDP->getMutex()));
+        }
+
+        std::lock_guard<std::recursive_mutex> __(*mp_mutex);
+
         while (m_userReaderList.size() > 0)
         {
             deleteUserEndpoint(static_cast<Endpoint*>(*m_userReaderList.begin()));
@@ -475,6 +485,8 @@ void RTPSParticipantImpl::disable()
             deleteUserEndpoint(static_cast<Endpoint*>(*m_userWriterList.begin()));
         }
     }
+
+    mp_event_thr.stop_thread();
 
     delete(mp_builtinProtocols);
     mp_builtinProtocols = nullptr;
@@ -1021,6 +1033,56 @@ bool RTPSParticipantImpl::createWriter(
     return create_writer(WriterOut, param, entityId, isBuiltin, callback);
 }
 
+bool RTPSParticipantImpl::create_writer(
+        RTPSWriter** WriterOut,
+        WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        WriterHistory* hist,
+        WriterListener* listen,
+        const EntityId_t& entityId,
+        bool isBuiltin)
+{
+    if (!payload_pool)
+    {
+        logError(RTPS_PARTICIPANT, "Trying to create writer with null payload pool");
+        return false;
+    }
+
+    auto callback = [hist, listen, &payload_pool, &change_pool, this]
+                (const GUID_t& guid, WriterAttributes& watt, fastdds::rtps::FlowController* flow_controller,
+                    IPersistenceService* persistence, bool is_reliable) -> RTPSWriter*
+            {
+                if (is_reliable)
+                {
+                    if (persistence != nullptr)
+                    {
+                        return new StatefulPersistentWriter(this, guid, watt, payload_pool, change_pool,
+                                       flow_controller, hist, listen, persistence);
+                    }
+                    else
+                    {
+                        return new StatefulWriter(this, guid, watt, payload_pool, change_pool,
+                                       flow_controller, hist, listen);
+                    }
+                }
+                else
+                {
+                    if (persistence != nullptr)
+                    {
+                        return new StatelessPersistentWriter(this, guid, watt, payload_pool, change_pool,
+                                       flow_controller, hist, listen, persistence);
+                    }
+                    else
+                    {
+                        return new StatelessWriter(this, guid, watt, payload_pool, change_pool,
+                                       flow_controller, hist, listen);
+                    }
+                }
+            };
+    return create_writer(WriterOut, watt, entityId, isBuiltin, callback);
+}
+
 bool RTPSParticipantImpl::createReader(
         RTPSReader** ReaderOut,
         ReaderAttributes& param,
@@ -1214,6 +1276,7 @@ void RTPSParticipantImpl::update_attributes(
     {
         update_pdp = true;
         std::vector<GUID_t> modified_servers;
+        LocatorList_t modified_locators;
         // Check that the remote servers list is consistent: all the already known remote servers must be included in
         // the list and either new remote servers are added or remote server listening locator is modified.
         for (auto existing_server : m_att.builtin.discovery_config.m_DiscoveryServers)
@@ -1237,6 +1300,7 @@ void RTPSParticipantImpl::update_attributes(
                         if (!locator_contained)
                         {
                             modified_servers.emplace_back(incoming_server.GetParticipant());
+                            modified_locators.push_back(incoming_locator);
                             logInfo(RTPS_QOS_CHECK,
                                     "DS Server: " << incoming_server.guidPrefix << " has modified its locators: "
                                                   << incoming_locator << " being added")
@@ -1283,6 +1347,10 @@ void RTPSParticipantImpl::update_attributes(
             createSenderResources(m_att.builtin.metatrafficMulticastLocatorList);
             createSenderResources(m_att.builtin.metatrafficUnicastLocatorList);
             createSenderResources(m_att.defaultUnicastLocatorList);
+            if (!modified_locators.empty())
+            {
+                createSenderResources(modified_locators);
+            }
 
             // Update remote servers list
             if (m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::CLIENT ||
