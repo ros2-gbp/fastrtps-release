@@ -270,6 +270,7 @@ bool ReaderProxy::change_is_unsent(
         const SequenceNumber_t& seq_num,
         FragmentNumber_t& next_unsent_frag,
         SequenceNumber_t& gap_seq,
+        const SequenceNumber_t& min_seq,
         bool& need_reactivate_periodic_heartbeat) const
 {
     if (seq_num <= changes_low_mark_ || changes_for_reader_.empty())
@@ -304,6 +305,19 @@ bool ReaderProxy::change_is_unsent(
             if (prev != chit->getSequenceNumber())
             {
                 gap_seq = prev;
+
+                // Verify the calculated gap_seq in ReaderProxy is a real hole in the history.
+                if (gap_seq < min_seq) // Several samples of the hole are not really already available.
+                {
+                    if (min_seq < seq_num)
+                    {
+                        gap_seq = min_seq;
+                    }
+                    else
+                    {
+                        gap_seq = SequenceNumber_t::unknown();
+                    }
+                }
             }
         }
     }
@@ -462,7 +476,7 @@ void ReaderProxy::from_unsent_to_status(
     {
         assert(changes_for_reader_.begin() == it);
         changes_for_reader_.erase(it);
-        changes_low_mark_ = seq_num;
+        acked_changes_set(seq_num + 1);
         return;
     }
 
@@ -563,6 +577,12 @@ void ReaderProxy::change_has_been_removed(
 
     // Element may not be in the container when marked as irrelevant.
     changes_for_reader_.erase(chit);
+
+    // When removing the next-to-be-acknowledged, we should auto-acknowledge it.
+    if ((changes_low_mark_ + 1) == seq_num)
+    {
+        acked_changes_set(seq_num + 1);
+    }
 }
 
 bool ReaderProxy::has_unacknowledged(
