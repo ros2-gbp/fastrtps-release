@@ -30,7 +30,7 @@ endif()
 ###############################################################################
 # Project                                                                     #
 ###############################################################################
-project(fastrtps VERSION "2.6.0" LANGUAGES C CXX)
+project(fastrtps VERSION "2.6.1" LANGUAGES C CXX)
 
 set(PROJECT_NAME_LARGE "Fast RTPS")
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
@@ -168,7 +168,9 @@ message(STATUS "Found foonathan_memory: ${foonathan_memory_DIR}")
 find_package(ThirdpartyBoost REQUIRED)
 
 if(ANDROID)
-    eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
+    if((ANDROID_PLATFORM LESS_EQUAL 23) OR (ANDROID_NATIVE_API_LEVEL LESS_EQUAL 23))
+        eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
+    endif()
 endif()
 
 include_directories(thirdparty/nlohmann-json)
@@ -353,11 +355,11 @@ if(BUILD_DOCUMENTATION)
     endif()
 
     if(NOT CHECK_DOCUMENTATION)
-        find_program(WGET_EXE wget)
-        if(WGET_EXE)
-            message(STATUS "Found WGet: ${WGET_EXE}")
+        find_program(CURL_EXE curl)
+        if(CURL_EXE)
+            message(STATUS "Found cURL: ${CURL_EXE}")
         else()
-            message(FATAL_ERROR "wget is needed to build the documentation. Please install it correctly")
+            message(FATAL_ERROR "curl is needed to build the documentation. Please install it correctly")
         endif()
         find_program(UNZIP_EXE unzip)
         if(UNZIP_EXE)
@@ -404,7 +406,7 @@ if(BUILD_DOCUMENTATION)
     ### ReadTheDocs ########################
     if(NOT CHECK_DOCUMENTATION)
         add_custom_target(readthedocs
-            COMMAND "${WGET_EXE}" "https://media.readthedocs.org/htmlzip/eprosima-fast-rtps/v${PROJECT_VERSION}/eprosima-fast-rtps.zip"
+            COMMAND "${CURL_EXE}" "https://fast-dds.docs.eprosima.com/_/downloads/en/v${PROJECT_VERSION}/htmlzip/" "--silent" "--output" "eprosima-fast-rtps.zip"
             COMMAND "${UNZIP_EXE}" "eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/"
             COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}/doc/manual"
             COMMAND ${CMAKE_COMMAND} -E rename "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual"

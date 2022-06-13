@@ -63,6 +63,12 @@ namespace rtps {
 using reader_map_helper = utilities::collections::map_size_helper<GUID_t, SubscriptionMatchedStatus>;
 using writer_map_helper = utilities::collections::map_size_helper<GUID_t, PublicationMatchedStatus>;
 
+static bool is_partition_empty(
+        const fastdds::dds::Partition_t& partition)
+{
+    return partition.size() <= 1 && 0 == strlen(partition.name());
+}
+
 EDP::EDP(
         PDP* p,
         RTPSParticipantImpl* part)
@@ -101,11 +107,9 @@ bool EDP::newLocalReaderProxyData(
         const ReaderQos& rqos,
         const fastdds::rtps::ContentFilterProperty* content_filter)
 {
-    static_cast<void>(content_filter);
-
     logInfo(RTPS_EDP, "Adding " << reader->getGuid().entityId << " in topic " << att.topicName);
 
-    auto init_fun = [this, reader, &att, &rqos](
+    auto init_fun = [this, reader, &att, &rqos, content_filter](
         ReaderProxyData* rpd,
         bool updating,
         const ParticipantProxyData& participant_data)
@@ -150,6 +154,21 @@ bool EDP::newLocalReaderProxyData(
                 }
                 rpd->m_qos.setQos(rqos, true);
                 rpd->userDefinedId(reader->getAttributes().getUserDefinedID());
+                if (nullptr != content_filter)
+                {
+                    // Check content of ContentFilterProperty.
+                    if (!(0 < content_filter->content_filtered_topic_name.size() &&
+                            0 < content_filter->related_topic_name.size() &&
+                            0 < content_filter->filter_class_name.size() &&
+                            0 < content_filter->filter_expression.size()
+                            ))
+                    {
+                        return false;
+                    }
+
+                    rpd->content_filter(*content_filter);
+                }
+
 #if HAVE_SECURITY
                 if (mp_RTPSParticipant->is_secure())
                 {
@@ -361,9 +380,7 @@ bool EDP::updatedLocalReader(
         const ReaderQos& rqos,
         const fastdds::rtps::ContentFilterProperty* content_filter)
 {
-    static_cast<void>(content_filter);
-
-    auto init_fun = [this, reader, &rqos, &att](
+    auto init_fun = [this, reader, &rqos, &att, content_filter](
         ReaderProxyData* rdata,
         bool updating,
         const ParticipantProxyData& participant_data)
@@ -384,6 +401,25 @@ bool EDP::updatedLocalReader(
                     rdata->set_announced_unicast_locators(reader->getAttributes().unicastLocatorList);
                 }
                 rdata->m_qos.setQos(rqos, false);
+                if (nullptr != content_filter)
+                {
+                    // Check content of ContentFilterProperty.
+                    if (!(0 < content_filter->content_filtered_topic_name.size() &&
+                            0 < content_filter->related_topic_name.size() &&
+                            0 < content_filter->filter_class_name.size() &&
+                            0 < content_filter->filter_expression.size()
+                            ))
+                    {
+                        return false;
+                    }
+
+                    rdata->content_filter(*content_filter);
+                }
+                else
+                {
+                    rdata->content_filter().filter_class_name = "";
+                    rdata->content_filter().filter_expression = "";
+                }
                 rdata->isAlive(true);
                 rdata->m_expectsInlineQos = reader->expectsInlineQos();
 
@@ -721,7 +757,7 @@ bool EDP::valid_matching(
         for (auto rnameit = rdata->m_qos.m_partition.begin();
                 rnameit != rdata->m_qos.m_partition.end(); ++rnameit)
         {
-            if (rnameit->size() == 0)
+            if (is_partition_empty(*rnameit))
             {
                 matched = true;
                 break;
@@ -733,7 +769,7 @@ bool EDP::valid_matching(
         for (auto wnameit = wdata->m_qos.m_partition.begin();
                 wnameit !=  wdata->m_qos.m_partition.end(); ++wnameit)
         {
-            if (wnameit->size() == 0)
+            if (is_partition_empty(*wnameit))
             {
                 matched = true;
                 break;
@@ -947,7 +983,7 @@ bool EDP::valid_matching(
         for (auto rnameit = wdata->m_qos.m_partition.begin();
                 rnameit != wdata->m_qos.m_partition.end(); ++rnameit)
         {
-            if (rnameit->size() == 0)
+            if (is_partition_empty(*rnameit))
             {
                 matched = true;
                 break;
@@ -959,7 +995,7 @@ bool EDP::valid_matching(
         for (auto wnameit = rdata->m_qos.m_partition.begin();
                 wnameit !=  rdata->m_qos.m_partition.end(); ++wnameit)
         {
-            if (wnameit->size() == 0)
+            if (is_partition_empty(*wnameit))
             {
                 matched = true;
                 break;
