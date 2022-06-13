@@ -122,7 +122,7 @@ public:
      * All changes with status UNKNOWN or MISSING with seq_num < input seq_num are marked LOST.
      * @param[in] seq_num Pointer to the SequenceNumber.
      */
-    void lost_changes_update(
+    int32_t lost_changes_update(
             const SequenceNumber_t& seq_num);
 
     /**
@@ -266,7 +266,8 @@ public:
             bool final_flag,
             bool liveliness_flag,
             bool disable_positive,
-            bool& assert_liveliness);
+            bool& assert_liveliness,
+            int32_t& current_sample_lost);
 
     /**
      * Set a new value for the interval of the heartbeat response event.
@@ -412,6 +413,8 @@ private:
     LocatorSelectorEntry locators_entry_;
     //! Is the writer datasharing
     bool is_datasharing_writer_;
+    //! Wether at least one heartbeat was recevied.
+    bool received_at_least_one_heartbeat_;
 
     using ChangeIterator = decltype(changes_received_)::iterator;
 

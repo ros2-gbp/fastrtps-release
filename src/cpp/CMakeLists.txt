@@ -91,7 +91,9 @@ set(${PROJECT_NAME}_source_files
     fastrtps_deprecated/subscriber/SubscriberHistory.cpp
     fastdds/publisher/DataWriter.cpp
     fastdds/publisher/DataWriterImpl.cpp
+    fastdds/publisher/DataWriterHistory.cpp
     fastdds/topic/ContentFilteredTopic.cpp
+    fastdds/topic/ContentFilteredTopicImpl.cpp
     fastdds/topic/Topic.cpp
     fastdds/topic/TopicImpl.cpp
     fastdds/topic/TypeSupport.cpp
@@ -344,9 +346,11 @@ if(TINYXML2_SOURCE_DIR)
 endif()
 
 if(ANDROID)
-    list(APPEND ${PROJECT_NAME}_source_files
-        ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-        )
+    if((ANDROID_PLATFORM LESS_EQUAL 23) OR (ANDROID_NATIVE_API_LEVEL LESS_EQUAL 23))
+        list(APPEND ${PROJECT_NAME}_source_files
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
 endif()
 
 # Option to enable strict real-time. In this case, several API functions have a real-time behaviour.
