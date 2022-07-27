@@ -30,7 +30,7 @@ endif()
 ###############################################################################
 # Project                                                                     #
 ###############################################################################
-project(fastrtps VERSION "2.6.1" LANGUAGES C CXX)
+project(fastrtps VERSION "2.6.2" LANGUAGES C CXX)
 
 set(PROJECT_NAME_LARGE "Fast RTPS")
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
@@ -62,7 +62,8 @@ if(MSVC OR MSVC_IDE)
     # C4555  expression has no effect; expected expression with side-effect
     # C4715: 'Test': not all control paths return a value
     # C5038 data member 'member1' will be initialized after data member 'member2'
-    add_compile_options(/w34101 /w34189 /w34555 /w34715 /w35038)
+    # C4100 'identifier' : unreferenced formal parameter (matches clang -Wunused-lambda-capture)
+    add_compile_options(/w34101 /w34189 /w34555 /w34715 /w35038 /w44100)
 
     if(EPROSIMA_BUILD)
         string(REPLACE "/DNDEBUG" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
@@ -355,12 +356,6 @@ if(BUILD_DOCUMENTATION)
     endif()
 
     if(NOT CHECK_DOCUMENTATION)
-        find_program(CURL_EXE curl)
-        if(CURL_EXE)
-            message(STATUS "Found cURL: ${CURL_EXE}")
-        else()
-            message(FATAL_ERROR "curl is needed to build the documentation. Please install it correctly")
-        endif()
         find_program(UNZIP_EXE unzip)
         if(UNZIP_EXE)
             message(STATUS "Found Unzip: ${UNZIP_EXE}")
@@ -405,12 +400,23 @@ if(BUILD_DOCUMENTATION)
 
     ### ReadTheDocs ########################
     if(NOT CHECK_DOCUMENTATION)
+
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom_template.cmake [=[
+
+            file(DOWNLOAD "https://fast-dds.docs.eprosima.com/_/downloads/en/v${PROJECT_VERSION}/htmlzip/" "./eprosima-fast-rtps.zip")
+            # TODO: when windows ci CMake version surpasses 17 favor file() instead of UNZIP as in the next line
+            # file(ARCHIVE_EXTRACT INPUT "./eprosima-fast-rtps.zip" DESTINATION  "${PROJECT_BINARY_DIR}/doc/")
+            execute_process(COMMAND "${UNZIP_EXE}" "./eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/")
+            file(REMOVE_RECURSE "${PROJECT_BINARY_DIR}/doc/manual")
+            file(RENAME "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual")
+            file(REMOVE  "./eprosima-fast-rtps.zip")
+
+            ]=])
+
+        configure_file(${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom_template.cmake  ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom.cmake)
+
         add_custom_target(readthedocs
-            COMMAND "${CURL_EXE}" "https://fast-dds.docs.eprosima.com/_/downloads/en/v${PROJECT_VERSION}/htmlzip/" "--silent" "--output" "eprosima-fast-rtps.zip"
-            COMMAND "${UNZIP_EXE}" "eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/"
-            COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}/doc/manual"
-            COMMAND ${CMAKE_COMMAND} -E rename "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual"
-            COMMAND ${CMAKE_COMMAND} -E remove "eprosima-fast-rtps.zip"
+            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom.cmake 
             )
 
         add_dependencies(readthedocs docdirs)
