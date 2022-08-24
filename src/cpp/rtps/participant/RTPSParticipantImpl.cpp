@@ -357,7 +357,16 @@ RTPSParticipantImpl::RTPSParticipantImpl(
 
     mp_builtinProtocols = new BuiltinProtocols();
 
-    logInfo(RTPS_PARTICIPANT, "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix);
+    if (c_GuidPrefix_Unknown != persistence_guid)
+    {
+        logInfo(RTPS_PARTICIPANT, "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix
+                                                       << " and persistence guid: " << persistence_guid);
+    }
+    else
+    {
+        logInfo(RTPS_PARTICIPANT,
+                "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix);
+    }
 }
 
 RTPSParticipantImpl::RTPSParticipantImpl(
@@ -1107,7 +1116,6 @@ bool RTPSParticipantImpl::assignEndpoint2LocatorList(
        one of the supported Locators is needed to make the match, and the case of new ListenResources being created has been removed
        since its the NetworkFactory the one that takes care of Resource creation.
      */
-    LocatorList_t finalList;
     for (auto lit = list.begin(); lit != list.end(); ++lit)
     {
         //Iteration of all Locators within the Locator list passed down as argument
