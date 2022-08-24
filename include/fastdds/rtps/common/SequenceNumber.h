@@ -18,15 +18,13 @@
 
 #ifndef _FASTDDS_RPTS_ELEM_SEQNUM_H_
 #define _FASTDDS_RPTS_ELEM_SEQNUM_H_
-
-#include <algorithm>
-#include <cassert>
-#include <limits>
-#include <vector>
-
 #include <fastrtps/fastrtps_dll.h>
 #include <fastrtps/utils/fixed_size_bitmap.hpp>
 #include <fastdds/rtps/common/Types.h>
+
+#include <algorithm>
+#include <cassert>
+#include <vector>
 
 namespace eprosima {
 namespace fastrtps {
@@ -86,7 +84,6 @@ struct RTPS_DllAPI SequenceNumber_t
         ++low;
         if (low == 0)
         {
-            assert(std::numeric_limits<decltype(high)>::max() > high);
             ++high;
         }
 
@@ -115,7 +112,6 @@ struct RTPS_DllAPI SequenceNumber_t
         if (low < aux_low)
         {
             // Being the type of the parameter an 'int', the increment of 'high' will be as much as 1.
-            assert(std::numeric_limits<decltype(high)>::max() > high);
             ++high;
         }
 
@@ -232,8 +228,8 @@ inline bool operator <=(
 /**
  * Subtract one uint32_t from a SequenceNumber_t
  * @param seq Base SequenceNumber_t
- * @param inc uint32_t to subtract
- * @return Result of the subtraction
+ * @param inc uint32_t to substract
+ * @return Result of the substraction
  */
 inline SequenceNumber_t operator -(
         const SequenceNumber_t& seq,
@@ -244,7 +240,6 @@ inline SequenceNumber_t operator -(
     if (inc > seq.low)
     {
         // Being the type of the parameter an 'uint32_t', the decrement of 'high' will be as much as 1.
-        assert(0 < res.high);
         --res.high;
     }
 
@@ -266,7 +261,6 @@ inline SequenceNumber_t operator +(
     if (res.low < seq.low)
     {
         // Being the type of the parameter an 'uint32_t', the increment of 'high' will be as much as 1.
-        assert(std::numeric_limits<decltype(res.high)>::max() > res.high);
         ++res.high;
     }
 
@@ -288,7 +282,6 @@ inline SequenceNumber_t operator -(
 
     if (minuend.low < subtrahend.low)
     {
-        assert(0 < res.high);
         --res.high;
     }
 
@@ -297,7 +290,7 @@ inline SequenceNumber_t operator -(
 
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-const SequenceNumber_t c_SequenceNumber_Unknown{-1, 0};
+const SequenceNumber_t c_SequenceNumber_Unknown(-1, 0);
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 

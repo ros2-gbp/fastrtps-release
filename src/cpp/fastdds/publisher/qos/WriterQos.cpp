@@ -31,12 +31,13 @@ namespace dds {
 
 WriterQos::WriterQos()
 {
-    m_reliability.kind = RELIABLE_RELIABILITY_QOS;
-    m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+    this->m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+    this->m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
 }
 
 WriterQos::~WriterQos()
 {
+
 }
 
 void WriterQos::setQos(
@@ -78,7 +79,7 @@ void WriterQos::setQos(
         m_destinationOrder = qos.m_destinationOrder;
         m_destinationOrder.hasChanged = true;
     }
-    if (first_time || m_userData.data_vec() != qos.m_userData.data_vec())
+    if (m_userData.data_vec() != qos.m_userData.data_vec())
     {
         m_userData = qos.m_userData;
         m_userData.hasChanged = true;
@@ -95,18 +96,18 @@ void WriterQos::setQos(
         m_presentation = qos.m_presentation;
         m_presentation.hasChanged = true;
     }
-    if (first_time || qos.m_partition.names().size() > 0)
+    if (qos.m_partition.names().size() > 0)
     {
         m_partition = qos.m_partition;
         m_partition.hasChanged = true;
     }
 
-    if (first_time || m_topicData.getValue() != qos.m_topicData.getValue())
+    if (m_topicData.getValue() != qos.m_topicData.getValue())
     {
         m_topicData = qos.m_topicData;
         m_topicData.hasChanged = true;
     }
-    if (first_time || m_groupData.getValue() != qos.m_groupData.getValue())
+    if (m_groupData.getValue() != qos.m_groupData.getValue())
     {
         m_groupData = qos.m_groupData;
         m_groupData.hasChanged = true;
@@ -144,11 +145,6 @@ void WriterQos::setQos(
     {
         representation = qos.representation;
         representation.hasChanged = true;
-    }
-    if (first_time && !(data_sharing == qos.data_sharing))
-    {
-        data_sharing = qos.data_sharing;
-        data_sharing.hasChanged = true;
     }
 }
 
@@ -224,13 +220,8 @@ bool WriterQos::canQosBeUpdated(
         updatable = false;
         logWarning(RTPS_QOS_CHECK, "Destination order Kind cannot be changed after the creation of a publisher.");
     }
-    if (data_sharing.kind() != qos.data_sharing.kind() ||
-            data_sharing.domain_ids() != qos.data_sharing.domain_ids())
-    {
-        updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Data sharing configuration cannot be changed after the creation of a publisher.");
-    }
     return updatable;
+
 }
 
 void WriterQos::clear()
@@ -254,7 +245,6 @@ void WriterQos::clear()
     m_ownershipStrength.clear();
     m_publishMode.clear();
     representation.clear();
-    data_sharing.clear();
 
     m_reliability.kind = RELIABLE_RELIABILITY_QOS;
 }

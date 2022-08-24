@@ -194,14 +194,6 @@ public:
      */
     void assert_liveliness();
 
-    /**
-     * Get the list of locators from which this publisher may send data.
-     *
-     * @param [out] locators  LocatorList_t where the list of locators will be stored.
-     */
-    void get_sending_locators(
-            rtps::LocatorList_t& locators) const;
-
     std::shared_ptr<rtps::IPayloadPool> payload_pool();
 
 private:
@@ -249,6 +241,8 @@ private:
     Publisher* mp_userPublisher;
 
     rtps::RTPSParticipant* mp_rtpsParticipant;
+
+    uint32_t high_mark_for_frag_;
 
     //! A timer used to check for deadlines
     rtps::TimedEvent* deadline_timer_;

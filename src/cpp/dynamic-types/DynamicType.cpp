@@ -20,6 +20,8 @@
 #include <fastrtps/types/DynamicTypeMember.h>
 #include <fastdds/dds/log/Log.hpp>
 
+#include <dds/core/LengthUnlimited.hpp>
+
 namespace eprosima {
 namespace fastrtps {
 namespace types {
@@ -411,7 +413,7 @@ uint32_t DynamicType::get_bounds(
     {
         return descriptor_->get_bounds(index);
     }
-    return BOUND_UNLIMITED;
+    return ::dds::core::LENGTH_UNLIMITED;
 }
 
 uint32_t DynamicType::get_bounds_size() const
@@ -456,7 +458,7 @@ uint32_t DynamicType::get_total_bounds() const
     {
         return descriptor_->get_total_bounds();
     }
-    return BOUND_UNLIMITED;
+    return ::dds::core::LENGTH_UNLIMITED;
 }
 
 bool DynamicType::has_children() const

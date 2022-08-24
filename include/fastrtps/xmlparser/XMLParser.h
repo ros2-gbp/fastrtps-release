@@ -162,6 +162,10 @@ protected:
             tinyxml2::XMLElement* p_root,
             BaseNode& profilesNode);
 
+    RTPS_DllAPI static XMLP_ret parseRoot(
+            tinyxml2::XMLElement* p_root,
+            BaseNode& rootNode);
+
 
     /**
      * Load a XML log node and parses it. It applies the configuration of the node directly.
@@ -521,7 +525,7 @@ protected:
 
     RTPS_DllAPI static XMLP_ret getXMLOctetVector(
             tinyxml2::XMLElement* elem,
-            std::vector<rtps::octet>& octet_vector,
+            std::vector<rtps::octet>& octetVector,
             uint8_t ident);
 
     RTPS_DllAPI static XMLP_ret getXMLInt(
@@ -577,11 +581,6 @@ protected:
     RTPS_DllAPI static XMLP_ret getXMLDisablePositiveAcksQos(
             tinyxml2::XMLElement* elem,
             DisablePositiveACKsQosPolicy& disablePositiveAcks,
-            uint8_t ident);
-
-    RTPS_DllAPI static XMLP_ret getXMLDataSharingQos(
-            tinyxml2::XMLElement* elem,
-            DataSharingQosPolicy& data_sharing,
             uint8_t ident);
 
     RTPS_DllAPI static XMLP_ret getXMLguidPrefix(

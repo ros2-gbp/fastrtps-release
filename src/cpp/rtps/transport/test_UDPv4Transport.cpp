@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/test_UDPv4Transport.h>
-
+#include <asio.hpp>
+#include <fastdds/rtps/transport/test_UDPv4Transport.h>
 #include <cstdlib>
 #include <functional>
-
-#include <asio.hpp>
-#include <fastrtps/utils/IPLocator.h>
 
 using namespace std;
 
@@ -27,6 +24,7 @@ namespace fastdds {
 namespace rtps {
 
 using octet = fastrtps::rtps::octet;
+using Locator_t = fastrtps::rtps::Locator_t;
 using CDRMessage_t = fastrtps::rtps::CDRMessage_t;
 using SubmessageHeader_t = fastrtps::rtps::SubmessageHeader_t;
 using SequenceNumber_t = fastrtps::rtps::SequenceNumber_t;
@@ -114,23 +112,6 @@ TransportInterface* test_UDPv4TransportDescriptor::create_transport() const
     return new test_UDPv4Transport(*this);
 }
 
-bool test_UDPv4TransportDescriptor::operator ==(
-        const test_UDPv4TransportDescriptor& t) const
-{
-    return (this->dropDataMessagesPercentage == t.dropDataMessagesPercentage &&
-           this->dropParticipantBuiltinTopicData == t.dropParticipantBuiltinTopicData &&
-           this->dropPublicationBuiltinTopicData == t.dropPublicationBuiltinTopicData &&
-           this->dropSubscriptionBuiltinTopicData == t.dropSubscriptionBuiltinTopicData &&
-           this->dropDataFragMessagesPercentage == t.dropDataFragMessagesPercentage &&
-           this->dropHeartbeatMessagesPercentage == t.dropHeartbeatMessagesPercentage &&
-           this->dropAckNackMessagesPercentage == t.dropAckNackMessagesPercentage &&
-           this->dropGapMessagesPercentage == t.dropGapMessagesPercentage &&
-           this->percentageOfMessagesToDrop == t.percentageOfMessagesToDrop &&
-           this->sequenceNumberDataMessagesToDrop == t.sequenceNumberDataMessagesToDrop &&
-           this->dropLogLength == t.dropLogLength &&
-           SocketTransportDescriptor::operator ==(t));
-}
-
 void test_UDPv4Transport::get_ips(
         std::vector<fastrtps::rtps::IPFinder::info_IP>& locNames,
         bool return_loopback)
@@ -154,28 +135,6 @@ void test_UDPv4Transport::get_ips(
     }
 }
 
-LocatorList test_UDPv4Transport::NormalizeLocator(
-        const Locator& locator)
-{
-    if (!simulate_no_interfaces)
-    {
-        return UDPv4Transport::NormalizeLocator(locator);
-    }
-
-    LocatorList list;
-    if (fastrtps::rtps::IPLocator::isAny(locator))
-    {
-        Locator newloc(locator);
-        fastrtps::rtps::IPLocator::setIPv4(newloc, "127.0.0.1");
-        list.push_back(newloc);
-    }
-    else
-    {
-        list.push_back(locator);
-    }
-    return list;
-}
-
 bool test_UDPv4Transport::send(
         const octet* send_buffer,
         uint32_t send_buffer_size,
@@ -183,7 +142,6 @@ bool test_UDPv4Transport::send(
         fastrtps::rtps::LocatorsIterator* destination_locators_begin,
         fastrtps::rtps::LocatorsIterator* destination_locators_end,
         bool only_multicast_purpose,
-        bool whitelisted,
         const std::chrono::steady_clock::time_point& max_blocking_time_point)
 {
     fastrtps::rtps::LocatorsIterator& it = *destination_locators_begin;
@@ -201,7 +159,6 @@ bool test_UDPv4Transport::send(
                             socket,
                             *it,
                             only_multicast_purpose,
-                            whitelisted,
                             std::chrono::duration_cast<std::chrono::microseconds>(now - max_blocking_time_point));
 
             ++it;
@@ -220,25 +177,19 @@ bool test_UDPv4Transport::send(
         const octet* send_buffer,
         uint32_t send_buffer_size,
         eProsimaUDPSocket& socket,
-        const Locator& remote_locator,
+        const Locator_t& remote_locator,
         bool only_multicast_purpose,
-        bool whitelisted,
         const std::chrono::microseconds& timeout)
 {
-    if (packet_should_drop(send_buffer, send_buffer_size) ||
-            // If there are no interfaces (simulate_no_interfaces), only multicast and localhost traffic is sent
-            (simulate_no_interfaces &&
-            !fastrtps::rtps::IPLocator::isMulticast(remote_locator) &&
-            !fastrtps::rtps::IPLocator::isLocal(remote_locator)))
+    if (packet_should_drop(send_buffer, send_buffer_size))
     {
-        statistics_info_.set_statistics_message_data(remote_locator, send_buffer, send_buffer_size);
         log_drop(send_buffer, send_buffer_size);
         return true;
     }
     else
     {
         return UDPv4Transport::send(send_buffer, send_buffer_size, socket, remote_locator, only_multicast_purpose,
-                       whitelisted, timeout);
+                       timeout);
     }
 }
 

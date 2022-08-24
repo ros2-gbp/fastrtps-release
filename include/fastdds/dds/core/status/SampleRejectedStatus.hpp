@@ -20,8 +20,7 @@
 #define _FASTDDS_DDS_QOS_SAMPLEREJECTEDSTATUS_HPP_
 
 #include <cstdint>
-
-#include <fastdds/dds/topic/TypeSupport.hpp>
+#include <fastdds/rtps/common/InstanceHandle.h>
 
 namespace eprosima {
 namespace fastdds {
@@ -62,7 +61,7 @@ struct SampleRejectedStatus
     /**
      * Handle to the instance being updated by the last sample that was rejected.
      */
-    InstanceHandle_t last_instance_handle;
+    fastrtps::rtps::InstanceHandle_t last_instance_handle;
 };
 
 } //namespace dds

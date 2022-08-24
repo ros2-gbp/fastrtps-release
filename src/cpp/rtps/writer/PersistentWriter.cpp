@@ -21,7 +21,6 @@
 #include <fastdds/rtps/history/WriterHistory.h>
 #include <rtps/persistence/PersistenceService.h>
 #include <fastrtps_deprecated/participant/ParticipantImpl.h>
-#include <rtps/DataSharing/WriterPool.hpp>
 
 namespace eprosima {
 namespace fastrtps {
@@ -44,24 +43,13 @@ PersistentWriter::PersistentWriter(
     ss << p_guid;
     persistence_guid_ = ss.str();
 
-    persistence_->load_writer_from_storage(persistence_guid_, guid, hist,
+    persistence_->load_writer_from_storage(persistence_guid_, guid, hist->m_changes,
             change_pool, payload_pool, hist->m_lastCacheChangeSeqNum);
 
     // Update history state after loading from DB
     hist->m_isHistoryFull =
             hist->m_att.maximumReservedCaches > 0 &&
             static_cast<int32_t>(hist->m_changes.size()) == hist->m_att.maximumReservedCaches;
-
-    // Prepare the changes for datasharing if compatible
-    if (att.endpoint.data_sharing_configuration().kind() != OFF)
-    {
-        auto pool = std::dynamic_pointer_cast<WriterPool>(payload_pool);
-        assert(pool != nullptr);
-        for (auto change : hist->m_changes)
-        {
-            pool->add_to_shared_history(change);
-        }
-    }
 }
 
 PersistentWriter::~PersistentWriter()

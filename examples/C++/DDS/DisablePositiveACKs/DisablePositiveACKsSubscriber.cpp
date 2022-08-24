@@ -127,7 +127,7 @@ void DisablePositiveACKsSubscriber::SubListener::on_data_available(
     SampleInfo info;
     if (reader->take_next_sample(&hello, &info) == ReturnCode_t::RETCODE_OK)
     {
-        if (info.valid_data)
+        if (info.instance_state == eprosima::fastdds::dds::ALIVE)
         {
             this->n_samples++;
             std::cout << "Message with index " << hello.index() << " RECEIVED" << std::endl;

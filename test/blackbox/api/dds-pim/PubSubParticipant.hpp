@@ -20,27 +20,25 @@
 #ifndef _TEST_BLACKBOX_PUBSUBPARTICIPANT_HPP_
 #define _TEST_BLACKBOX_PUBSUBPARTICIPANT_HPP_
 
-#include <atomic>
-#include <condition_variable>
-#include <thread>
-#include <tuple>
-#include <vector>
-
-#include <asio.hpp>
-#include <gtest/gtest.h>
-#include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
-#include <fastdds/dds/publisher/DataWriter.hpp>
-#include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
+#include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
-#include <fastdds/dds/subscriber/DataReader.hpp>
-#include <fastdds/dds/subscriber/DataReaderListener.hpp>
+#include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
+#include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
-#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
+#include <fastdds/dds/subscriber/DataReaderListener.hpp>
+
+#include <asio.hpp>
+#include <condition_variable>
+#include <gtest/gtest.h>
+#include <thread>
+#include <vector>
+#include <tuple>
 
 /**
  * @brief A class with one participant that can have multiple publishers and subscribers
@@ -48,13 +46,6 @@
 template<class TypeSupport>
 class PubSubParticipant
 {
-public:
-
-    typedef TypeSupport type_support;
-    typedef typename type_support::type type;
-
-private:
-
     class PubListener : public eprosima::fastdds::dds::DataWriterListener
     {
         friend class PubSubParticipant;
@@ -126,18 +117,6 @@ private:
 
         }
 
-        void on_data_available(
-                eprosima::fastdds::dds::DataReader* reader) override
-        {
-            type data;
-            eprosima::fastdds::dds::SampleInfo info;
-
-            while (ReturnCode_t::RETCODE_OK == reader->take_next_sample(&data, &info))
-            {
-                participant_->data_received();
-            }
-        }
-
     private:
 
         SubListener& operator =(
@@ -146,59 +125,10 @@ private:
         PubSubParticipant* participant_;
     };
 
-    class ParticipantListener : public eprosima::fastdds::dds::DomainParticipantListener
-    {
-        friend class PubSubParticipant;
-
-    public:
-
-        ParticipantListener(
-                PubSubParticipant* participant)
-            : participant_(participant)
-        {
-        }
-
-        ~ParticipantListener() = default;
-
-        void on_participant_discovery(
-                eprosima::fastdds::dds::DomainParticipant*,
-                eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&& info)
-        {
-            bool expected = false;
-            if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
-            {
-                ++participant_->matched_;
-                if (nullptr !=  participant_->on_discovery_)
-                {
-                    participant_->discovery_result_.compare_exchange_strong(expected,
-                            participant_->on_discovery_(info));
-                }
-                participant_->cv_discovery_.notify_one();
-            }
-            else if (participant_->on_participant_qos_update_ != nullptr &&
-                    info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::CHANGED_QOS_PARTICIPANT)
-            {
-                participant_->participant_qos_updated_.compare_exchange_strong(expected,
-                        participant_->on_participant_qos_update_(info));
-                participant_->cv_discovery_.notify_one();
-            }
-            else if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT ||
-                    info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
-            {
-                --participant_->matched_;
-                participant_->cv_discovery_.notify_one();
-            }
-        }
-
-    private:
-
-        ParticipantListener& operator =(
-                const ParticipantListener&) = delete;
-        PubSubParticipant* participant_;
-
-    };
-
 public:
+
+    typedef TypeSupport type_support;
+    typedef typename type_support::type type;
 
     PubSubParticipant(
             unsigned int num_publishers,
@@ -212,35 +142,14 @@ public:
         , num_expected_publishers_(num_expected_publishers)
         , publishers_(num_publishers)
         , subscribers_(num_subscribers)
-        , participant_listener_(this)
         , pub_listener_(this)
         , sub_listener_(this)
-        , matched_(0)
-        , on_discovery_(nullptr)
-        , on_participant_qos_update_(nullptr)
-        , discovery_result_(false)
-        , participant_qos_updated_(false)
         , pub_matched_(0)
         , sub_matched_(0)
         , pub_times_liveliness_lost_(0)
         , sub_times_liveliness_lost_(0)
         , sub_times_liveliness_recovered_(0)
     {
-        if (enable_datasharing)
-        {
-            datareader_qos_.data_sharing().automatic();
-            datawriter_qos_.data_sharing().automatic();
-        }
-        else
-        {
-            datareader_qos_.data_sharing().off();
-            datawriter_qos_.data_sharing().off();
-        }
-
-        if (use_pull_mode)
-        {
-            datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
-        }
 
 #if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
         datawriter_qos_.historyMemoryPolicy = rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
@@ -302,13 +211,9 @@ public:
 
     bool init_participant()
     {
-        matched_ = 0;
-
         participant_ = eprosima::fastdds::dds::DomainParticipantFactory::get_instance()->create_participant(
             (uint32_t)GET_PID() % 230,
-            participant_qos_,
-            &participant_listener_,
-            eprosima::fastdds::dds::StatusMask::none());
+            participant_qos_);
 
         if (participant_ != nullptr)
         {
@@ -394,18 +299,6 @@ public:
         return false;
     }
 
-    eprosima::fastdds::dds::DataWriter& get_native_writer(
-            unsigned int index)
-    {
-        return *(std::get<2>(publishers_[index]));
-    }
-
-    eprosima::fastdds::dds::DataReader& get_native_reader(
-            unsigned int index)
-    {
-        return *(std::get<2>(subscribers_[index]));
-    }
-
     bool send_sample(
             type& msg,
             unsigned int index = 0)
@@ -422,59 +315,6 @@ public:
             unsigned int index = 0)
     {
         std::get<2>(publishers_[index])->assert_liveliness();
-    }
-
-    bool wait_discovery(
-            std::chrono::seconds timeout = std::chrono::seconds::zero(),
-            uint8_t matched = 0,
-            bool exact = false)
-    {
-        // No need to wait in this case
-        if (exact && matched == matched_)
-        {
-            return true;
-        }
-
-        std::unique_lock<std::mutex> lock(mutex_discovery_);
-        bool ret_value = true;
-        std::cout << "Participant is waiting discovery..." << std::endl;
-
-        if (timeout == std::chrono::seconds::zero())
-        {
-            cv_discovery_.wait(lock, [&]()
-                    {
-                        if (exact)
-                        {
-                            return matched_ == matched;
-                        }
-                        return matched_ >= matched;
-                    });
-        }
-        else
-        {
-            if (!cv_discovery_.wait_for(lock, timeout, [&]()
-                    {
-                        if (exact)
-                        {
-                            return matched_ == matched;
-                        }
-                        return matched_ >= matched;
-                    }))
-            {
-                ret_value = false;
-            }
-        }
-
-        if (ret_value)
-        {
-            std::cout << "Participant discovery finished successfully..." << std::endl;
-        }
-        else
-        {
-            std::cout << "Participant discovery finished unsuccessfully..." << std::endl;
-        }
-
-        return ret_value;
     }
 
     void pub_wait_discovery(
@@ -616,67 +456,6 @@ public:
         return *this;
     }
 
-    PubSubParticipant& disable_builtin_transport()
-    {
-        participant_qos_.transport().use_builtin_transports = false;
-        return *this;
-    }
-
-    PubSubParticipant& add_user_transport_to_pparams(
-            std::shared_ptr<eprosima::fastdds::rtps::TransportDescriptorInterface> userTransportDescriptor)
-    {
-        participant_qos_.transport().user_transports.push_back(userTransportDescriptor);
-        return *this;
-    }
-
-    PubSubParticipant& user_data(
-            const std::vector<eprosima::fastrtps::rtps::octet>& user_data)
-    {
-        participant_qos_.user_data().data_vec(user_data);
-        return *this;
-    }
-
-    bool update_user_data(
-            const std::vector<eprosima::fastrtps::rtps::octet>& user_data)
-    {
-        participant_qos_.user_data().data_vec(user_data);
-        return ReturnCode_t::RETCODE_OK == participant_->set_qos(participant_qos_);
-    }
-
-    PubSubParticipant& wire_protocol(
-            const eprosima::fastdds::dds::WireProtocolConfigQos& wire_protocol)
-    {
-        participant_qos_.wire_protocol() = wire_protocol;
-        return *this;
-    }
-
-    bool update_wire_protocol(
-            const eprosima::fastdds::dds::WireProtocolConfigQos& wire_protocol)
-    {
-        eprosima::fastdds::dds::DomainParticipantQos participant_qos = participant_qos_;
-        participant_qos.wire_protocol() = wire_protocol;
-        if (ReturnCode_t::RETCODE_OK == participant_->set_qos(participant_qos))
-        {
-            participant_qos_ = participant_qos;
-            return true;
-        }
-        return false;
-    }
-
-    PubSubParticipant& pub_property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
-    {
-        datawriter_qos_.properties() = property_policy;
-        return *this;
-    }
-
-    PubSubParticipant& sub_property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
-    {
-        datareader_qos_.properties() = property_policy;
-        return *this;
-    }
-
     PubSubParticipant& pub_topic_name(
             std::string topicName)
     {
@@ -795,13 +574,6 @@ public:
         sub_liveliness_cv_.notify_one();
     }
 
-    void data_received()
-    {
-        std::unique_lock<std::mutex> lock(sub_data_mutex_);
-        sub_times_data_received_++;
-        sub_data_cv_.notify_one();
-    }
-
     unsigned int pub_times_liveliness_lost()
     {
         std::unique_lock<std::mutex> lock(pub_liveliness_mutex_);
@@ -818,46 +590,6 @@ public:
     {
         std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
         return sub_times_liveliness_recovered_;
-    }
-
-    void wait_discovery_result()
-    {
-        std::unique_lock<std::mutex> lock(mutex_discovery_);
-
-        std::cout << "Participant is waiting discovery result..." << std::endl;
-
-        cv_discovery_.wait(lock, [&]() ->  bool
-                {
-                    return discovery_result_;
-                });
-
-        std::cout << "Participant gets discovery result..." << std::endl;
-    }
-
-    void wait_qos_update()
-    {
-        std::unique_lock<std::mutex> lock(mutex_discovery_);
-
-        std::cout << "Participant is waiting QoS update..." << std::endl;
-
-        cv_discovery_.wait(lock, [&]() -> bool
-                {
-                    return participant_qos_updated_;
-                });
-
-        std::cout << "Participant gets QoS update..." << std::endl;
-    }
-
-    void set_on_discovery_function(
-            std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&)> f)
-    {
-        on_discovery_ = f;
-    }
-
-    void set_on_participant_qos_update_function(
-            std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&)> f)
-    {
-        on_participant_qos_update_ = f;
     }
 
 private:
@@ -919,23 +651,12 @@ private:
     eprosima::fastdds::dds::DataWriterQos datawriter_qos_;
     //! Subscriber attributes
     eprosima::fastdds::dds::DataReaderQos datareader_qos_;
-    //! A listener for participants
-    ParticipantListener participant_listener_;
     //! A listener for publishers
     PubListener pub_listener_;
     //! A listener for subscribers
     SubListener sub_listener_;
     std::string publisher_topicname_;
     std::string subscriber_topicname_;
-
-    //! Discovery
-    std::mutex mutex_discovery_;
-    std::condition_variable cv_discovery_;
-    std::atomic<unsigned int> matched_;
-    std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> on_discovery_;
-    std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> on_participant_qos_update_;
-    std::atomic_bool discovery_result_;
-    std::atomic_bool participant_qos_updated_;
 
     std::mutex pub_mutex_;
     std::mutex sub_mutex_;
@@ -958,13 +679,6 @@ private:
     std::mutex pub_liveliness_mutex_;
     //! A condition variable for liveliness of publisher
     std::condition_variable pub_liveliness_cv_;
-
-    //! A mutex protecting received data
-    std::mutex sub_data_mutex_;
-    //! A condition variable for received data
-    std::condition_variable sub_data_cv_;
-    //! Number of times a subscriber received data
-    size_t sub_times_data_received_ = 0;
 
     eprosima::fastdds::dds::TypeSupport type_;
 };

@@ -25,82 +25,63 @@
 
 #include "BenchmarkPubSubTypes.h"
 
-using SerializedPayload_t = eprosima::fastrtps::rtps::SerializedPayload_t;
-using InstanceHandle_t = eprosima::fastrtps::rtps::InstanceHandle_t;
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 BenchMarkPubSubType::BenchMarkPubSubType()
 {
     setName("BenchMark");
-    auto type_size = BenchMark::getMaxCdrSerializedSize();
-    type_size += eprosima::fastcdr::Cdr::alignment(type_size, 4); /* possible submessage alignment */
-    m_typeSize = static_cast<uint32_t>(type_size) + 4; /*encapsulation*/
+    m_typeSize = static_cast<uint32_t>(BenchMark::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
     m_isGetKeyDefined = BenchMark::isKeyDefined();
-    size_t keyLength = BenchMark::getKeyMaxCdrSerializedSize() > 16 ?
-            BenchMark::getKeyMaxCdrSerializedSize() : 16;
+    size_t keyLength = BenchMark::getKeyMaxCdrSerializedSize()>16 ? BenchMark::getKeyMaxCdrSerializedSize() : 16;
     m_keyBuffer = reinterpret_cast<unsigned char*>(malloc(keyLength));
     memset(m_keyBuffer, 0, keyLength);
 }
 
 BenchMarkPubSubType::~BenchMarkPubSubType()
 {
-    if (m_keyBuffer != nullptr)
-    {
+    if(m_keyBuffer!=nullptr)
         free(m_keyBuffer);
-    }
 }
 
-bool BenchMarkPubSubType::serialize(
-        void* data,
-        SerializedPayload_t* payload)
+bool BenchMarkPubSubType::serialize(void *data, SerializedPayload_t *payload)
 {
-    BenchMark* p_type = static_cast<BenchMark*>(data);
-
-    // Object that manages the raw buffer.
-    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->max_size);
-    // Object that serializes the data.
-    eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
+    BenchMark *p_type = static_cast<BenchMark*>(data);
+    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->max_size); // Object that manages the raw buffer.
+    eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
     payload->encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
     // Serialize encapsulation
     ser.serialize_encapsulation();
 
     try
     {
-        // Serialize the object.
-        p_type->serialize(ser);
+        p_type->serialize(ser); // Serialize the object:
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
+    catch(eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
     {
         return false;
     }
 
-    // Get the serialized length
-    payload->length = static_cast<uint32_t>(ser.getSerializedDataLength());
+    payload->length = static_cast<uint32_t>(ser.getSerializedDataLength()); //Get the serialized length
     return true;
 }
 
-bool BenchMarkPubSubType::deserialize(
-        SerializedPayload_t* payload,
-        void* data)
+bool BenchMarkPubSubType::deserialize(SerializedPayload_t* payload, void* data)
 {
+    BenchMark* p_type = static_cast<BenchMark*>(data); //Convert DATA to pointer of your type
+    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->length); // Object that manages the raw buffer.
+    eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
+    // Deserialize encapsulation.
+    deser.read_encapsulation();
+    payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+
     try
     {
-        //Convert DATA to pointer of your type
-        BenchMark* p_type = static_cast<BenchMark*>(data);
-
-        // Object that manages the raw buffer.
-        eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->length);
-
-        // Object that deserializes the data.
-        eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
-
-        // Deserialize encapsulation.
-        deser.read_encapsulation();
-        payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-
-        // Deserialize the object.
-        p_type->deserialize(deser);
+        p_type->deserialize(deser); //Deserialize the object:
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
+    catch(eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
     {
         return false;
     }
@@ -108,14 +89,12 @@ bool BenchMarkPubSubType::deserialize(
     return true;
 }
 
-std::function<uint32_t()> BenchMarkPubSubType::getSerializedSizeProvider(
-        void* data)
+std::function<uint32_t()> BenchMarkPubSubType::getSerializedSizeProvider(void* data)
 {
     return [data]() -> uint32_t
-           {
-               return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<BenchMark*>(data))) +
-                      4u /*encapsulation*/;
-           };
+    {
+        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<BenchMark*>(data))) + 4 /*encapsulation*/;
+    };
 }
 
 void* BenchMarkPubSubType::createData()
@@ -123,45 +102,29 @@ void* BenchMarkPubSubType::createData()
     return reinterpret_cast<void*>(new BenchMark());
 }
 
-void BenchMarkPubSubType::deleteData(
-        void* data)
+void BenchMarkPubSubType::deleteData(void* data)
 {
     delete(reinterpret_cast<BenchMark*>(data));
 }
 
-bool BenchMarkPubSubType::getKey(
-        void* data,
-        InstanceHandle_t* handle,
-        bool force_md5)
+bool BenchMarkPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
 {
-    if (!m_isGetKeyDefined)
-    {
+    if(!m_isGetKeyDefined)
         return false;
-    }
-
     BenchMark* p_type = static_cast<BenchMark*>(data);
-
-    // Object that manages the raw buffer.
-    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),
-            BenchMark::getKeyMaxCdrSerializedSize());
-
-    // Object that serializes the data.
-    eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::BIG_ENDIANNESS);
+    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),BenchMark::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
+    eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::BIG_ENDIANNESS);     // Object that serializes the data.
     p_type->serializeKey(ser);
-    if (force_md5 || BenchMark::getKeyMaxCdrSerializedSize() > 16)
-    {
+    if(force_md5 || BenchMark::getKeyMaxCdrSerializedSize()>16)    {
         m_md5.init();
         m_md5.update(m_keyBuffer, static_cast<unsigned int>(ser.getSerializedDataLength()));
         m_md5.finalize();
-        for (uint8_t i = 0; i < 16; ++i)
-        {
+        for(uint8_t i = 0;i<16;++i)        {
             handle->value[i] = m_md5.digest[i];
         }
     }
-    else
-    {
-        for (uint8_t i = 0; i < 16; ++i)
-        {
+    else    {
+        for(uint8_t i = 0;i<16;++i)        {
             handle->value[i] = m_keyBuffer[i];
         }
     }

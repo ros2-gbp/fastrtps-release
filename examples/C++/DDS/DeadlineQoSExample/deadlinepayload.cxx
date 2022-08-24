@@ -21,10 +21,8 @@
 
 #ifdef _WIN32
 // Remove linker warning LNK4221 on Visual Studio
-namespace {
-char dummy;
-}  // namespace
-#endif  // _WIN32
+namespace { char dummy; }
+#endif
 
 #include "deadlinepayload.h"
 #include <fastcdr/Cdr.h>
@@ -36,9 +34,9 @@ using namespace eprosima::fastcdr::exception;
 
 HelloMsg::HelloMsg()
 {
-    // m_deadlinekey com.eprosima.idl.parser.typecode.PrimitiveTypeCode@130f889
+    // m_deadlinekey com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5b239d7d
     m_deadlinekey = 0;
-    // m_payload com.eprosima.idl.parser.typecode.StringTypeCode@101df177
+    // m_payload com.eprosima.idl.parser.typecode.StringTypeCode@2a798d51
     m_payload ="";
 
 }
@@ -49,22 +47,19 @@ HelloMsg::~HelloMsg()
 
 }
 
-HelloMsg::HelloMsg(
-        const HelloMsg& x)
+HelloMsg::HelloMsg(const HelloMsg &x)
 {
     m_deadlinekey = x.m_deadlinekey;
     m_payload = x.m_payload;
 }
 
-HelloMsg::HelloMsg(
-        HelloMsg&& x)
+HelloMsg::HelloMsg(HelloMsg &&x)
 {
     m_deadlinekey = x.m_deadlinekey;
     m_payload = std::move(x.m_payload);
 }
 
-HelloMsg& HelloMsg::operator =(
-        const HelloMsg& x)
+HelloMsg& HelloMsg::operator=(const HelloMsg &x)
 {
 
     m_deadlinekey = x.m_deadlinekey;
@@ -73,8 +68,7 @@ HelloMsg& HelloMsg::operator =(
     return *this;
 }
 
-HelloMsg& HelloMsg::operator =(
-        HelloMsg&& x)
+HelloMsg& HelloMsg::operator=(HelloMsg &&x)
 {
 
     m_deadlinekey = x.m_deadlinekey;
@@ -83,21 +77,7 @@ HelloMsg& HelloMsg::operator =(
     return *this;
 }
 
-bool HelloMsg::operator ==(
-        const HelloMsg& x) const
-{
-
-    return (m_deadlinekey == x.m_deadlinekey && m_payload == x.m_payload);
-}
-
-bool HelloMsg::operator !=(
-        const HelloMsg& x) const
-{
-    return !(*this == x);
-}
-
-size_t HelloMsg::getMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t HelloMsg::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
 
@@ -111,9 +91,7 @@ size_t HelloMsg::getMaxCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-size_t HelloMsg::getCdrSerializedSize(
-        const HelloMsg& data,
-        size_t current_alignment)
+size_t HelloMsg::getCdrSerializedSize(const HelloMsg& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -128,17 +106,14 @@ size_t HelloMsg::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void HelloMsg::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void HelloMsg::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
 
     scdr << m_deadlinekey;
     scdr << m_payload;
-
 }
 
-void HelloMsg::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void HelloMsg::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
 
     dcdr >> m_deadlinekey;
@@ -149,10 +124,9 @@ void HelloMsg::deserialize(
  * @brief This function sets a value in member deadlinekey
  * @param _deadlinekey New value for member deadlinekey
  */
-void HelloMsg::deadlinekey(
-        uint16_t _deadlinekey)
+void HelloMsg::deadlinekey(uint16_t _deadlinekey)
 {
-    m_deadlinekey = _deadlinekey;
+m_deadlinekey = _deadlinekey;
 }
 
 /*!
@@ -177,20 +151,18 @@ uint16_t& HelloMsg::deadlinekey()
  * @brief This function copies the value in member payload
  * @param _payload New value to be copied in member payload
  */
-void HelloMsg::payload(
-        const std::string& _payload)
+void HelloMsg::payload(const std::string &_payload)
 {
-    m_payload = _payload;
+m_payload = _payload;
 }
 
 /*!
  * @brief This function moves the value in member payload
  * @param _payload New value to be moved in member payload
  */
-void HelloMsg::payload(
-        std::string&& _payload)
+void HelloMsg::payload(std::string &&_payload)
 {
-    m_payload = std::move(_payload);
+m_payload = std::move(_payload);
 }
 
 /*!
@@ -211,8 +183,7 @@ std::string& HelloMsg::payload()
     return m_payload;
 }
 
-size_t HelloMsg::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t HelloMsg::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t current_align = current_alignment;
 
@@ -227,13 +198,12 @@ size_t HelloMsg::getKeyMaxCdrSerializedSize(
 
 bool HelloMsg::isKeyDefined()
 {
-    return true;
+   return true;
 }
 
-void HelloMsg::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void HelloMsg::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
     (void) scdr;
-     scdr << m_deadlinekey;
-       
+     scdr << m_deadlinekey;  
+     
 }

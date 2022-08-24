@@ -118,7 +118,7 @@ void ReceiverResource::OnDataReceived(
         msg.reserved_size = size;
 
         // TODO: Should we unlock in case UnregisterReceiver is called from callback ?
-        rcv->processCDRMsg(remoteLocator, localLocator, &msg);
+        rcv->processCDRMsg(remoteLocator, &msg);
     }
 
 }

@@ -27,9 +27,8 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-HelloWorldPublisher::HelloWorldPublisher()
-    : mp_participant(nullptr)
-    , mp_publisher(nullptr)
+HelloWorldPublisher::HelloWorldPublisher():mp_participant(nullptr),
+mp_publisher(nullptr)
 {
 
 
@@ -43,16 +42,14 @@ bool HelloWorldPublisher::init()
     PParam.rtps.setName("HelloWorldPublisher");
     PParam.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
     PParam.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-    PParam.rtps.builtin.discovery_config.static_edp_xml_config("file://HelloWorldSubscriber.xml");
+    PParam.rtps.builtin.discovery_config.setStaticEndpointXMLFilename("HelloWorldSubscriber.xml");
     mp_participant = Domain::createParticipant(PParam);
 
-    if (mp_participant == nullptr)
-    {
+    if(mp_participant==nullptr)
         return false;
-    }
     //REGISTER THE TYPE
 
-    Domain::registerType(mp_participant, &m_type);
+    Domain::registerType(mp_participant,&m_type);
 
     //CREATE THE PUBLISHER
     PublisherAttributes Wparam;
@@ -62,11 +59,9 @@ bool HelloWorldPublisher::init()
     Wparam.qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
     Wparam.setUserDefinedID(1);
     Wparam.setEntityID(2);
-    mp_publisher = Domain::createPublisher(mp_participant, Wparam, (PublisherListener*)&m_listener);
-    if (mp_publisher == nullptr)
-    {
+    mp_publisher = Domain::createPublisher(mp_participant,Wparam,(PublisherListener*)&m_listener);
+    if(mp_publisher == nullptr)
         return false;
-    }
 
     return true;
 
@@ -78,34 +73,29 @@ HelloWorldPublisher::~HelloWorldPublisher()
     Domain::removeParticipant(mp_participant);
 }
 
-void HelloWorldPublisher::PubListener::onPublicationMatched(
-        Publisher* /*pub*/,
-        MatchingInfo& info)
+void HelloWorldPublisher::PubListener::onPublicationMatched(Publisher* /*pub*/,MatchingInfo& info)
 {
-    if (info.status == MATCHED_MATCHING)
+    if(info.status == MATCHED_MATCHING)
     {
         n_matched++;
-        std::cout << "Publisher matched" << std::endl;
+        std::cout << "Publisher matched"<<std::endl;
     }
     else
     {
         n_matched--;
-        std::cout << "Publisher unmatched" << std::endl;
+        std::cout << "Publisher unmatched"<<std::endl;
     }
 }
 
-void HelloWorldPublisher::run(
-        uint32_t samples)
+void HelloWorldPublisher::run(uint32_t samples)
 {
-    for (uint32_t i = 0; i < samples; ++i)
+    for(uint32_t i = 0;i<samples;++i)
     {
-        if (!publish())
-        {
+        if(!publish())
             --i;
-        }
         else
         {
-            std::cout << "Message: " << m_Hello.message() << " with index: " << m_Hello.index() << " SENT" << std::endl;
+            std::cout << "Message: "<<m_Hello.message()<< " with index: "<< m_Hello.index()<< " SENT"<<std::endl;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(25));
     }
@@ -113,11 +103,12 @@ void HelloWorldPublisher::run(
 
 bool HelloWorldPublisher::publish()
 {
-    if (m_listener.n_matched > 0)
+    if(m_listener.n_matched>0)
     {
-        m_Hello.index(m_Hello.index() + 1);
+        m_Hello.index(m_Hello.index()+1);
         mp_publisher->write((void*)&m_Hello);
         return true;
     }
     return false;
 }
+

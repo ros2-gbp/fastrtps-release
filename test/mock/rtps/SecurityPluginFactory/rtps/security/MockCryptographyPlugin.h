@@ -34,19 +34,11 @@ class MockCryptographyPlugin : public Cryptography
 {
 public:
 
-    CryptoKeyExchange* cryptokeyexchange() override
+    MockCryptographyPlugin()
     {
-        return &cryptokeyexchange_;
-    }
-
-    CryptoKeyFactory* cryptokeyfactory() override
-    {
-        return &cryptokeyfactory_;
-    }
-
-    CryptoTransform* cryptotransform() override
-    {
-        return &cryptotransform_;
+        m_cryptokeyfactory = &cryptokeyfactory_;
+        m_cryptokeyexchange = &cryptokeyexchange_;
+        m_cryptotransform = &cryptotransform_;
     }
 
     MockCryptoKeyFactory cryptokeyfactory_;

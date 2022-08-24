@@ -20,7 +20,7 @@
 #include <json.hpp>
 
 #include <fastdds/rtps/common/CacheChange.h>
-#include <rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp>
+#include "SharedBackupFunctions.hpp"
 
 namespace eprosima {
 namespace fastdds {
@@ -39,7 +39,7 @@ void to_json(
     j["sequence_number"] = object_to_string(change.sequenceNumber);
     j["isRead"] = change.isRead;
     j["source_timestamp"] = object_to_string(change.sourceTimestamp);
-    j["reception_timestamp"] = object_to_string(change.reader_info.receptionTimestamp);
+    j["reception_timestamp"] = object_to_string(change.receptionTimestamp);
     j["sample_identity"] = object_to_string(change.write_params.sample_identity());
     j["related_sample_identity"] = object_to_string(change.write_params.related_sample_identity());
 
@@ -59,7 +59,7 @@ void from_json(
     std::istringstream(j["sequence_number"].get<std::string>()) >> change.sequenceNumber;
     change.isRead = static_cast<fastrtps::rtps::ChangeKind_t>(j["isRead"].get<bool>());
     std::istringstream(j["source_timestamp"].get<std::string>()) >> change.sourceTimestamp;
-    std::istringstream(j["reception_timestamp"].get<std::string>()) >> change.reader_info.receptionTimestamp;
+    std::istringstream(j["reception_timestamp"].get<std::string>()) >> change.receptionTimestamp;
 
     // set sample identity
     fastrtps::rtps::SampleIdentity si;

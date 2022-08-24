@@ -29,7 +29,7 @@ public:
 
     test_SharedMemChannelResource(
             std::shared_ptr<SharedMemManager::Listener> listener,
-            const Locator& locator,
+            const fastrtps::rtps::Locator_t& locator,
             TransportReceiverInterface* receiver,
             uint32_t big_buffer_size,
             uint32_t* big_buffer_size_count)
@@ -53,9 +53,9 @@ protected:
      * Blocking Receive from the specified channel.
      */
     std::shared_ptr<SharedMemManager::Buffer> Receive(
-            Locator& remote_locator) override
+            fastrtps::rtps::Locator_t& remote_locator) override
     {
-        remote_locator.kind = LOCATOR_KIND_SHM;
+        (void)remote_locator;
 
         try
         {
@@ -76,7 +76,6 @@ protected:
             return nullptr;
         }
     }
-
 };
 
 } // namespace rtps

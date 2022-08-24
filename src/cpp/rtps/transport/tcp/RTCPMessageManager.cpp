@@ -16,17 +16,16 @@
  * @file RTCPMessageManager.cpp
  *
  */
-#include <fastdds/rtps/transport/TCPv4TransportDescriptor.h>
-#include <fastdds/rtps/transport/TCPv6TransportDescriptor.h>
+
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/transport/tcp/RTCPMessageManager.h>
+#include <fastdds/rtps/transport/TCPChannelResource.h>
+#include <fastdds/rtps/transport/TCPTransportInterface.h>
+#include <fastdds/rtps/transport/TCPv4TransportDescriptor.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/utils/System.h>
-#include <rtps/transport/tcp/RTCPHeader.h>
-#include <rtps/transport/tcp/RTCPMessageManager.h>
-#include <rtps/transport/TCPChannelResource.h>
-#include <rtps/transport/TCPTransportInterface.h>
-
 #include <utils/SystemInfo.hpp>
+
 
 #define IDSTRING "(ID:" << std::this_thread::get_id() << ") " <<
 
@@ -36,17 +35,19 @@ namespace eprosima {
 namespace fastdds {
 namespace rtps {
 
+using Locator_t = fastrtps::rtps::Locator_t;
 using IPLocator = fastrtps::rtps::IPLocator;
 using SerializedPayload_t = fastrtps::rtps::SerializedPayload_t;
 using octet = fastrtps::rtps::octet;
 using CDRMessage_t = fastrtps::rtps::CDRMessage_t;
 using RTPSMessageCreator = fastrtps::rtps::RTPSMessageCreator;
 using ProtocolVersion_t = fastrtps::rtps::ProtocolVersion_t;
+using System = fastrtps::System;
 using Log = fastdds::dds::Log;
 
 static void endpoint_to_locator(
         const asio::ip::tcp::endpoint& endpoint,
-        Locator& locator)
+        Locator_t& locator)
 {
     if (endpoint.protocol() == asio::ip::tcp::v4())
     {
@@ -295,7 +296,7 @@ TCPTransactionId RTCPMessageManager::sendConnectionRequest(
         std::shared_ptr<TCPChannelResource>& channel)
 {
     ConnectionRequest_t request;
-    Locator locator;
+    Locator_t locator;
     mTransport->endpoint_to_locator(channel->local_endpoint(), locator);
 
     auto config = mTransport->configuration();
@@ -430,7 +431,7 @@ ResponseCode RTCPMessageManager::processBindConnectionRequest(
         std::shared_ptr<TCPChannelResource>& channel,
         const ConnectionRequest_t& request,
         const TCPTransactionId& transaction_id,
-        Locator& localLocator)
+        Locator_t& localLocator)
 {
     BindConnectionResponse_t response;
 
@@ -699,7 +700,7 @@ ResponseCode RTCPMessageManager::processRTCPMessage(
         {
             //logInfo(RTCP_SEQ, "Receive [BIND_CONNECTION_REQUEST] Seq: " << controlHeader.transaction_id());
             ConnectionRequest_t request;
-            Locator myLocator;
+            Locator_t myLocator;
             SerializedPayload_t payload(static_cast<uint32_t>(bufferSize));
             endpoint_to_locator(channel->local_endpoint(), myLocator);
 

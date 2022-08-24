@@ -17,7 +17,7 @@
  *
  */
 
-#include <rtps/builtin/discovery/endpoint/EDPSimpleListeners.h>
+#include "EDPSimpleListeners.h"
 
 #include <fastdds/dds/log/Log.hpp>
 
@@ -25,6 +25,7 @@
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/builtin/discovery/endpoint/EDPSimple.h>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDPServer.h>
 #include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
 
 #include <fastdds/rtps/common/InstanceHandle.h>
@@ -72,43 +73,39 @@ void EDPBasePUBListener::add_writer_from_change(
     //LOAD INFORMATION IN DESTINATION WRITER PROXY DATA
     const NetworkFactory& network = edp->mp_RTPSParticipant->network_factory();
     CDRMessage_t tempMsg(change->serializedPayload);
-    auto temp_writer_data = edp->get_temporary_writer_proxies_pool().get();
-
-    if (temp_writer_data->readFromCDRMessage(&tempMsg, network,
+    if (temp_writer_data_.readFromCDRMessage(&tempMsg, network,
             edp->mp_RTPSParticipant->has_shm_transport()))
     {
-        if (temp_writer_data->guid().guidPrefix == edp->mp_RTPSParticipant->getGuid().guidPrefix)
+        if (temp_writer_data_.guid().guidPrefix == edp->mp_RTPSParticipant->getGuid().guidPrefix
+                && !ongoingDeserialization(edp))
         {
             logInfo(RTPS_EDP, "Message from own RTPSParticipant, ignoring");
             return;
         }
 
         //LOAD INFORMATION IN DESTINATION WRITER PROXY DATA
-        auto copy_data_fun = [&temp_writer_data, &network](
+        auto copy_data_fun = [this, &network](
             WriterProxyData* data,
             bool updating,
             const ParticipantProxyData& participant_data)
                 {
-                    if (!temp_writer_data->has_locators())
+                    if (!temp_writer_data_.has_locators())
                     {
-                        temp_writer_data->set_remote_locators(participant_data.default_locators, network, true);
+                        temp_writer_data_.set_remote_locators(participant_data.default_locators, network, true);
                     }
 
-                    if (updating && !data->is_update_allowed(*temp_writer_data))
+                    if (updating && !data->is_update_allowed(temp_writer_data_))
                     {
                         logWarning(RTPS_EDP,
                                 "Received incompatible update for WriterQos. writer_guid = " << data->guid());
                     }
-                    *data = *temp_writer_data;
+                    *data = temp_writer_data_;
                     return true;
                 };
 
         GUID_t participant_guid;
         WriterProxyData* writer_data =
-                edp->mp_PDP->addWriterProxyData(temp_writer_data->guid(), participant_guid, copy_data_fun);
-
-        // release temporary proxy
-        temp_writer_data.reset();
+                edp->mp_PDP->addWriterProxyData(temp_writer_data_.guid(), participant_guid, copy_data_fun);
 
         //Removing change from history
         reader_history->remove_change(reader_history->find_change(change), release_change);
@@ -173,6 +170,19 @@ bool EDPListener::computeKey(
     return ParameterList::readInstanceHandleFromCDRMsg(change, fastdds::dds::PID_ENDPOINT_GUID);
 }
 
+bool EDPListener::ongoingDeserialization(
+        EDP* edp)
+{
+    EDPServer* pServer = dynamic_cast<EDPServer*>(edp);
+
+    if (pServer)
+    {
+        return pServer->ongoingDeserialization();
+    }
+
+    return false;
+}
+
 void EDPBaseSUBListener::add_reader_from_change(
         RTPSReader* reader,
         ReaderHistory* reader_history,
@@ -183,43 +193,39 @@ void EDPBaseSUBListener::add_reader_from_change(
     //LOAD INFORMATION IN TEMPORAL WRITER PROXY DATA
     const NetworkFactory& network = edp->mp_RTPSParticipant->network_factory();
     CDRMessage_t tempMsg(change->serializedPayload);
-    auto temp_reader_data = edp->get_temporary_reader_proxies_pool().get();
-
-    if (temp_reader_data->readFromCDRMessage(&tempMsg, network,
+    if (temp_reader_data_.readFromCDRMessage(&tempMsg, network,
             edp->mp_RTPSParticipant->has_shm_transport()))
     {
-        if (temp_reader_data->guid().guidPrefix == edp->mp_RTPSParticipant->getGuid().guidPrefix)
+        if (temp_reader_data_.guid().guidPrefix == edp->mp_RTPSParticipant->getGuid().guidPrefix
+                && !ongoingDeserialization(edp))
         {
             logInfo(RTPS_EDP, "From own RTPSParticipant, ignoring");
             return;
         }
 
-        auto copy_data_fun = [&temp_reader_data, &network](
+        auto copy_data_fun = [this, &network](
             ReaderProxyData* data,
             bool updating,
             const ParticipantProxyData& participant_data)
                 {
-                    if (!temp_reader_data->has_locators())
+                    if (!temp_reader_data_.has_locators())
                     {
-                        temp_reader_data->set_remote_locators(participant_data.default_locators, network, true);
+                        temp_reader_data_.set_remote_locators(participant_data.default_locators, network, true);
                     }
 
-                    if (updating && !data->is_update_allowed(*temp_reader_data))
+                    if (updating && !data->is_update_allowed(temp_reader_data_))
                     {
                         logWarning(RTPS_EDP,
                                 "Received incompatible update for ReaderQos. reader_guid = " << data->guid());
                     }
-                    *data = *temp_reader_data;
+                    *data = temp_reader_data_;
                     return true;
                 };
 
         //LOOK IF IS AN UPDATED INFORMATION
         GUID_t participant_guid;
         ReaderProxyData* reader_data =
-                edp->mp_PDP->addReaderProxyData(temp_reader_data->guid(), participant_guid, copy_data_fun);
-
-        // Release the temporary proxy
-        temp_reader_data.reset();
+                edp->mp_PDP->addReaderProxyData(temp_reader_data_.guid(), participant_guid, copy_data_fun);
 
         // Remove change from history.
         reader_history->remove_change(reader_history->find_change(change), release_change);

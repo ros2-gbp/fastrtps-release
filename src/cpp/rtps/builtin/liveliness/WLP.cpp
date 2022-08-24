@@ -107,16 +107,14 @@ WLP::WLP(
     , temp_reader_proxy_data_(
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
-        p->mp_participantImpl->getRTPSParticipantAttributes().allocation.data_limits,
-        p->mp_participantImpl->getRTPSParticipantAttributes().allocation.content_filter)
+        p->mp_participantImpl->getRTPSParticipantAttributes().allocation.data_limits)
     , temp_writer_proxy_data_(
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.data_limits)
 {
-    GUID_t tmp_guid = p->mp_participantImpl->getGuid();
-    tmp_guid.entityId = 0;
-    automatic_instance_handle_ = tmp_guid;
+    automatic_instance_handle_ = p->mp_participantImpl->getGuid();
+    memset(&automatic_instance_handle_.value[12], 0, 3);
     manual_by_participant_instance_handle_ = automatic_instance_handle_;
 
     automatic_instance_handle_.value[15] = AUTOMATIC_LIVELINESS_QOS + 0x01;
@@ -139,8 +137,8 @@ WLP::~WLP()
 #if HAVE_SECURITY
     if (mp_participant->is_secure())
     {
-        mp_participant->deleteUserEndpoint(mp_builtinReaderSecure->getGuid());
-        mp_participant->deleteUserEndpoint(mp_builtinWriterSecure->getGuid());
+        mp_participant->deleteUserEndpoint(mp_builtinReaderSecure);
+        mp_participant->deleteUserEndpoint(mp_builtinWriterSecure);
 
         if (mp_builtinReaderSecureHistory)
         {
@@ -155,11 +153,13 @@ WLP::~WLP()
             delete mp_builtinWriterSecureHistory;
             secure_payload_pool_->release_history(swriter_pool_cfg, false);
         }
+
+        TopicPayloadPoolRegistry::release(secure_payload_pool_);
     }
 #endif // if HAVE_SECURITY
 
-    mp_participant->deleteUserEndpoint(mp_builtinReader->getGuid());
-    mp_participant->deleteUserEndpoint(mp_builtinWriter->getGuid());
+    mp_participant->deleteUserEndpoint(mp_builtinReader);
+    mp_participant->deleteUserEndpoint(mp_builtinWriter);
 
     if (mp_builtinReaderHistory)
     {
@@ -179,6 +179,8 @@ WLP::~WLP()
 
     delete pub_liveliness_manager_;
     delete sub_liveliness_manager_;
+
+    TopicPayloadPoolRegistry::release(payload_pool_);
 }
 
 bool WLP::initWL(
@@ -254,6 +256,11 @@ bool WLP::createEndpoints()
     watt.endpoint.topicKind = WITH_KEY;
     watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
     watt.endpoint.reliabilityKind = RELIABLE;
+    if (mp_participant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+            mp_participant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
+    {
+        watt.mode = ASYNCHRONOUS_WRITER;
+    }
     RTPSWriter* wout;
     if (mp_participant->createWriter(
                 &wout,
@@ -351,6 +358,11 @@ bool WLP::createSecureEndpoints()
     watt.endpoint.topicKind = WITH_KEY;
     watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
     watt.endpoint.reliabilityKind = RELIABLE;
+    if (mp_participant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+            mp_participant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
+    {
+        watt.mode = ASYNCHRONOUS_WRITER;
+    }
 
     const security::ParticipantSecurityAttributes& part_attrs = mp_participant->security_attributes();
     security::PluginParticipantSecurityAttributes plugin_attrs(part_attrs.plugin_participant_attributes);
@@ -719,7 +731,6 @@ bool WLP::remove_local_writer(
 
         automatic_writers_.erase(it);
 
-        min_automatic_ms_ = std::numeric_limits<double>::max();
         if (automatic_writers_.size() == 0)
         {
             automatic_liveliness_assertion_->cancel_timer();
@@ -727,6 +738,8 @@ bool WLP::remove_local_writer(
         }
 
         // There are still some writers. Calculate the new minimum announcement period
+
+        min_automatic_ms_ = std::numeric_limits<double>::max();
         for (const auto& w : automatic_writers_)
         {
             auto announcement_period = TimeConv::Duration_t2MilliSecondsDouble(w->get_liveliness_announcement_period());
@@ -761,7 +774,6 @@ bool WLP::remove_local_writer(
             logError(RTPS_LIVELINESS, "Could not remove writer " << W->getGuid() << " from liveliness manager");
         }
 
-        min_manual_by_participant_ms_ = std::numeric_limits<double>::max();
         if (manual_by_participant_writers_.size() == 0)
         {
             manual_liveliness_assertion_->cancel_timer();
@@ -769,6 +781,8 @@ bool WLP::remove_local_writer(
         }
 
         // There are still some writers. Calculate the new minimum announcement period
+
+        min_manual_by_participant_ms_ = std::numeric_limits<double>::max();
         for (const auto& w : manual_by_participant_writers_)
         {
             auto announcement_period = TimeConv::Duration_t2MilliSecondsDouble(w->get_liveliness_announcement_period());

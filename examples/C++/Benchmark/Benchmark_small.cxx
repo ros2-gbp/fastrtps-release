@@ -21,10 +21,8 @@
 
 #ifdef _WIN32
 // Remove linker warning LNK4221 on Visual Studio
-namespace {
-char dummy;
-}  // namespace
-#endif  // _WIN32
+namespace { char dummy; }
+#endif
 
 #include "Benchmark_small.h"
 #include <fastcdr/Cdr.h>
@@ -36,9 +34,9 @@ using namespace eprosima::fastcdr::exception;
 
 BenchMarkSmall::BenchMarkSmall()
 {
-    // m_array com.eprosima.idl.parser.typecode.ArrayTypeCode@4c762604
+    // m_array com.eprosima.idl.parser.typecode.ArrayTypeCode@353d0772
     memset(&m_array, 0, (16384) * 1);
-    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2641e737
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@57c758ac
     m_index = 0;
 
 }
@@ -49,22 +47,19 @@ BenchMarkSmall::~BenchMarkSmall()
 
 }
 
-BenchMarkSmall::BenchMarkSmall(
-        const BenchMarkSmall& x)
+BenchMarkSmall::BenchMarkSmall(const BenchMarkSmall &x)
 {
     m_array = x.m_array;
     m_index = x.m_index;
 }
 
-BenchMarkSmall::BenchMarkSmall(
-        BenchMarkSmall&& x)
+BenchMarkSmall::BenchMarkSmall(BenchMarkSmall &&x)
 {
     m_array = std::move(x.m_array);
     m_index = x.m_index;
 }
 
-BenchMarkSmall& BenchMarkSmall::operator =(
-        const BenchMarkSmall& x)
+BenchMarkSmall& BenchMarkSmall::operator=(const BenchMarkSmall &x)
 {
 
     m_array = x.m_array;
@@ -73,8 +68,7 @@ BenchMarkSmall& BenchMarkSmall::operator =(
     return *this;
 }
 
-BenchMarkSmall& BenchMarkSmall::operator =(
-        BenchMarkSmall&& x)
+BenchMarkSmall& BenchMarkSmall::operator=(BenchMarkSmall &&x)
 {
 
     m_array = std::move(x.m_array);
@@ -83,21 +77,7 @@ BenchMarkSmall& BenchMarkSmall::operator =(
     return *this;
 }
 
-bool BenchMarkSmall::operator ==(
-        const BenchMarkSmall& x) const
-{
-
-    return (m_array == x.m_array && m_index == x.m_index);
-}
-
-bool BenchMarkSmall::operator !=(
-        const BenchMarkSmall& x) const
-{
-    return !(*this == x);
-}
-
-size_t BenchMarkSmall::getMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t BenchMarkSmall::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
 
@@ -112,14 +92,11 @@ size_t BenchMarkSmall::getMaxCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-size_t BenchMarkSmall::getCdrSerializedSize(
-        const BenchMarkSmall& data,
-        size_t current_alignment)
+size_t BenchMarkSmall::getCdrSerializedSize(const BenchMarkSmall& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
 
-
     current_alignment += ((16384) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
@@ -129,18 +106,15 @@ size_t BenchMarkSmall::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void BenchMarkSmall::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void BenchMarkSmall::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
 
     scdr << m_array;
 
     scdr << m_index;
-
 }
 
-void BenchMarkSmall::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void BenchMarkSmall::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
 
     dcdr >> m_array;
@@ -152,20 +126,18 @@ void BenchMarkSmall::deserialize(
  * @brief This function copies the value in member array
  * @param _array New value to be copied in member array
  */
-void BenchMarkSmall::array(
-        const std::array<char, 16384>& _array)
+void BenchMarkSmall::array(const std::array<char, 16384> &_array)
 {
-    m_array = _array;
+m_array = _array;
 }
 
 /*!
  * @brief This function moves the value in member array
  * @param _array New value to be moved in member array
  */
-void BenchMarkSmall::array(
-        std::array<char, 16384>&& _array)
+void BenchMarkSmall::array(std::array<char, 16384> &&_array)
 {
-    m_array = std::move(_array);
+m_array = std::move(_array);
 }
 
 /*!
@@ -189,10 +161,9 @@ std::array<char, 16384>& BenchMarkSmall::array()
  * @brief This function sets a value in member index
  * @param _index New value for member index
  */
-void BenchMarkSmall::index(
-        uint32_t _index)
+void BenchMarkSmall::index(uint32_t _index)
 {
-    m_index = _index;
+m_index = _index;
 }
 
 /*!
@@ -214,8 +185,7 @@ uint32_t& BenchMarkSmall::index()
 }
 
 
-size_t BenchMarkSmall::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t BenchMarkSmall::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t current_align = current_alignment;
 
@@ -228,12 +198,12 @@ size_t BenchMarkSmall::getKeyMaxCdrSerializedSize(
 
 bool BenchMarkSmall::isKeyDefined()
 {
-    return false;
+   return false;
 }
 
-void BenchMarkSmall::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void BenchMarkSmall::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
     (void) scdr;
-      
+     
+     
 }

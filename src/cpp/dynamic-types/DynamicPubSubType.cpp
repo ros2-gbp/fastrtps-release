@@ -32,8 +32,7 @@ DynamicPubSubType::DynamicPubSubType()
 {
 }
 
-DynamicPubSubType::DynamicPubSubType(
-        DynamicType_ptr pType)
+DynamicPubSubType::DynamicPubSubType(DynamicType_ptr pType)
     : dynamic_type_(pType)
     , m_keyBuffer(nullptr)
 {
@@ -58,8 +57,7 @@ DynamicType_ptr DynamicPubSubType::GetDynamicType() const
     return dynamic_type_;
 }
 
-ReturnCode_t DynamicPubSubType::SetDynamicType(
-        DynamicData_ptr pData)
+ReturnCode_t DynamicPubSubType::SetDynamicType(DynamicData_ptr pData)
 {
     if (dynamic_type_ == nullptr)
     {
@@ -74,8 +72,7 @@ ReturnCode_t DynamicPubSubType::SetDynamicType(
     }
 }
 
-ReturnCode_t DynamicPubSubType::SetDynamicType(
-        DynamicType_ptr pType)
+ReturnCode_t DynamicPubSubType::SetDynamicType(DynamicType_ptr pType)
 {
     if (dynamic_type_ == nullptr)
     {
@@ -95,8 +92,7 @@ void* DynamicPubSubType::createData()
     return DynamicDataFactory::get_instance()->create_data(dynamic_type_);
 }
 
-void DynamicPubSubType::deleteData(
-        void* data)
+void DynamicPubSubType::deleteData(void* data)
 {
     DynamicDataFactory::get_instance()->delete_data((DynamicData*)data);
 }
@@ -107,8 +103,8 @@ bool DynamicPubSubType::deserialize(
 {
     eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->length); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-            eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
-                                              // Deserialize encapsulation.
+        eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
+                                          // Deserialize encapsulation.
     deser.read_encapsulation();
     payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
 
@@ -164,13 +160,12 @@ bool DynamicPubSubType::getKey(
     return true;
 }
 
-std::function<uint32_t()> DynamicPubSubType::getSerializedSizeProvider(
-        void* data)
+std::function<uint32_t()> DynamicPubSubType::getSerializedSizeProvider(void* data)
 {
     return [data]() -> uint32_t
-           {
-               return (uint32_t)DynamicData::getCdrSerializedSize((DynamicData*)data) + 4 /*encapsulation*/;
-           };
+    {
+        return (uint32_t)DynamicData::getCdrSerializedSize((DynamicData*)data) + 4 /*encapsulation*/;
+    };
 }
 
 bool DynamicPubSubType::serialize(

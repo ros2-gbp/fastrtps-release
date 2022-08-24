@@ -21,10 +21,8 @@
 
 #ifdef _WIN32
 // Remove linker warning LNK4221 on Visual Studio
-namespace {
-char dummy;
-}  // namespace
-#endif  // _WIN32
+namespace { char dummy; }
+#endif
 
 #include "XMLProfilesExample.h"
 #include <fastcdr/Cdr.h>
@@ -36,9 +34,9 @@ using namespace eprosima::fastcdr::exception;
 
 XMLProfilesExample::XMLProfilesExample()
 {
-    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@64f6106c
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1622f1b
     m_index = 0;
-    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@5891e32e
+    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@70e8f8e
     m_message ="";
 
 }
@@ -49,22 +47,19 @@ XMLProfilesExample::~XMLProfilesExample()
 
 }
 
-XMLProfilesExample::XMLProfilesExample(
-        const XMLProfilesExample& x)
+XMLProfilesExample::XMLProfilesExample(const XMLProfilesExample &x)
 {
     m_index = x.m_index;
     m_message = x.m_message;
 }
 
-XMLProfilesExample::XMLProfilesExample(
-        XMLProfilesExample&& x)
+XMLProfilesExample::XMLProfilesExample(XMLProfilesExample &&x)
 {
     m_index = x.m_index;
     m_message = std::move(x.m_message);
 }
 
-XMLProfilesExample& XMLProfilesExample::operator =(
-        const XMLProfilesExample& x)
+XMLProfilesExample& XMLProfilesExample::operator=(const XMLProfilesExample &x)
 {
 
     m_index = x.m_index;
@@ -73,8 +68,7 @@ XMLProfilesExample& XMLProfilesExample::operator =(
     return *this;
 }
 
-XMLProfilesExample& XMLProfilesExample::operator =(
-        XMLProfilesExample&& x)
+XMLProfilesExample& XMLProfilesExample::operator=(XMLProfilesExample &&x)
 {
 
     m_index = x.m_index;
@@ -83,21 +77,7 @@ XMLProfilesExample& XMLProfilesExample::operator =(
     return *this;
 }
 
-bool XMLProfilesExample::operator ==(
-        const XMLProfilesExample& x) const
-{
-
-    return (m_index == x.m_index && m_message == x.m_message);
-}
-
-bool XMLProfilesExample::operator !=(
-        const XMLProfilesExample& x) const
-{
-    return !(*this == x);
-}
-
-size_t XMLProfilesExample::getMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t XMLProfilesExample::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
 
@@ -111,9 +91,7 @@ size_t XMLProfilesExample::getMaxCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-size_t XMLProfilesExample::getCdrSerializedSize(
-        const XMLProfilesExample& data,
-        size_t current_alignment)
+size_t XMLProfilesExample::getCdrSerializedSize(const XMLProfilesExample& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -128,17 +106,14 @@ size_t XMLProfilesExample::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void XMLProfilesExample::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void XMLProfilesExample::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
 
     scdr << m_index;
     scdr << m_message;
-
 }
 
-void XMLProfilesExample::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void XMLProfilesExample::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
 
     dcdr >> m_index;
@@ -149,10 +124,9 @@ void XMLProfilesExample::deserialize(
  * @brief This function sets a value in member index
  * @param _index New value for member index
  */
-void XMLProfilesExample::index(
-        uint32_t _index)
+void XMLProfilesExample::index(uint32_t _index)
 {
-    m_index = _index;
+m_index = _index;
 }
 
 /*!
@@ -177,20 +151,18 @@ uint32_t& XMLProfilesExample::index()
  * @brief This function copies the value in member message
  * @param _message New value to be copied in member message
  */
-void XMLProfilesExample::message(
-        const std::string& _message)
+void XMLProfilesExample::message(const std::string &_message)
 {
-    m_message = _message;
+m_message = _message;
 }
 
 /*!
  * @brief This function moves the value in member message
  * @param _message New value to be moved in member message
  */
-void XMLProfilesExample::message(
-        std::string&& _message)
+void XMLProfilesExample::message(std::string &&_message)
 {
-    m_message = std::move(_message);
+m_message = std::move(_message);
 }
 
 /*!
@@ -211,8 +183,7 @@ std::string& XMLProfilesExample::message()
     return m_message;
 }
 
-size_t XMLProfilesExample::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t XMLProfilesExample::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t current_align = current_alignment;
 
@@ -225,12 +196,12 @@ size_t XMLProfilesExample::getKeyMaxCdrSerializedSize(
 
 bool XMLProfilesExample::isKeyDefined()
 {
-    return false;
+   return false;
 }
 
-void XMLProfilesExample::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void XMLProfilesExample::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
     (void) scdr;
-      
+     
+     
 }

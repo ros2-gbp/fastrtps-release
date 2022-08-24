@@ -153,7 +153,7 @@ bool AESGCMGMAC_Transform::encode_serialized_payload(
 
     try
     {
-        std::vector<std::shared_ptr<DatareaderCryptoHandle>> receiving_datareader_crypto_list;
+        std::vector<DatareaderCryptoHandle*> receiving_datareader_crypto_list;
         if (!serialize_SecureDataTag(serializer, keyMat.transformation_kind, session->session_id,
                 initialization_vector, receiving_datareader_crypto_list, false, tag, nKeys - 1))
         {
@@ -176,7 +176,7 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
         CDRMessage_t& encoded_rtps_submessage,
         const CDRMessage_t& plain_rtps_submessage,
         DatawriterCryptoHandle& sending_datawriter_crypto,
-        std::vector<std::shared_ptr<DatareaderCryptoHandle>>& receiving_datareader_crypto_list,
+        std::vector<DatareaderCryptoHandle*>& receiving_datareader_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_WriterCryptoHandle& local_writer = AESGCMGMAC_WriterCryptoHandle::narrow(sending_datawriter_crypto);
@@ -318,7 +318,7 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
         CDRMessage_t& encoded_rtps_submessage,
         const CDRMessage_t& plain_rtps_submessage,
         DatareaderCryptoHandle& sending_datareader_crypto,
-        std::vector<std::shared_ptr<DatawriterCryptoHandle>>& receiving_datawriter_crypto_list,
+        std::vector<DatawriterCryptoHandle*>& receiving_datawriter_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_ReaderCryptoHandle& local_reader = AESGCMGMAC_ReaderCryptoHandle::narrow(sending_datareader_crypto);
@@ -460,7 +460,7 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
         CDRMessage_t& encoded_rtps_message,
         const CDRMessage_t& plain_rtps_message,
         ParticipantCryptoHandle& sending_crypto,
-        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
+        std::vector<ParticipantCryptoHandle*>& receiving_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_ParticipantCryptoHandle& local_participant = AESGCMGMAC_ParticipantCryptoHandle::narrow(sending_crypto);
@@ -485,28 +485,28 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
 
     // If the maximum number of blocks have been processed, generate a new SessionKey
     bool update_specific_keys = false;
-    if (local_participant->Session.session_block_counter >= local_participant->max_blocks_per_session)
+    if (local_participant->session_block_counter >= local_participant->max_blocks_per_session)
     {
-        local_participant->Session.session_id += 1;
+        local_participant->session_id += 1;
         update_specific_keys = true;
-        compute_sessionkey(local_participant->Session.SessionKey, local_participant->ParticipantKeyMaterial,
-                local_participant->Session.session_id);
+        compute_sessionkey(local_participant->SessionKey, local_participant->ParticipantKeyMaterial,
+                local_participant->session_id);
 
         //ReceiverSpecific keys shall be computed specifically when needed
-        local_participant->Session.session_block_counter = 0;
+        local_participant->session_block_counter = 0;
         //Insert outdate session_id values in all RemoteParticipant trackers to trigger a SessionkeyUpdate
     }
 
-    local_participant->Session.session_block_counter += 1;
+    local_participant->session_block_counter += 1;
 
     //Build remaining NONCE elements
     std::array<uint8_t, initialization_vector_suffix_length> initialization_vector_suffix;  //iv suffix changes with every operation
     RAND_bytes(initialization_vector_suffix.data(), initialization_vector_suffix_length);
     std::array<uint8_t, 12> initialization_vector; //96 bytes, session_id + suffix
-    memcpy(initialization_vector.data(), &(local_participant->Session.session_id), 4);
+    memcpy(initialization_vector.data(), &(local_participant->session_id), 4);
     memcpy(initialization_vector.data() + 4, initialization_vector_suffix.data(), 8);
     std::array<uint8_t, 4> session_id;
-    memcpy(session_id.data(), &(local_participant->Session.session_id), 4);
+    memcpy(session_id.data(), &(local_participant->session_id), 4);
 
 #if FASTDDS_IS_BIG_ENDIAN_TARGET
     octet flags = 0x0;
@@ -548,7 +548,7 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
     try
     {
         if (!serialize_SecureDataBody(serializer, local_participant->ParticipantKeyMaterial.transformation_kind,
-                local_participant->Session.SessionKey,
+                local_participant->SessionKey,
                 initialization_vector, output_buffer, &plain_rtps_message.buffer[plain_rtps_message.pos],
                 plain_rtps_message.length - plain_rtps_message.pos, tag, true))
         {
@@ -885,9 +885,10 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
     //TODO(Ricardo) Deserializing header two times, here preprocessing and decoding submessage.
     //KeyId is present in Header->transform_identifier->transformation_key_id and contains the sender_key_id
 
-    for (auto& wt_sp : remote_participant->Writers)
+    for (std::vector<DatawriterCryptoHandle*>::iterator it = remote_participant->Writers.begin();
+            it != remote_participant->Writers.end(); ++it)
     {
-        AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(*wt_sp);
+        AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(**it);
         auto& wKeyMats = writer->Entity2RemoteKeyMaterial;
 
         if (wKeyMats.size() == 0)
@@ -900,7 +901,7 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         {
             // Remote writer found
             secure_submessage_category = DATAWRITER_SUBMESSAGE;
-            *datawriter_crypto = wt_sp.get();
+            *datawriter_crypto = *it;
 
             //We have the remote writer, now lets look for the local datareader
             bool found = lookup_reader(local_participant, datareader_crypto, key_id);
@@ -921,9 +922,10 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         } //Remote writer key found
     } //For each datawriter present in the remote participant
 
-    for (auto& rd_sh : remote_participant->Readers)
+    for (std::vector<DatareaderCryptoHandle*>::iterator it = remote_participant->Readers.begin();
+            it != remote_participant->Readers.end(); ++it)
     {
-        AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(*rd_sh);
+        AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(**it);
 
         auto& rKeyMats = reader->Entity2RemoteKeyMaterial;
 
@@ -937,7 +939,7 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         {
             // Remote reader found
             secure_submessage_category = DATAREADER_SUBMESSAGE;
-            *datareader_crypto = rd_sh.get();
+            *datareader_crypto = *it;
 
             //We have the remote reader, now lets look for the local datawriter
             bool found = lookup_writer(local_participant, datawriter_crypto, key_id);
@@ -1699,7 +1701,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
         const std::array<uint8_t, 4>& transformation_kind,
         const uint32_t session_id,
         const std::array<uint8_t, 12>& initialization_vector,
-        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
+        std::vector<EntityCryptoHandle*>& receiving_crypto_list,
         bool update_specific_keys,
         SecureDataTag& tag,
         size_t sessionIndex)
@@ -1817,7 +1819,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
         eprosima::fastcdr::Cdr& serializer,
         const AESGCMGMAC_ParticipantCryptoHandle& local_participant,
         const std::array<uint8_t, 12>& initialization_vector,
-        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
+        std::vector<ParticipantCryptoHandle*>& receiving_crypto_list,
         bool update_specific_keys,
         SecureDataTag& tag)
 {
@@ -1858,14 +1860,13 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
         int key_len = use_256_bits ? 32 : 16;
 
         //Update the key if needed
-        if ((update_specific_keys || remote_participant->Session.session_id != local_participant->Session.session_id) &&
+        if ((update_specific_keys || remote_participant->session_id != local_participant->session_id) &&
                 (*remote_participant != *local_participant))
         {
             //Update triggered!
-            remote_participant->Session.session_id = local_participant->Session.session_id;
-            compute_sessionkey(remote_participant->Session.SessionKey, true,
-                    keyMat.master_receiver_specific_key, keyMat.master_salt, remote_participant->Session.session_id,
-                    key_len);
+            remote_participant->session_id = local_participant->session_id;
+            compute_sessionkey(remote_participant->SessionKey, true,
+                    keyMat.master_receiver_specific_key, keyMat.master_salt, remote_participant->session_id, key_len);
         }
 
         //Obtain MAC using ReceiverSpecificKey and the same Initialization Vector as before
@@ -1876,7 +1877,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
                 trans_kind == c_transfrom_kind_aes128_gmac)
         {
             if (!EVP_EncryptInit(e_ctx, EVP_aes_128_gcm(),
-                    (const unsigned char*)(remote_participant->Session.SessionKey.data()),
+                    (const unsigned char*)(remote_participant->SessionKey.data()),
                     initialization_vector.data()))
             {
                 logError(SECURITY_CRYPTO, "Unable to encode the payload. EVP_EncryptInit function returns an error");
@@ -1888,7 +1889,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
                 trans_kind == c_transfrom_kind_aes256_gmac)
         {
             if (!EVP_EncryptInit(e_ctx, EVP_aes_256_gcm(),
-                    (const unsigned char*)(remote_participant->Session.SessionKey.data()),
+                    (const unsigned char*)(remote_participant->SessionKey.data()),
                     initialization_vector.data()))
             {
                 logError(SECURITY_CRYPTO, "Unable to encode the payload. EVP_EncryptInit function returns an error");
@@ -2244,7 +2245,7 @@ bool AESGCMGMAC_Transform::lookup_reader(
         DatareaderCryptoHandle** datareader_crypto,
         CryptoTransformKeyId key_id)
 {
-    for (auto& readerHandle : participant->Readers)
+    for (DatareaderCryptoHandle* readerHandle : participant->Readers)
     {
         AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(*readerHandle);
 
@@ -2258,7 +2259,7 @@ bool AESGCMGMAC_Transform::lookup_reader(
         {
             if (elem.sender_key_id == key_id)
             {
-                *datareader_crypto = readerHandle.get();
+                *datareader_crypto = readerHandle;
                 return true;
             }
         }   //For each Reader2WriterKeyMaterial in the datareader
@@ -2272,7 +2273,7 @@ bool AESGCMGMAC_Transform::lookup_writer(
         DatawriterCryptoHandle** datawriter_crypto,
         CryptoTransformKeyId key_id)
 {
-    for (auto& writerHandle : participant->Writers)
+    for (DatawriterCryptoHandle* writerHandle : participant->Writers)
     {
         AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(*writerHandle);
 
@@ -2286,7 +2287,7 @@ bool AESGCMGMAC_Transform::lookup_writer(
         {
             if (elem.sender_key_id == key_id)
             {
-                *datawriter_crypto = writerHandle.get();
+                *datawriter_crypto = writerHandle;
                 return true;
             }
         }   //For each Writer2ReaderKeyMaterial in the datawriter

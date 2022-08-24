@@ -33,7 +33,6 @@ namespace dds {
  * during the Endpoint Discovery Protocol, not all of the behaviour associated with them has been
  * implemented in the library.
  * Please consult each of them to check for implementation details and default values.
- *
  * @ingroup FASTDDS_QOS_MODULE
  */
 class PublisherQos
@@ -63,7 +62,6 @@ public:
 
     /**
      * Getter for PresentationQosPolicy
-     *
      * @return PresentationQosPolicy reference
      */
     const PresentationQosPolicy& presentation() const
@@ -73,7 +71,6 @@ public:
 
     /**
      * Getter for PresentationQosPolicy
-     *
      * @return PresentationQosPolicy reference
      */
     PresentationQosPolicy& presentation()
@@ -83,7 +80,6 @@ public:
 
     /**
      * Setter for PresentationQosPolicy
-     *
      * @param presentation PresentationQosPolicy
      */
     void presentation(
@@ -94,7 +90,6 @@ public:
 
     /**
      * Getter for PartitionQosPolicy
-     *
      * @return PartitionQosPolicy reference
      */
     const PartitionQosPolicy& partition() const
@@ -104,7 +99,6 @@ public:
 
     /**
      * Getter for PartitionQosPolicy
-     *
      * @return PartitionQosPolicy reference
      */
     PartitionQosPolicy& partition()
@@ -114,7 +108,6 @@ public:
 
     /**
      * Setter for PartitionQosPolicy
-     *
      * @param partition PartitionQosPolicy
      */
     void partition(
@@ -125,7 +118,6 @@ public:
 
     /**
      * Getter for GroupDataQosPolicy
-     *
      * @return GroupDataQosPolicy reference
      */
     const GroupDataQosPolicy& group_data() const
@@ -135,7 +127,6 @@ public:
 
     /**
      * Getter for GroupDataQosPolicy
-     *
      * @return GroupDataQosPolicy reference
      */
     GroupDataQosPolicy& group_data()
@@ -145,7 +136,6 @@ public:
 
     /**
      * Setter for GroupDataQosPolicy
-     *
      * @param group_data GroupDataQosPolicy
      */
     void group_data(
@@ -156,7 +146,6 @@ public:
 
     /**
      * Getter for EntityFactoryQosPolicy
-     *
      * @return EntityFactoryQosPolicy reference
      */
     const EntityFactoryQosPolicy& entity_factory() const
@@ -166,7 +155,6 @@ public:
 
     /**
      * Getter for EntityFactoryQosPolicy
-     *
      * @return EntityFactoryQosPolicy reference
      */
     EntityFactoryQosPolicy& entity_factory()
@@ -176,7 +164,6 @@ public:
 
     /**
      * Setter for EntityFactoryQosPolicy
-     *
      * @param entity_factory EntityFactoryQosPolicy
      */
     void entity_factory(

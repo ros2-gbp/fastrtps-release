@@ -13,10 +13,15 @@
 # limitations under the License.
 
 ###############################################################################
-# CMake build rules for Fast DDS
+# CMake build rules for FastRTPS
 ###############################################################################
 cmake_minimum_required(VERSION 3.5)
 cmake_policy(VERSION 3.5...3.13)
+
+set(IS_TOP_LEVEL TRUE)
+if(PROJECT_SOURCE_DIR)
+    set(IS_TOP_LEVEL FALSE)
+endif()
 
 # Set CMAKE_BUILD_TYPE to Release by default.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -28,19 +33,87 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 ###############################################################################
+# Version information                                                         #
+###############################################################################
+
+#If not set, copy over product version from configure.ac
+file(STRINGS
+    configure.ac
+    LIB_MAJOR_VERSION_TMP
+    REGEX "^m4_define\\(\\[?version_major\\]?, *\\[?[0-9]+\\]?\\)"
+    )
+file(STRINGS
+    configure.ac
+    LIB_MINOR_VERSION_TMP
+    REGEX "^m4_define\\(\\[?version_minor\\]?, *\\[?[0-9]+\\]?\\)"
+    )
+file(STRINGS
+    configure.ac
+    LIB_PATCH_VERSION_TMP
+    REGEX "^m4_define\\(\\[?version_micro\\]?, *\\[?[0-9]+\\]?\\)"
+    )
+
+string(REGEX REPLACE "m4_define\\(\\[?version_major\\]?, *\\[?([0-9]+)\\]?\\)"
+    "\\1"
+    LIB_MAJOR_VERSION
+    ${LIB_MAJOR_VERSION_TMP}
+    )
+string(REGEX REPLACE "m4_define\\(\\[?version_minor\\]?, *\\[?([0-9]+)\\]?\\)"
+    "\\1"
+    LIB_MINOR_VERSION
+    ${LIB_MINOR_VERSION_TMP}
+    )
+string(REGEX REPLACE "m4_define\\(\\[?version_micro\\]?, *\\[?([0-9]+)\\]?\\)"
+    "\\1"
+    LIB_PATCH_VERSION
+    ${LIB_PATCH_VERSION_TMP}
+    )
+
+set(LIB_VERSION_STR "${LIB_MAJOR_VERSION}.${LIB_MINOR_VERSION}.${LIB_PATCH_VERSION}")
+
+###############################################################################
 # Project                                                                     #
 ###############################################################################
-project(fastrtps VERSION "2.6.2" LANGUAGES C CXX)
+if (DEFINED PROJECT_VERSION)
+    message(STATUS "Manual version: ${PROJECT_VERSION}")
+    cmake_policy(SET CMP0048 NEW)
+    project(fastrtps VERSION "${PROJECT_VERSION}" LANGUAGES C CXX)
+else()
+    if(CMAKE_VERSION VERSION_LESS 3.0)
+        project(fastrtps C CXX)
+        set(PROJECT_VERSION_MAJOR "${LIB_MAJOR_VERSION}")
+        set(PROJECT_VERSION_MINOR "${LIB_MINOR_VERSION}")
+        set(PROJECT_VERSION_PATCH "${LIB_PATCH_VERSION}")
+        set(PROJECT_VERSION "${LIB_VERSION_STR}")
+    else()
+        cmake_policy(SET CMP0048 NEW)
+        project(fastrtps VERSION "${LIB_VERSION_STR}" LANGUAGES C CXX)
+    endif()
+endif()
 
+set(PROJECT_NAME_STYLED "FastRTPS")
 set(PROJECT_NAME_LARGE "Fast RTPS")
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
+set(${PROJECT_NAME}_DESCRIPTION_SUMMARY "C++ library implementation of RTPS protocol")
+set(${PROJECT_NAME}_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} library provides publication/subscription communication using RTPS protocol.")
 
+message(STATUS "Configuring ${PROJECT_NAME_LARGE}")
 message(STATUS "Version: ${PROJECT_VERSION}")
+message(STATUS "To change the version modify the file configure.ac")
+
+###############################################################################
+# Generation of windows installers.
+###############################################################################
+option(EPROSIMA_INSTALLER "Activate the creation of a build to create windows installers" OFF)
 
 ###############################################################################
 # eProsima build options
 ###############################################################################
 option(EPROSIMA_BUILD "Activate internal building" OFF)
+
+if(EPROSIMA_INSTALLER)
+    set(EPROSIMA_BUILD ON)
+endif()
 
 ###############################################################################
 # Warning level
@@ -55,15 +128,6 @@ if(MSVC OR MSVC_IDE)
     if(EPROSIMA_EXTRA_CMAKE_CXX_FLAGS)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${EPROSIMA_EXTRA_CMAKE_CXX_FLAGS}")
     endif()
-
-    # make visual studio more gcc and clang like.
-    # C4101 'identifier' : unreferenced local variable 
-    # C4189 'identifier' : local variable is initialized but not referenced
-    # C4555  expression has no effect; expected expression with side-effect
-    # C4715: 'Test': not all control paths return a value
-    # C5038 data member 'member1' will be initialized after data member 'member2'
-    # C4100 'identifier' : unreferenced formal parameter (matches clang -Wunused-lambda-capture)
-    add_compile_options(/w34101 /w34189 /w34555 /w34715 /w35038 /w44100)
 
     if(EPROSIMA_BUILD)
         string(REPLACE "/DNDEBUG" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
@@ -96,29 +160,23 @@ endif()
 # Test system configuration
 ###############################################################################
 include(${PROJECT_SOURCE_DIR}/cmake/common/check_configuration.cmake)
-
-set(FORCE_CXX "11" CACHE STRING "C++ standard fulfillment selection")
+set(FORCE_CXX "11")
 check_stdcxx()
-
 check_compile_feature()
 check_endianness()
 
 ###############################################################################
+# Check MSVC architecture
+###############################################################################
+if(MSVC OR MSVC_IDE)
+    check_msvc_arch()
+endif()
+
+###############################################################################
 # Installation paths
 ###############################################################################
-option(APPEND_PROJECT_NAME_TO_INCLUDEDIR
-  "When ON headers are installed to a path ending with a folder called \
-  ${PROJECT_NAME}. This avoids include directory search order issues when \
-  overriding this package from a merged catkin, ament, or colcon workspace."
-  OFF)
-
 set(BIN_INSTALL_DIR bin/ CACHE PATH "Installation directory for binaries")
-set(_include_dir "include/")
-if(APPEND_PROJECT_NAME_TO_INCLUDEDIR)
-  string(APPEND _include_dir "${PROJECT_NAME}/")
-endif()
-set(INCLUDE_INSTALL_DIR "${_include_dir}" CACHE PATH "Installation directory for C++ headers")
-unset(_include_dir)
+set(INCLUDE_INSTALL_DIR include/ CACHE PATH "Installation directory for C++ headers")
 set(LIB_INSTALL_DIR lib/ CACHE PATH "Installation directory for libraries")
 set(DATA_INSTALL_DIR share/ CACHE PATH "Installation directory for data")
 if(WIN32)
@@ -127,13 +185,17 @@ else()
     set(DOC_DIR "${DATA_INSTALL_DIR}/doc")
 endif()
 set(DOC_INSTALL_DIR ${DOC_DIR} CACHE PATH "Installation directory for documentation")
-set(LICENSE_INSTALL_DIR ${DATA_INSTALL_DIR}/${PROJECT_NAME} CACHE PATH "Installation directory for licenses")
+if(WIN32 AND EPROSIMA_INSTALLER AND IS_TOP_LEVEL)
+    set(LICENSE_INSTALL_DIR . CACHE PATH "Installation directory for licenses")
+else()
+    set(LICENSE_INSTALL_DIR ${DATA_INSTALL_DIR}/${PROJECT_NAME} CACHE PATH "Installation directory for licenses")
+endif()
 
 ###############################################################################
 # Internal debug messages
 ###############################################################################
 
-if(EPROSIMA_BUILD)
+if(EPROSIMA_BUILD AND NOT EPROSIMA_INSTALLER_MINION)
     set(INTERNAL_DEBUG ON)
 endif()
 
@@ -155,13 +217,8 @@ option(BUILD_SHARED_LIBS "Create shared libraries by default" ON)
 ###############################################################################
 include(${PROJECT_SOURCE_DIR}/cmake/common/eprosima_libraries.cmake)
 
-# if we are building Fast-DDS as a static library we must load Fast-CDR as one
-if(NOT BUILD_SHARED_LIBS)
-    set(FASTDDS_STATIC ON)
-endif()
-
 eprosima_find_package(fastcdr REQUIRED)
-eprosima_find_thirdparty(Asio asio VERSION 1.10.8)
+eprosima_find_thirdparty(Asio asio)
 eprosima_find_thirdparty(TinyXML2 tinyxml2)
 
 find_package(foonathan_memory REQUIRED)
@@ -169,13 +226,10 @@ message(STATUS "Found foonathan_memory: ${foonathan_memory_DIR}")
 find_package(ThirdpartyBoost REQUIRED)
 
 if(ANDROID)
-    if((ANDROID_PLATFORM LESS_EQUAL 23) OR (ANDROID_NATIVE_API_LEVEL LESS_EQUAL 23))
-        eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
-    endif()
+    eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
 endif()
 
 include_directories(thirdparty/nlohmann-json)
-include_directories(thirdparty/filewatch)
 
 ###############################################################################
 # Options
@@ -210,7 +264,7 @@ option(SQLITE3_SUPPORT "Activate SQLITE3 support" ON)
 ###############################################################################
 # SHM as Default transport
 ###############################################################################
-option(SHM_TRANSPORT_DEFAULT "Add SHM transport to the default transports" ON)
+option(SHM_TRANSPORT_DEFAULT "Adds SHM transport to the default transports" ON)
 
 ###############################################################################
 # LogConsumer default setup
@@ -223,75 +277,18 @@ if(LOG_CONSUMER_DEFAULT STREQUAL "STDOUTERR")
 endif()
 
 ###############################################################################
-# Log Info default setup
-###############################################################################
-
-include(CMakeDependentOption)
-
-set(LOG_NO_INFO_HELP "\
-Do not compile Info Log level. For the sake of efficiency non-debug \
-configs do not log info messages unless the option FASTDDS_ENFORCE_LOG_INFO \
-is set to on.")
-if(CMAKE_BUILD_TYPE MATCHES "^([Dd][Ee][Bb][Uu][Gg])$"  # single config generator
-   OR ("Debug" IN_LIST CMAKE_CONFIGURATION_TYPES))      # multi config generator
-    option(LOG_NO_INFO ${LOG_NO_INFO_HELP} OFF)
-else()
-    option(LOG_NO_INFO ${LOG_NO_INFO_HELP} ON)
-endif()
-unset(LOG_NO_INFO_HELP)
-
-option(LOG_NO_WARNING "Do not compile Warning Log level" OFF)
-
-option(LOG_NO_ERROR "Do not compile Error Log level" OFF)
-
-cmake_dependent_option(
-    FASTDDS_ENFORCE_LOG_INFO
-    "The LOG_NO_INFO option must be enforced regardless of selected configuration"
-    OFF
-    "NOT LOG_NO_INFO"
-    OFF)
-
-if(LOG_NO_INFO)
-    set(HAVE_LOG_NO_INFO 1)
-else()
-    set(HAVE_LOG_NO_INFO 0)
-endif()
-
-if(LOG_NO_WARNING)
-    set(HAVE_LOG_NO_WARNING 1)
-else()
-    set(HAVE_LOG_NO_WARNING 0)
-endif()
-
-if(LOG_NO_ERROR)
-    set(HAVE_LOG_NO_ERROR 1)
-else()
-    set(HAVE_LOG_NO_ERROR 0)
-endif()
-
-###############################################################################
 # Tools default setup
 ###############################################################################
 option(COMPILE_TOOLS "Build tools" ON)
 
-if(EPROSIMA_BUILD)
+if(EPROSIMA_BUILD AND IS_TOP_LEVEL)
     set(COMPILE_TOOLS ON)
 endif()
-
-###############################################################################
-# Fast DDS statistics tool default setup
-###############################################################################
-option(FASTDDS_STATISTICS "Enable Fast DDS Statistics Module" OFF)
 
 ###############################################################################
 # Compile library.
 ###############################################################################
 add_subdirectory(src/cpp)
-
-###############################################################################
-# Add http://optionparser.sourceforge.net/ as unified cli parser 
-###############################################################################
-add_subdirectory(thirdparty/optionparser)
 
 ###############################################################################
 # Testing options
@@ -305,19 +302,12 @@ add_subdirectory(test)
 ###############################################################################
 option(COMPILE_EXAMPLES "Build example" OFF)
 
-if(EPROSIMA_BUILD)
+if(EPROSIMA_BUILD AND IS_TOP_LEVEL AND NOT EPROSIMA_INSTALLER AND NOT EPROSIMA_INSTALLER_MINION)
     set(COMPILE_EXAMPLES ON)
 endif()
 
 if(COMPILE_EXAMPLES)
     add_subdirectory(examples)
-endif()
-
-###############################################################################
-# Fuzzers
-###############################################################################
-if(DEFINED ENV{LIB_FUZZING_ENGINE})
-    add_subdirectory(fuzz)
 endif()
 
 ###############################################################################
@@ -334,6 +324,11 @@ endif()
 # Add an option to toggle the generation of the API documentation.
 option(BUILD_DOCUMENTATION "Use doxygen to create product documentation" OFF)
 option(CHECK_DOCUMENTATION "Use doxygen to check code documentation" OFF)
+
+if(EPROSIMA_INSTALLER)
+    set(BUILD_DOCUMENTATION ON)
+    set(DOXYGEN_SHOULD_SKIP_THIS_PUBLIC "DOXYGEN_SHOULD_SKIP_THIS_PUBLIC")
+endif()
 
 if(CHECK_DOCUMENTATION)
     set(BUILD_DOCUMENTATION ON)
@@ -356,6 +351,12 @@ if(BUILD_DOCUMENTATION)
     endif()
 
     if(NOT CHECK_DOCUMENTATION)
+        find_program(WGET_EXE wget)
+        if(WGET_EXE)
+            message(STATUS "Found WGet: ${WGET_EXE}")
+        else()
+            message(FATAL_ERROR "wget is needed to build the documentation. Please install it correctly")
+        endif()
         find_program(UNZIP_EXE unzip)
         if(UNZIP_EXE)
             message(STATUS "Found Unzip: ${UNZIP_EXE}")
@@ -400,23 +401,12 @@ if(BUILD_DOCUMENTATION)
 
     ### ReadTheDocs ########################
     if(NOT CHECK_DOCUMENTATION)
-
-        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom_template.cmake [=[
-
-            file(DOWNLOAD "https://fast-dds.docs.eprosima.com/_/downloads/en/v${PROJECT_VERSION}/htmlzip/" "./eprosima-fast-rtps.zip")
-            # TODO: when windows ci CMake version surpasses 17 favor file() instead of UNZIP as in the next line
-            # file(ARCHIVE_EXTRACT INPUT "./eprosima-fast-rtps.zip" DESTINATION  "${PROJECT_BINARY_DIR}/doc/")
-            execute_process(COMMAND "${UNZIP_EXE}" "./eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/")
-            file(REMOVE_RECURSE "${PROJECT_BINARY_DIR}/doc/manual")
-            file(RENAME "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual")
-            file(REMOVE  "./eprosima-fast-rtps.zip")
-
-            ]=])
-
-        configure_file(${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom_template.cmake  ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom.cmake)
-
         add_custom_target(readthedocs
-            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom.cmake 
+            COMMAND "${WGET_EXE}" "https://media.readthedocs.org/htmlzip/eprosima-fast-rtps/v${PROJECT_VERSION}/eprosima-fast-rtps.zip"
+            COMMAND "${UNZIP_EXE}" "eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/"
+            COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}/doc/manual"
+            COMMAND ${CMAKE_COMMAND} -E rename "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual"
+            COMMAND ${CMAKE_COMMAND} -E remove "eprosima-fast-rtps.zip"
             )
 
         add_dependencies(readthedocs docdirs)
@@ -439,8 +429,15 @@ install(FILES ${PROJECT_SOURCE_DIR}/LICENSE
     DESTINATION ${LICENSE_INSTALL_DIR}
     COMPONENT licenses
     )
+set(CPACK_COMPONENT_LICENSES_HIDDEN 1)
+
+set(CPACK_COMPONENTS_ALL headers licenses)
 
 option(INSTALL_EXAMPLES "Install example" OFF)
+if(EPROSIMA_INSTALLER)
+    set(INSTALL_EXAMPLES ON)
+    set(INSTALL_TOOLS ON)
+endif()
 
 if(INSTALL_EXAMPLES)
   # Install examples
@@ -449,9 +446,17 @@ if(INSTALL_EXAMPLES)
       COMPONENT examples
       PATTERN "examples/CMakeLists.txt" EXCLUDE
       )
+
+  set(CPACK_COMPONENT_EXAMPLES_DISPLAY_NAME "Examples")
+  set(CPACK_COMPONENT_EXAMPLES_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} examples")
+
+  set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} examples)
 endif()
 
 option(INSTALL_TOOLS "Install tools" OFF)
+if(EPROSIMA_INSTALLER)
+    set(INSTALL_TOOLS ON)
+endif()
 
 if(INSTALL_TOOLS)
   # Install tools
@@ -460,6 +465,11 @@ if(INSTALL_TOOLS)
       COMPONENT tools
       PATTERN "tools/CMakeLists.txt" EXCLUDE
       )
+
+  set(CPACK_COMPONENT_TOOLS_DISPLAY_NAME "Tools")
+  set(CPACK_COMPONENT_TOOLS_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} tools")
+
+  set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} tools)
 endif()
 
 if(BUILD_DOCUMENTATION)
@@ -481,4 +491,27 @@ if(BUILD_DOCUMENTATION)
             COMPONENT documentation
             )
     endif()
+
+    ### Documentation component
+    set(CPACK_COMPONENT_DOCUMENTATION_DISPLAY_NAME "Documentation")
+    set(CPACK_COMPONENT_DOCUMENTATION_DESCRIPTION "eProsima ${PROJECT_NAME_LARGE} documentation")
+
+    set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} documentation)
 endif()
+
+if(MSVC OR MSVC_IDE)
+    if(EPROSIMA_INSTALLER)
+        set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL}
+            libraries_i86Win32VS2015
+            libraries_x64Win64VS2015
+            libraries_i86Win32VS2017
+            libraries_x64Win64VS2017
+            )
+    else()
+        set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} libraries_${MSVC_ARCH})
+    endif()
+else()
+    set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} libraries)
+endif()
+
+include(${PROJECT_SOURCE_DIR}/cmake/packaging/eProsimaPackaging.cmake)

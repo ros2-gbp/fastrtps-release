@@ -1,15 +1,14 @@
 #include <iostream>
 #include <string>
 
-#include <fastrtps/attributes/ParticipantAttributes.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/attributes/SubscriberAttributes.h>
-#include <fastrtps/Domain.h>
 #include <fastrtps/participant/Participant.h>
-#include <fastrtps/publisher/Publisher.h>
-#include <fastrtps/subscriber/SampleInfo.h>
+#include <fastrtps/attributes/ParticipantAttributes.h>
 #include <fastrtps/subscriber/Subscriber.h>
-#include <fastrtps/TopicDataType.h>
+#include <fastrtps/attributes/SubscriberAttributes.h>
+#include <fastrtps/publisher/Publisher.h>
+#include <fastrtps/attributes/PublisherAttributes.h>
+#include <fastrtps/Domain.h>
+#include <fastrtps/subscriber/SampleInfo.h>
 
 #include "samplePubSubTypes.h"
 
@@ -119,7 +118,7 @@ void safest()
     while (mySub1->readNextData(&my_sample, &sample_info))
     {
         std::cout << std::to_string(my_sample.index()) << " (key " << static_cast<int>(my_sample.key_value()) << ")" <<
-            std::endl;
+                std::endl;
     }
     std::cout << std::endl;
 

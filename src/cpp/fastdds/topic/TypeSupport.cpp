@@ -20,14 +20,7 @@
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 
-#include <fastcdr/exceptions/Exception.h>
-
-
-namespace eprosima {
-namespace fastdds {
-namespace dds {
-
-const InstanceHandle_t HANDLE_NIL;
+using namespace eprosima::fastdds::dds;
 
 ReturnCode_t TypeSupport::register_type(
         DomainParticipant* participant,
@@ -41,41 +34,3 @@ ReturnCode_t TypeSupport::register_type(
 {
     return participant->register_type(*this, get_type_name());
 }
-
-bool TypeSupport::serialize(
-        void* data,
-        fastrtps::rtps::SerializedPayload_t* payload)
-{
-    bool result = false;
-    try
-    {
-        result = get()->serialize(data, payload);
-    }
-    catch (eprosima::fastcdr::exception::Exception&)
-    {
-        result = false;
-    }
-
-    return result;
-}
-
-bool TypeSupport::deserialize(
-        fastrtps::rtps::SerializedPayload_t* payload,
-        void* data)
-{
-    bool result = false;
-    try
-    {
-        result = get()->deserialize(payload, data);
-    }
-    catch (eprosima::fastcdr::exception::Exception&)
-    {
-        result = false;
-    }
-
-    return result;
-}
-
-}  // namespace dds
-}  // namespace fastdds
-}  // namespace eprosima

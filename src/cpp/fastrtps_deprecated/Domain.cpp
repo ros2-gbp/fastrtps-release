@@ -18,27 +18,28 @@
  */
 
 #include <fastrtps/Domain.h>
-
-#include <chrono>
-#include <thread>
-
-#include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/RTPSDomain.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 
 #include <fastrtps/participant/Participant.h>
+#include <fastrtps_deprecated/participant/ParticipantImpl.h>
+
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/subscriber/Subscriber.h>
-#include <fastrtps/types/DynamicDataFactory.h>
-#include <fastrtps/types/DynamicPubSubType.h>
-#include <fastrtps/types/DynamicType.h>
-#include <fastrtps/types/DynamicTypeBuilderFactory.h>
-#include <fastrtps/types/DynamicTypeMember.h>
-#include <fastrtps/types/TypeObjectFactory.h>
+
+#include <fastdds/dds/log/Log.hpp>
+
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
-#include <fastrtps_deprecated/participant/ParticipantImpl.h>
-#include <utils/SystemInfo.hpp>
+#include <fastrtps/types/DynamicPubSubType.h>
+#include <fastrtps/types/DynamicType.h>
+#include <fastrtps/types/DynamicTypeMember.h>
+#include <fastrtps/types/DynamicTypeBuilderFactory.h>
+#include <fastrtps/types/DynamicDataFactory.h>
+#include <fastrtps/types/TypeObjectFactory.h>
+
+#include <chrono>
+#include <thread>
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::xmlparser;
@@ -148,7 +149,6 @@ Participant* Domain::createParticipant(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -167,12 +167,6 @@ Participant* Domain::createParticipant(
         const eprosima::fastrtps::ParticipantAttributes& att,
         ParticipantListener* listen)
 {
-    // If the user is not using XML and the environment variable is not set, this is going to be called always
-    if (!default_xml_profiles_loaded && SystemInfo::get_environment_file().empty())
-    {
-        SystemInfo::set_environment_file();
-    }
-
     Participant* pubsubpar = new Participant();
     ParticipantImpl* pspartimpl = new ParticipantImpl(att, pubsubpar, listen);
 
@@ -218,7 +212,6 @@ void Domain::getDefaultParticipantAttributes(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -263,7 +256,6 @@ void Domain::getDefaultPublisherAttributes(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -276,7 +268,6 @@ void Domain::getDefaultSubscriberAttributes(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -412,7 +403,6 @@ bool Domain::loadXMLProfilesFile(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -420,24 +410,6 @@ bool Domain::loadXMLProfilesFile(
     if ( XMLP_ret::XML_ERROR == XMLProfileManager::loadXMLFile(xml_profile_file))
     {
         logError(DOMAIN, "Problem loading XML file '" << xml_profile_file << "'");
-        return false;
-    }
-    return true;
-}
-
-bool Domain::loadXMLProfilesString(
-        const char* data,
-        size_t length)
-{
-    if (false == default_xml_profiles_loaded)
-    {
-        XMLProfileManager::loadDefaultXMLFile();
-        default_xml_profiles_loaded = true;
-    }
-
-    if ( XMLP_ret::XML_ERROR == XMLProfileManager::loadXMLString(data, length))
-    {
-        logError(DOMAIN, "Problem loading XML string");
         return false;
     }
     return true;

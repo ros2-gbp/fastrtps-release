@@ -30,13 +30,7 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-enum communication_type
-{
-    TRANSPORT,
-    INTRAPROCESS
-};
-
-class Persistence : public ::testing::TestWithParam<communication_type>
+class Persistence : public ::testing::TestWithParam<bool>
 {
 public:
 
@@ -53,8 +47,8 @@ public:
     std::list<HelloWorld> not_received_data;
 
     void run_one_send_recv_test(
-            RTPSWithRegistrationReader<HelloWorldPubSubType>& reader,
-            RTPSWithRegistrationWriter<HelloWorldPubSubType>& writer,
+            RTPSWithRegistrationReader<HelloWorldType>& reader,
+            RTPSWithRegistrationWriter<HelloWorldType>& writer,
             uint32_t seq_check = 0,
             bool reliable = false)
     {
@@ -116,15 +110,10 @@ protected:
     virtual void SetUp()
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
 
         // Get info about current test
@@ -164,15 +153,10 @@ protected:
     {
         std::remove(db_file_name_.c_str());
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
     }
 
@@ -180,8 +164,8 @@ protected:
 
 TEST_P(Persistence, RTPSAsNonReliableWithPersistence)
 {
-    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
     std::string ip("239.255.1.4");
 
     reader.make_persistent(db_file_name(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).init();
@@ -211,8 +195,8 @@ TEST_P(Persistence, RTPSAsNonReliableWithPersistence)
 
 TEST_P(Persistence, AsyncRTPSAsNonReliableWithPersistence)
 {
-    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
     std::string ip("239.255.1.4");
 
     reader.make_persistent(db_file_name(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).init();
@@ -243,8 +227,8 @@ TEST_P(Persistence, AsyncRTPSAsNonReliableWithPersistence)
 
 TEST_P(Persistence, RTPSAsReliableWithPersistence)
 {
-    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
     std::string ip("239.255.1.4");
 
     reader.make_persistent(db_file_name(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).
@@ -275,8 +259,8 @@ TEST_P(Persistence, RTPSAsReliableWithPersistence)
 
 TEST_P(Persistence, AsyncRTPSAsReliableWithPersistence)
 {
-    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
     std::string ip("239.255.1.4");
 
     reader.make_persistent(db_file_name(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).
@@ -314,18 +298,13 @@ TEST_P(Persistence, AsyncRTPSAsReliableWithPersistence)
 
 GTEST_INSTANTIATE_TEST_MACRO(Persistence,
         Persistence,
-        testing::Values(TRANSPORT, INTRAPROCESS),
+        testing::Values(false, true),
         [](const testing::TestParamInfo<Persistence::ParamType>& info)
         {
-            switch (info.param)
+            if (info.param)
             {
-                case INTRAPROCESS:
-                    return "Intraprocess";
-                    break;
-                case TRANSPORT:
-                default:
-                    return "Transport";
+                return "Intraprocess";
             }
-
+            return "NonIntraprocess";
         });
 #endif // if HAVE_SQLITE3

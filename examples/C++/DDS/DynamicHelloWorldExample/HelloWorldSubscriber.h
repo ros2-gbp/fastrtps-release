@@ -48,7 +48,7 @@ public:
     //!RUN the subscriber
     void run();
 
-    //!Run the subscriber until number samples have been received.
+    //!Run the subscriber until number samples have been recevied.
     void run(
             uint32_t number);
 
@@ -73,7 +73,7 @@ public:
     class SubListener
         :  public eprosima::fastdds::dds::DomainParticipantListener
     {
-    public:
+public:
 
         SubListener(
                 HelloWorldSubscriber* sub)
@@ -108,8 +108,7 @@ public:
 
         HelloWorldSubscriber* subscriber_;
 
-    }
-    m_listener;
+    } m_listener;
 
 };
 

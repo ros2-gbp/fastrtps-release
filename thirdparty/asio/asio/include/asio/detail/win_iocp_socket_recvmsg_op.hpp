@@ -2,7 +2,7 @@
 // detail/win_iocp_socket_recvmsg_op.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2020 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -24,7 +24,6 @@
 #include "asio/detail/fenced_block.hpp"
 #include "asio/detail/handler_alloc_helpers.hpp"
 #include "asio/detail/handler_invoke_helpers.hpp"
-#include "asio/detail/handler_work.hpp"
 #include "asio/detail/memory.hpp"
 #include "asio/detail/operation.hpp"
 #include "asio/detail/socket_ops.hpp"
@@ -36,7 +35,7 @@
 namespace asio {
 namespace detail {
 
-template <typename MutableBufferSequence, typename Handler, typename IoExecutor>
+template <typename MutableBufferSequence, typename Handler>
 class win_iocp_socket_recvmsg_op : public operation
 {
 public:
@@ -45,15 +44,14 @@ public:
   win_iocp_socket_recvmsg_op(
       socket_ops::weak_cancel_token_type cancel_token,
       const MutableBufferSequence& buffers,
-      socket_base::message_flags& out_flags,
-      Handler& handler, const IoExecutor& io_ex)
+      socket_base::message_flags& out_flags, Handler& handler)
     : operation(&win_iocp_socket_recvmsg_op::do_complete),
       cancel_token_(cancel_token),
       buffers_(buffers),
       out_flags_(out_flags),
-      handler_(ASIO_MOVE_CAST(Handler)(handler)),
-      work_(handler_, io_ex)
+      handler_(ASIO_MOVE_CAST(Handler)(handler))
   {
+    handler_work<Handler>::start(handler_);
   }
 
   static void do_complete(void* owner, operation* base,
@@ -66,13 +64,9 @@ public:
     win_iocp_socket_recvmsg_op* o(
         static_cast<win_iocp_socket_recvmsg_op*>(base));
     ptr p = { asio::detail::addressof(o->handler_), o, o };
+    handler_work<Handler> w(o->handler_);
 
     ASIO_HANDLER_COMPLETION((*o));
-
-    // Take ownership of the operation's outstanding work.
-    handler_work<Handler, IoExecutor> w(
-        ASIO_MOVE_CAST2(handler_work<Handler, IoExecutor>)(
-          o->work_));
 
 #if defined(ASIO_ENABLE_BUFFER_DEBUGGING)
     // Check whether buffers are still valid.
@@ -112,7 +106,6 @@ private:
   MutableBufferSequence buffers_;
   socket_base::message_flags& out_flags_;
   Handler handler_;
-  handler_work<Handler, IoExecutor> work_;
 };
 
 } // namespace detail

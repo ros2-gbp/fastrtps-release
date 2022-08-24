@@ -21,12 +21,10 @@
 
 #include <cstdlib>
 #include <memory>
-
 #include <fastrtps/fastrtps_dll.h>
 #include <fastdds/rtps/common/Guid.h>
+#include <fastdds/rtps/reader/StatefulReader.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
-#include <fastdds/statistics/IListeners.hpp>
 #include <fastrtps/qos/ReaderQos.h>
 #include <fastrtps/qos/WriterQos.h>
 
@@ -54,9 +52,6 @@ class RTPSWriter;
 class RTPSReader;
 class WriterProxyData;
 class ReaderProxyData;
-class EndpointAttributes;
-class WriterAttributes;
-class ReaderAttributes;
 class ResourceEvent;
 class WLP;
 
@@ -141,24 +136,15 @@ public:
 
     /**
      * Register a RTPSReader in the builtin Protocols.
-     * @param Reader          Pointer to the RTPSReader.
-     * @param topicAtt        Topic Attributes where you want to register it.
-     * @param rqos            ReaderQos.
-     * @param content_filter  Optional content filtering information.
+     * @param Reader Pointer to the RTPSReader.
+     * @param topicAtt Topic Attributes where you want to register it.
+     * @param rqos ReaderQos.
      * @return True if correctly registered.
      */
     bool registerReader(
             RTPSReader* Reader,
             const TopicAttributes& topicAtt,
-            const ReaderQos& rqos,
-            const fastdds::rtps::ContentFilterProperty* content_filter = nullptr);
-
-    /**
-     * Update participant attributes.
-     * @param patt New participant attributes.
-     */
-    void update_attributes(
-            const RTPSParticipantAttributes& patt);
+            const ReaderQos& rqos);
 
     /**
      * Update writer QOS
@@ -174,17 +160,15 @@ public:
 
     /**
      * Update reader QOS
-     * @param Reader          Pointer to the RTPSReader to update
-     * @param topicAtt        Topic Attributes where you want to register it.
-     * @param rqos            New reader QoS
-     * @param content_filter  Optional content filtering information.
+     * @param Reader to update
+     * @param topicAtt Topic Attributes where you want to register it.
+     * @param rqos New reader QoS
      * @return true on success
      */
     bool updateReader(
             RTPSReader* Reader,
             const TopicAttributes& topicAtt,
-            const ReaderQos& rqos,
-            const fastdds::rtps::ContentFilterProperty* content_filter = nullptr);
+            const ReaderQos& rqos);
 
     /**
      * Returns a list with the participant names.
@@ -254,58 +238,13 @@ public:
      */
     void enable();
 
-#if HAVE_SECURITY
-
-    /**
-     * @brief Checks whether the writer has security attributes enabled
-     * @param writer_attributes Attributes of the writer as given to the RTPSParticipantImpl::create_writer
-     */
-
-    bool is_security_enabled_for_writer(
-            const WriterAttributes& writer_attributes);
-
-    /**
-     * @brief Checks whether the reader has security attributes enabled
-     * @param reader_attributes Attributes of the reader as given to the RTPSParticipantImpl::create_reader
-     */
-
-    bool is_security_enabled_for_reader(
-            const ReaderAttributes& reader_attributes);
-
-#endif // if HAVE_SECURITY
-
-#ifdef FASTDDS_STATISTICS
-
-    /*
-     * Add a listener to receive statistics backend callbacks
-     * @param listener
-     * @param kind combination of fastdds::statistics::EventKind flags used as a mask. Events to notify.
-     * @return true if successfully added
-     */
-    bool add_statistics_listener(
-            std::shared_ptr<fastdds::statistics::IListener> listener,
-            uint32_t kind);
-
-    /*
-     * Remove a listener from receiving statistics backend callbacks
-     * @param listener
-     * @param kind combination of fastdds::statistics::EventKind flags used as a mask. Events to ignore.
-     * @return true if successfully removed
-     */
-    bool remove_statistics_listener(
-            std::shared_ptr<fastdds::statistics::IListener> listener,
-            uint32_t kind);
-
-#endif // FASTDDS_STATISTICS
-
 private:
 
     //!Pointer to the implementation.
     RTPSParticipantImpl* mp_impl;
-
 };
 
-} // namespace rtps
+}
 } /* namespace rtps */
 } /* namespace eprosima */
 

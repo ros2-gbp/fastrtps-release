@@ -41,7 +41,6 @@
 #include <fastrtps/types/TypesBase.h>
 #include <fastrtps/types/TypeIdentifier.h>
 #include <fastrtps/utils/string_convert.hpp>
-#include <fastrtps/fastrtps_dll.h>
 #include <stdint.h>
 #include <array>
 #include <vector>
@@ -67,39 +66,39 @@ public:
     /*!
      * @brief Default constructor.
      */
-    RTPS_DllAPI ExtendedAnnotationParameterValue();
+    ExtendedAnnotationParameterValue();
 
     /*!
      * @brief Default destructor.
      */
-    RTPS_DllAPI ~ExtendedAnnotationParameterValue();
+    ~ExtendedAnnotationParameterValue();
 
     /*!
      * @brief Copy constructor.
      * @param x Reference to the object ExtendedAnnotationParameterValue that will be copied.
      */
-    RTPS_DllAPI ExtendedAnnotationParameterValue(
+    ExtendedAnnotationParameterValue(
             const ExtendedAnnotationParameterValue& x);
 
     /*!
      * @brief Move constructor.
      * @param x Reference to the object ExtendedAnnotationParameterValue that will be copied.
      */
-    RTPS_DllAPI ExtendedAnnotationParameterValue(
+    ExtendedAnnotationParameterValue(
             ExtendedAnnotationParameterValue&& x);
 
     /*!
      * @brief Copy assignment.
      * @param x Reference to the object ExtendedAnnotationParameterValue that will be copied.
      */
-    RTPS_DllAPI ExtendedAnnotationParameterValue& operator =(
+    ExtendedAnnotationParameterValue& operator =(
             const ExtendedAnnotationParameterValue& x);
 
     /*!
      * @brief Move assignment.
      * @param x Reference to the object ExtendedAnnotationParameterValue that will be copied.
      */
-    RTPS_DllAPI ExtendedAnnotationParameterValue& operator =(
+    ExtendedAnnotationParameterValue& operator =(
             ExtendedAnnotationParameterValue&& x);
 
     /*!
@@ -108,7 +107,7 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
-    RTPS_DllAPI static size_t getCdrSerializedSize(
+    static size_t getCdrSerializedSize(
             const ExtendedAnnotationParameterValue& data,
             size_t current_alignment = 0);
 
@@ -117,14 +116,14 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void serialize(
+    void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
     /*!
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void deserialize(
+    void deserialize(
             eprosima::fastcdr::Cdr& cdr);
 
 
@@ -135,22 +134,22 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Maximum serialized size.
      */
-    RTPS_DllAPI static size_t getKeyMaxCdrSerializedSize(
+    static size_t getKeyMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
     /*!
      * @brief This function tells you if the Key has been defined for this type
      */
-    RTPS_DllAPI static bool isKeyDefined();
+    static bool isKeyDefined();
 
     /*!
      * @brief This function serializes the key members of an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void serializeKey(
+    void serializeKey(
             eprosima::fastcdr::Cdr& cdr) const;
 
-    RTPS_DllAPI bool operator ==(
+    bool operator ==(
             const ExtendedAnnotationParameterValue&) const
     {
         return true;
@@ -169,39 +168,39 @@ public:
     /*!
      * @brief Default constructor.
      */
-    RTPS_DllAPI AnnotationParameterValue();
+    AnnotationParameterValue();
 
     /*!
      * @brief Default destructor.
      */
-    RTPS_DllAPI ~AnnotationParameterValue();
+    ~AnnotationParameterValue();
 
     /*!
      * @brief Copy constructor.
      * @param x Reference to the object AnnotationParameterValue that will be copied.
      */
-    RTPS_DllAPI AnnotationParameterValue(
+    AnnotationParameterValue(
             const AnnotationParameterValue& x);
 
     /*!
      * @brief Move constructor.
      * @param x Reference to the object AnnotationParameterValue that will be copied.
      */
-    RTPS_DllAPI AnnotationParameterValue(
+    AnnotationParameterValue(
             AnnotationParameterValue&& x);
 
     /*!
      * @brief Copy assignment.
      * @param x Reference to the object AnnotationParameterValue that will be copied.
      */
-    RTPS_DllAPI AnnotationParameterValue& operator =(
+    AnnotationParameterValue& operator =(
             const AnnotationParameterValue& x);
 
     /*!
      * @brief Move assignment.
      * @param x Reference to the object AnnotationParameterValue that will be copied.
      */
-    RTPS_DllAPI AnnotationParameterValue& operator =(
+    AnnotationParameterValue& operator =(
             AnnotationParameterValue&& x);
 
     /*!
@@ -209,26 +208,26 @@ public:
      * @param __d New value for the discriminator.
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the new value doesn't correspond to the selected union member.
      */
-    RTPS_DllAPI void _d(
+    void _d(
             char __d);
 
     /*!
      * @brief This function returns the value of the discriminator.
      * @return Value of the discriminator
      */
-    RTPS_DllAPI char _d() const;
+    char _d() const;
 
     /*!
      * @brief This function returns a reference to the discriminator.
      * @return Reference to the discriminator.
      */
-    RTPS_DllAPI char& _d();
+    char& _d();
 
     /*!
      * @brief This function sets a value in member boolean_value
      * @param _boolean_value New value for member boolean_value
      */
-    RTPS_DllAPI void boolean_value(
+    void boolean_value(
             bool _boolean_value);
 
     /*!
@@ -236,19 +235,19 @@ public:
      * @return Value of member boolean_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI bool boolean_value() const;
+    bool boolean_value() const;
 
     /*!
      * @brief This function returns a reference to member boolean_value
      * @return Reference to member boolean_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI bool& boolean_value();
+    bool& boolean_value();
     /*!
      * @brief This function sets a value in member byte_value
      * @param _byte_value New value for member byte_value
      */
-    RTPS_DllAPI void byte_value(
+    void byte_value(
             uint8_t _byte_value);
 
     /*!
@@ -256,19 +255,19 @@ public:
      * @return Value of member byte_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI uint8_t byte_value() const;
+    uint8_t byte_value() const;
 
     /*!
      * @brief This function returns a reference to member byte_value
      * @return Reference to member byte_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI uint8_t& byte_value();
+    uint8_t& byte_value();
     /*!
      * @brief This function sets a value in member int16_value
      * @param _int16_value New value for member int16_value
      */
-    RTPS_DllAPI void int16_value(
+    void int16_value(
             int16_t _int16_value);
 
     /*!
@@ -276,19 +275,19 @@ public:
      * @return Value of member int16_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI int16_t int16_value() const;
+    int16_t int16_value() const;
 
     /*!
      * @brief This function returns a reference to member int16_value
      * @return Reference to member int16_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI int16_t& int16_value();
+    int16_t& int16_value();
     /*!
      * @brief This function sets a value in member uint_16_value
      * @param _uint_16_value New value for member uint_16_value
      */
-    RTPS_DllAPI void uint_16_value(
+    void uint_16_value(
             uint16_t _uint_16_value);
 
     /*!
@@ -296,19 +295,19 @@ public:
      * @return Value of member uint_16_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI uint16_t uint_16_value() const;
+    uint16_t uint_16_value() const;
 
     /*!
      * @brief This function returns a reference to member uint_16_value
      * @return Reference to member uint_16_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI uint16_t& uint_16_value();
+    uint16_t& uint_16_value();
     /*!
      * @brief This function sets a value in member int32_value
      * @param _int32_value New value for member int32_value
      */
-    RTPS_DllAPI void int32_value(
+    void int32_value(
             int32_t _int32_value);
 
     /*!
@@ -316,19 +315,19 @@ public:
      * @return Value of member int32_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI int32_t int32_value() const;
+    int32_t int32_value() const;
 
     /*!
      * @brief This function returns a reference to member int32_value
      * @return Reference to member int32_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI int32_t& int32_value();
+    int32_t& int32_value();
     /*!
      * @brief This function sets a value in member uint32_value
      * @param _uint32_value New value for member uint32_value
      */
-    RTPS_DllAPI void uint32_value(
+    void uint32_value(
             uint32_t _uint32_value);
 
     /*!
@@ -336,19 +335,19 @@ public:
      * @return Value of member uint32_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI uint32_t uint32_value() const;
+    uint32_t uint32_value() const;
 
     /*!
      * @brief This function returns a reference to member uint32_value
      * @return Reference to member uint32_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI uint32_t& uint32_value();
+    uint32_t& uint32_value();
     /*!
      * @brief This function sets a value in member int64_value
      * @param _int64_value New value for member int64_value
      */
-    RTPS_DllAPI void int64_value(
+    void int64_value(
             int64_t _int64_value);
 
     /*!
@@ -356,20 +355,19 @@ public:
      * @return Value of member int64_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI int64_t int64_value() const;
+    int64_t int64_value() const;
 
     /*!
      * @brief This function returns a reference to member int64_value
      * @return Reference to member int64_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI int64_t& int64_value();
-
+    int64_t& int64_value();
     /*!
      * @brief This function sets a value in member uint64_value
      * @param _uint64_value New value for member uint64_value
      */
-    RTPS_DllAPI void uint64_value(
+    void uint64_value(
             uint64_t _uint64_value);
 
     /*!
@@ -377,19 +375,19 @@ public:
      * @return Value of member uint64_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI uint64_t uint64_value() const;
+    uint64_t uint64_value() const;
 
     /*!
      * @brief This function returns a reference to member uint64_value
      * @return Reference to member uint64_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI uint64_t& uint64_value();
+    uint64_t& uint64_value();
     /*!
      * @brief This function sets a value in member float32_value
      * @param _float32_value New value for member float32_value
      */
-    RTPS_DllAPI void float32_value(
+    void float32_value(
             float _float32_value);
 
     /*!
@@ -397,19 +395,19 @@ public:
      * @return Value of member float32_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI float float32_value() const;
+    float float32_value() const;
 
     /*!
      * @brief This function returns a reference to member float32_value
      * @return Reference to member float32_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI float& float32_value();
+    float& float32_value();
     /*!
      * @brief This function sets a value in member float64_value
      * @param _float64_value New value for member float64_value
      */
-    RTPS_DllAPI void float64_value(
+    void float64_value(
             double _float64_value);
 
     /*!
@@ -417,20 +415,19 @@ public:
      * @return Value of member float64_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI double float64_value() const;
+    double float64_value() const;
 
     /*!
      * @brief This function returns a reference to member float64_value
      * @return Reference to member float64_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI double& float64_value();
-
+    double& float64_value();
     /*!
      * @brief This function sets a value in member float128_value
      * @param _float128_value New value for member float128_value
      */
-    RTPS_DllAPI void float128_value(
+    void float128_value(
             long double _float128_value);
 
     /*!
@@ -438,19 +435,19 @@ public:
      * @return Value of member float128_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI long double float128_value() const;
+    long double float128_value() const;
 
     /*!
      * @brief This function returns a reference to member float128_value
      * @return Reference to member float128_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI long double& float128_value();
+    long double& float128_value();
     /*!
      * @brief This function sets a value in member char_value
      * @param _char_value New value for member char_value
      */
-    RTPS_DllAPI void char_value(
+    void char_value(
             char _char_value);
 
     /*!
@@ -458,19 +455,19 @@ public:
      * @return Value of member char_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI char char_value() const;
+    char char_value() const;
 
     /*!
      * @brief This function returns a reference to member char_value
      * @return Reference to member char_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI char& char_value();
+    char& char_value();
     /*!
      * @brief This function sets a value in member wchar_value
      * @param _wchar_value New value for member wchar_value
      */
-    RTPS_DllAPI void wchar_value(
+    void wchar_value(
             wchar_t _wchar_value);
 
     /*!
@@ -478,19 +475,19 @@ public:
      * @return Value of member wchar_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI wchar_t wchar_value() const;
+    wchar_t wchar_value() const;
 
     /*!
      * @brief This function returns a reference to member wchar_value
      * @return Reference to member wchar_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI wchar_t& wchar_value();
+    wchar_t& wchar_value();
     /*!
      * @brief This function sets a value in member enumerated_value
      * @param _enumerated_value New value for member enumerated_value
      */
-    RTPS_DllAPI void enumerated_value(
+    void enumerated_value(
             int32_t _enumerated_value);
 
     /*!
@@ -498,26 +495,26 @@ public:
      * @return Value of member enumerated_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI int32_t enumerated_value() const;
+    int32_t enumerated_value() const;
 
     /*!
      * @brief This function returns a reference to member enumerated_value
      * @return Reference to member enumerated_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI int32_t& enumerated_value();
+    int32_t& enumerated_value();
     /*!
      * @brief This function copies the value in member string8_value
      * @param _string8_value New value to be copied in member string8_value
      */
-    RTPS_DllAPI void string8_value(
+    void string8_value(
             const std::string& _string8_value);
 
     /*!
      * @brief This function moves the value in member string8_value
      * @param _string8_value New value to be moved in member string8_value
      */
-    RTPS_DllAPI void string8_value(
+    void string8_value(
             std::string&& _string8_value);
 
     /*!
@@ -525,26 +522,26 @@ public:
      * @return Constant reference to member string8_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI const std::string& string8_value() const;
+    const std::string& string8_value() const;
 
     /*!
      * @brief This function returns a reference to member string8_value
      * @return Reference to member string8_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI std::string& string8_value();
+    std::string& string8_value();
     /*!
      * @brief This function copies the value in member string16_value
      * @param _string16_value New value to be copied in member string16_value
      */
-    RTPS_DllAPI void string16_value(
+    void string16_value(
             const std::wstring& _string16_value);
 
     /*!
      * @brief This function moves the value in member string16_value
      * @param _string16_value New value to be moved in member string16_value
      */
-    RTPS_DllAPI void string16_value(
+    void string16_value(
             std::wstring&& _string16_value);
 
     /*!
@@ -552,27 +549,26 @@ public:
      * @return Constant reference to member string16_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI const std::wstring& string16_value() const;
+    const std::wstring& string16_value() const;
 
     /*!
      * @brief This function returns a reference to member string16_value
      * @return Reference to member string16_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI std::wstring& string16_value();
-
+    std::wstring& string16_value();
     /*!
      * @brief This function copies the value in member extended_value
      * @param _extended_value New value to be copied in member extended_value
      */
-    RTPS_DllAPI void extended_value(
+    void extended_value(
             const ExtendedAnnotationParameterValue& _extended_value);
 
     /*!
      * @brief This function moves the value in member extended_value
      * @param _extended_value New value to be moved in member extended_value
      */
-    RTPS_DllAPI void extended_value(
+    void extended_value(
             ExtendedAnnotationParameterValue&& _extended_value);
 
     /*!
@@ -580,14 +576,14 @@ public:
      * @return Constant reference to member extended_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI const ExtendedAnnotationParameterValue& extended_value() const;
+    const ExtendedAnnotationParameterValue& extended_value() const;
 
     /*!
      * @brief This function returns a reference to member extended_value
      * @return Reference to member extended_value
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
-    RTPS_DllAPI ExtendedAnnotationParameterValue& extended_value();
+    ExtendedAnnotationParameterValue& extended_value();
 
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
@@ -595,7 +591,7 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
-    RTPS_DllAPI static size_t getCdrSerializedSize(
+    static size_t getCdrSerializedSize(
             const AnnotationParameterValue& data,
             size_t current_alignment = 0);
 
@@ -604,14 +600,14 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void serialize(
+    void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
     /*!
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void deserialize(
+    void deserialize(
             eprosima::fastcdr::Cdr& cdr);
 
 
@@ -622,28 +618,28 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Maximum serialized size.
      */
-    RTPS_DllAPI static size_t getKeyMaxCdrSerializedSize(
+    static size_t getKeyMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
     /*!
      * @brief This function tells you if the Key has been defined for this type
      */
-    RTPS_DllAPI static bool isKeyDefined();
+    static bool isKeyDefined();
 
     /*!
      * @brief This function serializes the key members of an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void serializeKey(
+    void serializeKey(
             eprosima::fastcdr::Cdr& cdr) const;
 
-    RTPS_DllAPI bool operator ==(
+    bool operator ==(
             const AnnotationParameterValue& other) const;
 
     /**
      * Aux method to return value as its string representation.
      */
-    RTPS_DllAPI std::string to_string() const
+    std::string to_string() const
     {
         switch (m__d)
         {
@@ -690,7 +686,7 @@ public:
     /**
      * Aux method to set value from its string representation.
      */
-    RTPS_DllAPI void from_string(
+    void from_string(
             const std::string& value)
     {
         switch (m__d)
@@ -810,7 +806,6 @@ private:
     std::wstring m_string16_value;
     ExtendedAnnotationParameterValue m_extended_value;
 };
-
 /*!
  * @brief This class represents the structure AppliedAnnotationParameter defined by the user in the IDL file.
  * @ingroup ANNOTATIONPARAMETERVALUE
@@ -822,39 +817,39 @@ public:
     /*!
      * @brief Default constructor.
      */
-    RTPS_DllAPI AppliedAnnotationParameter();
+    AppliedAnnotationParameter();
 
     /*!
      * @brief Default destructor.
      */
-    RTPS_DllAPI ~AppliedAnnotationParameter();
+    ~AppliedAnnotationParameter();
 
     /*!
      * @brief Copy constructor.
      * @param x Reference to the object AppliedAnnotationParameter that will be copied.
      */
-    RTPS_DllAPI AppliedAnnotationParameter(
+    AppliedAnnotationParameter(
             const AppliedAnnotationParameter& x);
 
     /*!
      * @brief Move constructor.
      * @param x Reference to the object AppliedAnnotationParameter that will be copied.
      */
-    RTPS_DllAPI AppliedAnnotationParameter(
+    AppliedAnnotationParameter(
             AppliedAnnotationParameter&& x);
 
     /*!
      * @brief Copy assignment.
      * @param x Reference to the object AppliedAnnotationParameter that will be copied.
      */
-    RTPS_DllAPI AppliedAnnotationParameter& operator =(
+    AppliedAnnotationParameter& operator =(
             const AppliedAnnotationParameter& x);
 
     /*!
      * @brief Move assignment.
      * @param x Reference to the object AppliedAnnotationParameter that will be copied.
      */
-    RTPS_DllAPI AppliedAnnotationParameter& operator =(
+    AppliedAnnotationParameter& operator =(
             AppliedAnnotationParameter&& x);
 
     /*!
@@ -939,7 +934,7 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
-    RTPS_DllAPI static size_t getCdrSerializedSize(
+    static size_t getCdrSerializedSize(
             const AppliedAnnotationParameter& data,
             size_t current_alignment = 0);
 
@@ -948,14 +943,14 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void serialize(
+    void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
     /*!
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void deserialize(
+    void deserialize(
             eprosima::fastcdr::Cdr& cdr);
 
 
@@ -966,22 +961,22 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Maximum serialized size.
      */
-    RTPS_DllAPI static size_t getKeyMaxCdrSerializedSize(
+    static size_t getKeyMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
     /*!
      * @brief This function tells you if the Key has been defined for this type
      */
-    RTPS_DllAPI static bool isKeyDefined();
+    static bool isKeyDefined();
 
     /*!
      * @brief This function serializes the key members of an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
-    RTPS_DllAPI void serializeKey(
+    void serializeKey(
             eprosima::fastcdr::Cdr& cdr) const;
 
-    RTPS_DllAPI bool operator ==(
+    bool operator ==(
             const AppliedAnnotationParameter& other) const;
 
 private:
@@ -1040,18 +1035,15 @@ class AppliedAnnotation
 {
 public:
 
-    RTPS_DllAPI AppliedAnnotation();
-
-    RTPS_DllAPI ~AppliedAnnotation();
-
-    RTPS_DllAPI AppliedAnnotation(
+    AppliedAnnotation();
+    ~AppliedAnnotation();
+    AppliedAnnotation(
             const AppliedAnnotation& x);
-
-    RTPS_DllAPI AppliedAnnotation(
+    AppliedAnnotation(
             AppliedAnnotation&& x);
-    RTPS_DllAPI AppliedAnnotation& operator =(
+    AppliedAnnotation& operator =(
             const AppliedAnnotation& x);
-    RTPS_DllAPI AppliedAnnotation& operator =(
+    AppliedAnnotation& operator =(
             AppliedAnnotation&& x);
 
     inline void annotation_typeid(
@@ -1098,20 +1090,20 @@ public:
         return m_param_seq;
     }
 
-    RTPS_DllAPI static size_t getCdrSerializedSize(
+    static size_t getCdrSerializedSize(
             const AppliedAnnotation& data,
             size_t current_alignment = 0);
-    RTPS_DllAPI void serialize(
+    void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
-    RTPS_DllAPI void deserialize(
+    void deserialize(
             eprosima::fastcdr::Cdr& cdr);
-    RTPS_DllAPI static size_t getKeyMaxCdrSerializedSize(
+    static size_t getKeyMaxCdrSerializedSize(
             size_t current_alignment = 0);
-    RTPS_DllAPI static bool isKeyDefined();
-    RTPS_DllAPI void serializeKey(
+    static bool isKeyDefined();
+    void serializeKey(
             eprosima::fastcdr::Cdr& cdr) const;
 
-    RTPS_DllAPI bool operator ==(
+    bool operator ==(
             const AppliedAnnotation& other) const;
 
 private:
@@ -1133,20 +1125,15 @@ class AppliedVerbatimAnnotation
 {
 public:
 
-    RTPS_DllAPI AppliedVerbatimAnnotation();
-
-    RTPS_DllAPI ~AppliedVerbatimAnnotation();
-
-    RTPS_DllAPI AppliedVerbatimAnnotation(
+    AppliedVerbatimAnnotation();
+    ~AppliedVerbatimAnnotation();
+    AppliedVerbatimAnnotation(
             const AppliedVerbatimAnnotation& x);
-
-    RTPS_DllAPI AppliedVerbatimAnnotation(
+    AppliedVerbatimAnnotation(
             AppliedVerbatimAnnotation&& x);
-
-    RTPS_DllAPI AppliedVerbatimAnnotation& operator =(
+    AppliedVerbatimAnnotation& operator =(
             const AppliedVerbatimAnnotation& x);
-
-    RTPS_DllAPI AppliedVerbatimAnnotation& operator =(
+    AppliedVerbatimAnnotation& operator =(
             AppliedVerbatimAnnotation&& x);
 
     inline void placement(
@@ -1215,25 +1202,20 @@ public:
         return m_text;
     }
 
-    RTPS_DllAPI static size_t getCdrSerializedSize(
+    static size_t getCdrSerializedSize(
             const AppliedVerbatimAnnotation& data,
             size_t current_alignment = 0);
-
-    RTPS_DllAPI void serialize(
+    void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
-
-    RTPS_DllAPI void deserialize(
+    void deserialize(
             eprosima::fastcdr::Cdr& cdr);
-
-    RTPS_DllAPI static size_t getKeyMaxCdrSerializedSize(
+    static size_t getKeyMaxCdrSerializedSize(
             size_t current_alignment = 0);
-
-    RTPS_DllAPI static bool isKeyDefined();
-
-    RTPS_DllAPI void serializeKey(
+    static bool isKeyDefined();
+    void serializeKey(
             eprosima::fastcdr::Cdr& cdr) const;
 
-    RTPS_DllAPI bool operator ==(
+    bool operator ==(
             const AppliedVerbatimAnnotation& other) const;
 
 private:
@@ -1255,20 +1237,15 @@ class AppliedBuiltinMemberAnnotations
 {
 public:
 
-    RTPS_DllAPI AppliedBuiltinMemberAnnotations();
-
-    RTPS_DllAPI ~AppliedBuiltinMemberAnnotations();
-
-    RTPS_DllAPI AppliedBuiltinMemberAnnotations(
+    AppliedBuiltinMemberAnnotations();
+    ~AppliedBuiltinMemberAnnotations();
+    AppliedBuiltinMemberAnnotations(
             const AppliedBuiltinMemberAnnotations& x);
-
-    RTPS_DllAPI AppliedBuiltinMemberAnnotations(
+    AppliedBuiltinMemberAnnotations(
             AppliedBuiltinMemberAnnotations&& x);
-
-    RTPS_DllAPI AppliedBuiltinMemberAnnotations& operator =(
+    AppliedBuiltinMemberAnnotations& operator =(
             const AppliedBuiltinMemberAnnotations& x);
-
-    RTPS_DllAPI AppliedBuiltinMemberAnnotations& operator =(
+    AppliedBuiltinMemberAnnotations& operator =(
             AppliedBuiltinMemberAnnotations&& x);
 
     inline void unit(
@@ -1359,25 +1336,20 @@ public:
         return m_hash_id;
     }
 
-    RTPS_DllAPI static size_t getCdrSerializedSize(
+    static size_t getCdrSerializedSize(
             const AppliedBuiltinMemberAnnotations& data,
             size_t current_alignment = 0);
-
-    RTPS_DllAPI void serialize(
+    void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
-
-    RTPS_DllAPI void deserialize(
+    void deserialize(
             eprosima::fastcdr::Cdr& cdr);
-
-    RTPS_DllAPI static size_t getKeyMaxCdrSerializedSize(
+    static size_t getKeyMaxCdrSerializedSize(
             size_t current_alignment = 0);
-
-    RTPS_DllAPI static bool isKeyDefined();
-
-    RTPS_DllAPI void serializeKey(
+    static bool isKeyDefined();
+    void serializeKey(
             eprosima::fastcdr::Cdr& cdr) const;
 
-    RTPS_DllAPI bool operator ==(
+    bool operator ==(
             const AppliedBuiltinMemberAnnotations& other) const;
 
 private:

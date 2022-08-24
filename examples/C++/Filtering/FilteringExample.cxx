@@ -21,10 +21,8 @@
 
 #ifdef _WIN32
 // Remove linker warning LNK4221 on Visual Studio
-namespace {
-char dummy;
-}  // namespace
-#endif  // _WIN32
+namespace { char dummy; }
+#endif
 
 #include "FilteringExample.h"
 #include <fastcdr/Cdr.h>
@@ -36,7 +34,7 @@ using namespace eprosima::fastcdr::exception;
 
 FilteringExample::FilteringExample()
 {
-    // m_sampleNumber com.eprosima.idl.parser.typecode.PrimitiveTypeCode@553a3d88
+    // m_sampleNumber com.eprosima.idl.parser.typecode.PrimitiveTypeCode@72a7c7e0
     m_sampleNumber = 0;
 
 }
@@ -45,20 +43,17 @@ FilteringExample::~FilteringExample()
 {
 }
 
-FilteringExample::FilteringExample(
-        const FilteringExample& x)
+FilteringExample::FilteringExample(const FilteringExample &x)
 {
     m_sampleNumber = x.m_sampleNumber;
 }
 
-FilteringExample::FilteringExample(
-        FilteringExample&& x)
+FilteringExample::FilteringExample(FilteringExample &&x)
 {
     m_sampleNumber = x.m_sampleNumber;
 }
 
-FilteringExample& FilteringExample::operator =(
-        const FilteringExample& x)
+FilteringExample& FilteringExample::operator=(const FilteringExample &x)
 {
 
     m_sampleNumber = x.m_sampleNumber;
@@ -66,8 +61,7 @@ FilteringExample& FilteringExample::operator =(
     return *this;
 }
 
-FilteringExample& FilteringExample::operator =(
-        FilteringExample&& x)
+FilteringExample& FilteringExample::operator=(FilteringExample &&x)
 {
 
     m_sampleNumber = x.m_sampleNumber;
@@ -75,21 +69,7 @@ FilteringExample& FilteringExample::operator =(
     return *this;
 }
 
-bool FilteringExample::operator ==(
-        const FilteringExample& x) const
-{
-
-    return (m_sampleNumber == x.m_sampleNumber);
-}
-
-bool FilteringExample::operator !=(
-        const FilteringExample& x) const
-{
-    return !(*this == x);
-}
-
-size_t FilteringExample::getMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t FilteringExample::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
 
@@ -100,9 +80,7 @@ size_t FilteringExample::getMaxCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-size_t FilteringExample::getCdrSerializedSize(
-        const FilteringExample& data,
-        size_t current_alignment)
+size_t FilteringExample::getCdrSerializedSize(const FilteringExample& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -114,16 +92,13 @@ size_t FilteringExample::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void FilteringExample::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void FilteringExample::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
 
     scdr << m_sampleNumber;
-
 }
 
-void FilteringExample::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void FilteringExample::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
 
     dcdr >> m_sampleNumber;
@@ -133,10 +108,9 @@ void FilteringExample::deserialize(
  * @brief This function sets a value in member sampleNumber
  * @param _sampleNumber New value for member sampleNumber
  */
-void FilteringExample::sampleNumber(
-        int32_t _sampleNumber)
+void FilteringExample::sampleNumber(int32_t _sampleNumber)
 {
-    m_sampleNumber = _sampleNumber;
+m_sampleNumber = _sampleNumber;
 }
 
 /*!
@@ -158,8 +132,7 @@ int32_t& FilteringExample::sampleNumber()
 }
 
 
-size_t FilteringExample::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t FilteringExample::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t current_align = current_alignment;
 
@@ -170,11 +143,10 @@ size_t FilteringExample::getKeyMaxCdrSerializedSize(
 
 bool FilteringExample::isKeyDefined()
 {
-    return false;
+   return false;
 }
 
-void FilteringExample::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void FilteringExample::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
     (void) scdr;
      

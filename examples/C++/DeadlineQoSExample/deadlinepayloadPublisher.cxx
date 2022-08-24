@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "deadlinepayloadPublisher.h"
-
-#include <fastrtps/attributes/ParticipantAttributes.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/Domain.h>
 #include <fastrtps/participant/Participant.h>
+#include <fastrtps/attributes/ParticipantAttributes.h>
 #include <fastrtps/publisher/Publisher.h>
-#include <fastrtps/TopicDataType.h>
+#include <fastrtps/attributes/PublisherAttributes.h>
+
+#include <fastrtps/Domain.h>
+#include "deadlinepayloadPublisher.h"
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;

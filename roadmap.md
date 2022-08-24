@@ -15,33 +15,24 @@ at any time.
 
 Disclaimer:
 
-* This section has been last updated in March 2022.
+* This section has been last updated in May 2020.
   Please take into account its content could be obsolete.
 
 ## Short term
 
-The following list of features are planned to be addressed in the short term, and incorporated into the following
-minor release of the product:
+The following list of features are planned to be addressed in the short term, and incorporated into the coming
+release(s) of the product:
 
-* Content filtered topic support on DataWriter
-* Complete support for dynamic network interfaces
-* ReadCondition implementation
-* Secure Discovery Server
-* DataReader, DataWriter and DomainParticipant DDS API implementation:
-    - `DataReader::get_sample_lost_status`
-    - `DataReader::lookup_instance`
-    - `DataWriter::get_key_value`
-    - `DataWriter::write_w_timestamp`
-    - `DomainParticipant::find_topic`
-* Android support
+* Full compliance with DDS minimum-profile
+* Support of DDS-RPC Enhanced Discovery Mechanism
 
 ## Medium term
 
 The following list of features are planned to be addressed in the medium term, typically within the subsequent
 release(s) generated in the next **9 months** after next planned release:
 
-* Service aware DataWriter
-* DDS-XTypes 1.3
+* Localhost zero-copy delivery
+* DDS x-types 1.2
 
 ## Long term
 

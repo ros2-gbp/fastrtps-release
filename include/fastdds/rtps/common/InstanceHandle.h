@@ -19,8 +19,6 @@
 #ifndef _FASTDDS_RTPS_INSTANCEHANDLE_H_
 #define _FASTDDS_RTPS_INSTANCEHANDLE_H_
 
-#include <array>
-
 #include <fastrtps/fastrtps_dll.h>
 #include <fastdds/rtps/common/Types.h>
 #include <fastdds/rtps/common/Guid.h>
@@ -29,121 +27,6 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-using KeyHash_t = std::array<octet, 16>;
-
-struct RTPS_DllAPI InstanceHandleValue_t
-{
-    /**
-     * Write access indexing operator.
-     *
-     * Provides a reference to the byte value at position @c i.
-     *
-     * @param [in] i index of the byte to return.
-     *
-     * @post Method has_been_set() returns @c true.
-     *
-     * @remark Do not use this method to check if this value has been set.
-     *         Use method has_been_set() instead.
-     */
-    template<typename T>
-    octet& operator [] (
-            T i) noexcept
-    {
-        has_been_set_ = true;
-        return value_[i];
-    }
-
-    /**
-     * Read access indexing operator.
-     *
-     * Provides the byte value at position @c i.
-     *
-     * @param [in] i index of the byte to return.
-     *
-     * @remark Do not use this method to check if this value has been set.
-     *         Use method has_been_set() instead.
-     */
-    template<typename T>
-    octet operator [] (
-            T i) const noexcept
-    {
-        return value_[i];
-    }
-
-    /**
-     * Write access pointer cast operator.
-     *
-     * Provides a pointer to the start of the raw data.
-     *
-     * @post Method has_been_set() returns @c true.
-     *
-     * @remark Do not use this method to check if this value has been set.
-     *         Use method has_been_set() instead.
-     */
-    operator octet* () noexcept
-    {
-        has_been_set_ = true;
-        return value_.data();
-    }
-
-    /**
-     * Read access pointer cast operator.
-     *
-     * Provides a pointer to the start of the raw data.
-     *
-     * @remark Do not use this method to check if this value has been set.
-     *         Use method has_been_set() instead.
-     */
-    operator const octet* () const noexcept
-    {
-        return value_.data();
-    }
-
-    /**
-     * Return whether any of the write access operators of this value has been used.
-     */
-    bool has_been_set() const noexcept
-    {
-        return has_been_set_;
-    }
-
-    void clear() noexcept
-    {
-        value_.fill(0);
-        has_been_set_ = false;
-    }
-
-    /**
-     * Equality comparison operator.
-     */
-    bool operator == (
-            const InstanceHandleValue_t& other) const noexcept
-    {
-        return (has_been_set_ == other.has_been_set_) && (value_ == other.value_);
-    }
-
-    /**
-     * Less than comparisor operator.
-     */
-    bool operator < (
-            const InstanceHandleValue_t& other) const noexcept
-    {
-        if (has_been_set_)
-        {
-            return other.has_been_set_ && value_ < other.value_;
-        }
-
-        return other.has_been_set_;
-    }
-
-private:
-
-    //! Hash value
-    KeyHash_t value_ {};
-    //! Flag indicating if value_ has been modified since the creation of this object
-    bool has_been_set_ = false;
-};
-
 /**
  * Struct InstanceHandle_t, used to contain the key for WITH_KEY topics.
  * @ingroup COMMON_MODULE
@@ -151,36 +34,73 @@ private:
 struct RTPS_DllAPI InstanceHandle_t
 {
     //!Value
-    InstanceHandleValue_t value;
-
-    InstanceHandle_t() noexcept = default;
-
-    InstanceHandle_t(
-            const InstanceHandle_t& ihandle) noexcept = default;
-
-    InstanceHandle_t(
-            const GUID_t& guid) noexcept
+    octet value[16];
+    InstanceHandle_t()
     {
-        *this = guid;
+        for (uint8_t i = 0; i < 16; i++)
+        {
+            value[i] = 0;
+        }
+    }
+
+    InstanceHandle_t(
+            const InstanceHandle_t& ihandle)
+    {
+        for (uint8_t i = 0; i < 16; i++)
+        {
+            value[i] = ihandle.value[i];
+        }
+    }
+
+    InstanceHandle_t(
+            const GUID_t& guid)
+    {
+        for (uint8_t i = 0; i < 16; ++i)
+        {
+            if (i < 12)
+            {
+                value[i] = guid.guidPrefix.value[i];
+            }
+            else
+            {
+                value[i] = guid.entityId.value[i - 12];
+            }
+        }
     }
 
     /**
-     * Assignment operator
+     * Assingment operator
      * @param ihandle Instance handle to copy the data from
      */
     InstanceHandle_t& operator =(
-            const InstanceHandle_t& ihandle) noexcept = default;
+            const InstanceHandle_t& ihandle)
+    {
+
+        for (uint8_t i = 0; i < 16; i++)
+        {
+            value[i] = ihandle.value[i];
+        }
+        return *this;
+    }
 
     /**
-     * Assignment operator
+     * Assingment operator
      * @param guid GUID to copy the data from
      */
     InstanceHandle_t& operator =(
-            const GUID_t& guid) noexcept
+            const GUID_t& guid)
     {
-        octet* dst = value;
-        memcpy(dst, guid.guidPrefix.value, 12);
-        memcpy(&dst[12], guid.entityId.value, 4);
+        for (uint8_t i = 0; i < 16; i++)
+        {
+            if (i < 12)
+            {
+                value[i] = guid.guidPrefix.value[i];
+            }
+            else
+            {
+                value[i] = guid.entityId.value[i - 12];
+            }
+        }
         return *this;
     }
 
@@ -188,18 +108,20 @@ struct RTPS_DllAPI InstanceHandle_t
      * Know if the instance handle is defined
      * @return True if the values are not zero.
      */
-    bool isDefined() const noexcept
+    bool isDefined() const
     {
-        return value.has_been_set();
-    }
-
-    void clear() noexcept
-    {
-        value.clear();
+        for (uint8_t i = 0; i < 16; ++i)
+        {
+            if (value[i] != 0)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     // TODO Review this conversion once InstanceHandle_t is implemented as DDS standard defines
-    explicit operator const GUID_t&() const noexcept
+    explicit operator const GUID_t&() const
     {
         return *reinterpret_cast<const GUID_t*>(this);
     }
@@ -218,21 +140,21 @@ const InstanceHandle_t c_InstanceHandle_Unknown;
  */
 inline bool operator ==(
         const InstanceHandle_t& ihandle1,
-        const InstanceHandle_t& ihandle2) noexcept
+        const InstanceHandle_t& ihandle2)
 {
-    return ihandle1.value == ihandle2.value;
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        if (ihandle1.value[i] != ihandle2.value[i])
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
-/**
- * @brief Comparison operator
- *
- * @param ihandle1 First InstanceHandle_t to compare
- * @param ihandle2 Second InstanceHandle_t to compare
- * @return True if not equal
- */
 inline bool operator !=(
         const InstanceHandle_t& ihandle1,
-        const InstanceHandle_t& ihandle2) noexcept
+        const InstanceHandle_t& ihandle2)
 {
     return !(ihandle1 == ihandle2);
 }
@@ -246,11 +168,20 @@ inline bool operator !=(
  */
 inline void iHandle2GUID(
         GUID_t& guid,
-        const InstanceHandle_t& ihandle) noexcept
+        const InstanceHandle_t& ihandle)
 {
-    const octet* value = ihandle.value;
-    memcpy(guid.guidPrefix.value, value, 12);
-    memcpy(guid.entityId.value, &value[12], 4);
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        if (i < 12)
+        {
+            guid.guidPrefix.value[i] = ihandle.value[i];
+        }
+        else
+        {
+            guid.entityId.value[i - 12] = ihandle.value[i];
+        }
+    }
+    return;
 }
 
 /**
@@ -259,35 +190,36 @@ inline void iHandle2GUID(
  * @return GUID_t
  */
 inline GUID_t iHandle2GUID(
-        const InstanceHandle_t& ihandle) noexcept
+        const InstanceHandle_t& ihandle)
 {
     GUID_t guid;
-    iHandle2GUID(guid, ihandle);
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        if (i < 12)
+        {
+            guid.guidPrefix.value[i] = ihandle.value[i];
+        }
+        else
+        {
+            guid.entityId.value[i - 12] = ihandle.value[i];
+        }
+    }
     return guid;
 }
 
-/**
- * @brief Comparison operator: checks if a InstanceHandle_t is less than another.
- *
- * @param h1 First InstanceHandle_t to compare.
- * @param h2 Second InstanceHandle_t to compare.
- * @return True if the first InstanceHandle_t is less than the second.
- */
 inline bool operator <(
         const InstanceHandle_t& h1,
-        const InstanceHandle_t& h2) noexcept
+        const InstanceHandle_t& h2)
 {
-    return h1.value < h2.value;
+    return memcmp(h1.value, h2.value, 16) < 0;
 }
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 /**
- * Stream operator: print an InstanceHandle_t.
  *
- * @param output Output stream.
- * @param iHandle InstanceHandle_t to print.
- * @return Stream operator.
+ * @param output
+ * @param iHandle
  */
 inline std::ostream& operator <<(
         std::ostream& output,
@@ -303,11 +235,9 @@ inline std::ostream& operator <<(
 }
 
 /**
- * Stream operator: retrieve an InstanceHandle_t.
  *
- * @param input Input stream.
- * @param iHandle InstanceHandle_t that will receive the input as its new value.
- * @return Stream operator.
+ * @param input
+ * @param iHandle
  */
 inline std::istream& operator >>(
         std::istream& input,

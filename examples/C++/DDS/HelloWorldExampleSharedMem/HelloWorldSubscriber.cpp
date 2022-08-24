@@ -48,12 +48,17 @@ bool HelloWorldSubscriber::init()
     pqos.wire_protocol().builtin.discovery_config.leaseDuration = eprosima::fastrtps::c_TimeInfinite;
     pqos.name("Participant_sub");
 
-    // Explicit configuration of SharedMem transport
+    // SharedMem transport configuration
     pqos.transport().use_builtin_transports = false;
 
     auto sm_transport = std::make_shared<SharedMemTransportDescriptor>();
     sm_transport->segment_size(2 * 1024 * 1024);
     pqos.transport().user_transports.push_back(sm_transport);
+
+    // UDP
+    auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+    //udp_transport->interfaceWhiteList.push_back("127.0.0.1");
+    pqos.transport().user_transports.push_back(udp_transport);
 
     participant_ = DomainParticipantFactory::get_instance()->create_participant(0, pqos);
 
@@ -144,7 +149,7 @@ void HelloWorldSubscriber::SubListener::on_data_available(
     SampleInfo info;
     if (reader->take_next_sample(hello_.get(), &info) == ReturnCode_t::RETCODE_OK)
     {
-        if (info.valid_data)
+        if (info.instance_state == eprosima::fastdds::dds::ALIVE)
         {
             samples_++;
             const size_t data_size = hello_->data().size();

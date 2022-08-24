@@ -39,7 +39,7 @@ void default_receive_print(
 
 template<>
 void default_receive_print(
-        const StringTest& str)
+        const String& str)
 {
     std::cout << "Received String " << str.message()[str.message().size() - 2]
               << str.message()[str.message().size() - 1] << std::endl;
@@ -60,15 +60,8 @@ void default_receive_print(
 }
 
 template<>
-void default_receive_print(
-        const KeyedData1mb& data)
-{
-    std::cout << "Received KeyedData1mb " << data.key() << " " << (uint16_t)data.data()[0] << std::endl;
-}
-
-template<>
 void default_send_print(
-        const StringTestPubSubType&)
+        const StringType&)
 {
     std::cout << "Sent StringType" << std::endl;
 }
@@ -96,7 +89,7 @@ void default_send_print(
 
 template<>
 void default_send_print(
-        const StringTest& str)
+        const String& str)
 {
     std::cout << "Sent String " << str.message()[str.message().size() - 2]
               << str.message()[str.message().size() - 1] << std::endl;
@@ -114,11 +107,4 @@ void default_send_print(
         const Data1mb& data)
 {
     std::cout << "Sent Data1mb " << (uint16_t)data.data()[0] << std::endl;
-}
-
-template<>
-void default_send_print(
-        const KeyedData1mb& data)
-{
-    std::cout << "Sent KeyedData1mb " << data.key() << " " << (uint16_t)data.data()[0] << std::endl;
 }

@@ -16,10 +16,8 @@
 #define MOCK_BLACKBOX_LOG_CONSUMER_H
 
 #include <fastdds/dds/log/Log.hpp>
-
-#include <condition_variable>
-#include <mutex>
 #include <thread>
+#include <mutex>
 #include <vector>
 
 namespace eprosima {
@@ -35,7 +33,7 @@ public:
     {
         std::unique_lock<std::mutex> guard(mMutex);
         mEntriesConsumed.push_back(entry);
-        cv_.notify_all();
+        cv_.notify_one();
     }
 
     const std::vector<Log::Entry> ConsumedEntries() const
@@ -44,21 +42,9 @@ public:
         return mEntriesConsumed;
     }
 
-    void clear_entries()
+    std::condition_variable& cv()
     {
-        std::unique_lock<std::mutex> guard(mMutex);
-        mEntriesConsumed.clear();
-        cv_.notify_all();
-    }
-
-    void wait(
-            uint32_t amount)
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-        cv_.wait(lock, [this, amount]() -> bool
-                {
-                    return mEntriesConsumed.size() >= amount;
-                });
+        return cv_;
     }
 
 private:
@@ -73,3 +59,4 @@ private:
 } // namespace eprosima
 
 #endif // ifndef MOCK_BLACKBOX_LOG_CONSUMER_H
+

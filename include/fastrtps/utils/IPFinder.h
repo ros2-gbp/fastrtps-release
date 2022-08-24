@@ -36,100 +36,66 @@ namespace rtps {
  */
 class IPFinder
 {
-public:
-
+    public:
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-    /**
-     * Enum IPTYPE, to define the type of IP obtained from the NICs.
-     */
-    enum IPTYPE
-    {
-        IP4,          //!< IP4
-        IP6,          //!< IP6
-        IP4_LOCAL,    //!< IP4_LOCAL
-        IP6_LOCAL     //!< IP6_LOCAL
-    };
-    /**
-     * Structure info_IP with information about a specific IP obtained from a NIC.
-     */
-    typedef struct info_IP
-    {
-        IPTYPE type;
-        std::string name;
-        std::string dev;
-        Locator_t locator;
-    }info_IP;
-
-    /**
-     * Structure info_MAC with information about a specific MAC obtained from a NIC.
-     */
-    typedef struct info_MAC
-    {
-        unsigned char address[6];
-
-        bool operator == (
-                const info_MAC& other)
+        /**
+         * Enum IPTYPE, to define the type of IP obtained from the NICs.
+         */
+        enum IPTYPE
         {
-            return memcmp(address, other.address, 6) == 0;
-        }
+            IP4,      //!< IP4
+            IP6,      //!< IP6
+            IP4_LOCAL,//!< IP4_LOCAL
+            IP6_LOCAL //!< IP6_LOCAL
+        };
+        /**
+         * Structure info_IP with information about a specific IP obtained from a NIC.
+         */
+        typedef struct info_IP
+        {
+            IPTYPE type;
+            std::string name;
+            std::string dev;
+            Locator_t locator;
+        }info_IP;
+#endif
+        IPFinder();
+        virtual ~IPFinder();
 
-    }info_MAC;
+        RTPS_DllAPI static bool getIPs(std::vector<info_IP>* vec_name, bool return_loopback = false);
 
-#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-    IPFinder();
-    virtual ~IPFinder();
+        /**
+         * Get the IP4Adresses in all interfaces.
+         * @param[out] locators List of locators to be populated with the IP4 addresses.
+         */
+        RTPS_DllAPI static bool getIP4Address(LocatorList_t* locators);
+        /**
+         * Get the IP6Adresses in all interfaces.
+         * @param[out] locators List of locators to be populated with the IP6 addresses.
+         */
+        RTPS_DllAPI static bool getIP6Address(LocatorList_t* locators);
+        /**
+         * Get all IP Adresses in all interfaces.
+         * @param[out] locators List of locators to be populated with the addresses.
+         */
+        RTPS_DllAPI static bool getAllIPAddress(LocatorList_t* locators);
+        /**
+         * Parses an IP4 string, populating a info_IP with its value.
+         * @param[out] info info_IP to populate.
+         * */
+        RTPS_DllAPI static bool parseIP4(info_IP& info);
+        /**
+         * Parses an IP6 string, populating a info_IP with its value.
+         * @param[out] info info_IP to populate.
+         * */
+        RTPS_DllAPI static bool parseIP6(info_IP& info);
 
-    RTPS_DllAPI static bool getIPs(
-            std::vector<info_IP>* vec_name,
-            bool return_loopback = false);
-
-    /**
-     * Get the IP4Adresses in all interfaces.
-     * @param[out] locators List of locators to be populated with the IP4 addresses.
-     */
-    RTPS_DllAPI static bool getIP4Address(
-            LocatorList_t* locators);
-    /**
-     * Get the IP6Adresses in all interfaces.
-     * @param[out] locators List of locators to be populated with the IP6 addresses.
-     */
-    RTPS_DllAPI static bool getIP6Address(
-            LocatorList_t* locators);
-    /**
-     * Get all IP Adresses in all interfaces.
-     * @param[out] locators List of locators to be populated with the addresses.
-     */
-    RTPS_DllAPI static bool getAllIPAddress(
-            LocatorList_t* locators);
-    /**
-     * Parses an IP4 string, populating a info_IP with its value.
-     * @param[out] info info_IP to populate.
-     * */
-    RTPS_DllAPI static bool parseIP4(
-            info_IP& info);
-    /**
-     * Parses an IP6 string, populating a info_IP with its value.
-     * @param[out] info info_IP to populate.
-     * */
-    RTPS_DllAPI static bool parseIP6(
-            info_IP& info);
-
-    RTPS_DllAPI static std::string getIPv4Address(
-            const std::string& name);
-    RTPS_DllAPI static std::string getIPv6Address(
-            const std::string& name);
-
-    /**
-     * Get all MAC Adresses of all interfaces.
-     * Will return all unique MAC addresses for eadh of the interfaces returned by getAllIPAddress
-     * @param[out] macs List of MAC addresses.
-     */
-    RTPS_DllAPI static bool getAllMACAddress(
-            std::vector<info_MAC>* macs);
+        RTPS_DllAPI static std::string getIPv4Address(const std::string &name);
+        RTPS_DllAPI static std::string getIPv6Address(const std::string &name);
 };
 
-} // namespace rtps
-} // namespace fastrtps
+}
+}
 } /* namespace eprosima */
 
 #endif /* IPFINDER_H_ */
