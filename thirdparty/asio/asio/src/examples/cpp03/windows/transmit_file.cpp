@@ -2,7 +2,7 @@
 // transmit_file.cpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2020 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -11,7 +11,7 @@
 #include <ctime>
 #include <iostream>
 #include <string>
-#include <boost/bind/bind.hpp>
+#include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include "asio.hpp"
@@ -22,15 +22,9 @@ using asio::ip::tcp;
 using asio::windows::overlapped_ptr;
 using asio::windows::random_access_handle;
 
-typedef asio::basic_stream_socket<tcp,
-    asio::io_context::executor_type> tcp_socket;
-
-typedef asio::basic_socket_acceptor<tcp,
-    asio::io_context::executor_type> tcp_acceptor;
-
 // A wrapper for the TransmitFile overlapped I/O operation.
 template <typename Handler>
-void transmit_file(tcp_socket& socket,
+void transmit_file(tcp::socket& socket,
     random_access_handle& file, Handler handler)
 {
   // Construct an OVERLAPPED-derived object to contain the handler.
@@ -71,7 +65,7 @@ public:
     return pointer(new connection(io_context, filename));
   }
 
-  tcp_socket& socket()
+  tcp::socket& socket()
   {
     return socket_;
   }
@@ -102,10 +96,10 @@ private:
       size_t /*bytes_transferred*/)
   {
     asio::error_code ignored_ec;
-    socket_.shutdown(tcp_socket::shutdown_both, ignored_ec);
+    socket_.shutdown(tcp::socket::shutdown_both, ignored_ec);
   }
 
-  tcp_socket socket_;
+  tcp::socket socket_;
   std::string filename_;
   random_access_handle file_;
 };
@@ -143,7 +137,7 @@ private:
     start_accept();
   }
 
-  tcp_acceptor acceptor_;
+  tcp::acceptor acceptor_;
   std::string filename_;
 };
 

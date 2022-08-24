@@ -16,6 +16,10 @@
  * @file PKIDH.cpp
  */
 
+// TODO This isn't a proper fix for compatibility with OpenSSL 3.0, but
+// suppresses the warnings until true OpenSSL 3.0 APIs can be used.
+#define OPENSSL_API_COMPAT 10101
+
 #include <security/authentication/PKIDH.h>
 #include <security/authentication/PKIIdentityHandle.h>
 #include <fastdds/rtps/security/logging/Logging.h>
@@ -819,7 +823,7 @@ static bool store_dh_public_key(
 
     if (type == EVP_PKEY_DH)
     {
-        DH* dh =
+        const DH* dh =
 #if IS_OPENSSL_1_1
                 EVP_PKEY_get0_DH(dhkey);
 #else
@@ -856,7 +860,7 @@ static bool store_dh_public_key(
     }
     else if (type == EVP_PKEY_EC)
     {
-        EC_KEY* ec =
+        const EC_KEY* ec =
 #if IS_OPENSSL_1_1
                 EVP_PKEY_get0_EC_KEY(dhkey);
 #else
