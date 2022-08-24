@@ -31,6 +31,8 @@
 #include <fastdds/dds/publisher/PublisherListener.hpp>
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
 
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
+
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
@@ -41,6 +43,7 @@ namespace fastdds {
 namespace dds {
 
 using fastrtps::PublisherAttributes;
+using fastrtps::rtps::PropertyPolicyHelper;
 using fastrtps::xmlparser::XMLProfileManager;
 using fastrtps::xmlparser::XMLP_ret;
 
@@ -94,6 +97,69 @@ public:
     }
 
 };
+
+class LoanableTopicDataTypeMock : public TopicDataType
+{
+public:
+
+    LoanableTopicDataTypeMock()
+        : TopicDataType()
+    {
+        m_typeSize = 4u;
+        setName("loanablefootype");
+    }
+
+    bool serialize(
+            void* /*data*/,
+            fastrtps::rtps::SerializedPayload_t* /*payload*/) override
+    {
+        return true;
+    }
+
+    bool deserialize(
+            fastrtps::rtps::SerializedPayload_t* /*payload*/,
+            void* /*data*/) override
+    {
+        return true;
+    }
+
+    std::function<uint32_t()> getSerializedSizeProvider(
+            void* /*data*/) override
+    {
+        return std::function<uint32_t()>();
+    }
+
+    void* createData() override
+    {
+        return nullptr;
+    }
+
+    void deleteData(
+            void* /*data*/) override
+    {
+    }
+
+    inline bool is_bounded() const override
+    {
+        return true;
+    }
+
+    inline bool is_plain() const override
+    {
+        return true;
+    }
+
+    bool getKey(
+            void* /*data*/,
+            fastrtps::rtps::InstanceHandle_t* /*ihandle*/,
+            bool /*force_md5*/) override
+    {
+        return true;
+    }
+
+};
+
+
 
 TEST(PublisherTests, GetPublisherParticipant)
 {
@@ -242,7 +308,19 @@ void check_datawriter_with_profile (
     ASSERT_TRUE(
         qos.writer_resource_limits().matched_subscriber_allocation ==
         publisher_atts.matched_subscriber_allocation);
-    ASSERT_TRUE(qos.properties() == publisher_atts.properties);
+    if (publisher_atts.qos.m_partition.names().empty())
+    {
+        ASSERT_TRUE(qos.properties() == publisher_atts.properties);
+    }
+    else
+    {
+        ASSERT_NE(PropertyPolicyHelper::find_property(qos.properties(), "partitions"), nullptr);
+        for (auto partition: publisher_atts.qos.m_partition.names())
+        {
+            ASSERT_NE(PropertyPolicyHelper::find_property(qos.properties(), "partitions")->find(
+                        partition), std::string::npos);
+        }
+    }
     ASSERT_TRUE(qos.throughput_controller() == publisher_atts.throughputController);
     ASSERT_TRUE(qos.endpoint().unicast_locator_list == publisher_atts.unicastLocatorList);
     ASSERT_TRUE(qos.endpoint().multicast_locator_list == publisher_atts.multicastLocatorList);
@@ -418,15 +496,57 @@ TEST(PublisherTests, SetListener)
     ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant), ReturnCode_t::RETCODE_OK);
 }
 
+// Delete contained entities test
+TEST(Publisher, DeleteContainedEntities)
+{
+    DomainParticipant* participant =
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
+    ASSERT_NE(participant, nullptr);
+
+    Publisher* publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT);
+    ASSERT_NE(publisher, nullptr);
+
+    TypeSupport type(new LoanableTopicDataTypeMock());
+    type.register_type(participant);
+
+    Topic* topic_foo = participant->create_topic("footopic", type.get_type_name(), TOPIC_QOS_DEFAULT);
+    ASSERT_NE(topic_foo, nullptr);
+    Topic* topic_bar = participant->create_topic("bartopic", type.get_type_name(), TOPIC_QOS_DEFAULT);
+    ASSERT_NE(topic_bar, nullptr);
+
+    DataWriter* data_writer_foo = publisher->create_datawriter(topic_foo, DATAWRITER_QOS_DEFAULT);
+    ASSERT_NE(data_writer_foo, nullptr);
+    DataWriter* data_writer_bar = publisher->create_datawriter(topic_bar, DATAWRITER_QOS_DEFAULT);
+    ASSERT_NE(data_writer_bar, nullptr);
+
+    std::vector<DataWriter*> data_writer_list;
+    publisher->get_datawriters(data_writer_list);
+    ASSERT_EQ(data_writer_list.size(), 2);
+
+    data_writer_list.clear();
+    void* loan_data;
+    ASSERT_EQ(data_writer_bar->loan_sample(loan_data), ReturnCode_t::RETCODE_OK);
+
+    ASSERT_EQ(publisher->delete_contained_entities(), ReturnCode_t::RETCODE_PRECONDITION_NOT_MET);
+    publisher->get_datawriters(data_writer_list);
+    ASSERT_EQ(data_writer_list.size(), 2);
+
+    data_writer_list.clear();
+    data_writer_bar->discard_loan(loan_data);
+
+    ASSERT_EQ(publisher->delete_contained_entities(), ReturnCode_t::RETCODE_OK);
+    publisher->get_datawriters(data_writer_list);
+    ASSERT_FALSE(publisher->has_datawriters());
+}
+
 /*
  * This test checks that the Publisher methods defined in the standard not yet implemented in FastDDS return
  * ReturnCode_t::RETCODE_UNSUPPORTED. The following methods are checked:
  * 1. copy_from_topic_qos
- * 2. delete_contained_entities
- * 3. suspend_publications
- * 4. resume_publications
- * 5. begin_coherent_changes
- * 6. end_coherent_changes
+ * 2. suspend_publications
+ * 3. resume_publications
+ * 4. begin_coherent_changes
+ * 5. end_coherent_changes
  */
 TEST(PublisherTests, UnsupportedPublisherMethods)
 {
@@ -439,7 +559,6 @@ TEST(PublisherTests, UnsupportedPublisherMethods)
     fastdds::dds::DataWriterQos writer_qos;
     fastdds::dds::TopicQos topic_qos;
     EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, publisher->copy_from_topic_qos(writer_qos, topic_qos));
-    EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, publisher->delete_contained_entities());
     EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, publisher->suspend_publications());
     EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, publisher->resume_publications());
     EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, publisher->begin_coherent_changes());

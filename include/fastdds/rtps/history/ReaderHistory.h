@@ -64,6 +64,19 @@ public:
             size_t);
 
     /**
+     * Called when a fragmented change is received completely by the Subscriber. Will find its instance and store it.
+     * @pre Change should be already present in the history.
+     * @param[in] change The received change
+     * @return
+     */
+    RTPS_DllAPI bool virtual completed_change(
+            rtps::CacheChange_t* change)
+    {
+        (void)change;
+        return true;
+    }
+
+    /**
      * Add a CacheChange_t to the ReaderHistory.
      * @param a_change Pointer to the CacheChange to add.
      * @return True if added.
@@ -125,9 +138,6 @@ protected:
 
     RTPS_DllAPI void do_release_cache(
             CacheChange_t* ch) override;
-
-    iterator get_first_change_with_minimum_ts(
-            const Time_t timestamp);
 
     //!Pointer to the reader
     RTPSReader* mp_reader;

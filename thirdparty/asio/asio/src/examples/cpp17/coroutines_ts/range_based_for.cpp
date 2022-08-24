@@ -2,14 +2,14 @@
 // range_based_for.cpp
 // ~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2020 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#include <asio/co_spawn.hpp>
-#include <asio/detached.hpp>
+#include <asio/experimental/co_spawn.hpp>
+#include <asio/experimental/detached.hpp>
 #include <asio/io_context.hpp>
 #include <asio/ip/tcp.hpp>
 #include <asio/signal_set.hpp>
@@ -17,10 +17,10 @@
 #include <cstdio>
 
 using asio::ip::tcp;
-using asio::awaitable;
-using asio::co_spawn;
-using asio::detached;
-using asio::use_awaitable;
+using asio::experimental::awaitable;
+using asio::experimental::co_spawn;
+using asio::experimental::detached;
+namespace this_coro = asio::experimental::this_coro;
 
 class connection_iter
 {
@@ -39,7 +39,8 @@ public:
 
   awaitable<void> operator++()
   {
-    socket_ = co_await acceptor_->async_accept(use_awaitable);
+    auto token = co_await this_coro::token();
+    socket_ = co_await acceptor_->async_accept(token);
   }
 
   bool operator==(const connection_iter&) const noexcept
@@ -62,22 +63,25 @@ public:
 
   awaitable<connection_iter> begin()
   {
-    tcp::socket s = co_await acceptor_.async_accept(use_awaitable);
+    auto token = co_await this_coro::token();
+    tcp::socket s = co_await acceptor_.async_accept(token);
     co_return connection_iter(acceptor_, std::move(s));
   }
 
   connection_iter end()
   {
     return connection_iter(acceptor_,
-        tcp::socket(acceptor_.get_executor()));
+        tcp::socket(acceptor_.get_executor().context()));
   }
 };
 
 awaitable<void> listener(tcp::acceptor acceptor)
 {
+  auto token = co_await this_coro::token();
+
   for co_await (tcp::socket s : connections(acceptor))
   {
-    co_await asio::async_write(s, asio::buffer("hello\r\n", 7), use_awaitable);
+    co_await asio::async_write(s, asio::buffer("hello\r\n", 7), token);
   }
 }
 
@@ -91,7 +95,12 @@ int main()
     signals.async_wait([&](auto, auto){ io_context.stop(); });
 
     tcp::acceptor acceptor(io_context, {tcp::v4(), 55555});
-    co_spawn(io_context, listener(std::move(acceptor)), detached);
+    co_spawn(io_context,
+        [acceptor = std::move(acceptor)]() mutable
+        {
+          return listener(std::move(acceptor));
+        },
+        detached);
 
     io_context.run();
   }
