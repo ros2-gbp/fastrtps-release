@@ -1,4 +1,4 @@
-From bf3250c75851e578720b828e4100d57d1e357c3f Mon Sep 17 00:00:00 2001
+From b2263e0ffe7b0768dd27b6abf7f6b415adad988a Mon Sep 17 00:00:00 2001
 From: Scott K Logan <logans@cottsay.net>
 Date: Wed, 20 Jan 2021 12:08:26 -0800
 Subject: [PATCH] Set CMake flags for Fast-RTPS
@@ -22,5 +22,5 @@ index de5e5a79..b31a6b33 100644
  
  %make_build
 -- 
-2.31.1
+2.37.2
 
