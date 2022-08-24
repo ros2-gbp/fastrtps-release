@@ -745,7 +745,7 @@ static EVP_PKEY* generate_dh_key(
                     (1 != EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, NID_X9_62_prime256v1)) ||
                     (1 != EVP_PKEY_paramgen(pctx, &params)))
             {
-                exception = _SecurityException_("Cannot set default paremeters: ");
+                exception = _SecurityException_("Cannot set default parameters: ");
                 EVP_PKEY_CTX_free(pctx);
                 return nullptr;
             }
@@ -763,7 +763,7 @@ static EVP_PKEY* generate_dh_key(
         {
             if (1 != EVP_PKEY_set1_DH(params, DH_get_2048_256()))
             {
-                exception = _SecurityException_("Cannot set default paremeters: ");
+                exception = _SecurityException_("Cannot set default parameters: ");
                 EVP_PKEY_free(params);
                 return nullptr;
             }
@@ -823,7 +823,7 @@ static bool store_dh_public_key(
 
     if (type == EVP_PKEY_DH)
     {
-        DH* dh =
+        const DH* dh =
 #if IS_OPENSSL_1_1
                 EVP_PKEY_get0_DH(dhkey);
 #else
@@ -860,7 +860,7 @@ static bool store_dh_public_key(
     }
     else if (type == EVP_PKEY_EC)
     {
-        EC_KEY* ec =
+        const EC_KEY* ec =
 #if IS_OPENSSL_1_1
                 EVP_PKEY_get0_EC_KEY(dhkey);
 #else

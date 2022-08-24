@@ -18,28 +18,32 @@
 
 #include <fastdds/rtps/RTPSDomain.h>
 
-#include <fastdds/dds/log/Log.hpp>
+#include <chrono>
+#include <thread>
+#include <cstdlib>
+#include <regex>
 
+#include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/history/WriterHistory.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/reader/RTPSReader.h>
 #include <fastdds/rtps/writer/RTPSWriter.h>
 
-#include <fastdds/rtps/transport/UDPv4Transport.h>
-#include <fastdds/rtps/transport/UDPv6Transport.h>
-#include <fastdds/rtps/transport/test_UDPv4Transport.h>
+#include <rtps/transport/UDPv4Transport.h>
+#include <rtps/transport/UDPv6Transport.h>
+#include <rtps/transport/test_UDPv4Transport.h>
 
+#include <fastrtps/utils/IPFinder.h>
+#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/utils/System.h>
+#include <fastrtps/utils/md5.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
-
 #include <rtps/RTPSDomainImpl.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <rtps/common/GuidUtils.hpp>
+#include <utils/Host.hpp>
 
-#include <chrono>
-#include <thread>
-#include <cstdlib>
-#include <regex>
 
 namespace eprosima {
 namespace fastrtps {
@@ -51,11 +55,6 @@ static void guid_prefix_create(
 {
     eprosima::fastdds::rtps::GuidUtils::instance().guid_prefix_create(ID, guidP);
 }
-
-// environment variables that forces server-client discovery
-// it must contain a list of UDPv4 locators separated by ;
-// the position in the list defines the default server that listens on the locator
-const char* const DEFAULT_ROS2_MASTER_URI = "ROS_DISCOVERY_SERVER";
 
 std::mutex RTPSDomain::m_mutex;
 std::atomic<uint32_t> RTPSDomain::m_maxRTPSParticipantID(1);
@@ -143,8 +142,6 @@ RTPSParticipant* RTPSDomain::createParticipant(
     }
 
     PParam.participantID = ID;
-    LocatorList_t loc;
-    IPFinder::getIP4Address(&loc);
 
     // Generate a new GuidPrefix_t
     GuidPrefix_t guidP;
@@ -215,6 +212,7 @@ bool RTPSDomain::removeRTPSParticipant(
 {
     if (p != nullptr)
     {
+        assert((p->mp_impl != nullptr) && "This participant has been previously invalidated");
         p->mp_impl->disable();
 
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -238,6 +236,8 @@ bool RTPSDomain::removeRTPSParticipant(
 void RTPSDomain::removeRTPSParticipant_nts(
         RTPSDomain::t_p_RTPSParticipant& participant)
 {
+    // The destructor of RTPSParticipantImpl already deletes the associated RTPSParticipant and sets
+    // its pointer to the RTPSParticipant to nullptr, so there is no need to do it here manually.
     delete(participant.second);
 }
 
@@ -272,6 +272,27 @@ RTPSWriter* RTPSDomain::createRTPSWriter(
     {
         RTPSWriter* ret_val = nullptr;
         if (impl->createWriter(&ret_val, watt, payload_pool, hist, listen))
+        {
+            return ret_val;
+        }
+    }
+
+    return nullptr;
+}
+
+RTPSWriter* RTPSDomain::createRTPSWriter(
+        RTPSParticipant* p,
+        const EntityId_t& entity_id,
+        WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+{
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
+    {
+        RTPSWriter* ret_val = nullptr;
+        if (impl->createWriter(&ret_val, watt, payload_pool, hist, listen, entity_id))
         {
             return ret_val;
         }
@@ -361,23 +382,6 @@ RTPSParticipant* RTPSDomain::clientServerEnvironmentCreationOverride(
         const RTPSParticipantAttributes& att,
         RTPSParticipantListener* listen /*= nullptr*/)
 {
-    // retrieve the environment variable value
-    std::string list;
-    {
-#pragma warning(suppress:4996)
-        const char* data = std::getenv(DEFAULT_ROS2_MASTER_URI);
-
-        if (nullptr != data)
-        {
-            list = data;
-        }
-        else
-        {
-            // if the variable is not set abort the server-client default setup
-            return nullptr;
-        }
-    }
-
     // Check the specified discovery protocol: if other than simple it has priority over ros environment variable
     if (att.builtin.discovery_config.discoveryProtocol != DiscoveryProtocol_t::SIMPLE)
     {
@@ -390,9 +394,7 @@ RTPSParticipant* RTPSDomain::clientServerEnvironmentCreationOverride(
     RTPSParticipantAttributes client_att(att);
 
     // Retrieve the info from the environment variable
-    if (!load_environment_server_info(
-                list,
-                client_att.builtin.discovery_config.m_DiscoveryServers))
+    if (!load_environment_server_info(client_att.builtin.discovery_config.m_DiscoveryServers))
     {
         // it's not an error, the environment variable may not be set. Any issue with environment
         // variable syntax is logError already

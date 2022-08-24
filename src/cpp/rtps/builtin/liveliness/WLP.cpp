@@ -153,8 +153,6 @@ WLP::~WLP()
             delete mp_builtinWriterSecureHistory;
             secure_payload_pool_->release_history(swriter_pool_cfg, false);
         }
-
-        TopicPayloadPoolRegistry::release(secure_payload_pool_);
     }
 #endif // if HAVE_SECURITY
 
@@ -179,8 +177,6 @@ WLP::~WLP()
 
     delete pub_liveliness_manager_;
     delete sub_liveliness_manager_;
-
-    TopicPayloadPoolRegistry::release(payload_pool_);
 }
 
 bool WLP::initWL(
@@ -731,6 +727,7 @@ bool WLP::remove_local_writer(
 
         automatic_writers_.erase(it);
 
+        min_automatic_ms_ = std::numeric_limits<double>::max();
         if (automatic_writers_.size() == 0)
         {
             automatic_liveliness_assertion_->cancel_timer();
@@ -738,8 +735,6 @@ bool WLP::remove_local_writer(
         }
 
         // There are still some writers. Calculate the new minimum announcement period
-
-        min_automatic_ms_ = std::numeric_limits<double>::max();
         for (const auto& w : automatic_writers_)
         {
             auto announcement_period = TimeConv::Duration_t2MilliSecondsDouble(w->get_liveliness_announcement_period());
@@ -774,6 +769,7 @@ bool WLP::remove_local_writer(
             logError(RTPS_LIVELINESS, "Could not remove writer " << W->getGuid() << " from liveliness manager");
         }
 
+        min_manual_by_participant_ms_ = std::numeric_limits<double>::max();
         if (manual_by_participant_writers_.size() == 0)
         {
             manual_liveliness_assertion_->cancel_timer();
@@ -781,8 +777,6 @@ bool WLP::remove_local_writer(
         }
 
         // There are still some writers. Calculate the new minimum announcement period
-
-        min_manual_by_participant_ms_ = std::numeric_limits<double>::max();
         for (const auto& w : manual_by_participant_writers_)
         {
             auto announcement_period = TimeConv::Duration_t2MilliSecondsDouble(w->get_liveliness_announcement_period());

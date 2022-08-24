@@ -26,28 +26,50 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-class LivelinessQos : public testing::TestWithParam<bool>
+enum communication_type
+{
+    TRANSPORT,
+    INTRAPROCESS,
+    DATASHARING
+};
+
+class LivelinessQos : public testing::TestWithParam<communication_type>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = true;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
-
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = false;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
     }
 
@@ -102,6 +124,22 @@ TEST_P(LivelinessQos, Liveliness_Automatic_Reliable)
     EXPECT_EQ(writer.times_liveliness_lost(), 0u);
     EXPECT_EQ(reader.times_liveliness_recovered(), 1u);
     EXPECT_EQ(reader.times_liveliness_lost(), 0u);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+    std::this_thread::sleep_for(std::chrono::milliseconds(lease_duration_ms * 2));
+
+    // Liveliness is recovered as there is a new publisher.
+    EXPECT_EQ(writer.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_recovered(), 2u);
+    EXPECT_EQ(reader.times_liveliness_lost(), 0u);
 }
 
 //! Same as above using best-effort reliability
@@ -139,6 +177,22 @@ TEST_P(LivelinessQos, Liveliness_Automatic_BestEffort)
     // It would only be lost if the publishing application crashed, which can't be reproduced in this test
     EXPECT_EQ(writer.times_liveliness_lost(), 0u);
     EXPECT_EQ(reader.times_liveliness_recovered(), 1u);
+    EXPECT_EQ(reader.times_liveliness_lost(), 0u);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+    std::this_thread::sleep_for(std::chrono::milliseconds(lease_duration_ms * 2));
+
+    // Liveliness is recovered as there is a new publisher.
+    EXPECT_EQ(writer.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_recovered(), 2u);
     EXPECT_EQ(reader.times_liveliness_lost(), 0u);
 }
 
@@ -204,6 +258,28 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByParticipant_Reliable)
     EXPECT_EQ(writer.times_liveliness_lost(), num_samples * 2);
     EXPECT_EQ(reader.times_liveliness_lost(), num_samples * 2);
     EXPECT_EQ(reader.times_liveliness_recovered(), num_samples * 2);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    for (count = 0; count < num_samples; count++)
+    {
+        writer.assert_liveliness();
+        reader.wait_liveliness_recovered(count + num_samples * 2 + 1);
+        reader.wait_liveliness_lost(count + num_samples * 2 + 1);
+        writer.wait_liveliness_lost(count + num_samples * 2 + 1);
+    }
+
+    EXPECT_EQ(writer.times_liveliness_lost(), num_samples);
+    EXPECT_EQ(reader.times_liveliness_lost(), num_samples * 3);
+    EXPECT_EQ(reader.times_liveliness_recovered(), num_samples * 3);
 }
 
 //! Tests that liveliness is lost and recovered as expected, with the following paramters
@@ -268,6 +344,28 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByParticipant_BestEffort)
     EXPECT_EQ(writer.times_liveliness_lost(), num_samples * 2);
     EXPECT_EQ(reader.times_liveliness_lost(), num_samples * 2);
     EXPECT_EQ(reader.times_liveliness_recovered(), num_samples * 2);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    for (count = 0; count < num_samples; count++)
+    {
+        writer.assert_liveliness();
+        reader.wait_liveliness_recovered(count + num_samples * 2 + 1);
+        reader.wait_liveliness_lost(count + num_samples * 2 + 1);
+        writer.wait_liveliness_lost(count + num_samples * 2 + 1);
+    }
+
+    EXPECT_EQ(writer.times_liveliness_lost(), num_samples);
+    EXPECT_EQ(reader.times_liveliness_lost(), num_samples * 3);
+    EXPECT_EQ(reader.times_liveliness_recovered(), num_samples * 3);
 }
 
 //! Tests that liveliness is not lost when lease duration is big, with the following paramters
@@ -327,6 +425,27 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByParticipant_Reliable)
     EXPECT_EQ(writer.times_liveliness_lost(), 0u);
     EXPECT_EQ(reader.times_liveliness_lost(), 0u);
     EXPECT_EQ(reader.times_liveliness_recovered(), 1u);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    for (count = 0; count < num_samples; count++)
+    {
+        writer.assert_liveliness();
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+    }
+
+    // Liveliness shouldn't have been lost
+    EXPECT_EQ(writer.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_recovered(), 2u);
 }
 
 //! Tests that liveliness is not lost when lease duration is big, with the following paramters
@@ -386,6 +505,27 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByParticipant_BestEffort)
     EXPECT_EQ(writer.times_liveliness_lost(), 0u);
     EXPECT_EQ(reader.times_liveliness_lost(), 0u);
     EXPECT_EQ(reader.times_liveliness_recovered(), 1u);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    for (count = 0; count < num_samples; count++)
+    {
+        writer.assert_liveliness();
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+    }
+
+    // Liveliness shouldn't have been lost
+    EXPECT_EQ(writer.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_recovered(), 2u);
 }
 
 //! Tests that liveliness is lost and recovered as expected, with the following paramters
@@ -448,6 +588,28 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_Reliable)
     EXPECT_EQ(writer.times_liveliness_lost(), num_samples * 2);
     EXPECT_EQ(reader.times_liveliness_lost(), num_samples * 2);
     EXPECT_EQ(reader.times_liveliness_recovered(), num_samples * 2);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    for (count = 0; count < num_samples; count++)
+    {
+        writer.assert_liveliness();
+        reader.wait_liveliness_recovered(count + num_samples * 2 + 1);
+        reader.wait_liveliness_lost(count + num_samples * 2 + 1);
+        writer.wait_liveliness_lost(count + num_samples * 2 + 1);
+    }
+
+    EXPECT_EQ(writer.times_liveliness_lost(), num_samples);
+    EXPECT_EQ(reader.times_liveliness_lost(), num_samples * 3);
+    EXPECT_EQ(reader.times_liveliness_recovered(), num_samples * 3);
 }
 
 //! Tests that liveliness is lost and recovered, with the following paramters
@@ -510,6 +672,26 @@ TEST_P(LivelinessQos, ShortLiveliness_ManualByTopic_BestEffort)
     // However best-effort writers don't send heartbeats, so the reader in this case will never get notified
     EXPECT_EQ(reader.times_liveliness_lost(), num_samples);
     EXPECT_EQ(reader.times_liveliness_recovered(), num_samples);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    for (count = 0; count < num_samples; count++)
+    {
+        writer.assert_liveliness();
+        writer.wait_liveliness_lost(count + num_samples * 2 + 1);
+    }
+
+    EXPECT_EQ(writer.times_liveliness_lost(), num_samples);
+    EXPECT_EQ(reader.times_liveliness_lost(), num_samples);
+    EXPECT_EQ(reader.times_liveliness_recovered(), num_samples);
 }
 
 //! Tests liveliness is not lost when lease duration is big, with the following paramters
@@ -569,6 +751,27 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByTopic_Reliable)
     EXPECT_EQ(writer.times_liveliness_lost(), 0u);
     EXPECT_EQ(reader.times_liveliness_lost(), 0u);
     EXPECT_EQ(reader.times_liveliness_recovered(), 1u);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    for (count = 0; count < num_samples; count++)
+    {
+        writer.assert_liveliness();
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+    }
+
+    // Liveliness shouldn't have been lost
+    EXPECT_EQ(writer.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_recovered(), 2u);
 }
 
 //! Tests liveliness is not lost when lease duration is big, with the following paramters
@@ -618,6 +821,27 @@ TEST_P(LivelinessQos, LongLiveliness_ManualByTopic_BestEffort)
         reader.wait_liveliness_recovered();
         std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
     }
+    for (count = 0; count < num_samples; count++)
+    {
+        writer.assert_liveliness();
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+    }
+
+    // Liveliness shouldn't have been lost
+    EXPECT_EQ(writer.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_lost(), 0u);
+    EXPECT_EQ(reader.times_liveliness_recovered(), 1u);
+
+    // Remove and re-create publisher, test liveliness on subscriber and the new publisher.
+    writer.removePublisher();
+    ASSERT_FALSE(writer.isInitialized());
+    reader.wait_writer_undiscovery();
+    writer.createPublisher();
+    ASSERT_TRUE(writer.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
     for (count = 0; count < num_samples; count++)
     {
         writer.assert_liveliness();
@@ -1675,13 +1899,19 @@ TEST_P(LivelinessQos, AssertLivelinessParticipant)
 
 GTEST_INSTANTIATE_TEST_MACRO(LivelinessQos,
         LivelinessQos,
-        testing::Values(false, true),
+        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
         [](const testing::TestParamInfo<LivelinessQos::ParamType>& info)
         {
-            if (info.param)
+            switch (info.param)
             {
-                return "Intraprocess";
+                case INTRAPROCESS:
+                    return "Intraprocess";
+                    break;
+                case DATASHARING:
+                    return "Datasharing";
+                    break;
+                case TRANSPORT:
+                default:
+                    return "Transport";
             }
-            return "NonIntraprocess";
         });
-

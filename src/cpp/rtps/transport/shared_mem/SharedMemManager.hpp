@@ -20,8 +20,9 @@
 #include <unordered_map>
 
 #include <rtps/transport/shared_mem/SharedMemGlobal.hpp>
-#include <rtps/transport/shared_mem/RobustSharedLock.hpp>
-#include <rtps/transport/shared_mem/SharedMemWatchdog.hpp>
+
+#include <utils/shared_memory/RobustSharedLock.hpp>
+#include <utils/shared_memory/SharedMemWatchdog.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -847,9 +848,11 @@ public:
 
             try
             {
-                ret = global_port_->try_push( {shared_mem_buffer->segment_id(), shared_mem_buffer->node_offset(),
-                                               validity_id},
-                                &are_listeners_active);
+                ret = global_port_->try_push(
+                    SharedMemGlobal::BufferDescriptor{shared_mem_buffer->segment_id(),
+                                                      shared_mem_buffer->node_offset(),
+                                                      validity_id},
+                    &are_listeners_active);
 
                 if (!are_listeners_active)
                 {

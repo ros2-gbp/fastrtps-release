@@ -200,9 +200,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         target_compile_definitions(UDPv4Tests PRIVATE FASTRTPS_NO_LIB
             BOOST_ASIO_STANDALONE
             ASIO_STANDALONE
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
             )
         target_include_directories(UDPv4Tests PRIVATE
-            ${ASIO_INCLUDE_DIR}
+            ${Asio_INCLUDE_DIR}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
@@ -222,9 +224,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             target_compile_definitions(UDPv6Tests PRIVATE FASTRTPS_NO_LIB
                 BOOST_ASIO_STANDALONE
                 ASIO_STANDALONE
+                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
                 )
             target_include_directories(UDPv6Tests PRIVATE
-                ${ASIO_INCLUDE_DIR}
+                ${Asio_INCLUDE_DIR}
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
                 ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
@@ -241,9 +245,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             target_compile_definitions(TCPv6Tests PRIVATE FASTRTPS_NO_LIB
                 BOOST_ASIO_STANDALONE
                 ASIO_STANDALONE
+                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
                 )
             target_include_directories(TCPv6Tests PRIVATE
-                ${ASIO_INCLUDE_DIR}
+                ${Asio_INCLUDE_DIR}
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
                 ${PROJECT_SOURCE_DIR}/test/mock/dds/QosPolicies
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
@@ -266,9 +272,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         target_compile_definitions(test_UDPv4Tests PRIVATE FASTRTPS_NO_LIB
             BOOST_ASIO_STANDALONE
             ASIO_STANDALONE
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
             )
         target_include_directories(test_UDPv4Tests PRIVATE
-            ${ASIO_INCLUDE_DIR}
+            ${Asio_INCLUDE_DIR}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
             ${PROJECT_SOURCE_DIR}/test/mock/dds/QosPolicies
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
@@ -289,9 +297,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         target_compile_definitions(TCPv4Tests PRIVATE FASTRTPS_NO_LIB
             BOOST_ASIO_STANDALONE
             ASIO_STANDALONE
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
             )
         target_include_directories(TCPv4Tests PRIVATE
-            ${ASIO_INCLUDE_DIR}
+            ${Asio_INCLUDE_DIR}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
             ${PROJECT_SOURCE_DIR}/test/mock/dds/QosPolicies
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
@@ -315,10 +325,13 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             target_compile_definitions(SharedMemTests PRIVATE FASTRTPS_NO_LIB
                 BOOST_ASIO_STANDALONE
                 ASIO_STANDALONE
-                $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>)
+                $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
+                $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+                $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+                )
 
             target_include_directories(SharedMemTests PRIVATE
-                ${ASIO_INCLUDE_DIR}
+                ${Asio_INCLUDE_DIR}
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/MessageReceiver
                 ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
                 ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
@@ -326,8 +339,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
                 ${THIRDPARTY_BOOST_INCLUDE_DIR}
                 )
             target_link_libraries(SharedMemTests GTest::gtest ${MOCKS}
-                    $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
-                    ${THIRDPARTY_BOOST_LINK_LIBS})
+                $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
+                ${THIRDPARTY_BOOST_LINK_LIBS}
+                eProsima_atomic
+                )
             if(MSVC OR MSVC_IDE)
                 target_link_libraries(SharedMemTests ${PRIVACY} iphlpapi Shlwapi )
             else()

@@ -84,9 +84,7 @@ public:
     /**
      * @brief Constructor
      */
-    RTPS_DllAPI ReaderResourceLimitsQos()
-    {
-    }
+    RTPS_DllAPI ReaderResourceLimitsQos() = default;
 
     /**
      * @brief Destructor
@@ -96,7 +94,11 @@ public:
     bool operator ==(
             const ReaderResourceLimitsQos& b) const
     {
-        return (this->matched_publisher_allocation == b.matched_publisher_allocation);
+        return
+            (matched_publisher_allocation == b.matched_publisher_allocation) &&
+            (sample_infos_allocation == b.sample_infos_allocation) &&
+            (outstanding_reads_allocation == b.outstanding_reads_allocation) &&
+            (max_samples_per_read == b.max_samples_per_read);
     }
 
     inline void clear()
@@ -105,8 +107,24 @@ public:
         std::swap(*this, reset);
     }
 
-    //!Matched publishers allocation limits.
+    //! Matched publishers allocation limits.
     fastrtps::ResourceLimitedContainerConfig matched_publisher_allocation;
+    //! SampleInfo allocation limits.
+    fastrtps::ResourceLimitedContainerConfig sample_infos_allocation{ 32u };
+    //! Loaned collections allocation limits.
+    fastrtps::ResourceLimitedContainerConfig outstanding_reads_allocation{ 2u };
+
+    /**
+     * Maximum number of samples to return on a single call to read / take.
+     *
+     * This attribute is a signed integer to be consistent with the @c max_samples argument of
+     * @ref DataReader methods, but should always have a strict positive value. Bear in mind that
+     * a big number here may cause the creation of the DataReader to fail due to pre-allocation of
+     * internal resources.
+     *
+     * Default value: 32.
+     */
+    int32_t max_samples_per_read = 32;
 };
 
 //! Qos Policy to configure the XTypes Qos associated to the DataReader
@@ -189,7 +207,8 @@ public:
                (expects_inline_qos_ == b.expects_inline_qos()) &&
                (properties_ == b.properties()) &&
                (endpoint_ == b.endpoint()) &&
-               (reader_resource_limits_ == b.reader_resource_limits());
+               (reader_resource_limits_ == b.reader_resource_limits()) &&
+               (data_sharing_ == b.data_sharing());
     }
 
     RTPS_DllAPI ReaderQos get_readerqos(
@@ -746,6 +765,34 @@ public:
         reader_resource_limits_ = new_value;
     }
 
+    /**
+     * Getter for DataSharingQosPolicy
+     * @return DataSharingQosPolicy reference
+     */
+    RTPS_DllAPI DataSharingQosPolicy& data_sharing()
+    {
+        return data_sharing_;
+    }
+
+    /**
+     * Getter for DataSharingQosPolicy
+     * @return DataSharingQosPolicy reference
+     */
+    RTPS_DllAPI const DataSharingQosPolicy& data_sharing() const
+    {
+        return data_sharing_;
+    }
+
+    /**
+     * Setter for DataSharingQosPolicy
+     * @param data_sharing new value for the DataSharingQosPolicy
+     */
+    RTPS_DllAPI void data_sharing(
+            const DataSharingQosPolicy& data_sharing)
+    {
+        data_sharing_ = data_sharing;
+    }
+
 private:
 
     //!Durability Qos, implemented in the library.
@@ -808,6 +855,9 @@ private:
 
     //!ReaderResourceLimitsQos
     ReaderResourceLimitsQos reader_resource_limits_;
+
+    //!DataSharing configuration (Extension)
+    DataSharingQosPolicy data_sharing_;
 };
 
 RTPS_DllAPI extern const DataReaderQos DATAREADER_QOS_DEFAULT;

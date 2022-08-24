@@ -91,7 +91,7 @@ bool ReaderHistory::matches_change(
     if (nullptr == outer_change
             || nullptr == inner_change)
     {
-        logError(RTPS_READER_HISTORY, "Pointer is not valid")
+        logError(RTPS_READER_HISTORY, "Pointer is not valid");
         return false;
     }
 
@@ -116,13 +116,16 @@ History::iterator ReaderHistory::remove_change_nts(
     }
 
     CacheChange_t* change = *removal;
+    auto ret_val = m_changes.erase(removal);
+    m_isHistoryFull = false;
+
     mp_reader->change_removed_by_history(change);
-    if ( release )
+    if (release)
     {
         mp_reader->releaseCache(change);
     }
 
-    return m_changes.erase(removal);
+    return ret_val;
 }
 
 bool ReaderHistory::remove_changes_with_guid(
@@ -182,9 +185,7 @@ bool ReaderHistory::remove_fragmented_changes_until(
                 if (item->is_fully_assembled() == false)
                 {
                     logInfo(RTPS_READER_HISTORY, "Removing change " << item->sequenceNumber);
-                    mp_reader->change_removed_by_history(item);
-                    mp_reader->releaseCache(item);
-                    chit = m_changes.erase(chit);
+                    chit = remove_change_nts(chit);
                     continue;
                 }
             }

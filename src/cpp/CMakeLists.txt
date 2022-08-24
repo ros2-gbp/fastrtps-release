@@ -14,7 +14,6 @@
 
 include(${PROJECT_SOURCE_DIR}/cmake/dev/set_sources.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/dev/generate_msvc_libraries.cmake)
-include(CheckLibatomic)
 
 # Set source files
 
@@ -58,6 +57,9 @@ set(${PROJECT_NAME}_source_files
     rtps/history/ReaderHistory.cpp
     rtps/history/TopicPayloadPool.cpp
     rtps/history/TopicPayloadPoolRegistry.cpp
+    rtps/DataSharing/DataSharingPayloadPool.cpp
+    rtps/DataSharing/DataSharingListener.cpp
+    rtps/DataSharing/DataSharingNotification.cpp
     rtps/reader/WriterProxy.cpp
     rtps/reader/StatefulReader.cpp
     rtps/reader/StatelessReader.cpp
@@ -156,7 +158,10 @@ set(${PROJECT_NAME}_source_files
     dynamic-types/DynamicDataHelper.cpp
 
     fastrtps_deprecated/attributes/TopicAttributes.cpp
+    fastdds/core/condition/StatusCondition.cpp
+    fastdds/core/condition/WaitSet.cpp
     fastdds/core/policy/ParameterList.cpp
+    fastdds/core/policy/QosPolicyUtils.cpp
     fastdds/publisher/qos/WriterQos.cpp
     fastdds/subscriber/qos/ReaderQos.cpp
     rtps/builtin/BuiltinProtocols.cpp
@@ -175,12 +180,14 @@ set(${PROJECT_NAME}_source_files
     rtps/builtin/data/ReaderProxyData.cpp
     rtps/flowcontrol/ThroughputController.cpp
     rtps/flowcontrol/ThroughputControllerDescriptor.cpp
+    rtps/flowcontrol/FlowControllerConsts.cpp
     rtps/flowcontrol/FlowController.cpp
     rtps/exceptions/Exception.cpp
     rtps/attributes/PropertyPolicy.cpp
     rtps/common/Token.cpp
     rtps/xmlparser/XMLParserCommon.cpp
     rtps/xmlparser/XMLElementParser.cpp
+    rtps/xmlparser/XMLDynamicParser.cpp
     rtps/xmlparser/XMLEndpointParser.cpp
     rtps/xmlparser/XMLParser.cpp
     rtps/xmlparser/XMLProfileManager.cpp
@@ -191,54 +198,26 @@ set(${PROJECT_NAME}_source_files
     rtps/reader/StatefulPersistentReader.cpp
     rtps/persistence/PersistenceFactory.cpp
 
-    # old discovery-server sources
-
-    rtps/builtin/discovery/participant/timedevent/DSClientEvent.cpp
-    rtps/builtin/discovery/participant/timedevent/DServerEvent.cpp
-    rtps/builtin/discovery/participant/PDPClient.cpp
-    rtps/builtin/discovery/participant/PDPServer.cpp
-    rtps/builtin/discovery/participant/PDPServerListener.cpp
+    rtps/builtin/discovery/database/backup/SharedBackupFunctions.cpp
     rtps/builtin/discovery/endpoint/EDPClient.cpp
     rtps/builtin/discovery/endpoint/EDPServer.cpp
     rtps/builtin/discovery/endpoint/EDPServerListeners.cpp
-
-    # new discovery-server sources
-
-#   rtps/builtin/discovery/database/DiscoveryDataFilter.hpp
-#   rtps/builtin/discovery/database/DiscoveryDataBase.hpp
     rtps/builtin/discovery/database/DiscoveryDataBase.cpp
-#   rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.hpp
-    rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.cpp
-#   rtps/builtin/discovery/database/DiscoveryParticipantInfo.hpp
     rtps/builtin/discovery/database/DiscoveryParticipantInfo.cpp
-#   rtps/builtin/discovery/database/DiscoverySharedInfo.hpp
+    rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.cpp
     rtps/builtin/discovery/database/DiscoverySharedInfo.cpp
-#   rtps/builtin/discovery/database/DiscoveryDataQueueInfo.hpp
-#   rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp
-    rtps/builtin/discovery/database/backup/SharedBackupFunctions.cpp
-
-#   rtps/builtin/discovery/participant/DSClientEvent2.hpp
-    rtps/builtin/discovery/participant/DSClientEvent2.cpp
-#   rtps/builtin/discovery/participant/DServerEvent2.hpp
-    rtps/builtin/discovery/participant/DServerEvent2.cpp
-#   rtps/builtin/discovery/participant/PDPClient2.hpp
-    rtps/builtin/discovery/participant/PDPClient2.cpp
-#   rtps/builtin/discovery/participant/PDPServer2.hpp
-    rtps/builtin/discovery/participant/PDPServer2.cpp
-#   rtps/builtin/discovery/participant/PDPServerListener2.hpp
-    rtps/builtin/discovery/participant/PDPServerListener2.cpp
-#   rtps/builtin/discovery/endpoint/EDPClient2.hpp
-    rtps/builtin/discovery/endpoint/EDPClient2.cpp
-#   rtps/builtin/discovery/endpoint/EDPServer2.hpp
-    rtps/builtin/discovery/endpoint/EDPServer2.cpp
-#   rtps/builtin/discovery/endpoint/EDPServerListeners2.hpp
-    rtps/builtin/discovery/endpoint/EDPServerListeners2.cpp
+    rtps/builtin/discovery/participant/PDPClient.cpp
+    rtps/builtin/discovery/participant/PDPServer.cpp
+    rtps/builtin/discovery/participant/PDPServerListener.cpp
+    rtps/builtin/discovery/participant/timedevent/DSClientEvent.cpp
+    rtps/builtin/discovery/participant/timedevent/DServerEvent.cpp
 
     utils/IPFinder.cpp
     utils/md5.cpp
     utils/StringMatching.cpp
     utils/IPLocator.cpp
     utils/System.cpp
+    utils/SystemInfo.cpp
     utils/TimedConditionVariable.cpp
     utils/string_convert.cpp
 
@@ -251,7 +230,30 @@ set(${PROJECT_NAME}_source_files
     dds/sub/Subscriber.cpp
     dds/sub/DataReader.cpp
     dds/topic/Topic.cpp
+
+    statistics/fastdds/domain/DomainParticipant.cpp
+    statistics/fastdds/publisher/qos/DataWriterQos.cpp
+    statistics/fastdds/subscriber/qos/DataReaderQos.cpp
     )
+
+# Statistics support
+if (FASTDDS_STATISTICS)
+
+    set(statistics_sources
+        statistics/fastdds/domain/DomainParticipantImpl.cpp
+        statistics/fastdds/domain/DomainParticipantStatisticsListener.cpp
+        statistics/rtps/StatisticsBase.cpp
+        statistics/rtps/reader/StatisticsReaderImpl.cpp
+        statistics/rtps/writer/StatisticsWriterImpl.cpp
+        statistics/types/typesPubSubTypes.cxx
+        statistics/types/types.cxx
+        )
+
+    list(APPEND ${PROJECT_NAME}_source_files
+        ${statistics_sources}
+        )
+
+endif()
 
 # SHM Transport
 if(IS_THIRDPARTY_BOOST_OK)
@@ -389,24 +391,29 @@ if((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER AND IS_TOP_LEVEL)
     generate_msvc_libraries(i86Win32VS2017)
     generate_msvc_libraries(x64Win64VS2017)
 elseif(NOT EPROSIMA_INSTALLER)
+
     #Create library
     add_library(${PROJECT_NAME} ${${PROJECT_NAME}_source_files})
     set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
-    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
+    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
     option(INTERNAL_DEBUG "Activate developer debug messages" OFF)
 
-    # make visual studio more clang like
+    # make visual studio more gcc and clang like. Propagated to dependent targets.
     if(MSVC)
-        # C4101 'identifier' : unreferenced local variable
-        # C4555 expression has no effect; expected expression with side-effect
-        target_compile_options(${PROJECT_NAME} PRIVATE /w34101 /w34555 )
+        # C4101 'identifier' : unreferenced local variable 
+        # C4189 'identifier' : local variable is initialized but not referenced
+        # C4555  expression has no effect; expected expression with side-effect
+        # C4715: 'Test': not all control paths return a value
+        # C5038 data member 'member1' will be initialized after data member 'member2'
+        target_compile_options(${PROJECT_NAME} PUBLIC /w34101 /w34555 /w34189 /w35038 /w34715)
     endif(MSVC)
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         ${PROJECT_NAME_UPPER}_SOURCE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
+        ASIO_DISABLE_VISIBILITY
         SQLITE_WIN32_GETVERSIONEX=0
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
         $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
@@ -428,33 +435,77 @@ elseif(NOT EPROSIMA_INSTALLER)
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/cpp>
         $<INSTALL_INTERFACE:include>
         PRIVATE
-        ${ASIO_INCLUDE_DIR}
+        ${Asio_INCLUDE_DIR}
         ${TINYXML2_INCLUDE_DIR}
         $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
         ${THIRDPARTY_BOOST_INCLUDE_DIR}
         )
 
     # Made linked libraries PRIVATE to prevent local directories in Windows installer.
-    if(EPROSIMA_INSTALLER_MINION)
+    if(EPROSIMA_INSTALLER_MINION
+        # No need to expose linked libs when target is a shared library on MSVC.
+            OR (BUILD_SHARED_LIBS AND MSVC))
         set(PRIVACY "PRIVATE")
+    else()
+        set(PRIVACY "PUBLIC")
     endif()
 
-    # No need to expose linked libs when target is a shared library on MSVC.
-    if(BUILD_SHARED_LIBS AND MSVC)
-        set(PRIVACY "PRIVATE")
-    endif()
+    # Find out if libatomic link is required in this platform
+    find_package(Atomic MODULE)
 
     # Link library to external libraries.
     target_link_libraries(${PROJECT_NAME} ${PRIVACY} fastcdr foonathan_memory
         ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS}
         ${TINYXML2_LIBRARY}
-        $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
+        $<$<BOOL:${LINK_SSL}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto$<$<BOOL:${WIN32}>:$<SEMICOLON>crypt32.lib>>
         $<$<BOOL:${WIN32}>:iphlpapi$<SEMICOLON>Shlwapi>
         ${THIRDPARTY_BOOST_LINK_LIBS}
-        $<$<BOOL:${LINK_LIBATOMIC}>:atomic>
+        PRIVATE eProsima_atomic
         )
 
     if(MSVC OR MSVC_IDE)
+
+        # On installed binaries use manifest to specify dependencies
+        if(INSTALLER_PLATFORM AND OPENSSL_FOUND)
+
+            # Get Fast-DDS version suitable manifest format
+            set(FASTDDS_CANONICAL_VERSION ${fastrtps_VERSION})
+            
+            if( NOT FASTDDS_CANONICAL_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+                message(FATAL_ERROR "Fast-DDS version number ${fastrtps_VERSION} must include major, minor and patch.")
+            endif()
+
+            if( NOT fastrtps_VERSION_TWEAK)
+                set(FASTDDS_CANONICAL_VERSION "${FASTDDS_CANONICAL_VERSION}.0")
+            endif()
+
+            # Get OpenSSL version suitable manifest format
+            execute_process( COMMAND PowerShell -NoLogo -Command "&{ param([string]$original) 
+                    if ($original -notmatch '\\d+$')
+                    { $res = $original.Substring(0,$original.length-1) + '.' +
+                            ([int]$original[$original.length-1]-[int][char]'a'+1); }
+                    else { while(($original -split '\\.').count -le 3)
+                        { $original += '.0'; } $res = $original; } $res }" -original ${OPENSSL_VERSION}
+                OUTPUT_VARIABLE OPENSSL_CANONICAL_VERSION
+                )
+            string(STRIP ${OPENSSL_CANONICAL_VERSION} OPENSSL_CANONICAL_VERSION)
+
+            # replace the values in the manifest template
+            configure_file(
+                "${CMAKE_SOURCE_DIR}/cmake/packaging/windows/fastrtps.manifest.in"
+                "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest"
+                @ONLY
+                )
+
+            file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest" MANIFEST_FILE_PATH)
+            target_link_options(${PROJECT_NAME} PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${MANIFEST_FILE_PATH}")
+
+            unset(WINDOWS_SOURCE_DIR)
+            unset(FASTDDS_CANONICAL_VERSION)
+            unset(OPENSSL_CANONICAL_VERSION)
+            unset(MANIFEST_FILE_PATH)
+        endif()
+
         set_target_properties(${PROJECT_NAME} PROPERTIES RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
         set_target_properties(${PROJECT_NAME} PROPERTIES RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
         set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
@@ -463,9 +514,17 @@ elseif(NOT EPROSIMA_INSTALLER)
         if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
             # Export symbols in DLL library
             target_compile_definitions(${PROJECT_NAME} PUBLIC ${PROJECT_NAME_UPPER}_DYN_LINK)
+            set_target_properties(${PROJECT_NAME} PROPERTIES
+                PDB_NAME_DEBUG "${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+                PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
+            )
         else()
             # Rename the library to have a "lib" before.
             set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME lib${PROJECT_NAME})
+            set_target_properties(${PROJECT_NAME} PROPERTIES
+                COMPILE_PDB_NAME_DEBUG "lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+                COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
+            )
         endif()
 
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "WindowsStore")
@@ -482,6 +541,11 @@ elseif(NOT EPROSIMA_INSTALLER)
             endif()
         endif()
     endif()
+endif()
+
+if(DEFINED ENV{LIB_FUZZING_ENGINE})
+  add_executable(fuzz_processCDRMsg rtps/messages/fuzz_processCDRMsg.cpp)
+  target_link_libraries(fuzz_processCDRMsg ${PROJECT_NAME} $ENV{LIB_FUZZING_ENGINE})
 endif()
 
 ###############################################################################
@@ -515,7 +579,7 @@ if(UNIX AND EPROSIMA_INSTALLER)
         COMPONENT headers
         )
 
-    set_public_headers_directory(${ASIO_INCLUDE_DIR} ""
+    set_public_headers_directory(${Asio_INCLUDE_DIR} ""
         DESTINATION thirdparty/asio
         COMPONENT headers
         )
@@ -551,7 +615,17 @@ if(UNIX AND EPROSIMA_INSTALLER)
         COMPONENT sources
         )
 endif()
+
 # Install libraries
+
+# Generate different target names depending on linking
+get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
+if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
+    set(FASTDDS_LINKING dynamic)
+else()
+    set(FASTDDS_LINKING static)
+endif()
+
 if((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER)
     if(IS_TOP_LEVEL)
         install_msvc_libraries(i86Win32VS2015)
@@ -565,15 +639,15 @@ if((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER)
         COMPONENT cmake
         )
 elseif(NOT EPROSIMA_INSTALLER)
-    install(TARGETS ${PROJECT_NAME}
-        EXPORT ${PROJECT_NAME}-targets
+    install(TARGETS ${PROJECT_NAME} eProsima_atomic
+        EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
         RUNTIME DESTINATION ${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         LIBRARY DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         ARCHIVE DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         COMPONENT libraries${MSVCARCH_EXTENSION}
         )
 
-    export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-targets.cmake)
+    export(TARGETS ${PROJECT_NAME} eProsima_atomic FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-${FASTDDS_LINKING}-targets.cmake)
 
     if(INSTALLER_PLATFORM)
         set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}-${INSTALLER_PLATFORM}/cmake)
@@ -581,25 +655,32 @@ elseif(NOT EPROSIMA_INSTALLER)
         set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}/cmake${MSVCARCH_DIR_EXTENSION_EXT})
     endif()
 
-    install(EXPORT ${PROJECT_NAME}-targets
+    install(EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
         DESTINATION ${INSTALL_DESTINATION_PATH}
         COMPONENT cmake
         )
 
     if(MSVC OR MSVC_IDE)
-        if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
-            # Install pdb files
-            install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Debug/
-                DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-                COMPONENT libraries${MSVCARCH_EXTENSION}
-                CONFIGURATIONS Debug
-                FILES_MATCHING
-                PATTERN "*.pdb"
-                )
+
+        # first try dll symbols
+        get_target_property(PDB_FILE ${PROJECT_NAME} PDB_NAME_DEBUG)
+        if(PDB_FILE)
+            get_target_property(PDB_DIR ${PROJECT_NAME} PDB_OUTPUT_DIRECTORY_DEBUG)
+            set(PDB_FILE "${PDB_DIR}/${PDB_FILE}.pdb")
         else()
-            install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.dir/Debug/${PROJECT_NAME}.pdb
+            # fallback to static lib symbols
+            get_target_property(PDB_FILE ${PROJECT_NAME} COMPILE_PDB_NAME_DEBUG)
+            if(PDB_FILE)
+                get_target_property(PDB_DIR ${PROJECT_NAME} COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG)
+                set(PDB_FILE "${PDB_DIR}/${PDB_FILE}.pdb")
+            endif()
+        endif()
+
+        # install symbols if any
+        if(PDB_FILE)
+            install(FILES ${PDB_FILE}
                 DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-                COMPONENT libraries${MSVCARCH_EXTENSION}
+                COMPONENT symbols
                 CONFIGURATIONS Debug
                 )
         endif()
@@ -640,8 +721,28 @@ elseif(NOT EPROSIMA_INSTALLER)
     endif()
 
     # Add fastrtps dependencies in its CMake config file.
-    if(LINK_SSL AND NOT EPROSIMA_INSTALLER_MINION)
-        set(FASTRTPS_PACKAGE_OPT_DEPS "find_package(OpenSSL REQUIRED)")
+    if(LINK_SSL)
+        if(INSTALLER_PLATFORM)
+            # OpenSSL dependency is only propagated on static linking
+            # We must use the deployed OpenSSL binaries to prevent compatibility issues
+            set(FASTRTPS_INSTALLER_DEPS_ANCILLARY "\
+function(find_fastdds_deployed_openssl)\n\
+    if(OPENSSL_FOUND AND NOT(OPENSSL_VERSION STREQUAL \"${OPENSSL_VERSION}\") )\n\
+        message(WARNING \"OpenSSL already loaded. Version \${OPENSSL_VERSION} differs from version ${OPENSSL_VERSION}, used in Fast-DDS binaries building, ABI issues may arise\")\n\
+    endif()\n\
+    set(OPENSSL_USE_STATIC_LIBS TRUE)\n\
+    set(OPENSSL_ROOT_DIR  \"\${PACKAGE_PREFIX_DIR}/lib/${INSTALLER_PLATFORM}\")\n\
+    find_package(OpenSSL REQUIRED)\n\
+endfunction()"
+            )
+            set(FASTRTPS_INSTALLER_OPT_DEPS "find_fastdds_deployed_openssl()")
+        elseif(WIN32)
+            # windows from sources only requires OpenSSL on static libraries
+            set(FASTRTPS_PACKAGE_WIN32_OPT_DEPS "find_package(OpenSSL REQUIRED)")
+        else()
+            # linux from sources requires OpenSSL always
+            set(FASTRTPS_PACKAGE_UNIX_OPT_DEPS "find_package(OpenSSL REQUIRED)")
+        endif()
     endif()
 
     configure_package_config_file(${PROJECT_SOURCE_DIR}/cmake/packaging/Config.cmake.in

@@ -19,35 +19,23 @@
 #include <fastrtps/types/TypesBase.h>
 #include <fastcdr/Cdr.h>
 
-namespace eprosima{
-namespace fastrtps{
+namespace eprosima {
+namespace fastrtps {
 
 using namespace rtps;
 
-namespace types{
+namespace types {
 
-const ReturnCode_t ReturnCode_t::RETCODE_OK = {0};
-const ReturnCode_t ReturnCode_t::RETCODE_ERROR = {1};
-const ReturnCode_t ReturnCode_t::RETCODE_UNSUPPORTED = {2};
-const ReturnCode_t ReturnCode_t::RETCODE_BAD_PARAMETER = {3};
-const ReturnCode_t ReturnCode_t::RETCODE_PRECONDITION_NOT_MET = {4};
-const ReturnCode_t ReturnCode_t::RETCODE_OUT_OF_RESOURCES = {5};
-const ReturnCode_t ReturnCode_t::RETCODE_NOT_ENABLED = {6};
-const ReturnCode_t ReturnCode_t::RETCODE_IMMUTABLE_POLICY = {7};
-const ReturnCode_t ReturnCode_t::RETCODE_INCONSISTENT_POLICY = {8};
-const ReturnCode_t ReturnCode_t::RETCODE_ALREADY_DELETED = {9};
-const ReturnCode_t ReturnCode_t::RETCODE_TIMEOUT = {10};
-const ReturnCode_t ReturnCode_t::RETCODE_NO_DATA = {11};
-const ReturnCode_t ReturnCode_t::RETCODE_ILLEGAL_OPERATION = {12};
-
-void MemberFlag::serialize(eprosima::fastcdr::Cdr &cdr) const
+void MemberFlag::serialize(
+        eprosima::fastcdr::Cdr& cdr) const
 {
     //cdr << m_MemberFlag;
     uint16_t bits = static_cast<uint16_t>(m_MemberFlag.to_ulong());
     cdr << bits;
 }
 
-void MemberFlag::deserialize(eprosima::fastcdr::Cdr &cdr)
+void MemberFlag::deserialize(
+        eprosima::fastcdr::Cdr& cdr)
 {
     //cdr >> (uint16_t)m_MemberFlag;
     uint16_t bits;
@@ -55,19 +43,23 @@ void MemberFlag::deserialize(eprosima::fastcdr::Cdr &cdr)
     m_MemberFlag = std::bitset<16>(bits);
 }
 
-size_t MemberFlag::getCdrSerializedSize(const MemberFlag&, size_t current_alignment)
+size_t MemberFlag::getCdrSerializedSize(
+        const MemberFlag&,
+        size_t current_alignment)
 {
     return 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
 }
 
-void TypeFlag::serialize(eprosima::fastcdr::Cdr &cdr) const
+void TypeFlag::serialize(
+        eprosima::fastcdr::Cdr& cdr) const
 {
     //cdr << m_TypeFlag;
     uint16_t bits = static_cast<uint16_t>(m_TypeFlag.to_ulong());
     cdr << bits;
 }
 
-void TypeFlag::deserialize(eprosima::fastcdr::Cdr &cdr)
+void TypeFlag::deserialize(
+        eprosima::fastcdr::Cdr& cdr)
 {
     //cdr >> (uint16_t)m_TypeFlag;
     uint16_t bits;
@@ -75,7 +67,9 @@ void TypeFlag::deserialize(eprosima::fastcdr::Cdr &cdr)
     m_TypeFlag = std::bitset<16>(bits);
 }
 
-size_t TypeFlag::getCdrSerializedSize(const TypeFlag&, size_t current_alignment)
+size_t TypeFlag::getCdrSerializedSize(
+        const TypeFlag&,
+        size_t current_alignment)
 {
     return 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
 }

@@ -23,13 +23,14 @@
 #include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
 #include <fastrtps/utils/Semaphore.h>
-#include <fastrtps/transport/TCPv4Transport.h>
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/IPLocator.h>
-#include <fastdds/rtps/transport/tcp/RTCPHeader.h>
+#include <rtps/transport/TCPv4Transport.h>
+#include <rtps/transport/tcp/RTCPHeader.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
+using TCPv4Transport = eprosima::fastdds::rtps::TCPv4Transport;
 using TCPHeader = eprosima::fastdds::rtps::TCPHeader;
 
 #if defined(_WIN32)
@@ -171,12 +172,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_ports)
     eprosima::fastdds::dds::Log::SetCategoryFilter(filter);
     TCPv4TransportDescriptor recvDescriptor;
     recvDescriptor.add_listener_port(g_default_port);
-    recvDescriptor.wait_for_tcp_negotiation = true;
     TCPv4Transport receiveTransportUnderTest(recvDescriptor);
     receiveTransportUnderTest.init();
 
     TCPv4TransportDescriptor sendDescriptor;
-    sendDescriptor.wait_for_tcp_negotiation = true;
     TCPv4Transport sendTransportUnderTest(sendDescriptor);
     sendTransportUnderTest.init();
 
@@ -386,13 +385,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_interfaces_ports)
             TCPv4TransportDescriptor recvDescriptor;
             recvDescriptor.interfaceWhiteList.emplace_back(IPLocator::toIPv4string(locator));
             recvDescriptor.add_listener_port(g_default_port);
-            recvDescriptor.wait_for_tcp_negotiation = true;
             TCPv4Transport receiveTransportUnderTest(recvDescriptor);
             receiveTransportUnderTest.init();
 
             TCPv4TransportDescriptor sendDescriptor;
             sendDescriptor.interfaceWhiteList.emplace_back(IPLocator::toIPv4string(locator));
-            sendDescriptor.wait_for_tcp_negotiation = true;
             TCPv4Transport sendTransportUnderTest(sendDescriptor);
             sendTransportUnderTest.init();
 
@@ -1165,13 +1162,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_localhost_interfaces_ports)
     TCPv4TransportDescriptor recvDescriptor;
     recvDescriptor.interfaceWhiteList.emplace_back("127.0.0.1");
     recvDescriptor.add_listener_port(g_default_port);
-    recvDescriptor.wait_for_tcp_negotiation = true;
     TCPv4Transport receiveTransportUnderTest(recvDescriptor);
     receiveTransportUnderTest.init();
 
     TCPv4TransportDescriptor sendDescriptor;
     sendDescriptor.interfaceWhiteList.emplace_back("127.0.0.1");
-    sendDescriptor.wait_for_tcp_negotiation = true;
     TCPv4Transport sendTransportUnderTest(sendDescriptor);
     sendTransportUnderTest.init();
 
@@ -1262,13 +1257,11 @@ TEST_F(TCPv4Tests, send_and_receive_between_blocked_interfaces_ports)
             TCPv4TransportDescriptor recvDescriptor;
             recvDescriptor.interfaceWhiteList.emplace_back(IPLocator::toIPv4string(locator));
             recvDescriptor.add_listener_port(g_default_port);
-            recvDescriptor.wait_for_tcp_negotiation = true;
             TCPv4Transport receiveTransportUnderTest(recvDescriptor);
             receiveTransportUnderTest.init();
 
             TCPv4TransportDescriptor sendDescriptor;
             sendDescriptor.interfaceWhiteList.emplace_back(IPLocator::toIPv4string(locator));
-            sendDescriptor.wait_for_tcp_negotiation = true;
             TCPv4Transport sendTransportUnderTest(sendDescriptor);
             sendTransportUnderTest.init();
 

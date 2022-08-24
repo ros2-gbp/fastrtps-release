@@ -20,25 +20,25 @@
 #ifndef _TEST_BLACKBOX_PUBSUBPARTICIPANT_HPP_
 #define _TEST_BLACKBOX_PUBSUBPARTICIPANT_HPP_
 
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/domain/DomainParticipant.hpp>
-#include <fastdds/dds/domain/DomainParticipantListener.hpp>
-#include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
-#include <fastdds/dds/publisher/Publisher.hpp>
-#include <fastdds/dds/publisher/DataWriter.hpp>
-#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
-#include <fastdds/dds/publisher/DataWriterListener.hpp>
-#include <fastdds/dds/subscriber/Subscriber.hpp>
-#include <fastdds/dds/subscriber/DataReader.hpp>
-#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
-#include <fastdds/dds/subscriber/DataReaderListener.hpp>
+#include <condition_variable>
+#include <thread>
+#include <tuple>
+#include <vector>
 
 #include <asio.hpp>
-#include <condition_variable>
 #include <gtest/gtest.h>
-#include <thread>
-#include <vector>
-#include <tuple>
+#include <fastdds/dds/domain/DomainParticipant.hpp>
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/domain/DomainParticipantListener.hpp>
+#include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
+#include <fastdds/dds/publisher/DataWriter.hpp>
+#include <fastdds/dds/publisher/DataWriterListener.hpp>
+#include <fastdds/dds/publisher/Publisher.hpp>
+#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+#include <fastdds/dds/subscriber/DataReader.hpp>
+#include <fastdds/dds/subscriber/DataReaderListener.hpp>
+#include <fastdds/dds/subscriber/Subscriber.hpp>
+#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 
 /**
  * @brief A class with one participant that can have multiple publishers and subscribers
@@ -46,6 +46,13 @@
 template<class TypeSupport>
 class PubSubParticipant
 {
+public:
+
+    typedef TypeSupport type_support;
+    typedef typename type_support::type type;
+
+private:
+
     class PubListener : public eprosima::fastdds::dds::DataWriterListener
     {
         friend class PubSubParticipant;
@@ -117,6 +124,18 @@ class PubSubParticipant
 
         }
 
+        void on_data_available(
+                eprosima::fastdds::dds::DataReader* reader) override
+        {
+            type data;
+            eprosima::fastdds::dds::SampleInfo info;
+
+            while (ReturnCode_t::RETCODE_OK == reader->take_next_sample(&data, &info))
+            {
+                participant_->data_received();
+            }
+        }
+
     private:
 
         SubListener& operator =(
@@ -126,9 +145,6 @@ class PubSubParticipant
     };
 
 public:
-
-    typedef TypeSupport type_support;
-    typedef typename type_support::type type;
 
     PubSubParticipant(
             unsigned int num_publishers,
@@ -150,6 +166,21 @@ public:
         , sub_times_liveliness_lost_(0)
         , sub_times_liveliness_recovered_(0)
     {
+        if (enable_datasharing)
+        {
+            datareader_qos_.data_sharing().automatic();
+            datawriter_qos_.data_sharing().automatic();
+        }
+        else
+        {
+            datareader_qos_.data_sharing().off();
+            datawriter_qos_.data_sharing().off();
+        }
+
+        if (use_pull_mode)
+        {
+            datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
+        }
 
 #if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
         datawriter_qos_.historyMemoryPolicy = rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
@@ -297,6 +328,18 @@ public:
             }
         }
         return false;
+    }
+
+    eprosima::fastdds::dds::DataWriter& get_native_writer(
+            unsigned int index)
+    {
+        return *(std::get<2>(publishers_[index]));
+    }
+
+    eprosima::fastdds::dds::DataReader& get_native_reader(
+            unsigned int index)
+    {
+        return *(std::get<2>(subscribers_[index]));
     }
 
     bool send_sample(
@@ -456,6 +499,33 @@ public:
         return *this;
     }
 
+    PubSubParticipant& disable_builtin_transport()
+    {
+        participant_qos_.transport().use_builtin_transports = false;
+        return *this;
+    }
+
+    PubSubParticipant& add_user_transport_to_pparams(
+            std::shared_ptr<eprosima::fastdds::rtps::TransportDescriptorInterface> userTransportDescriptor)
+    {
+        participant_qos_.transport().user_transports.push_back(userTransportDescriptor);
+        return *this;
+    }
+
+    PubSubParticipant& pub_property_policy(
+            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
+    {
+        datawriter_qos_.properties() = property_policy;
+        return *this;
+    }
+
+    PubSubParticipant& sub_property_policy(
+            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
+    {
+        datareader_qos_.properties() = property_policy;
+        return *this;
+    }
+
     PubSubParticipant& pub_topic_name(
             std::string topicName)
     {
@@ -574,6 +644,13 @@ public:
         sub_liveliness_cv_.notify_one();
     }
 
+    void data_received()
+    {
+        std::unique_lock<std::mutex> lock(sub_data_mutex_);
+        sub_times_data_received_++;
+        sub_data_cv_.notify_one();
+    }
+
     unsigned int pub_times_liveliness_lost()
     {
         std::unique_lock<std::mutex> lock(pub_liveliness_mutex_);
@@ -679,6 +756,13 @@ private:
     std::mutex pub_liveliness_mutex_;
     //! A condition variable for liveliness of publisher
     std::condition_variable pub_liveliness_cv_;
+
+    //! A mutex protecting received data
+    std::mutex sub_data_mutex_;
+    //! A condition variable for received data
+    std::condition_variable sub_data_cv_;
+    //! Number of times a subscriber received data
+    size_t sub_times_data_received_ = 0;
 
     eprosima::fastdds::dds::TypeSupport type_;
 };

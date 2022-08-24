@@ -39,8 +39,11 @@
 #include <fastdds/rtps/resources/TimedEvent.h>
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
 #include <fastdds/core/policy/ParameterSerializer.hpp>
+#include <fastdds/core/policy/QosPolicyUtils.hpp>
 
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
+#include <rtps/DataSharing/DataSharingPayloadPool.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <functional>
 #include <iostream>
@@ -53,6 +56,71 @@ namespace eprosima {
 namespace fastdds {
 namespace dds {
 
+static bool qos_has_pull_mode_request(
+        const DataWriterQos& qos)
+{
+    auto push_mode = PropertyPolicyHelper::find_property(qos.properties(), "fastdds.push_mode");
+    return (nullptr != push_mode) && ("false" == *push_mode);
+}
+
+class DataWriterImpl::LoanCollection
+{
+public:
+
+    explicit LoanCollection(
+            const PoolConfig& config)
+        : loans_(get_collection_limits(config))
+    {
+    }
+
+    bool add_loan(
+            void* data,
+            PayloadInfo_t& payload)
+    {
+        static_cast<void>(data);
+        assert(data == payload.payload.data + SerializedPayload_t::representation_header_size);
+        return loans_.push_back(payload);
+    }
+
+    bool check_and_remove_loan(
+            void* data,
+            PayloadInfo_t& payload)
+    {
+        octet* payload_data = static_cast<octet*>(data) - SerializedPayload_t::representation_header_size;
+        for (auto it = loans_.begin(); it != loans_.end(); ++it)
+        {
+            if (it->payload.data == payload_data)
+            {
+                payload = *it;
+                loans_.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool is_empty() const
+    {
+        return loans_.empty();
+    }
+
+private:
+
+    static ResourceLimitedContainerConfig get_collection_limits(
+            const PoolConfig& config)
+    {
+        return
+            {
+                config.initial_size,
+                config.maximum_size,
+                config.initial_size == config.maximum_size ? 0u : 1u
+            };
+    }
+
+    ResourceLimitedVector<PayloadInfo_t> loans_;
+
+};
+
 DataWriterImpl::DataWriterImpl(
         PublisherImpl* p,
         TypeSupport type,
@@ -63,13 +131,7 @@ DataWriterImpl::DataWriterImpl(
     , type_(type)
     , topic_(topic)
     , qos_(&qos == &DATAWRITER_QOS_DEFAULT ? publisher_->get_default_datawriter_qos() : qos)
-    , history_(get_topic_attributes(qos_, *topic_, type_), type_->m_typeSize
-#if HAVE_SECURITY
-            // In future v2 changepool is in writer, and writer set this value to cachechagepool.
-            + 20 /*SecureDataHeader*/ + 4 + ((2 * 16) /*EVP_MAX_IV_LENGTH max block size*/ - 1 ) /* SecureDataBodey*/
-            + 16 + 4 /*SecureDataTag*/
-#endif // if HAVE_SECURITY
-            , qos_.endpoint().history_memory_policy)
+    , history_(get_topic_attributes(qos_, *topic_, type_), type_->m_typeSize, qos_.endpoint().history_memory_policy)
     , listener_(listen)
 #pragma warning (disable : 4355 )
     , writer_listener_(this)
@@ -77,6 +139,16 @@ DataWriterImpl::DataWriterImpl(
     , deadline_duration_us_(qos_.deadline().period.to_ns() * 1e-3)
     , lifespan_duration_us_(qos_.lifespan().duration.to_ns() * 1e-3)
 {
+}
+
+fastrtps::rtps::RTPSWriter* DataWriterImpl::create_rtps_writer(
+        fastrtps::rtps::RTPSParticipant* p,
+        fastrtps::rtps::WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        fastrtps::rtps::WriterHistory* hist,
+        fastrtps::rtps::WriterListener* listen)
+{
+    return RTPSDomain::createRTPSWriter(p, watt, payload_pool, hist, listen);
 }
 
 ReturnCode_t DataWriterImpl::enable()
@@ -118,7 +190,15 @@ ReturnCode_t DataWriterImpl::enable()
     property.value(topic_->get_name().c_str());
     w_att.endpoint.properties.properties().push_back(std::move(property));
 
-    if (publisher_->get_qos().partition().names().size() > 0)
+    std::string* endpoint_partitions = PropertyPolicyHelper::find_property(qos_.properties(), "partitions");
+
+    if (endpoint_partitions)
+    {
+        property.name("partitions");
+        property.value(*endpoint_partitions);
+        w_att.endpoint.properties.properties().push_back(std::move(property));
+    }
+    else if (publisher_->get_qos().partition().names().size() > 0)
     {
         property.name("partitions");
         std::string partitions;
@@ -139,13 +219,64 @@ ReturnCode_t DataWriterImpl::enable()
         w_att.keep_duration = qos_.reliable_writer_qos().disable_positive_acks.duration;
     }
 
+    ReturnCode_t ret_code = check_datasharing_compatible(w_att, is_data_sharing_compatible_);
+    if (ret_code != ReturnCode_t::RETCODE_OK)
+    {
+        return ret_code;
+    }
+
+    if (is_data_sharing_compatible_)
+    {
+        DataSharingQosPolicy datasharing(qos_.data_sharing());
+        if (datasharing.domain_ids().empty())
+        {
+            datasharing.add_domain_id(utils::default_domain_id());
+        }
+        w_att.endpoint.set_data_sharing_configuration(datasharing);
+    }
+    else
+    {
+        DataSharingQosPolicy datasharing;
+        datasharing.off();
+        w_att.endpoint.set_data_sharing_configuration(datasharing);
+    }
+
     auto pool = get_payload_pool();
-    RTPSWriter* writer = RTPSDomain::createRTPSWriter(
+    if (!pool)
+    {
+        logError(DATA_WRITER, "Problem creating payload pool for associated Writer");
+        return ReturnCode_t::RETCODE_ERROR;
+    }
+
+    RTPSWriter* writer = create_rtps_writer(
         publisher_->rtps_participant(),
         w_att, pool,
         static_cast<WriterHistory*>(&history_),
         static_cast<WriterListener*>(&writer_listener_));
 
+    if (writer == nullptr &&
+            w_att.endpoint.data_sharing_configuration().kind() == DataSharingKind::AUTO)
+    {
+        logInfo(DATA_WRITER, "Trying with a non-datasharing pool");
+        release_payload_pool();
+        is_data_sharing_compatible_ = false;
+        DataSharingQosPolicy datasharing;
+        datasharing.off();
+        w_att.endpoint.set_data_sharing_configuration(datasharing);
+
+        pool = get_payload_pool();
+        if (!pool)
+        {
+            logError(DATA_WRITER, "Problem creating payload pool for associated Writer");
+            return ReturnCode_t::RETCODE_ERROR;
+        }
+
+        writer = RTPSDomain::createRTPSWriter(
+            publisher_->rtps_participant(),
+            w_att, pool,
+            static_cast<WriterHistory*>(&history_),
+            static_cast<WriterListener*>(&writer_listener_));
+    }
     if (writer == nullptr)
     {
         release_payload_pool();
@@ -198,8 +329,32 @@ ReturnCode_t DataWriterImpl::enable()
                     },
                     qos_.lifespan().duration.to_ns() * 1e-6);
 
+    // In case it has been loaded from the persistence DB, expire old samples.
+    if (qos_.lifespan().duration != c_TimeInfinite)
+    {
+        if (lifespan_expired())
+        {
+            lifespan_timer_->restart_timer();
+        }
+    }
+
     // REGISTER THE WRITER
     WriterQos wqos = qos_.get_writerqos(get_publisher()->get_qos(), topic_->get_qos());
+    if (!is_data_sharing_compatible_)
+    {
+        wqos.data_sharing.off();
+    }
+    if (endpoint_partitions)
+    {
+        std::istringstream partition_string(*endpoint_partitions);
+        std::string partition_name;
+        wqos.m_partition.clear();
+
+        while (std::getline(partition_string, partition_name, ';'))
+        {
+            wqos.m_partition.push_back(partition_name.c_str());
+        }
+    }
     publisher_->rtps_participant()->registerWriter(writer_, get_topic_attributes(qos_, *topic_, type_), wqos);
 
     return ReturnCode_t::RETCODE_OK;
@@ -212,6 +367,16 @@ void DataWriterImpl::disable()
     {
         writer_->set_listener(nullptr);
     }
+}
+
+ReturnCode_t DataWriterImpl::check_delete_preconditions()
+{
+    if (loans_ && !loans_->is_empty())
+    {
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    return ReturnCode_t::RETCODE_OK;
 }
 
 DataWriterImpl::~DataWriterImpl()
@@ -229,6 +394,115 @@ DataWriterImpl::~DataWriterImpl()
     delete user_datawriter_;
 }
 
+ReturnCode_t DataWriterImpl::loan_sample(
+        void*& sample,
+        LoanInitializationKind initialization)
+{
+    // Type should be plain and have space for the representation header
+    if (!type_->is_plain() || SerializedPayload_t::representation_header_size > type_->m_typeSize)
+    {
+        return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
+    }
+
+    // Writer should be enabled
+    if (nullptr == writer_)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
+    std::lock_guard<RecursiveTimedMutex> lock(writer_->getMutex());
+
+    // Get one payload from the pool
+    PayloadInfo_t payload;
+    uint32_t size = type_->m_typeSize;
+    if (!get_free_payload_from_pool([size]()
+            {
+                return size;
+            }, payload))
+    {
+        return ReturnCode_t::RETCODE_OUT_OF_RESOURCES;
+    }
+
+    // Leave payload state as if serialization has already been performed
+    payload.payload.length = size;
+    payload.payload.pos = size;
+    payload.payload.data[1] = DEFAULT_ENCAPSULATION;
+    payload.payload.encapsulation = DEFAULT_ENCAPSULATION;
+
+    // Sample starts after representation header
+    sample = payload.payload.data + SerializedPayload_t::representation_header_size;
+
+    // Add to loans collection
+    if (!add_loan(sample, payload))
+    {
+        sample = nullptr;
+        return_payload_to_pool(payload);
+        return ReturnCode_t::RETCODE_OUT_OF_RESOURCES;
+    }
+
+    switch (initialization)
+    {
+        default:
+            logWarning(DATA_WRITER, "Using wrong LoanInitializationKind value ("
+                    << static_cast<int>(initialization) << "). Using default NO_LOAN_INITIALIZATION");
+            break;
+
+        case LoanInitializationKind::NO_LOAN_INITIALIZATION:
+            break;
+
+        case LoanInitializationKind::ZERO_LOAN_INITIALIZATION:
+            if (SerializedPayload_t::representation_header_size < size)
+            {
+                size -= SerializedPayload_t::representation_header_size;
+                memset(sample, 0, size);
+            }
+            break;
+
+        case LoanInitializationKind::CONSTRUCTED_LOAN_INITIALIZATION:
+            if (!type_->construct_sample(sample))
+            {
+                check_and_remove_loan(sample, payload);
+                return_payload_to_pool(payload);
+                sample = nullptr;
+                return ReturnCode_t::RETCODE_UNSUPPORTED;
+            }
+            break;
+    }
+
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataWriterImpl::discard_loan(
+        void*& sample)
+{
+    // Type should be plain and have space for the representation header
+    if (!type_->is_plain() || SerializedPayload_t::representation_header_size > type_->m_typeSize)
+    {
+        return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
+    }
+
+    // Writer should be enabled
+    if (nullptr == writer_)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
+    std::lock_guard<RecursiveTimedMutex> lock(writer_->getMutex());
+
+    // Remove sample from loans collection
+    PayloadInfo_t payload;
+    if ((nullptr == sample) || !check_and_remove_loan(sample, payload))
+    {
+        return ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+
+    // Return payload to pool
+    return_payload_to_pool(payload);
+    sample = nullptr;
+
+    return ReturnCode_t::RETCODE_OK;
+}
+
 bool DataWriterImpl::write(
         void* data)
 {
@@ -238,7 +512,7 @@ bool DataWriterImpl::write(
     }
 
     logInfo(DATA_WRITER, "Writing new data");
-    return create_new_change(ALIVE, data);
+    return ReturnCode_t::RETCODE_OK == create_new_change(ALIVE, data);
 }
 
 bool DataWriterImpl::write(
@@ -251,12 +525,12 @@ bool DataWriterImpl::write(
     }
 
     logInfo(DATA_WRITER, "Writing new data with WriteParams");
-    return create_new_change_with_params(ALIVE, data, params);
+    return ReturnCode_t::RETCODE_OK == create_new_change_with_params(ALIVE, data, params);
 }
 
 ReturnCode_t DataWriterImpl::write(
         void* data,
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
 {
     if (writer_ == nullptr)
     {
@@ -275,20 +549,16 @@ ReturnCode_t DataWriterImpl::write(
 
     //Check if the Handle is different from the special value HANDLE_NIL and
     //does not correspond with the instance referred by the data
-    if (handle.isDefined() && handle.value != instance_handle.value)
+    if (handle.isDefined() && handle != instance_handle)
     {
         return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
     logInfo(DATA_WRITER, "Writing new data with Handle");
     WriteParams wparams;
-    if (create_new_change_with_params(ALIVE, data, wparams, instance_handle))
-    {
-        return ReturnCode_t::RETCODE_OK;
-    }
-    return ReturnCode_t::RETCODE_ERROR;
+    return create_new_change_with_params(ALIVE, data, wparams, instance_handle);
 }
 
-fastrtps::rtps::InstanceHandle_t DataWriterImpl::register_instance(
+InstanceHandle_t DataWriterImpl::register_instance(
         void* key)
 {
     /// Preconditions
@@ -392,10 +662,7 @@ ReturnCode_t DataWriterImpl::unregister_instance(
                     NOT_ALIVE_UNREGISTERED;
         }
 
-        if (create_new_change_with_params(change_kind, instance, wparams, ih))
-        {
-            returned_value = ReturnCode_t::RETCODE_OK;
-        }
+        returned_value = create_new_change_with_params(change_kind, instance, wparams, ih);
     }
     else
     {
@@ -405,7 +672,7 @@ ReturnCode_t DataWriterImpl::unregister_instance(
     return returned_value;
 }
 
-bool DataWriterImpl::create_new_change(
+ReturnCode_t DataWriterImpl::create_new_change(
         ChangeKind_t changeKind,
         void* data)
 {
@@ -413,7 +680,7 @@ bool DataWriterImpl::create_new_change(
     return create_new_change_with_params(changeKind, data, wparams);
 }
 
-bool DataWriterImpl::check_new_change_preconditions(
+ReturnCode_t DataWriterImpl::check_new_change_preconditions(
         ChangeKind_t change_kind,
         void* data)
 {
@@ -421,7 +688,7 @@ bool DataWriterImpl::check_new_change_preconditions(
     if (data == nullptr)
     {
         logError(PUBLISHER, "Data pointer not valid");
-        return false;
+        return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 
     if (change_kind == NOT_ALIVE_UNREGISTERED
@@ -431,14 +698,14 @@ bool DataWriterImpl::check_new_change_preconditions(
         if (!type_->m_isGetKeyDefined)
         {
             logError(PUBLISHER, "Topic is NO_KEY, operation not permitted");
-            return false;
+            return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
         }
     }
 
-    return true;
+    return ReturnCode_t::RETCODE_OK;
 }
 
-bool DataWriterImpl::perform_create_new_change(
+ReturnCode_t DataWriterImpl::perform_create_new_change(
         ChangeKind_t change_kind,
         void* data,
         WriteParams& wparams,
@@ -450,77 +717,92 @@ bool DataWriterImpl::perform_create_new_change(
 
 #if HAVE_STRICT_REALTIME
     std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex(), std::defer_lock);
-    if (lock.try_lock_until(max_blocking_time))
+    if (!lock.try_lock_until(max_blocking_time))
+    {
+        return ReturnCode_t::RETCODE_TIMEOUT;
+    }
 #else
     std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex());
 #endif // if HAVE_STRICT_REALTIME
+
+    PayloadInfo_t payload;
+    bool was_loaned = check_and_remove_loan(data, payload);
+    if (!was_loaned)
     {
-        CacheChange_t* ch = writer_->new_change(type_->getSerializedSizeProvider(data), change_kind, handle);
-        if (ch != nullptr)
+        if (!get_free_payload_from_pool(type_->getSerializedSizeProvider(data), payload))
         {
-            if (change_kind == ALIVE)
-            {
-                //If these two checks are correct, we asume the cachechange is valid and thwn we can write to it.
-                if (!type_->serialize(data, &ch->serializedPayload))
-                {
-                    logWarning(RTPS_WRITER, "RTPSWriter:Serialization returns false"; );
-                    writer_->release_change(ch);
-                    return false;
-                }
-            }
+            return ReturnCode_t::RETCODE_OUT_OF_RESOURCES;
+        }
 
-            set_fragment_size_on_change(wparams, ch, high_mark_for_frag_);
-
-            if (!this->history_.add_pub_change(ch, wparams, lock, max_blocking_time))
-            {
-                writer_->release_change(ch);
-                return false;
-            }
-
-            if (qos_.deadline().period != c_TimeInfinite)
-            {
-                if (!history_.set_next_deadline(
-                            handle,
-                            steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
-                {
-                    logError(PUBLISHER, "Could not set the next deadline in the history");
-                }
-                else
-                {
-                    if (timer_owner_ == handle || timer_owner_ == InstanceHandle_t())
-                    {
-                        if (deadline_timer_reschedule())
-                        {
-                            deadline_timer_->cancel_timer();
-                            deadline_timer_->restart_timer();
-                        }
-                    }
-                }
-            }
-
-            if (qos_.lifespan().duration != c_TimeInfinite)
-            {
-                lifespan_duration_us_ = duration<double, std::ratio<1, 1000000>>(
-                    qos_.lifespan().duration.to_ns() * 1e-3);
-                lifespan_timer_->update_interval_millisec(qos_.lifespan().duration.to_ns() * 1e-6);
-                lifespan_timer_->restart_timer();
-            }
-
-            return true;
+        if ((ALIVE == change_kind) && !type_->serialize(data, &payload.payload))
+        {
+            logWarning(RTPS_WRITER, "RTPSWriter:Serialization returns false");
+            return_payload_to_pool(payload);
+            return ReturnCode_t::RETCODE_ERROR;
         }
     }
 
-    return false;
+    CacheChange_t* ch = writer_->new_change(change_kind, handle);
+    if (ch != nullptr)
+    {
+        payload.move_into_change(*ch);
+        set_fragment_size_on_change(wparams, ch, high_mark_for_frag_);
+
+        if (!this->history_.add_pub_change(ch, wparams, lock, max_blocking_time))
+        {
+            if (was_loaned)
+            {
+                payload.move_from_change(*ch);
+                add_loan(data, payload);
+            }
+            writer_->release_change(ch);
+            return ReturnCode_t::RETCODE_TIMEOUT;
+        }
+
+        if (qos_.deadline().period != c_TimeInfinite)
+        {
+            if (!history_.set_next_deadline(
+                        handle,
+                        steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
+            {
+                logError(PUBLISHER, "Could not set the next deadline in the history");
+            }
+            else
+            {
+                if (timer_owner_ == handle || timer_owner_ == InstanceHandle_t())
+                {
+                    if (deadline_timer_reschedule())
+                    {
+                        deadline_timer_->cancel_timer();
+                        deadline_timer_->restart_timer();
+                    }
+                }
+            }
+        }
+
+        if (qos_.lifespan().duration != c_TimeInfinite)
+        {
+            lifespan_duration_us_ = duration<double, std::ratio<1, 1000000>>(
+                qos_.lifespan().duration.to_ns() * 1e-3);
+            lifespan_timer_->update_interval_millisec(qos_.lifespan().duration.to_ns() * 1e-6);
+            lifespan_timer_->restart_timer();
+        }
+
+        return ReturnCode_t::RETCODE_OK;
+    }
+
+    return ReturnCode_t::RETCODE_OUT_OF_RESOURCES;
 }
 
-bool DataWriterImpl::create_new_change_with_params(
+ReturnCode_t DataWriterImpl::create_new_change_with_params(
         ChangeKind_t changeKind,
         void* data,
         WriteParams& wparams)
 {
-    if (!check_new_change_preconditions(changeKind, data))
+    ReturnCode_t ret_code = check_new_change_preconditions(changeKind, data);
+    if (!ret_code)
     {
-        return false;
+        return ret_code;
     }
 
     InstanceHandle_t handle;
@@ -536,15 +818,16 @@ bool DataWriterImpl::create_new_change_with_params(
     return perform_create_new_change(changeKind, data, wparams, handle);
 }
 
-bool DataWriterImpl::create_new_change_with_params(
+ReturnCode_t DataWriterImpl::create_new_change_with_params(
         ChangeKind_t changeKind,
         void* data,
         WriteParams& wparams,
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
 {
-    if (!check_new_change_preconditions(changeKind, data))
+    ReturnCode_t ret_code = check_new_change_preconditions(changeKind, data);
+    if (!ret_code)
     {
-        return false;
+        return ret_code;
     }
 
     return perform_create_new_change(changeKind, data, wparams, handle);
@@ -559,6 +842,18 @@ ReturnCode_t DataWriterImpl::clear_history(
         size_t* removed)
 {
     return (history_.removeAllChange(removed) ? ReturnCode_t::RETCODE_OK : ReturnCode_t::RETCODE_ERROR);
+}
+
+ReturnCode_t DataWriterImpl::get_sending_locators(
+        rtps::LocatorList& locators) const
+{
+    if (nullptr == writer_)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
+    writer_->getRTPSParticipant()->get_sending_locators(locators);
+    return ReturnCode_t::RETCODE_OK;
 }
 
 const GUID_t& DataWriterImpl::guid() const
@@ -1086,6 +1381,25 @@ ReturnCode_t DataWriterImpl::check_qos(
         logError(RTPS_QOS_CHECK, "BY SOURCE TIMESTAMP DestinationOrder not supported");
         return ReturnCode_t::RETCODE_UNSUPPORTED;
     }
+    if (nullptr != PropertyPolicyHelper::find_property(qos.properties(), "fastdds.unique_network_flows"))
+    {
+        logError(RTPS_QOS_CHECK, "Unique network flows not supported on writers");
+        return ReturnCode_t::RETCODE_UNSUPPORTED;
+    }
+    bool is_pull_mode = qos_has_pull_mode_request(qos);
+    if (is_pull_mode)
+    {
+        if (BEST_EFFORT_RELIABILITY_QOS == qos.reliability().kind)
+        {
+            logError(RTPS_QOS_CHECK, "BEST_EFFORT incompatible with pull mode");
+            return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+        }
+        if (c_TimeInfinite == qos.reliable_writer_qos().times.heartbeatPeriod)
+        {
+            logError(RTPS_QOS_CHECK, "Infinite heartbeat period incompatible with pull mode");
+            return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+        }
+    }
     if (qos.reliability().kind == BEST_EFFORT_RELIABILITY_QOS && qos.ownership().kind == EXCLUSIVE_OWNERSHIP_QOS)
     {
         logError(RTPS_QOS_CHECK, "BEST_EFFORT incompatible with EXCLUSIVE ownership");
@@ -1100,6 +1414,13 @@ ReturnCode_t DataWriterImpl::check_qos(
             logError(RTPS_QOS_CHECK, "WRITERQOS: LeaseDuration <= announcement period.");
             return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
         }
+    }
+    if (qos.data_sharing().kind() == DataSharingKind::ON &&
+            (qos.endpoint().history_memory_policy != PREALLOCATED_MEMORY_MODE &&
+            qos.endpoint().history_memory_policy != PREALLOCATED_WITH_REALLOC_MEMORY_MODE))
+    {
+        logError(RTPS_QOS_CHECK, "DATA_SHARING cannot be used with memory policies other than PREALLOCATED.");
+        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
     }
     return ReturnCode_t::RETCODE_OK;
 }
@@ -1148,6 +1469,21 @@ bool DataWriterImpl::can_qos_be_updated(
         updatable = false;
         logWarning(RTPS_QOS_CHECK, "Destination order Kind cannot be changed after the creation of a DataWriter.");
     }
+    if (to.data_sharing().kind() != from.data_sharing().kind())
+    {
+        updatable = false;
+        logWarning(RTPS_QOS_CHECK, "Data sharing configuration cannot be changed after the creation of a DataWriter.");
+    }
+    if (to.data_sharing().shm_directory() != from.data_sharing().shm_directory())
+    {
+        updatable = false;
+        logWarning(RTPS_QOS_CHECK, "Data sharing configuration cannot be changed after the creation of a DataWriter.");
+    }
+    if (to.data_sharing().domain_ids() != from.data_sharing().domain_ids())
+    {
+        updatable = false;
+        logWarning(RTPS_QOS_CHECK, "Data sharing configuration cannot be changed after the creation of a DataWriter.");
+    }
     return updatable;
 }
 
@@ -1189,25 +1525,161 @@ void DataWriterImpl::set_fragment_size_on_change(
 
 std::shared_ptr<IPayloadPool> DataWriterImpl::get_payload_pool()
 {
-    PoolConfig config = PoolConfig::from_history_attributes(history_.m_att);
-
     if (!payload_pool_)
     {
-        payload_pool_ = TopicPayloadPoolRegistry::get(topic_->get_name(), config);
+        // When the user requested PREALLOCATED_WITH_REALLOC, but we know the type cannot
+        // grow, we translate the policy into bare PREALLOCATED
+        if (PREALLOCATED_WITH_REALLOC_MEMORY_MODE == history_.m_att.memoryPolicy &&
+                (type_->is_bounded() || type_->is_plain()))
+        {
+            history_.m_att.memoryPolicy = PREALLOCATED_MEMORY_MODE;
+        }
+
+        PoolConfig config = PoolConfig::from_history_attributes(history_.m_att);
+
+        // Avoid calling the serialization size functors on PREALLOCATED mode
+        fixed_payload_size_ = config.memory_policy == PREALLOCATED_MEMORY_MODE ? config.payload_initial_size : 0u;
+
+        // Get payload pool reference and allocate space for our history
+        if (is_data_sharing_compatible_)
+        {
+            payload_pool_ = DataSharingPayloadPool::get_writer_pool(config);
+        }
+        else
+        {
+            payload_pool_ = TopicPayloadPoolRegistry::get(topic_->get_name(), config);
+            if (!std::static_pointer_cast<ITopicPayloadPool>(payload_pool_)->reserve_history(config, false))
+            {
+                payload_pool_.reset();
+            }
+        }
+
+        // Prepare loans collection for plain types only
+        if (type_->is_plain())
+        {
+            loans_.reset(new LoanCollection(config));
+        }
     }
 
-    payload_pool_->reserve_history(config, false);
     return payload_pool_;
 }
 
-void DataWriterImpl::release_payload_pool()
+bool DataWriterImpl::release_payload_pool()
 {
     assert(payload_pool_);
 
-    PoolConfig config = PoolConfig::from_history_attributes(history_.m_att);
-    payload_pool_->release_history(config, false);
+    loans_.reset();
 
-    TopicPayloadPoolRegistry::release(payload_pool_);
+    bool result = true;
+
+    if (is_data_sharing_compatible_)
+    {
+        // No-op
+    }
+    else
+    {
+        PoolConfig config = PoolConfig::from_history_attributes(history_.m_att);
+        auto topic_pool = std::static_pointer_cast<ITopicPayloadPool>(payload_pool_);
+        result = topic_pool->release_history(config, false);
+    }
+
+    payload_pool_.reset();
+
+    return result;
+}
+
+bool DataWriterImpl::add_loan(
+        void* data,
+        PayloadInfo_t& payload)
+{
+    return loans_ && loans_->add_loan(data, payload);
+}
+
+bool DataWriterImpl::check_and_remove_loan(
+        void* data,
+        PayloadInfo_t& payload)
+{
+    return loans_ && loans_->check_and_remove_loan(data, payload);
+}
+
+ReturnCode_t DataWriterImpl::check_datasharing_compatible(
+        const WriterAttributes& writer_attributes,
+        bool& is_datasharing_compatible) const
+{
+
+#if HAVE_SECURITY
+    bool has_security_enabled = publisher_->rtps_participant()->is_security_enabled_for_writer(writer_attributes);
+#else
+    (void) writer_attributes;
+#endif // HAVE_SECURITY
+
+    bool has_bound_payload_size =
+            (qos_.endpoint().history_memory_policy == eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE ||
+            qos_.endpoint().history_memory_policy == eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE) &&
+            type_.is_bounded();
+
+    bool has_key = type_->m_isGetKeyDefined;
+
+    is_datasharing_compatible = false;
+    switch (qos_.data_sharing().kind())
+    {
+        case DataSharingKind::OFF:
+            return ReturnCode_t::RETCODE_OK;
+            break;
+        case DataSharingKind::ON:
+#if HAVE_SECURITY
+            if (has_security_enabled)
+            {
+                logError(DATA_WRITER, "Data sharing cannot be used with security protection.");
+                return ReturnCode_t::RETCODE_NOT_ALLOWED_BY_SECURITY;
+            }
+#endif // HAVE_SECURITY
+
+            if (!has_bound_payload_size)
+            {
+                logError(DATA_WRITER, "Data sharing cannot be used with " <<
+                        (type_.is_bounded() ? "memory policies other than PREALLOCATED" : "unbounded data types"));
+                return ReturnCode_t::RETCODE_BAD_PARAMETER;
+            }
+
+            if (has_key)
+            {
+                logError(DATA_WRITER, "Data sharing cannot be used with keyed data types");
+                return ReturnCode_t::RETCODE_BAD_PARAMETER;
+            }
+
+            is_datasharing_compatible = true;
+            return ReturnCode_t::RETCODE_OK;
+            break;
+        case DataSharingKind::AUTO:
+#if HAVE_SECURITY
+            if (has_security_enabled)
+            {
+                logInfo(DATA_WRITER, "Data sharing disabled due to security configuration.");
+                return ReturnCode_t::RETCODE_OK;
+            }
+#endif // HAVE_SECURITY
+
+            if (!has_bound_payload_size)
+            {
+                logInfo(DATA_WRITER, "Data sharing disabled because " <<
+                        (type_.is_bounded() ? "memory policy is not PREALLOCATED" : "data type is not bounded"));
+                return ReturnCode_t::RETCODE_OK;
+            }
+
+            if (has_key)
+            {
+                logInfo(DATA_WRITER, "Data sharing disabled because data type is keyed");
+                return ReturnCode_t::RETCODE_OK;
+            }
+
+            is_datasharing_compatible = true;
+            return ReturnCode_t::RETCODE_OK;
+            break;
+        default:
+            logError(DATA_WRITER, "Unknown data sharing kind.");
+            return ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
 }
 
 } // namespace dds

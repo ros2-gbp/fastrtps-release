@@ -55,6 +55,7 @@ class DomainParticipantImpl;
 class Subscriber;
 class DataReaderImpl;
 class TopicDescription;
+class TypeSupport;
 
 /**
  * Class SubscriberImpl, contains the actual implementation of the behaviour of the Subscriber.
@@ -105,7 +106,7 @@ public:
             const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_datareader(
-            DataReader* reader);
+            const DataReader* reader);
 
     DataReader* lookup_datareader(
             const std::string& topic_name) const;
@@ -133,10 +134,6 @@ public:
     bool has_datareaders() const;
 
     ReturnCode_t notify_datareaders() const;
-
-    /* TODO
-       bool delete_contained_entities();
-     */
 
     ReturnCode_t set_default_datareader_qos(
             const DataReaderQos& qos);
@@ -219,6 +216,10 @@ public:
     SubscriberListener* get_listener_for(
             const StatusMask& status);
 
+    ReturnCode_t delete_contained_entities();
+
+    bool can_be_deleted() const;
+
 protected:
 
     //!Participant
@@ -288,6 +289,11 @@ protected:
 
     fastrtps::rtps::InstanceHandle_t handle_;
 
+    virtual DataReaderImpl* create_datareader_impl(
+            const TypeSupport& type,
+            TopicDescription* topic,
+            const DataReaderQos& qos,
+            DataReaderListener* listener);
 };
 
 } /* namespace dds */

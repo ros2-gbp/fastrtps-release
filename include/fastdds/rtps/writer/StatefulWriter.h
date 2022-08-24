@@ -106,8 +106,8 @@ private:
     //!WriterTimes
     WriterTimes m_times;
 
-    //! Vector containing all the active ReaderProxies.
-    ResourceLimitedVector<ReaderProxy*> matched_readers_;
+    //! Vector containing all the remote ReaderProxies.
+    ResourceLimitedVector<ReaderProxy*> matched_remote_readers_;
     //! Vector containing all the inactive, ready for reuse, ReaderProxies.
     ResourceLimitedVector<ReaderProxy*> matched_readers_pool_;
 
@@ -168,7 +168,7 @@ public:
     //!Increment the HB count.
     inline void incrementHBCount()
     {
-        ++m_heartbeatCount;
+        on_heartbeat(++m_heartbeatCount);
     }
 
     /**
@@ -204,7 +204,15 @@ public:
     {
         // we cannot directly pass iterators neither const_iterators to matched_readers_ because then the functor would
         // be able to modify ReaderProxy elements
-        for ( const ReaderProxy* rp : matched_readers_ )
+        for ( const ReaderProxy* rp : matched_local_readers_ )
+        {
+            f(rp);
+        }
+        for ( const ReaderProxy* rp : matched_datasharing_readers_ )
+        {
+            f(rp);
+        }
+        for ( const ReaderProxy* rp : matched_remote_readers_ )
         {
             f(rp);
         }
@@ -222,6 +230,11 @@ public:
      * @return True if removed.
      */
     bool try_remove_change(
+            const std::chrono::steady_clock::time_point& max_blocking_time_point,
+            std::unique_lock<RecursiveTimedMutex>& lock) override;
+
+    bool wait_for_acknowledgement(
+            const SequenceNumber_t& seq,
             const std::chrono::steady_clock::time_point& max_blocking_time_point,
             std::unique_lock<RecursiveTimedMutex>& lock) override;
 
@@ -266,7 +279,9 @@ public:
     inline size_t getMatchedReadersSize() const
     {
         std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
-        return matched_readers_.size();
+        return matched_remote_readers_.size()
+               + matched_local_readers_.size()
+               + matched_datasharing_readers_.size();
     }
 
     /**
@@ -366,6 +381,9 @@ public:
 
 private:
 
+    bool is_acked_by_all(
+            const SequenceNumber_t seq) const;
+
     void update_reader_info(
             bool create_sender_resources);
 
@@ -397,6 +415,9 @@ private:
     void send_all_intraprocess_changes(
             SequenceNumber_t max_sequence);
 
+    void send_all_datasharing_changes(
+            SequenceNumber_t max_sequence);
+
     void send_all_unsent_changes(
             SequenceNumber_t max_sequence,
             bool& activateHeartbeatPeriod);
@@ -411,6 +432,17 @@ private:
     void select_all_readers_with_lowmark_below(
             SequenceNumber_t seq,
             RTPSMessageGroup& group);
+
+    void prepare_datasharing_delivery(
+            CacheChange_t* change);
+
+    void async_delivery(
+            CacheChange_t* change,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time);
+
+    void sync_delivery(
+            CacheChange_t* change,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time);
 
     //! True to disable piggyback heartbeats
     bool disable_heartbeat_piggyback_;
@@ -437,6 +469,11 @@ private:
 
     //! The filter for the reader
     fastdds::rtps::IReaderDataFilter* reader_data_filter_ = nullptr;
+    //! Vector containing all the active ReaderProxies for intraprocess delivery.
+    ResourceLimitedVector<ReaderProxy*> matched_local_readers_;
+    //! Vector containing all the active ReaderProxies for datasharing delivery.
+    ResourceLimitedVector<ReaderProxy*> matched_datasharing_readers_;
+    bool there_are_datasharing_readers_ = false;
 };
 
 } /* namespace rtps */

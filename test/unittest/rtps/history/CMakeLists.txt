@@ -57,7 +57,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         endif()
 
         add_executable(ReaderHistoryTests ${READERHISTORYTESTS_SOURCE})
-        target_compile_definitions(ReaderHistoryTests PRIVATE FASTRTPS_NO_LIB)
+        target_compile_definitions(ReaderHistoryTests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
         target_include_directories(ReaderHistoryTests PRIVATE
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSReader
@@ -70,7 +73,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         add_gtest(ReaderHistoryTests SOURCES ${READERHISTORYTESTS_SOURCE})
 
         add_executable(BasicPoolsTests ${BASICPOOLSTESTS_SOURCE})
-        target_compile_definitions(BasicPoolsTests PRIVATE FASTRTPS_NO_LIB)
+        target_compile_definitions(BasicPoolsTests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
         target_include_directories(BasicPoolsTests PRIVATE
             ${PROJECT_SOURCE_DIR}/src/cpp
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
@@ -80,7 +86,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         add_gtest(BasicPoolsTests SOURCES ${BASICPOOLSTESTS_SOURCE})
 
         add_executable(CacheChangePoolTests ${CACHECHANGEPOOLTESTS_SOURCE})
-        target_compile_definitions(CacheChangePoolTests PRIVATE FASTRTPS_NO_LIB)
+        target_compile_definitions(CacheChangePoolTests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
         target_include_directories(CacheChangePoolTests PRIVATE
             ${PROJECT_SOURCE_DIR}/src/cpp
             ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
@@ -90,7 +99,10 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         add_gtest(CacheChangePoolTests SOURCES ${CACHECHANGEPOOLTESTS_SOURCE})
 
         add_executable(TopicPayloadPoolTests ${TOPICPAYLOADPOOLTESTS_SOURCE})
-        target_compile_definitions(TopicPayloadPoolTests PRIVATE FASTRTPS_NO_LIB)
+        target_compile_definitions(TopicPayloadPoolTests PRIVATE FASTRTPS_NO_LIB
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+            )
         target_include_directories(TopicPayloadPoolTests PRIVATE
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/TopicPayloadPoolProxy
             ${PROJECT_SOURCE_DIR}/src/cpp

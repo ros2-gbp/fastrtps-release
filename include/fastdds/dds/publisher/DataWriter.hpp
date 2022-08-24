@@ -16,34 +16,35 @@
  * @file DataWriter.hpp
  */
 
-#ifndef _FASTRTPS_DATAWRITER_HPP_
-#define _FASTRTPS_DATAWRITER_HPP_
+#ifndef _FASTDDS_DDS_PUBLISHER_DATAWRITER_HPP_
+#define _FASTDDS_DDS_PUBLISHER_DATAWRITER_HPP_
 
-#include <fastdds/rtps/common/Time_t.h>
-#include <fastrtps/qos/DeadlineMissedStatus.h>
-#include <fastdds/dds/core/status/IncompatibleQosStatus.hpp>
-#include <fastdds/dds/core/status/BaseStatus.hpp>
-#include <fastrtps/types/TypesBase.h>
+#include <fastdds/dds/builtin/topic/SubscriptionBuiltinTopicData.hpp>
 #include <fastdds/dds/core/Entity.hpp>
+#include <fastdds/dds/core/status/BaseStatus.hpp>
+#include <fastdds/dds/core/status/IncompatibleQosStatus.hpp>
+#include <fastdds/dds/core/status/PublicationMatchedStatus.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+
+#include <fastdds/rtps/common/LocatorList.hpp>
+#include <fastdds/rtps/common/Time_t.h>
+
+#include <fastrtps/fastrtps_dll.h>
+
+#include <fastrtps/qos/DeadlineMissedStatus.h>
+#include <fastrtps/types/TypesBase.h>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
 namespace eprosima {
 namespace fastrtps {
-
-class TopicAttributes;
-
 namespace rtps {
 
 class WriteParams;
-class WriterAttributes;
-struct InstanceHandle_t;
 struct GUID_t;
 
 } // namespace rtps
-
 } // namespace fastrtps
 
 namespace fastdds {
@@ -88,6 +89,37 @@ protected:
 
 public:
 
+    /**
+     * How to initialize samples loaned with @ref loan_sample
+     */
+    enum class LoanInitializationKind
+    {
+        /**
+         * @brief Do not perform initialization of sample.
+         *
+         * This is the default initialization scheme of loaned samples.
+         * It is the fastest scheme, but implies the user should take care of writing
+         * every field on the data type before calling @ref write on the loaned sample.
+         */
+        NO_LOAN_INITIALIZATION,
+
+        /**
+         * @brief Initialize all memory with zero-valued bytes.
+         *
+         * The contents of the loaned sample will be zero-initialized upon return of
+         * @ref loan_sample.
+         */
+        ZERO_LOAN_INITIALIZATION,
+
+        /**
+         * @brief Use in-place constructor initialization.
+         *
+         * This will call the constructor of the data type over the memory space being
+         * returned by @ref loan_sample.
+         */
+        CONSTRUCTED_LOAN_INITIALIZATION
+    };
+
     RTPS_DllAPI virtual ~DataWriter();
 
     /**
@@ -128,7 +160,28 @@ public:
      */
     RTPS_DllAPI ReturnCode_t write(
             void* data,
-            const fastrtps::rtps::InstanceHandle_t& handle);
+            const InstanceHandle_t& handle);
+
+    /** NOT YET IMPLEMENTED
+     * @brief This operation performs the same function as write except that it also provides the value for the
+     * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp" that is made available to DataReader
+     * objects by means of the @ref eprosima::fastdds::dds::SampleInfo::source_timestamp attribute "source_timestamp"
+     * inside the SampleInfo.
+     * The constraints on the values of the @c handle parameter and the corresponding error behavior are the same
+     * specified for the @ref write operation. This operation may block and return RETCODE_TIMEOUT under the same
+     * circumstances described for the @ref write operation.
+     * This operation may return RETCODE_OUT_OF_RESOURCES, RETCODE_PRECONDITION_NOT_MET or RETCODE_BAD_PARAMETER under
+     * the same circumstances described for the write operation.
+     *
+     * @param data Pointer to the data
+     * @param handle InstanceHandle_t
+     * @param timestamp Time_t used to set the source_timestamp.
+     * @return Any of the standard return codes.
+     */
+    RTPS_DllAPI ReturnCode_t write_w_timestamp(
+            void* data,
+            const InstanceHandle_t& handle,
+            const fastrtps::rtps::Time_t& timestamp);
 
     /*!
      * @brief Informs that the application will be modifying a particular instance.
@@ -138,8 +191,30 @@ public:
      * This handle could be used in successive `write` or `dispose` operations.
      * In case of error, HANDLE_NIL will be returned.
      */
-    RTPS_DllAPI fastrtps::rtps::InstanceHandle_t register_instance(
+    RTPS_DllAPI InstanceHandle_t register_instance(
             void* instance);
+
+    /** NOT YET IMPLEMENTED
+     * @brief This operation performs the same function as register_instance and can be used instead of
+     * @ref register_instance in the cases where the application desires to specify the value for the
+     * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp".
+     * The @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp" potentially affects the relative
+     * order in which readers observe events from multiple writers. See the QoS policy
+     * @ref eprosima::fastdds::dds::DataWriterQos::destination_order "DESTINATION_ORDER".
+     *
+     * This operation may block and return RETCODE_TIMEOUT under the same circumstances described for the @ref write
+     * operation.
+     *
+     * This operation may return RETCODE_OUT_OF_RESOURCES under the same circumstances described for the
+     * @ref write operation.
+     *
+     * @param instance  Sample used to get the instance's key.
+     * @param timestamp Time_t used to set the source_timestamp.
+     * @return Handle containing the instance's key.
+     */
+    RTPS_DllAPI InstanceHandle_t register_instance_w_timestamp(
+            void* instance,
+            const fastrtps::rtps::Time_t& timestamp);
 
     /*!
      * @brief This operation reverses the action of `register_instance`.
@@ -153,13 +228,61 @@ public:
      */
     RTPS_DllAPI ReturnCode_t unregister_instance(
             void* instance,
-            const fastrtps::rtps::InstanceHandle_t& handle);
+            const InstanceHandle_t& handle);
 
-    /**
-     * Returns the DataWriter's GUID
-     * @return Reference to the DataWriter GUID
+    /** NOT YET IMPLEMENTED
+     * @brief This operation performs the same function as @ref unregister_instance and can be used instead of
+     * @ref unregister_instance in the cases where the application desires to specify the value for the
+     * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp".
+     * The @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp" potentially affects the relative
+     * order in which readers observe events from multiple writers. See the QoS policy
+     * @ref eprosima::fastdds::dds::DataWriterQos::destination_order "DESTINATION_ORDER".
+     *
+     * The constraints on the values of the @c handle parameter and the corresponding error behavior are the same
+     * specified for the @ref unregister_instance operation.
+     *
+     * This operation may block and return RETCODE_TIMEOUT under the same circumstances described for the write
+     * operation
+     *
+     * @param instance  Sample used to deduce instance's key in case of `handle` parameter is HANDLE_NIL.
+     * @param handle Instance's key to be unregistered.
+     * @param timestamp Time_t used to set the source_timestamp.
+     * @return Handle containing the instance's key.
      */
-    RTPS_DllAPI const fastrtps::rtps::GUID_t& guid();
+    RTPS_DllAPI ReturnCode_t unregister_instance_w_timestamp(
+            void* instance,
+            const InstanceHandle_t& handle,
+            const fastrtps::rtps::Time_t& timestamp);
+
+    /** NOT YET IMPLEMENTED
+     * This operation can be used to retrieve the instance key that corresponds to an
+     * @ref eprosima::fastdds::dds::Entity::instance_handle_ "instance_handle".
+     * The operation will only fill the fields that form the key inside the key_holder instance.
+     *
+     * This operation may return BAD_PARAMETER if the InstanceHandle_t handle does not correspond to an existing
+     * data-object known to the DataWriter. If the implementation is not able to check invalid handles then the result
+     * in this situation is unspecified.
+     *
+     * @param[in,out] key_holder
+     * @param[in] handle
+     *
+     * @return Any of the standard return codes.
+     */
+    RTPS_DllAPI ReturnCode_t get_key_value(
+            void* key_holder,
+            const InstanceHandle_t& handle);
+
+    /** NOT YET IMPLEMENTED
+     * Takes as a parameter an instance and returns a handle that can be used in subsequent operations that accept an
+     * instance handle as an argument. The instance parameter is only used for the purpose of examining the fields that
+     * define the key.
+     *
+     * @param[in] instance Data pointer to the sample
+     *
+     * @return handle of the given instance
+     */
+    RTPS_DllAPI InstanceHandle_t lookup_instance(
+            const void* instance) const;
 
     /**
      * Returns the DataWriter's GUID
@@ -171,7 +294,7 @@ public:
      * Returns the DataWriter's InstanceHandle
      * @return Copy of the DataWriter InstanceHandle
      */
-    RTPS_DllAPI fastrtps::rtps::InstanceHandle_t get_instance_handle() const;
+    RTPS_DllAPI InstanceHandle_t get_instance_handle() const;
 
     /**
      * Get data type associated to the DataWriter
@@ -193,7 +316,7 @@ public:
      * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t get_offered_deadline_missed_status(
-            fastrtps::OfferedDeadlineMissedStatus& status);
+            OfferedDeadlineMissedStatus& status);
 
     /**
      * @brief Returns the offered incompatible qos status
@@ -202,6 +325,14 @@ public:
      */
     RTPS_DllAPI ReturnCode_t get_offered_incompatible_qos_status(
             OfferedIncompatibleQosStatus& status);
+
+    /**
+     * @brief Returns the publication matched status
+     * @param[out] status publication matched status struct
+     * @return RETCODE_OK
+     */
+    RTPS_DllAPI ReturnCode_t get_publication_matched_status(
+            PublicationMatchedStatus& status) const;
 
     /**
      * Establishes the DataWriterQos for this DataWriter.
@@ -259,7 +390,7 @@ public:
     /* TODO
        bool get_key_value(
             void* key_holder,
-            const fastrtps::rtps::InstanceHandle_t& handle);
+            const InstanceHandle_t& handle);
      */
 
     /**
@@ -278,8 +409,30 @@ public:
      */
     RTPS_DllAPI ReturnCode_t dispose(
             void* data,
-            const fastrtps::rtps::InstanceHandle_t& handle);
+            const InstanceHandle_t& handle);
 
+    /**
+     * @brief This operation performs the same functions as @ref dispose except that the application provides the value
+     * for the @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp" that is made available to
+     * DataReader objects by means of the @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp"
+     * attribute inside the SampleInfo.
+     *
+     * The constraints on the values of the @c handle parameter and the corresponding error behavior are the same
+     * specified for the @ref dispose operation.
+     *
+     * This operation may return RETCODE_PRECONDITION_NOT_MET and RETCODE_BAD_PARAMETER under the same circumstances
+     * described for the @ref dispose operation.
+     *
+     * This operation may return RETCODE_TIMEOUT and RETCODE_OUT_OF_RESOURCES under the same circumstances described
+     * for the @ref write operation.
+     *
+     * @param data Pointer to the data.
+     * @param handle InstanceHandle_t
+     * @return RTPS_DllAPI
+     */
+    RTPS_DllAPI ReturnCode_t dispose_w_timestamp(
+            void* data,
+            const InstanceHandle_t& handle);
     /**
      * @brief Returns the liveliness lost status
      * @param status Liveliness lost status struct
@@ -287,16 +440,6 @@ public:
      */
     RTPS_DllAPI ReturnCode_t get_liveliness_lost_status(
             LivelinessLostStatus& status);
-
-    /* TODO
-       bool get_offered_incompatible_qos_status(
-            OfferedIncompatibleQosStatus& status)
-       {
-        // Not implemented
-        (void)status;
-        return false;
-       }
-     */
 
     /**
      * @brief Getter for the Publisher that creates this DataWriter
@@ -317,12 +460,86 @@ public:
     RTPS_DllAPI ReturnCode_t assert_liveliness();
 
     /**
+     * @brief Retrieves in a subscription associated with the DataWriter
+     * @param[out] subscription_data subscription data struct
+     * @param subscription_handle InstanceHandle_t of the subscription
+     * @return RETCODE_OK
+     *
+     */
+    RTPS_DllAPI ReturnCode_t get_matched_subscription_data(
+            builtin::SubscriptionBuiltinTopicData& subscription_data,
+            const fastrtps::rtps::InstanceHandle_t& subscription_handle) const;
+
+    /**
+     * @brief Fills the given vector with the InstanceHandle_t of matched DataReaders
+     * @param[out] subscription_handles Vector where the InstanceHandle_t are returned
+     * @return RETCODE_OK
+     */
+    RTPS_DllAPI ReturnCode_t get_matched_subscriptions(
+            std::vector<fastrtps::rtps::InstanceHandle_t*>& subscription_handles) const;
+
+    /**
      * @brief Clears the DataWriter history
      * @param removed size_t pointer to return the size of the data removed
      * @return RETCODE_OK if the samples are removed and RETCODE_ERROR otherwise
      */
     RTPS_DllAPI ReturnCode_t clear_history(
             size_t* removed);
+
+    /**
+     * @brief Get a pointer to the internal pool where the user could directly write.
+     *
+     * This method can only be used on a DataWriter for a plain data type. It will provide the
+     * user with a pointer to an internal buffer where the data type can be prepared for sending.
+     *
+     * When using NO_LOAN_INITIALIZATION on the initialization parameter, which is the default,
+     * no assumptions should be made on the contents where the pointer points to, as it may be an
+     * old pointer being reused. See @ref LoanInitializationKind for more details.
+     *
+     * Once the sample has been prepared, it can then be published by calling @ref write.
+     * After a successful call to @ref write, the middleware takes ownership of the loaned pointer again,
+     * and the user should not access that memory again.
+     *
+     * If, for whatever reason, the sample is not published, the loan can be returned by calling
+     * @ref discard_loan.
+     *
+     * @param [out] sample          Pointer to the sample on the internal pool.
+     * @param [in]  initialization  How to initialize the loaned sample.
+     *
+     * @return ReturnCode_t::RETCODE_ILLEGAL_OPERATION when the data type does not support loans.
+     * @return ReturnCode_t::RETCODE_NOT_ENABLED if the writer has not been enabled.
+     * @return ReturnCode_t::RETCODE_OUT_OF_RESOURCES if the pool has been exhausted.
+     * @return ReturnCode_t::RETCODE_OK if a pointer to a sample is successfully obtained.
+     */
+    RTPS_DllAPI ReturnCode_t loan_sample(
+            void*& sample,
+            LoanInitializationKind initialization = LoanInitializationKind::NO_LOAN_INITIALIZATION);
+
+    /**
+     * @brief Discards a loaned sample pointer.
+     *
+     * See the description on @ref loan_sample for how and when to call this method.
+     *
+     * @param [in,out] sample  Pointer to the previously loaned sample.
+     *
+     * @return ReturnCode_t::RETCODE_ILLEGAL_OPERATION when the data type does not support loans.
+     * @return ReturnCode_t::RETCODE_NOT_ENABLED if the writer has not been enabled.
+     * @return ReturnCode_t::RETCODE_BAD_PARAMETER if the pointer does not correspond to a loaned sample.
+     * @return ReturnCode_t::RETCODE_OK if the loan is successfully discarded.
+     */
+    RTPS_DllAPI ReturnCode_t discard_loan(
+            void*& sample);
+
+    /**
+     * @brief Get the list of locators from which this DataWriter may send data.
+     *
+     * @param [out] locators  LocatorList where the list of locators will be stored.
+     *
+     * @return NOT_ENABLED if the reader has not been enabled.
+     * @return OK if a list of locators is returned.
+     */
+    RTPS_DllAPI ReturnCode_t get_sending_locators(
+            rtps::LocatorList& locators) const;
 
 protected:
 
@@ -333,4 +550,4 @@ protected:
 } /* namespace fastdds */
 } /* namespace eprosima */
 
-#endif //_FASTRTPS_DATAWRITER_HPP_
+#endif // _FASTDDS_DDS_PUBLISHER_DATAWRITER_HPP_

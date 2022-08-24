@@ -75,7 +75,6 @@ using fastrtps::rtps::ReaderDiscoveryInfo;
 using fastrtps::rtps::ReaderProxyData;
 using fastrtps::rtps::WriterDiscoveryInfo;
 using fastrtps::rtps::WriterProxyData;
-using fastrtps::rtps::InstanceHandle_t;
 using fastrtps::rtps::GUID_t;
 using fastrtps::rtps::EndpointKind_t;
 using fastrtps::rtps::ResourceEvent;
@@ -172,7 +171,8 @@ void DomainParticipantImpl::disable()
     }
     rtps_listener_.participant_ = nullptr;
 
-    // We only need to disable lower entities if we have been previously enabled
+    // The function to disable the DomainParticipantImpl is called from
+    // DomainParticipantFactory::delete_participant() and DomainParticipantFactory destructor.
     if (rtps_participant_ != nullptr)
     {
         rtps_participant_->set_listener(nullptr);
@@ -359,17 +359,19 @@ const DomainParticipantQos& DomainParticipantImpl::get_qos() const
 }
 
 ReturnCode_t DomainParticipantImpl::delete_publisher(
-        Publisher* pub)
+        const Publisher* pub)
 {
     if (participant_ != pub->get_participant())
     {
         return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
     std::lock_guard<std::mutex> lock(mtx_pubs_);
-    auto pit = publishers_.find(pub);
+    auto pit = publishers_.find(const_cast<Publisher*>(pub));
 
-    if (pit != publishers_.end() && pub->get_instance_handle() == pit->second->get_instance_handle())
+    if (pit != publishers_.end())
     {
+        assert(pub->get_instance_handle() == pit->second->get_instance_handle()
+                && "The publisher instance handle does not match the publisher implementation instance handle");
         if (pub->has_datawriters())
         {
             return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
@@ -385,17 +387,19 @@ ReturnCode_t DomainParticipantImpl::delete_publisher(
 }
 
 ReturnCode_t DomainParticipantImpl::delete_subscriber(
-        Subscriber* sub)
+        const Subscriber* sub)
 {
     if (participant_ != sub->get_participant())
     {
         return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
     std::lock_guard<std::mutex> lock(mtx_subs_);
-    auto sit = subscribers_.find(sub);
+    auto sit = subscribers_.find(const_cast<Subscriber*>(sub));
 
-    if (sit != subscribers_.end() && sub->get_instance_handle() == sit->second->get_instance_handle())
+    if (sit != subscribers_.end())
     {
+        assert(sub->get_instance_handle() == sit->second->get_instance_handle()
+                && "The subscriber instance handle does not match the subscriber implementation instance handle");
         if (sub->has_datareaders())
         {
             return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
@@ -411,7 +415,7 @@ ReturnCode_t DomainParticipantImpl::delete_subscriber(
 }
 
 ReturnCode_t DomainParticipantImpl::delete_topic(
-        Topic* topic)
+        const Topic* topic)
 {
     if (topic == nullptr)
     {
@@ -426,8 +430,10 @@ ReturnCode_t DomainParticipantImpl::delete_topic(
     std::lock_guard<std::mutex> lock(mtx_topics_);
     auto it = topics_.find(topic->get_name());
 
-    if (it != topics_.end() && topic->get_instance_handle() == it->second->get_topic()->get_instance_handle())
+    if (it != topics_.end())
     {
+        assert(topic->get_instance_handle() == it->second->get_topic()->get_instance_handle()
+                && "The topic instance handle does not match the topic implementation instance handle");
         if (it->second->is_referenced())
         {
             return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
@@ -459,12 +465,14 @@ Publisher* DomainParticipantImpl::create_publisher(
 {
     if (!PublisherImpl::check_qos(qos))
     {
-        logError(PARTICIPANT, "PublisherQos inconsistent or not supported");
-        return nullptr;
+        // The PublisherImpl::check_qos() function is not yet implemented and always returns ReturnCode_t::RETCODE_OK.
+        // It will be implemented in future releases of Fast DDS.
+        // logError(PARTICIPANT, "PublisherQos inconsistent or not supported");
+        // return nullptr;
     }
 
     //TODO CONSTRUIR LA IMPLEMENTACION DENTRO DEL OBJETO DEL USUARIO.
-    PublisherImpl* pubimpl = new PublisherImpl(this, qos, listener);
+    PublisherImpl* pubimpl = create_publisher_impl(qos, listener);
     Publisher* pub = new Publisher(pubimpl, mask);
     pubimpl->user_publisher_ = pub;
     pubimpl->rtps_participant_ = rtps_participant_;
@@ -484,11 +492,9 @@ Publisher* DomainParticipantImpl::create_publisher(
     // Enable publisher if appropriate
     if (enabled && qos_.entity_factory().autoenable_created_entities)
     {
-        if (ReturnCode_t::RETCODE_OK != pub->enable())
-        {
-            delete_publisher(pub);
-            return nullptr;
-        }
+        ReturnCode_t ret_publisher_enable = pub->enable();
+        assert(ReturnCode_t::RETCODE_OK == ret_publisher_enable);
+        (void)ret_publisher_enable;
     }
 
     return pub;
@@ -511,6 +517,13 @@ Publisher* DomainParticipantImpl::create_publisher_with_profile(
     return nullptr;
 }
 
+PublisherImpl* DomainParticipantImpl::create_publisher_impl(
+        const PublisherQos& qos,
+        PublisherListener* listener)
+{
+    return new PublisherImpl(this, qos, listener);
+}
+
 /* TODO
    Subscriber* DomainParticipantImpl::get_builtin_subscriber()
    {
@@ -521,7 +534,7 @@ Publisher* DomainParticipantImpl::create_publisher_with_profile(
 
 /* TODO
    bool DomainParticipantImpl::ignore_participant(
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
    {
     (void)handle;
     logError(PARTICIPANT, "Not implemented.");
@@ -531,7 +544,7 @@ Publisher* DomainParticipantImpl::create_publisher_with_profile(
 
 /* TODO
    bool DomainParticipantImpl::ignore_topic(
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
    {
     (void)handle;
     logError(PARTICIPANT, "Not implemented.");
@@ -541,7 +554,7 @@ Publisher* DomainParticipantImpl::create_publisher_with_profile(
 
 /* TODO
    bool DomainParticipantImpl::ignore_publication(
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
    {
     (void)handle;
     logError(PARTICIPANT, "Not implemented.");
@@ -551,7 +564,7 @@ Publisher* DomainParticipantImpl::create_publisher_with_profile(
 
 /* TODO
    bool DomainParticipantImpl::ignore_subscription(
-        const fastrtps::rtps::InstanceHandle_t& handle)
+        const InstanceHandle_t& handle)
    {
     (void)handle;
     logError(PARTICIPANT, "Not implemented.");
@@ -564,13 +577,86 @@ DomainId_t DomainParticipantImpl::get_domain_id() const
     return domain_id_;
 }
 
-/* TODO
-   bool DomainParticipantImpl::delete_contained_entities()
-   {
-    logError(PARTICIPANT, "Not implemented.");
-    return false;
-   }
- */
+ReturnCode_t DomainParticipantImpl::delete_contained_entities()
+{
+    bool can_be_deleted = true;
+
+    std::lock_guard<std::mutex> lock_subscribers(mtx_subs_);
+
+    for (auto subscriber : subscribers_)
+    {
+        can_be_deleted = subscriber.second->can_be_deleted();
+        if (!can_be_deleted)
+        {
+            return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+        }
+    }
+
+    std::lock_guard<std::mutex> lock_publishers(mtx_pubs_);
+
+
+
+    for (auto publisher : publishers_)
+    {
+        can_be_deleted = publisher.second->can_be_deleted();
+        if (!can_be_deleted)
+        {
+            return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+        }
+    }
+
+    ReturnCode_t ret_code = ReturnCode_t::RETCODE_OK;
+
+    for (auto& subscriber : subscribers_)
+    {
+        ret_code = subscriber.first->delete_contained_entities();
+        if (!ret_code)
+        {
+            return ReturnCode_t::RETCODE_ERROR;
+        }
+    }
+
+    auto it_subs = subscribers_.begin();
+    while (it_subs != subscribers_.end())
+    {
+        it_subs->second->set_listener(nullptr);
+        subscribers_by_handle_.erase(it_subs->second->get_subscriber()->get_instance_handle());
+        delete it_subs->second;
+        it_subs = subscribers_.erase(it_subs);
+    }
+
+    for (auto& publisher : publishers_)
+    {
+        ret_code = publisher.first->delete_contained_entities();
+        if (!ret_code)
+        {
+            return ReturnCode_t::RETCODE_ERROR;
+        }
+    }
+
+    auto it_pubs = publishers_.begin();
+    while (it_pubs != publishers_.end())
+    {
+        it_pubs->second->set_listener(nullptr);
+        publishers_by_handle_.erase(it_pubs->second->get_publisher()->get_instance_handle());
+        delete it_pubs->second;
+        it_pubs = publishers_.erase(it_pubs);
+    }
+
+    std::lock_guard<std::mutex> lock_topics(mtx_topics_);
+
+    auto it_topics = topics_.begin();
+
+    while (it_topics != topics_.end())
+    {
+        it_topics->second->set_listener(nullptr);
+        topics_by_handle_.erase(it_topics->second->get_topic()->get_instance_handle());
+        delete it_topics->second;
+        it_topics = topics_.erase(it_topics);
+    }
+
+    return ReturnCode_t::RETCODE_OK;
+}
 
 ReturnCode_t DomainParticipantImpl::assert_liveliness()
 {
@@ -605,7 +691,9 @@ ReturnCode_t DomainParticipantImpl::set_default_publisher_qos(
     ReturnCode_t ret_val = PublisherImpl::check_qos(qos);
     if (!ret_val)
     {
-        return ret_val;
+        // The PublisherImpl::check_qos() function is not yet implemented and always returns ReturnCode_t::RETCODE_OK.
+        // It will be implemented in future releases of Fast DDS.
+        // return ret_val;
     }
     PublisherImpl::set_qos(default_pub_qos_, qos, true);
     return ReturnCode_t::RETCODE_OK;
@@ -651,7 +739,9 @@ ReturnCode_t DomainParticipantImpl::set_default_subscriber_qos(
     ReturnCode_t check_result = SubscriberImpl::check_qos(qos);
     if (!check_result)
     {
-        return check_result;
+        // The SubscriberImpl::check_qos() function is not yet implemented and always returns ReturnCode_t::RETCODE_OK.
+        // It will be implemented in future releases of Fast DDS.
+        // return check_result;
     }
     SubscriberImpl::set_qos(default_sub_qos_, qos, true);
     return ReturnCode_t::RETCODE_OK;
@@ -736,7 +826,7 @@ const ReturnCode_t DomainParticipantImpl::get_topic_qos_from_profile(
 
 /* TODO
    bool DomainParticipantImpl::get_discovered_participants(
-        std::vector<fastrtps::rtps::InstanceHandle_t>& participant_handles) const
+        std::vector<InstanceHandle_t>& participant_handles) const
    {
     (void)participant_handles;
     logError(PARTICIPANT, "Not implemented.");
@@ -746,7 +836,7 @@ const ReturnCode_t DomainParticipantImpl::get_topic_qos_from_profile(
 
 /* TODO
    bool DomainParticipantImpl::get_discovered_topics(
-        std::vector<fastrtps::rtps::InstanceHandle_t>& topic_handles) const
+        std::vector<InstanceHandle_t>& topic_handles) const
    {
     (void)topic_handles;
     logError(PARTICIPANT, "Not implemented.");
@@ -755,7 +845,7 @@ const ReturnCode_t DomainParticipantImpl::get_topic_qos_from_profile(
  */
 
 bool DomainParticipantImpl::contains_entity(
-        const fastrtps::rtps::InstanceHandle_t& handle,
+        const InstanceHandle_t& handle,
         bool recursive) const
 {
     // Look for publishers
@@ -800,8 +890,8 @@ bool DomainParticipantImpl::contains_entity(
         }
 
         // Look into subscribers
-        std::vector<DataReader*> readers;
         {
+            std::lock_guard<std::mutex> lock(mtx_subs_);
             for (auto sit : subscribers_)
             {
                 if (sit.second->contains_entity(handle))
@@ -855,12 +945,14 @@ Subscriber* DomainParticipantImpl::create_subscriber(
 {
     if (!SubscriberImpl::check_qos(qos))
     {
-        logError(PARTICIPANT, "SubscriberQos inconsistent or not supported");
-        return nullptr;
+        // The SubscriberImpl::check_qos() function is not yet implemented and always returns ReturnCode_t::RETCODE_OK.
+        // It will be implemented in future releases of Fast DDS.
+        // logError(PARTICIPANT, "SubscriberQos inconsistent or not supported");
+        // return nullptr;
     }
 
     //TODO CONSTRUIR LA IMPLEMENTACION DENTRO DEL OBJETO DEL USUARIO.
-    SubscriberImpl* subimpl = new SubscriberImpl(this, qos, listener);
+    SubscriberImpl* subimpl = create_subscriber_impl(qos, listener);
     Subscriber* sub = new Subscriber(subimpl, mask);
     subimpl->user_subscriber_ = sub;
     subimpl->rtps_participant_ = this->rtps_participant_;
@@ -881,11 +973,9 @@ Subscriber* DomainParticipantImpl::create_subscriber(
     // Enable subscriber if appropriate
     if (enabled && qos_.entity_factory().autoenable_created_entities)
     {
-        if (ReturnCode_t::RETCODE_OK != sub->enable())
-        {
-            delete_subscriber(sub);
-            return nullptr;
-        }
+        ReturnCode_t ret_subscriber_enable = sub->enable();
+        assert(ReturnCode_t::RETCODE_OK == ret_subscriber_enable);
+        (void)ret_subscriber_enable;
     }
 
     return sub;
@@ -906,6 +996,13 @@ Subscriber* DomainParticipantImpl::create_subscriber_with_profile(
     }
 
     return nullptr;
+}
+
+SubscriberImpl* DomainParticipantImpl::create_subscriber_impl(
+        const SubscriberQos& qos,
+        SubscriberListener* listener)
+{
+    return new SubscriberImpl(this, qos, listener);
 }
 
 Topic* DomainParticipantImpl::create_topic(
@@ -956,11 +1053,9 @@ Topic* DomainParticipantImpl::create_topic(
     // Enable topic if appropriate
     if (enabled && qos_.entity_factory().autoenable_created_entities)
     {
-        if (ReturnCode_t::RETCODE_OK != topic->enable())
-        {
-            delete_topic(topic);
-            return nullptr;
-        }
+        ReturnCode_t ret_topic_enable = topic->enable();
+        assert(ReturnCode_t::RETCODE_OK == ret_topic_enable);
+        (void)ret_topic_enable;
     }
 
     return topic;
@@ -1262,16 +1357,6 @@ ResourceEvent& DomainParticipantImpl::get_resource_event() const
     return rtps_participant_->get_resource_event();
 }
 
-bool DomainParticipantImpl::exists_entity_id(
-        const fastrtps::rtps::EntityId_t& entity_id) const
-{
-    GUID_t g = guid();
-    g.entityId = entity_id;
-    InstanceHandle_t instance(g);
-
-    return contains_entity(instance, false);
-}
-
 fastrtps::rtps::SampleIdentity DomainParticipantImpl::get_type_dependencies(
         const fastrtps::types::TypeIdentifierSeq& in) const
 {
@@ -1302,7 +1387,7 @@ ReturnCode_t DomainParticipantImpl::register_remote_type(
     {
         DynamicType_ptr dyn = factory->build_dynamic_type(
             type_name,
-            &type_information.complete().typeid_with_size().type_id());
+            &type_information.minimal().typeid_with_size().type_id());
 
         if (nullptr != dyn)
         {
@@ -1801,7 +1886,7 @@ bool DomainParticipantImpl::can_qos_be_updated(
 }
 
 void DomainParticipantImpl::create_instance_handle(
-        fastrtps::rtps::InstanceHandle_t& handle)
+        InstanceHandle_t& handle)
 {
     using eprosima::fastrtps::rtps::octet;
 

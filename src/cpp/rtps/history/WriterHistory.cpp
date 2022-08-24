@@ -94,6 +94,7 @@ bool WriterHistory::add_change_(
     ++m_lastCacheChangeSeqNum;
     a_change->sequenceNumber = m_lastCacheChangeSeqNum;
     Time_t::now(a_change->sourceTimestamp);
+    a_change->num_sent_submessages = 0;
 
     a_change->write_params = wparams;
     // Updated sample and related sample identities on the user's write params
@@ -123,7 +124,7 @@ bool WriterHistory::matches_change(
     if (nullptr == outer_change
             || nullptr == inner_change)
     {
-        logError(RTPS_WRITER_HISTORY, "Pointer is not valid")
+        logError(RTPS_WRITER_HISTORY, "Pointer is not valid");
         return false;
     }
 

@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
-check_gtest()
-
 if(GTest_FOUND)
     add_library(mutex_testing_tool SHARED TMutex.cpp)
 

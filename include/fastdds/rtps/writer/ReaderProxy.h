@@ -48,6 +48,7 @@ namespace rtps {
 class StatefulWriter;
 class TimedEvent;
 class RTPSReader;
+class IDataSharingNotifier;
 class RTPSGapBuilder;
 
 /**
@@ -74,9 +75,11 @@ public:
     /**
      * Activate this proxy associating it to a remote reader.
      * @param reader_attributes ReaderProxyData of the reader for which to keep state.
+     * @param is_datasharing whether the reader is datasharing compatible with the writer or not.
      */
     void start(
-            const ReaderProxyData& reader_attributes);
+            const ReaderProxyData& reader_attributes,
+            bool is_datasharing = false);
 
     /**
      * Update information about the remote reader.
@@ -236,9 +239,9 @@ public:
 
     /**
      * Turns all REQUESTED changes into UNSENT.
-     * @return true if at least one change changed its status, false otherwise.
+     * @return the number of changes that changed its status.
      */
-    bool perform_acknack_response();
+    uint32_t perform_acknack_response();
 
     /**
      * Call this to inform a change was removed from history.
@@ -300,7 +303,7 @@ public:
      */
     inline bool is_remote_and_reliable() const
     {
-        return !locator_info_.is_local_reader() && is_reliable_;
+        return !locator_info_.is_local_reader() && !locator_info_.is_datasharing_reader() && is_reliable_;
     }
 
     /**
@@ -408,6 +411,31 @@ public:
         return locator_info_;
     }
 
+    bool is_datasharing_reader() const
+    {
+        return locator_info_.is_datasharing_reader();
+    }
+
+    IDataSharingNotifier* datasharing_notifier()
+    {
+        return locator_info_.datasharing_notifier();
+    }
+
+    const IDataSharingNotifier* datasharing_notifier() const
+    {
+        return locator_info_.datasharing_notifier();
+    }
+
+    void datasharing_notify()
+    {
+        locator_info_.datasharing_notify();
+    }
+
+    size_t locators_size() const
+    {
+        return locator_info_.locators_size();
+    }
+
 private:
 
     //!Is this proxy active? I.e. does it have a remote reader associated?
@@ -447,9 +475,9 @@ private:
      * Converts all changes with a given status to a different status.
      * @param previous Status to change.
      * @param next Status to adopt.
-     * @return true when at least one change has been modified, false otherwise.
+     * @return the number of changes that have been modified.
      */
-    bool convert_status_on_all_changes(
+    uint32_t convert_status_on_all_changes(
             ChangeForReaderStatus_t previous,
             ChangeForReaderStatus_t next);
 

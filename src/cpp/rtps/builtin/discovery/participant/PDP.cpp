@@ -64,19 +64,6 @@
 #include <chrono>
 
 namespace eprosima {
-namespace fastdds {
-namespace rtps {
-
-// Values for participant type parameter property
-const char ParticipantType::SIMPLE[] = "SIMPLE";
-const char ParticipantType::SERVER[] = "SERVER";
-const char ParticipantType::CLIENT[] = "CLIENT";
-const char ParticipantType::BACKUP[] = "BACKUP";
-const char ParticipantType::SUPER_CLIENT[] = "SUPER_CLIENT";
-
-} // namespace rtps
-} // namespace fastdds
-
 namespace fastrtps {
 namespace rtps {
 
@@ -153,7 +140,6 @@ PDP::~PDP()
         if (writer_payload_pool_)
         {
             writer_payload_pool_->release_history(cfg, false);
-            TopicPayloadPoolRegistry::release(writer_payload_pool_);
         }
     }
 
@@ -164,7 +150,6 @@ PDP::~PDP()
         if (reader_payload_pool_)
         {
             reader_payload_pool_->release_history(cfg, true);
-            TopicPayloadPoolRegistry::release(reader_payload_pool_);
         }
     }
 
@@ -236,6 +221,9 @@ ParticipantProxyData* PDP::add_participant_proxy_data(
     ret_val->should_check_lease_duration = with_lease_duration;
     ret_val->m_guid = participant_guid;
     participant_proxies_.push_back(ret_val);
+
+    // notify statistics module
+    getRTPSParticipant()->on_entity_discovery(participant_guid);
 
     return ret_val;
 }
@@ -363,6 +351,12 @@ void PDP::initializeParticipantProxyData(
         participant_data->plugin_security_attributes_ = 0UL;
     }
 #endif // if HAVE_SECURITY
+
+    // Set participant type property
+    std::stringstream participant_type;
+    participant_type << mp_RTPSParticipant->getAttributes().builtin.discovery_config.discoveryProtocol;
+    auto ptype = participant_type.str();
+    participant_data->m_properties.push_back(fastdds::dds::parameter_property_participant_type, ptype);
 }
 
 bool PDP::initPDP(
@@ -715,6 +709,9 @@ ReaderProxyData* PDP::addReaderProxyData(
     logInfo(RTPS_PDP, "Adding reader proxy data " << reader_guid);
     ReaderProxyData* ret_val = nullptr;
 
+    // notify statistics module
+    getRTPSParticipant()->on_entity_discovery(reader_guid);
+
     std::lock_guard<std::recursive_mutex> guardPDP(*this->mp_mutex);
 
     for (ParticipantProxyData* pit : participant_proxies_)
@@ -804,8 +801,11 @@ WriterProxyData* PDP::addWriterProxyData(
         GUID_t& participant_guid,
         std::function<bool(WriterProxyData*, bool, const ParticipantProxyData&)> initializer_func)
 {
-    logInfo(RTPS_PDP, "Adding reader proxy data " << writer_guid);
+    logInfo(RTPS_PDP, "Adding writer proxy data " << writer_guid);
     WriterProxyData* ret_val = nullptr;
+
+    // notify statistics module
+    getRTPSParticipant()->on_entity_discovery(writer_guid);
 
     std::lock_guard<std::recursive_mutex> guardPDP(*this->mp_mutex);
 

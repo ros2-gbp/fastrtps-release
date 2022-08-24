@@ -34,9 +34,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         target_compile_definitions(ReaderProxyTests PRIVATE FASTRTPS_NO_LIB
             BOOST_ASIO_STANDALONE
             ASIO_STANDALONE
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
             )
         target_include_directories(ReaderProxyTests PRIVATE
-            ${ASIO_INCLUDE_DIR}
+            ${Asio_INCLUDE_DIR}
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSWriter
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/WriterHistory
@@ -50,13 +52,16 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/include
             ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
+            ${THIRDPARTY_BOOST_INCLUDE_DIR}
             )
         target_link_libraries(ReaderProxyTests
             GTest::gmock foonathan_memory
-            ${CMAKE_DL_LIBS})
+            ${CMAKE_DL_LIBS}
+            ${THIRDPARTY_BOOST_LINK_LIBS})
         add_gtest(ReaderProxyTests SOURCES ${WRITERPROXYTESTS_SOURCE})
 
-        # LivelinessManager
+    # LivelinessManager
+
         set(LIVELINESSMANAGERTESTS_SOURCE LivelinessManagerTests.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
@@ -73,9 +78,11 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         target_compile_definitions(LivelinessManagerTests PRIVATE FASTRTPS_NO_LIB
             BOOST_ASIO_STANDALONE
             ASIO_STANDALONE
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
             )
         target_include_directories(LivelinessManagerTests PRIVATE
-            ${ASIO_INCLUDE_DIR}
+            ${Asio_INCLUDE_DIR}
             ${PROJECT_SOURCE_DIR}/include
             ${PROJECT_BINARY_DIR}/include
             ${PROJECT_SOURCE_DIR}/src/cpp
@@ -84,16 +91,19 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             GTest::gmock)
         add_gtest(LivelinessManagerTests SOURCES ${LIVELINESSMANAGERTESTS_SOURCE})
 
-        # RTPSWriter
+    # RTPSWriter
+
         set(RTPSWRITERTESTS_SOURCE RTPSWriterTests.cpp)
 
         add_executable(RTPSWriterTests ${RTPSWRITERTESTS_SOURCE})
         target_compile_definitions(RTPSWriterTests PRIVATE
             BOOST_ASIO_STANDALONE
             ASIO_STANDALONE
+            $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+            $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
             )
         target_include_directories(RTPSWriterTests PRIVATE
-            ${ASIO_INCLUDE_DIR})
+            ${Asio_INCLUDE_DIR})
         target_link_libraries(RTPSWriterTests fastrtps foonathan_memory
             GTest::gmock
             ${CMAKE_DL_LIBS})

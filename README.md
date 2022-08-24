@@ -1,5 +1,10 @@
 # eProsima Fast DDS
 
+<a href="https://twitter.com/intent/tweet?text=I+recommend+@EProsima+%23FastRTPS,+the+ most+complete+open+source+dds+middleware!&url=https%3A%2F%2Fgithub.com%2FeProsima%2FFast-RTPS&hashtags=github&original_referer=http%3A%2F%2Fgithub.com%2F&tw_p=tweetbutton" target="_blank">
+  <img align="right"; hspace="20" src="https://www.eprosima.com/images/icons/eProsima_tweet.png"
+       alt="tweet button" title="Recommend Fast RTPS on Twitter"></img>
+</a>
+
 [![FIWARE Robotics](https://nexus.lab.fiware.org/static/badges/chapters/robotics.svg)](https://www.fiware.org/developers/catalogue/)
 [![License](https://img.shields.io/github/license/eProsima/Fast-RTPS.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Releases](https://img.shields.io/github/v/release/eProsima/Fast-RTPS?sort=semver)](https://github.com/eProsima/Fast-RTPS/releases)
@@ -35,19 +40,17 @@ system input/output channel combination for each deployment.
 
 *eProsima Fast DDS* has been adopted by multiple organizations in many sectors including these important cases:
 
-* Robotics: ROS (Robotic Operating System) as their default middleware for ROS2.
+* Robotics: ROS (Robotic Operating System) as their default middleware for ROS2 until and including the 
+  latest long term release Foxy Fitzroy.
 * EU R&D: FIWARE Incubated GE.
 
 This project is part of [FIWARE](https://www.fiware.org/). For more information check the FIWARE Catalogue entry for
 [Robotics](https://github.com/Fiware/catalogue/tree/master/robotics).
 
-<br/>
+## Want us to share your project with the community?
 
-**Want us to share your project with the community?
-Write to Evaluation.Support@eprosima.com or mention @EProsima on Twitter.
-We are curious to get to know your use case!**
-
-<br/>
+Write to evaluation.support@eprosima.com or mention @EProsima on Twitter.
+We are curious to get to know your use case!
 
 ## Supported platforms
 
@@ -91,7 +94,7 @@ choco install -y -s <PATH\TO\DOWNLOADS\> asio tinyxml2
 Please replace `<PATH\TO\DOWNLOADS>` with the folder you downloaded the packages to.
 
 #### Colcon installation
-*******************
+
 [colcon](https://colcon.readthedocs.io) is a command line tool to build sets of software packages.
 This section explains to use it to compile easily Fast-RTPS and its dependencies.
 First install ROS2 development tools (colcon and vcstool):
@@ -117,7 +120,7 @@ $ colcon build
 ```
 
 #### Manual installation
-*******************
+
 Before compiling manually Fast DDS you need to clone the following dependencies and compile them using
 [CMake](https://cmake.org).
 
@@ -162,24 +165,48 @@ You can access the documentation online, which is hosted on [Read the Docs](http
 
 ## Quality Declaration
 
-*eprosima Fast DDS* claims to be in the **Quality Level 2** category based on the guidelines provided by [ROS 2](https://ros.org/reps/rep-2004.html). See the [Quality Declaration](https://github.com/eProsima/Fast-DDS/blob/master/QUALITY.md) for more details.
+*eprosima Fast DDS* claims to be in the **Quality Level 1** category based on the guidelines provided by
+[ROS 2](https://ros.org/reps/rep-2004.html).
+See the [Quality Declaration](https://github.com/eProsima/Fast-DDS/blob/master/QUALITY.md) for more details.
 
 ## Quick Demo
 
-For those who want to try a quick demonstration of Fast-DDS libraries on Ubuntu, here is a way to launch an example application.
+For those who want to try a quick demonstration of *Fast DDS* libraries on Ubuntu, here is a way to launch an example
+application.
 
-First, download and install **docker** application. Open a terminal and type the following command
+First, download and install **docker** application.
+Open a terminal and type the following command:
 
 	$ sudo apt-get install docker.io
 
-Then, download the docker image file from https://eprosima.com/index.php/downloads-all
+Then, download the docker image files from the
+[eProsima downloads website](https://eprosima.com/index.php/downloads-all).
 
-Load the image and run it:
+Load the docker images:
 
-	$ docker load -i ubuntu-fast-rtps.tar
-	$ docker run -it ubuntu-fast-rtps
+	$ docker load -i ubuntu-fast-dds:<FastDDS-Version>.tar
+	$ docker tag ubuntu-fast-rtps:<FastDDS-Version> ubuntu-fast-rtps:latest
+	$ docker load -i ubuntu-fast-dds-helloworld:<FastDDS-Version>.tar
+	$ docker load -i ubuntu-fast-dds-shapesdemo:<ShapesDemo-Version>.tar
 
-You can run as many images as you want and check the communication between them.
+Run the Docker container with the *eProsima Shapes Demo* application. Please refer to
+[Shapes Demo documentation](https://eprosima-shapes-demo.readthedocs.io)
+for further details on how to use this application.
+
+    $ xhost local:root
+    $ docker run -it --privileged -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \
+        ubuntu-fast-dds-shapesdemo:<ShapesDemo-Version>
+
+It is also possible to run the *Fast DDS* HelloWorld example by executing the following command:
+
+    $ docker run -it ubuntu-fast-dds-helloworld:<FastDDS-Version>
+
+Run as many images as wanted and check the communication between them.
+
+For instance, to run `Benchmark` example, run the following commands in the separate terminal sessions:
+
+	$ docker run -i ubuntu-fast-rtps /usr/local/examples/C++/Benchmark/bin/Benchmark subscriber udp
+	$ docker run -i ubuntu-fast-rtps /usr/local/examples/C++/Benchmark/bin/Benchmark publisher udp
 
 ## Getting Help
 
