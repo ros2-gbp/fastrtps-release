@@ -19,82 +19,80 @@
 #include <string>
 #include <exception>
 
-namespace eprosima {
-namespace fastcdr {
-namespace exception {
-/*!
- * @brief This abstract class is used to create exceptions.
- * @ingroup EXCEPTIONMODULE
- */
-class Exception : public std::exception
+namespace eprosima
 {
-public:
+    namespace fastcdr
+    {
+        namespace exception
+        {
+            /*!
+             * @brief This abstract class is used to create exceptions.
+             * @ingroup EXCEPTIONMODULE
+             */
+            class Exception : public std::exception
+            {
+                public:
 
-    //! \brief Default destructor.
-    virtual Cdr_DllAPI ~Exception() noexcept;
+                    //! \brief Default destructor.
+                    virtual Cdr_DllAPI ~Exception() throw();
 
-    //! \brief This function throws the object as exception.
-    virtual Cdr_DllAPI void raise() const = 0;
+                    //! \brief This function throws the object as exception.
+                    virtual Cdr_DllAPI void raise() const = 0;
 
-    /*!
-     * @brief This function returns the error message.
-     *
-     * @return The error message.
-     */
-    virtual Cdr_DllAPI const char* what() const noexcept override;
+                    /*!
+                     * @brief This function returns the error message.
+                     *
+                     * @return The error message.
+                     */
+                    virtual Cdr_DllAPI const char* what() const throw() ;
 
-protected:
+                protected:
 
-    /*!
-     * @brief Default constructor.
-     *
-     * @param message A error message. This message pointer is copied.
-     */
-    Cdr_DllAPI Exception(
-            const char* const& message) noexcept;
+                    /*!
+                     * @brief Default constructor.
+                     *
+                     * @param message A error message. This message is copied.
+                     */
+                    Cdr_DllAPI Exception(const char* const &message);
 
-    /*!
-     * @brief Default copy constructor.
-     *
-     * @param ex Exception that will be copied.
-     */
-    Cdr_DllAPI Exception(
-            const Exception& ex) noexcept;
-
-#if HAVE_CXX0X
-    /*!
-     * @brief Default move constructor.
-     *
-     * @param ex Exception that will be moved.
-     */
-    Cdr_DllAPI Exception(
-            Exception&& ex) noexcept;
-#endif // if HAVE_CXX0X
-
-    /*!
-     * @brief Assigment operation.
-     *
-     * @param ex Exception that will be copied.
-     */
-    Cdr_DllAPI Exception& operator =(
-            const Exception& ex) noexcept;
+                    /*!
+                     * @brief Default copy constructor.
+                     *
+                     * @param ex Exception that will be copied.
+                     */
+                    Cdr_DllAPI Exception(const Exception &ex);
 
 #if HAVE_CXX0X
-    /*!
-     * @brief Assigment operation.
-     *
-     * @param ex Exception that will be moved.
-     */
-    Cdr_DllAPI Exception& operator =(
-            Exception&&) noexcept;
-#endif // if HAVE_CXX0X
+                    /*!
+                     * @brief Default move constructor.
+                     *
+                     * @param ex Exception that will be moved.
+                     */
+                    Cdr_DllAPI Exception(Exception&& ex);
+#endif
 
-private:
+                    /*!
+                     * @brief Assigment operation.
+                     *
+                     * @param ex Exception that will be copied.
+                     */
+                    Cdr_DllAPI Exception& operator=(const Exception &ex);
 
-    const char* m_message;
-};
-}         //namespace exception
-}     //namespace fastcdr
+#if HAVE_CXX0X
+                    /*!
+                     * @brief Assigment operation.
+                     *
+                     * @param ex Exception that will be moved.
+                     */
+                    Cdr_DllAPI Exception& operator=(Exception&&);
+#endif
+
+                private:
+
+                    std::string m_message;
+            };
+        } //namespace exception
+    } //namespace fastcdr
 } //namespace eprosima
 
 #endif // _FASTCDR_EXCEPTIONS_EXCEPTION_H_

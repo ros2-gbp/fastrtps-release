@@ -177,7 +177,16 @@ ReturnCode_t DataReaderImpl::enable()
     property.name("topic_name");
     property.value(topic_->get_name().c_str());
     att.endpoint.properties.properties().push_back(std::move(property));
-    if (subscriber_->get_qos().partition().names().size() > 0)
+
+    std::string* endpoint_partitions = PropertyPolicyHelper::find_property(qos_.properties(), "partitions");
+
+    if (endpoint_partitions)
+    {
+        property.name("partitions");
+        property.value(*endpoint_partitions);
+        att.endpoint.properties.properties().push_back(std::move(property));
+    }
+    else if (subscriber_->get_qos().partition().names().size() > 0)
     {
         property.name("partitions");
         std::string partitions;
@@ -249,6 +258,17 @@ ReturnCode_t DataReaderImpl::enable()
     {
         rqos.data_sharing.off();
     }
+    if (endpoint_partitions)
+    {
+        std::istringstream partition_string(*endpoint_partitions);
+        std::string partition_name;
+        rqos.m_partition.clear();
+
+        while (std::getline(partition_string, partition_name, ';'))
+        {
+            rqos.m_partition.push_back(partition_name.c_str());
+        }
+    }
     subscriber_->rtps_participant()->registerReader(reader_, topic_attributes(), rqos);
 
     return ReturnCode_t::RETCODE_OK;
@@ -265,6 +285,8 @@ void DataReaderImpl::disable()
 
 DataReaderImpl::~DataReaderImpl()
 {
+    // Disable the datareader to prevent receiving data in the middle of deleting it
+    disable();
     delete lifespan_timer_;
     delete deadline_timer_;
 
@@ -1497,6 +1519,12 @@ ReturnCode_t DataReaderImpl::get_listening_locators(
 
     locators.assign(reader_->getAttributes().unicastLocatorList);
     locators.push_back(reader_->getAttributes().multicastLocatorList);
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataReaderImpl::delete_contained_entities()
+{
+    // Until Query Conditions are implemented, there are no contained entities to destroy, so return OK.
     return ReturnCode_t::RETCODE_OK;
 }
 

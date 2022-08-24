@@ -190,7 +190,15 @@ ReturnCode_t DataWriterImpl::enable()
     property.value(topic_->get_name().c_str());
     w_att.endpoint.properties.properties().push_back(std::move(property));
 
-    if (publisher_->get_qos().partition().names().size() > 0)
+    std::string* endpoint_partitions = PropertyPolicyHelper::find_property(qos_.properties(), "partitions");
+
+    if (endpoint_partitions)
+    {
+        property.name("partitions");
+        property.value(*endpoint_partitions);
+        w_att.endpoint.properties.properties().push_back(std::move(property));
+    }
+    else if (publisher_->get_qos().partition().names().size() > 0)
     {
         property.name("partitions");
         std::string partitions;
@@ -335,6 +343,17 @@ ReturnCode_t DataWriterImpl::enable()
     if (!is_data_sharing_compatible_)
     {
         wqos.data_sharing.off();
+    }
+    if (endpoint_partitions)
+    {
+        std::istringstream partition_string(*endpoint_partitions);
+        std::string partition_name;
+        wqos.m_partition.clear();
+
+        while (std::getline(partition_string, partition_name, ';'))
+        {
+            wqos.m_partition.push_back(partition_name.c_str());
+        }
     }
     publisher_->rtps_participant()->registerWriter(writer_, get_topic_attributes(qos_, *topic_, type_), wqos);
 
@@ -743,7 +762,7 @@ ReturnCode_t DataWriterImpl::perform_create_new_change(
         if (qos_.deadline().period != c_TimeInfinite)
         {
             if (!history_.set_next_deadline(
-                        ch->instanceHandle,
+                        handle,
                         steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
             {
                 logError(PUBLISHER, "Could not set the next deadline in the history");
@@ -996,11 +1015,16 @@ void DataWriterImpl::InnerDataWriterListener::on_liveliness_lost(
         fastrtps::rtps::RTPSWriter* /*writer*/,
         const fastrtps::LivelinessLostStatus& status)
 {
-    DataWriterListener* listener = data_writer_->get_listener_for(StatusMask::liveliness_lost());
+    data_writer_->update_liveliness_lost_status(status);
+    StatusMask notify_status = StatusMask::liveliness_lost();
+    DataWriterListener* listener = data_writer_->get_listener_for(notify_status);
     if (listener != nullptr)
     {
-        listener->on_liveliness_lost(
-            data_writer_->user_datawriter_, status);
+        LivelinessLostStatus callback_status;
+        if (ReturnCode_t::RETCODE_OK == data_writer_->get_liveliness_lost_status(callback_status))
+        {
+            listener->on_liveliness_lost(data_writer_->user_datawriter_, callback_status);
+        }
     }
 }
 
@@ -1145,10 +1169,8 @@ ReturnCode_t DataWriterImpl::get_liveliness_lost_status(
 
     std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex());
 
-    status.total_count = writer_->liveliness_lost_status_.total_count;
-    status.total_count_change = writer_->liveliness_lost_status_.total_count_change;
-
-    writer_->liveliness_lost_status_.total_count_change = 0u;
+    status = liveliness_lost_status_;
+    liveliness_lost_status_.total_count_change = 0u;
 
     return ReturnCode_t::RETCODE_OK;
 }
@@ -1226,6 +1248,14 @@ OfferedIncompatibleQosStatus& DataWriterImpl::update_offered_incompatible_qos(
         }
     }
     return offered_incompatible_qos_status_;
+}
+
+LivelinessLostStatus& DataWriterImpl::update_liveliness_lost_status(
+        const fastrtps::LivelinessLostStatus& liveliness_lost_status)
+{
+    liveliness_lost_status_.total_count = liveliness_lost_status.total_count;
+    liveliness_lost_status_.total_count_change += liveliness_lost_status.total_count_change;
+    return liveliness_lost_status_;
 }
 
 void DataWriterImpl::set_qos(

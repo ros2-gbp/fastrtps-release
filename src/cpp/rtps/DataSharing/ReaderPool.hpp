@@ -92,7 +92,7 @@ public:
         try
         {
             segment_ = std::unique_ptr<fastdds::rtps::SharedMemSegment>(
-                new fastdds::rtps::SharedMemSegment(boost::interprocess::open_only,
+                new fastdds::rtps::SharedMemSegment(boost::interprocess::open_read_only,
                 segment_name_.c_str()));
         }
         catch (const std::exception& e)
@@ -123,13 +123,18 @@ public:
         }
 
         // Set the reading pointer
+        next_payload_ = begin();
         if (is_volatile_)
         {
-            next_payload_ = end();
-        }
-        else
-        {
-            next_payload_ = begin();
+            CacheChange_t ch;
+            SequenceNumber_t last_sequence = c_SequenceNumber_Unknown;
+            get_next_unread_payload(ch, last_sequence);
+            while (ch.sequenceNumber != SequenceNumber_t::unknown())
+            {
+                advance(next_payload_);
+                get_next_unread_payload(ch, last_sequence);
+            }
+            assert(next_payload_ == end());
         }
 
         return true;
@@ -233,14 +238,18 @@ protected:
 
     bool ensure_reading_reference_is_in_bounds()
     {
-        if ((next_payload_ >> 32) < (descriptor_->notified_end >> 32) &&
-                static_cast<uint32_t>(next_payload_) <= static_cast<uint32_t>(descriptor_->notified_end))
+        auto notified_end = end();
+        auto notified_end_high = notified_end >> 32;
+        auto next_payload_high = next_payload_ >> 32;
+        if (next_payload_high + 1 < notified_end_high ||
+                (next_payload_high < notified_end_high &&
+                static_cast<uint32_t>(next_payload_) <= static_cast<uint32_t>(notified_end)))
         {
             logWarning(RTPS_READER, "Writer " << writer() << " overtook reader in datasharing pool."
                                               << " Some changes will be missing.");
 
             // lower part is the index, upper part is the loop counter
-            next_payload_ = ((next_payload_ >> 32) << 32) + static_cast<uint32_t>(descriptor_->notified_end);
+            next_payload_ = ((notified_end_high - 1) << 32) + static_cast<uint32_t>(notified_end);
             advance(next_payload_);
             return false;
         }
