@@ -181,6 +181,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
             types/Data64kbType.cpp
             types/Data1mb.cpp
             types/Data1mbType.cpp
+            types/KeyedData1mb.cpp
+            types/KeyedData1mbType.cpp
             types/FixedSized.cpp
             types/FixedSizedType.cpp
 
@@ -213,6 +215,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
             types/Data64kbType.cpp
             types/Data1mb.cpp
             types/Data1mbType.cpp
+            types/KeyedData1mb.cpp
+            types/KeyedData1mbType.cpp
             types/FixedSized.cpp
             types/FixedSizedType.cpp
 
@@ -252,6 +256,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
             ${CMAKE_CURRENT_BINARY_DIR}/StatisticsDomainParticipant.xml)
         configure_file(${CMAKE_CURRENT_SOURCE_DIR}/utils/check_guid.py
             ${CMAKE_CURRENT_BINARY_DIR}/check_guid.py)
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/partitions.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/partitions.xml)
 
         if(FASTRTPS_API_TESTS)
             set(BLACKBOXTESTS_FASTRTPS_SOURCE

@@ -16,49 +16,39 @@
 
 using namespace eprosima::fastcdr::exception;
 
-Exception::Exception(
-        const char* const& message) noexcept
-    : m_message(message)
+Exception::Exception(const char* const &message) : m_message(message)
 {
 }
 
-Exception::Exception(
-        const Exception& ex) noexcept
-    : m_message(ex.m_message)
+Exception::Exception(const Exception &ex) : m_message(ex.m_message)
 {
 }
 
 #if HAVE_CXX0X
-Exception::Exception(
-        Exception&& ex) noexcept
-    : m_message(std::move(ex.m_message))
+Exception::Exception(Exception&& ex) : m_message(std::move(ex.m_message))
 {
 }
+#endif
 
-#endif // if HAVE_CXX0X
-
-Exception& Exception::operator =(
-        const Exception& ex) noexcept
+Exception& Exception::operator=(const Exception &ex)
 {
     m_message = ex.m_message;
     return *this;
 }
 
 #if HAVE_CXX0X
-Exception& Exception::operator =(
-        Exception&& ex) noexcept
+Exception& Exception::operator=(Exception&& ex)
 {
     m_message = std::move(ex.m_message);
     return *this;
 }
+#endif
 
-#endif // if HAVE_CXX0X
-
-Exception::~Exception() noexcept
+Exception::~Exception() throw()
 {
 }
 
-const char* Exception::what() const noexcept
+const char* Exception::what() const throw()
 {
-    return m_message;
+    return m_message.c_str();
 }

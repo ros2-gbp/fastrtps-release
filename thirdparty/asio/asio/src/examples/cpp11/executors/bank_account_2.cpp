@@ -1,9 +1,11 @@
-#include <asio/execution.hpp>
-#include <asio/static_thread_pool.hpp>
+#include <asio/post.hpp>
+#include <asio/thread_pool.hpp>
+#include <asio/use_future.hpp>
 #include <iostream>
 
-using asio::static_thread_pool;
-namespace execution = asio::execution;
+using asio::post;
+using asio::thread_pool;
+using asio::use_future;
 
 // Traditional active object pattern.
 // Member functions block until operation is finished.
@@ -11,43 +13,35 @@ namespace execution = asio::execution;
 class bank_account
 {
   int balance_ = 0;
-  mutable static_thread_pool pool_{1};
+  mutable thread_pool pool_{1};
 
 public:
   void deposit(int amount)
   {
-    execution::execute(
-        asio::require(pool_.executor(),
-          execution::blocking.always),
-        [this, amount]
+    post(pool_,
+      use_future([=]
         {
           balance_ += amount;
-        });
+        })).get();
   }
 
   void withdraw(int amount)
   {
-    execution::execute(
-        asio::require(pool_.executor(),
-          execution::blocking.always),
-        [this, amount]
+    post(pool_,
+      use_future([=]
         {
           if (balance_ >= amount)
             balance_ -= amount;
-        });
+        })).get();
   }
 
   int balance() const
   {
-    int result = 0;
-    execution::execute(
-        asio::require(pool_.executor(),
-          execution::blocking.always),
-        [this, &result]
+    return post(pool_,
+      use_future([=]
         {
-          result = balance_;
-        });
-    return result;
+          return balance_;
+        })).get();
   }
 };
 
