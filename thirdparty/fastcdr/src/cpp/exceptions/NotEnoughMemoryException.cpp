@@ -16,58 +16,45 @@
 
 using namespace eprosima::fastcdr::exception;
 
-const char* const NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT =
-        "Not enough memory in the buffer stream";
+const char* const NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT = "Not enough memory in the buffer stream";
 
-NotEnoughMemoryException::NotEnoughMemoryException(
-        const char* const& message) noexcept
-    : Exception(message)
+NotEnoughMemoryException::NotEnoughMemoryException(const char* const &message) : Exception(message)
 {
 }
 
-NotEnoughMemoryException::NotEnoughMemoryException(
-        const NotEnoughMemoryException& ex) noexcept
-    : Exception(ex)
+NotEnoughMemoryException::NotEnoughMemoryException(const NotEnoughMemoryException &ex) : Exception(ex)
 {
 }
 
 #if HAVE_CXX0X
-NotEnoughMemoryException::NotEnoughMemoryException(
-        NotEnoughMemoryException&& ex) noexcept
-    : Exception(std::move(ex))
+NotEnoughMemoryException::NotEnoughMemoryException(NotEnoughMemoryException&& ex) : Exception(std::move(ex))
 {
 }
+#endif
 
-#endif // if HAVE_CXX0X
-
-NotEnoughMemoryException& NotEnoughMemoryException::operator =(
-        const NotEnoughMemoryException& ex) noexcept
+NotEnoughMemoryException& NotEnoughMemoryException::operator=(const NotEnoughMemoryException &ex)
 {
-    if (this != &ex)
+    if(this != &ex)
     {
-        Exception::operator =(
-                ex);
+        Exception::operator=(ex);
     }
 
     return *this;
 }
 
 #if HAVE_CXX0X
-NotEnoughMemoryException& NotEnoughMemoryException::operator =(
-        NotEnoughMemoryException&& ex) noexcept
+NotEnoughMemoryException& NotEnoughMemoryException::operator=(NotEnoughMemoryException&& ex)
 {
-    if (this != &ex)
+    if(this != &ex)
     {
-        Exception::operator =(
-                std::move(ex));
+        Exception::operator=(std::move(ex));
     }
 
     return *this;
 }
+#endif
 
-#endif // if HAVE_CXX0X
-
-NotEnoughMemoryException::~NotEnoughMemoryException() noexcept
+NotEnoughMemoryException::~NotEnoughMemoryException() throw()
 {
 }
 
