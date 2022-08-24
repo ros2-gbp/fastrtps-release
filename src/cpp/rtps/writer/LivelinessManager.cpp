@@ -23,9 +23,9 @@ LivelinessManager::LivelinessManager(
     , timer_(
         service,
         [this]() -> bool
-            {
-                return timer_expired();
-            },
+        {
+            return timer_expired();
+        },
         0)
 {
 }
@@ -61,6 +61,19 @@ bool LivelinessManager::add_writer(
         }
     }
     writers_.emplace_back(guid, kind, lease_duration);
+
+    if (!calculate_next())
+    {
+        timer_.cancel_timer();
+        return true;
+    }
+
+    // Some times the interval could be negative if a writer expired during the call to this function
+    // Once in this situation there is not much we can do but let asio timers expire immediately
+    auto interval = timer_owner_->time - steady_clock::now();
+    timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
+    timer_.restart_timer();
+
     return true;
 }
 
@@ -79,31 +92,24 @@ bool LivelinessManager::remove_writer(
         {
             if (--writer.count == 0)
             {
+                LivelinessData::WriterStatus status = writer.status;
+
                 writers_.remove(writer);
 
                 if (callback_ != nullptr)
                 {
-                    if (writer.status == LivelinessData::WriterStatus::ALIVE)
+                    if (status == LivelinessData::WriterStatus::ALIVE)
                     {
-                        callback_(writer.guid,
-                                writer.kind,
-                                writer.lease_duration,
-                                -1,
-                                0);
+                        callback_(guid, kind, lease_duration, -1, 0);
                     }
-                    else if (writer.status == LivelinessData::WriterStatus::NOT_ALIVE)
+                    else if (status == LivelinessData::WriterStatus::NOT_ALIVE)
                     {
-                        callback_(writer.guid,
-                                writer.kind,
-                                writer.lease_duration,
-                                0,
-                                -1);
+                        callback_(guid, kind, lease_duration, 0, -1);
                     }
                 }
 
-                if (timer_owner_ != nullptr && timer_owner_->guid == guid)
+                if (timer_owner_ != nullptr)
                 {
-                    timer_owner_ = nullptr;
                     if (!calculate_next())
                     {
                         timer_.cancel_timer();
@@ -228,7 +234,7 @@ bool LivelinessManager::calculate_next()
 
     bool any_alive = false;
 
-    for (LivelinessDataIterator it=writers_.begin(); it!=writers_.end(); ++it)
+    for (LivelinessDataIterator it = writers_.begin(); it != writers_.end(); ++it)
     {
         if (it->status == LivelinessData::WriterStatus::ALIVE)
         {
@@ -281,7 +287,7 @@ bool LivelinessManager::find_writer(
         const Duration_t& lease_duration,
         ResourceLimitedVector<LivelinessData>::iterator* wit_out)
 {
-    for (LivelinessDataIterator it=writers_.begin(); it!=writers_.end(); ++it)
+    for (LivelinessDataIterator it = writers_.begin(); it != writers_.end(); ++it)
     {
         if (it->guid == guid &&
                 it->kind == kind &&
@@ -341,6 +347,6 @@ const ResourceLimitedVector<LivelinessData>& LivelinessManager::get_liveliness_d
     return writers_;
 }
 
-}
-}
-}
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima

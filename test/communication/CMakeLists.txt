@@ -15,13 +15,6 @@
 if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
     find_package(PythonInterp 3)
 
-    add_definitions(
-        -DBOOST_ASIO_STANDALONE
-        -DASIO_STANDALONE
-        )
-
-    include_directories(${ASIO_INCLUDE_DIR})
-
     ###############################################################################
     # Binaries
     ###############################################################################
@@ -34,7 +27,13 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         PublisherMain.cpp
         )
     add_executable(SimpleCommunicationPublisher ${PUBLISHER_SOURCE})
-    target_include_directories(SimpleCommunicationPublisher PRIVATE ${PROJECT_SOURCE_DIR}/test/blackbox)
+    target_compile_definitions(SimpleCommunicationPublisher PRIVATE
+        BOOST_ASIO_STANDALONE
+        ASIO_STANDALONE
+        )
+    target_include_directories(SimpleCommunicationPublisher PRIVATE
+        ${ASIO_INCLUDE_DIR}
+        ${PROJECT_SOURCE_DIR}/test/blackbox)
     target_link_libraries(SimpleCommunicationPublisher fastrtps fastcdr foonathan_memory ${CMAKE_DL_LIBS})
 
     set(SUBSCRIBER_SOURCE ${COMMON_SOURCE}
@@ -42,7 +41,13 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         SubscriberMain.cpp
         )
     add_executable(SimpleCommunicationSubscriber ${SUBSCRIBER_SOURCE})
-    target_include_directories(SimpleCommunicationSubscriber PRIVATE ${PROJECT_SOURCE_DIR}/test/blackbox)
+    target_compile_definitions(SimpleCommunicationSubscriber PRIVATE
+        BOOST_ASIO_STANDALONE
+        ASIO_STANDALONE
+        )
+    target_include_directories(SimpleCommunicationSubscriber PRIVATE
+        ${ASIO_INCLUDE_DIR}
+        ${PROJECT_SOURCE_DIR}/test/blackbox)
     target_link_libraries(SimpleCommunicationSubscriber fastrtps fastcdr foonathan_memory ${CMAKE_DL_LIBS})
 
     set(PUBSUB_SOURCE ${COMMON_SOURCE}
@@ -52,7 +57,13 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         )
 
     add_executable(SimpleCommunicationPubSub ${PUBSUB_SOURCE})
-    target_include_directories(SimpleCommunicationPubSub PRIVATE ${PROJECT_SOURCE_DIR}/test/blackbox)
+    target_compile_definitions(SimpleCommunicationPubSub PRIVATE
+        BOOST_ASIO_STANDALONE
+        ASIO_STANDALONE
+        )
+    target_include_directories(SimpleCommunicationPubSub PRIVATE
+        ${ASIO_INCLUDE_DIR}
+        ${PROJECT_SOURCE_DIR}/test/blackbox)
     target_link_libraries(SimpleCommunicationPubSub fastrtps fastcdr foonathan_memory ${CMAKE_DL_LIBS})
 
     ###############################################################################
@@ -68,6 +79,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         ${CMAKE_CURRENT_BINARY_DIR}/liveliness_assertion.py COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/automatic_liveliness_assertion.py
         ${CMAKE_CURRENT_BINARY_DIR}/automatic_liveliness_assertion.py COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/shm_communication_subscriber_dies_while_processing_message.py
+        ${CMAKE_CURRENT_BINARY_DIR}/shm_communication_subscriber_dies_while_processing_message.py COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/simple_besteffort.xml
         ${CMAKE_CURRENT_BINARY_DIR}/simple_besteffort.xml COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/simple_reliable.xml
@@ -98,6 +111,8 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
         ${CMAKE_CURRENT_BINARY_DIR}/secure_submsg_crypto_besteffort_pub.xml COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/secure_submsg_crypto_besteffort_sub.xml
         ${CMAKE_CURRENT_BINARY_DIR}/secure_submsg_crypto_besteffort_sub.xml COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/shm_communication_subscriber_dies_while_processing_message.xml
+        ${CMAKE_CURRENT_BINARY_DIR}/shm_communication_subscriber_dies_while_processing_message.xml COPYONLY)
     if(SECURITY)
         configure_file(${PROJECT_SOURCE_DIR}/test/certs/maincacert.pem
             ${CMAKE_CURRENT_BINARY_DIR}/maincacert.pem COPYONLY)
@@ -347,5 +362,24 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
             set_property(TEST TwoPublishersCommunicationReliable APPEND PROPERTY ENVIRONMENT
                 "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
         endif()
+
+        add_test(NAME SHMCommunicationSubscriberDiesWhileProcessingMessage
+            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/shm_communication_subscriber_dies_while_processing_message.py)
+
+        # Set test with label NoMemoryCheck
+        set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage PROPERTY LABELS "NoMemoryCheck")
+
+        set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage PROPERTY ENVIRONMENT
+            "SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:SimpleCommunicationPublisher>")
+        set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage APPEND PROPERTY ENVIRONMENT
+            "SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:SimpleCommunicationSubscriber>")
+        set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage APPEND PROPERTY ENVIRONMENT
+            "XML_FILE=shm_communication_subscriber_dies_while_processing_message.xml")
+        if(WIN32)
+            string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+            set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage APPEND PROPERTY ENVIRONMENT
+                "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+        endif()
+
     endif()
 endif()

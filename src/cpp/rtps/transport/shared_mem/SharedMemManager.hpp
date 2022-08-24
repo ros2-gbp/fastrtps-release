@@ -44,7 +44,7 @@ private:
     {
         struct Status
         {
-            // When buffers are enqued in a port this validity_id is copied to the BufferDescriptor in the port.
+            // When buffers are enqueued in a port this validity_id is copied to the BufferDescriptor in the port.
             // If the sender process needs to recover the buffer by force, just increment this validity_id, the
             // receiver process must check this validity_id vs the validity_id in the BufferDescriptor, if not equal
             // the buffer has been invalidated by the sender.
@@ -77,7 +77,7 @@ private:
 
         /**
          * Atomically invalidates a buffer, only, when the buffer is valid for the caller.
-         * @return true when succedded, false when the buffer was invalid for the caller.
+         * @return true when succeeded, false when the buffer was invalid for the caller.
          */
         inline bool invalidate_buffer(
                 uint32_t listener_validity_id)
@@ -96,7 +96,7 @@ private:
 
         /**
          * Atomically invalidates a buffer, only, if the buffer is not being processed.
-         * @return true when succedded, false otherwise.
+         * @return true when succeeded, false otherwise.
          */
         bool invalidate_if_not_processing()
         {
@@ -109,7 +109,7 @@ private:
                     std::memory_order_relaxed))
             {
             }
-
+            logWarning(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
             return (s.processing_count == 0);
         }
 
@@ -124,7 +124,7 @@ private:
 
         /**
          * Atomically decrease enqueued count & increase the buffer processing counts, only, if the buffer is valid.
-         * @return true when succedded, false when the buffer has been invalidated.
+         * @return true when succeeded, false when the buffer has been invalidated.
          */
         inline bool dec_enqueued_inc_processing_counts(
                 uint32_t listener_validity_id)
@@ -143,7 +143,7 @@ private:
 
         /**
          * Atomically increase the buffer processing count, only, if the buffer is valid.
-         * @return true when succedded, false when the buffer has been invalidated.
+         * @return true when succeeded, false when the buffer has been invalidated.
          */
         inline bool inc_processing_count(
                 uint32_t listener_validity_id)
@@ -162,7 +162,7 @@ private:
 
         /**
          * Atomically increase the buffer enqueued count, only, if the buffer is valid.
-         * @return true when succedded, false when the buffer has been invalidated.
+         * @return true when succeeded, false when the buffer has been invalidated.
          */
         inline bool inc_enqueued_count(
                 uint32_t listener_validity_id)
@@ -181,7 +181,7 @@ private:
 
         /**
          * Atomically decrease the buffer enqueued count, only, if the buffer is valid.
-         * @return true when succedded, false when the buffer has been invalidated.
+         * @return true when succeeded, false when the buffer has been invalidated.
          */
         inline bool dec_enqueued_count(
                 uint32_t listener_validity_id)
@@ -206,7 +206,7 @@ private:
 
         /**
          * Atomically decrease the buffer processing count, only, if the buffer is valid.
-         * @return true when succedded, false when the buffer has been invalidated.
+         * @return true when succeeded, false when the buffer has been invalidated.
          */
         inline bool dec_processing_count(
                 uint32_t listener_validity_id)
@@ -226,13 +226,21 @@ private:
     };
 
     SharedMemManager(
-            const std::string& domain_name)
+            const std::string& domain_name,
+            uint32_t alloc_extra_size)
         : segments_mem_(0)
         , global_segment_(domain_name)
         , watch_task_(SegmentWrapper::WatchTask::get())
     {
         static_assert(std::alignment_of<BufferNode>::value % 8 == 0, "SharedMemManager::BufferNode bad alignment");
+        per_allocation_extra_size_ = alloc_extra_size;
+    }
 
+public:
+
+    static std::shared_ptr<SharedMemManager> create(
+            const std::string& domain_name)
+    {
         if (domain_name.length() > SharedMemGlobal::MAX_DOMAIN_NAME_LENGTH)
         {
             throw std::runtime_error(
@@ -242,17 +250,9 @@ private:
                       " characters");
         }
 
-        per_allocation_extra_size_ =
-                SharedMemSegment::compute_per_allocation_extra_size(std::alignment_of<BufferNode>::value,
-                        domain_name);
-    }
-
-public:
-
-    static std::shared_ptr<SharedMemManager> create(
-            const std::string& domain_name)
-    {
-        return std::shared_ptr<SharedMemManager>(new SharedMemManager(domain_name));
+        uint32_t extra_size =
+                SharedMemSegment::compute_per_allocation_extra_size(std::alignment_of<BufferNode>::value, domain_name);
+        return std::shared_ptr<SharedMemManager>(new SharedMemManager(domain_name, extra_size));
     }
 
     ~SharedMemManager()
@@ -560,7 +560,6 @@ public:
                 uint32_t required_data_size)
         {
             auto it = allocated_buffers_.begin();
-
             while (it != allocated_buffers_.end())
             {
                 // There is enough space to allocate the buffer
@@ -582,7 +581,7 @@ public:
                 }
                 else // No enough space, try to recover oldest not processing buffers
                 {
-                    // Buffer is not beign processed by any listener
+                    // Buffer is not being processed by any listener
                     if ((*it)->invalidate_if_not_processing())
                     {
                         release_buffer(*it);
@@ -594,6 +593,24 @@ public:
                     {
                         it++;
                     }
+                }
+            }
+
+            // We may have enough memory but no free buffers
+            it = allocated_buffers_.begin();
+            while (free_buffers_.empty() && it != allocated_buffers_.end())
+            {
+                // Buffer is not beign processed by any listener
+                if ((*it)->invalidate_if_not_processing())
+                {
+                    release_buffer(*it);
+
+                    free_buffers_.push_back(*it);
+                    it = allocated_buffers_.erase(it);
+                }
+                else
+                {
+                    it++;
                 }
             }
 
@@ -651,7 +668,7 @@ public:
         }
 
         /**
-         * Extract the first buffer enqued in the port.
+         * Extract the first buffer enqueued in the port.
          * If the queue is empty, blocks until a buffer is pushed
          * to the port.
          * @return A shared_ptr to the buffer, this shared_ptr can be nullptr if the
@@ -705,6 +722,7 @@ public:
 
                     if (buffer_ref)
                     {
+                        global_port_->listener_processing_start(listener_index_, buffer_descriptor);
                         if (was_cell_freed)
                         {
                             // Atomically increase processing & decrease enqueued
@@ -743,6 +761,11 @@ public:
             }
 
             return buffer_ref;
+        }
+
+        void stop_processing_buffer()
+        {
+            global_port_->listener_processing_stop(listener_index_);
         }
 
         void regenerate_port()
@@ -854,6 +877,34 @@ public:
             return ret;
         }
 
+        /**
+         * @brief Unlock buffers being processed by the port if the port is frozen.
+         *
+         * If the port is zombie, finds all the buffers that were being processed by a listener
+         * and decrements their processing count, so that they are not kept locked forever
+         */
+        void recover_blocked_processing()
+        {
+            SharedMemGlobal::BufferDescriptor buffer_descriptor;
+            if (SharedMemGlobal::Port::is_zombie(global_port_->port_id(),
+                    shared_mem_manager_->global_segment()->domain_name()))
+            {
+                while (global_port_->get_and_remove_blocked_processing(buffer_descriptor))
+                {
+                    auto segment = shared_mem_manager_->find_segment(buffer_descriptor.source_segment_id);
+                    if (!segment)
+                    {
+                        // If the segment is gone, nothing to do
+                        continue;
+                    }
+                    auto buffer_node =
+                            static_cast<BufferNode*>(segment->get_address_from_offset(buffer_descriptor.
+                                    buffer_node_offset));
+                    buffer_node->dec_processing_count(buffer_descriptor.validity_id);
+                }
+            }
+        }
+
         std::shared_ptr<Listener> create_listener()
         {
             return std::make_shared<Listener>(shared_mem_manager_, global_port_);
@@ -863,6 +914,7 @@ public:
 
         void regenerate_port()
         {
+            recover_blocked_processing();
             auto new_port = shared_mem_manager_->regenerate_port(global_port_, open_mode_);
 
             *this = std::move(*new_port);
