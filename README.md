@@ -1,3 +1,26 @@
+## fastrtps (galactic) - 2.3.5-1
+
+The packages in the `fastrtps` repository were released into the `galactic` distro by running `/home/steven/osrf/bloom/.direnv/python-3.10.6/bin/bloom-release -r galactic -e fastrtps` on `Wed, 24 Aug 2022 21:14:20 -0000`
+
+The `fastrtps` package was released.
+
+Version of package(s) in repository `fastrtps`:
+
+- upstream repository: https://github.com/eProsima/Fast-DDS.git
+- release repository: https://github.com/ros2-gbp/fastrtps-release.git
+- rosdistro version: `2.3.4-1`
+- old version: `2.3.4-1`
+- new version: `2.3.5-1`
+
+Versions of tools used:
+
+- bloom version: `0.11.1`
+- catkin_pkg version: `0.5.2`
+- rosdep version: `0.22.1`
+- rosdistro version: `0.9.0`
+- vcstools version: `0.1.42`
+
+
 ## fastrtps (foxy) - 2.1.2-1
 
 The packages in the `fastrtps` repository were released into the `foxy` distro by running `/home/steven/osrf/bloom/.direnv/python-3.10.6/bin/bloom-release -r foxy -e fastrtps` on `Wed, 24 Aug 2022 20:57:22 -0000`
