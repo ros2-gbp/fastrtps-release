@@ -140,70 +140,73 @@ bool StatefulReader::matched_writer_add(
 {
     assert(wdata.guid() != c_Guid_Unknown);
 
-    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
-
-    if (!is_alive_)
     {
-        return false;
-    }
+        std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
 
-    bool is_same_process = RTPSDomainImpl::should_intraprocess_between(m_guid, wdata.guid());
-
-    for (WriterProxy* it : matched_writers_)
-    {
-        if (it->guid() == wdata.guid())
+        if (!is_alive_)
         {
-            logInfo(RTPS_READER, "Attempting to add existing writer, updating information");
-            it->update(wdata);
-            if (!is_same_process)
-            {
-                for (const Locator_t& locator : it->remote_locators_shrinked())
-                {
-                    getRTPSParticipant()->createSenderResources(locator);
-                }
-            }
             return false;
         }
-    }
 
-    // Get a writer proxy from the inactive pool (or create a new one if necessary and allowed)
-    WriterProxy* wp = nullptr;
-    if (matched_writers_pool_.empty())
-    {
-        size_t max_readers = matched_writers_pool_.max_size();
-        if (matched_writers_.size() + matched_writers_pool_.size() < max_readers)
+        bool is_same_process = RTPSDomainImpl::should_intraprocess_between(m_guid, wdata.guid());
+
+        for (WriterProxy* it : matched_writers_)
         {
-            const RTPSParticipantAttributes& part_att = mp_RTPSParticipant->getRTPSParticipantAttributes();
-            wp = new WriterProxy(this, part_att.allocation.locators, proxy_changes_config_);
+            if (it->guid() == wdata.guid())
+            {
+                logInfo(RTPS_READER, "Attempting to add existing writer, updating information");
+                it->update(wdata);
+                if (!is_same_process)
+                {
+                    for (const Locator_t& locator : it->remote_locators_shrinked())
+                    {
+                        getRTPSParticipant()->createSenderResources(locator);
+                    }
+                }
+                return false;
+            }
+        }
+
+        // Get a writer proxy from the inactive pool (or create a new one if necessary and allowed)
+        WriterProxy* wp = nullptr;
+        if (matched_writers_pool_.empty())
+        {
+            size_t max_readers = matched_writers_pool_.max_size();
+            if (matched_writers_.size() + matched_writers_pool_.size() < max_readers)
+            {
+                const RTPSParticipantAttributes& part_att = mp_RTPSParticipant->getRTPSParticipantAttributes();
+                wp = new WriterProxy(this, part_att.allocation.locators, proxy_changes_config_);
+            }
+            else
+            {
+                logWarning(RTPS_READER, "Maximum number of reader proxies (" << max_readers << \
+                        ") reached for writer " << m_guid);
+                return false;
+            }
         }
         else
         {
-            logWarning(RTPS_WRITER, "Maximum number of reader proxies (" << max_readers << \
-                    ") reached for writer " << m_guid);
-            return false;
+            wp = matched_writers_pool_.back();
+            matched_writers_pool_.pop_back();
         }
-    }
-    else
-    {
-        wp = matched_writers_pool_.back();
-        matched_writers_pool_.pop_back();
-    }
 
-    if (!is_same_process)
-    {
-        for (const Locator_t& locator : wp->remote_locators_shrinked())
+        SequenceNumber_t initial_sequence;
+        add_persistence_guid(wdata.guid(), wdata.persistence_guid());
+        initial_sequence = get_last_notified(wdata.guid());
+
+        wp->start(wdata, initial_sequence);
+
+        if (!is_same_process)
         {
-            getRTPSParticipant()->createSenderResources(locator);
+            for (const Locator_t& locator : wp->remote_locators_shrinked())
+            {
+                getRTPSParticipant()->createSenderResources(locator);
+            }
         }
+
+        matched_writers_.push_back(wp);
+        logInfo(RTPS_READER, "Writer Proxy " << wp->guid() << " added to " << m_guid.entityId);
     }
-
-    SequenceNumber_t initial_sequence;
-    add_persistence_guid(wdata.guid(), wdata.persistence_guid());
-    initial_sequence = get_last_notified(wdata.guid());
-
-    wp->start(wdata, initial_sequence);
-
-    matched_writers_.push_back(wp);
 
     if (liveliness_lease_duration_ < c_TimeInfinite)
     {
@@ -221,7 +224,6 @@ bool StatefulReader::matched_writer_add(
         }
     }
 
-    logInfo(RTPS_READER, "Writer Proxy " << wp->guid() << " added to " << m_guid.entityId);
     return true;
 }
 
@@ -229,6 +231,23 @@ bool StatefulReader::matched_writer_remove(
         const GUID_t& writer_guid,
         bool removed_by_lease)
 {
+    if (is_alive_ && liveliness_lease_duration_ < c_TimeInfinite)
+    {
+        auto wlp = this->mp_RTPSParticipant->wlp();
+        if ( wlp != nullptr)
+        {
+            wlp->sub_liveliness_manager_->remove_writer(
+                writer_guid,
+                liveliness_kind_,
+                liveliness_lease_duration_);
+        }
+        else
+        {
+            logError(RTPS_LIVELINESS,
+                    "Finite liveliness lease duration but WLP not enabled, cannot remove writer");
+        }
+    }
+
     std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
     if (is_alive_)
     {
@@ -243,39 +262,24 @@ bool StatefulReader::matched_writer_remove(
             if ((*it)->guid() == writer_guid)
             {
                 logInfo(RTPS_READER, "Writer proxy " << writer_guid << " removed from " << m_guid.entityId);
-
-                if (liveliness_lease_duration_ < c_TimeInfinite)
-                {
-                    auto wlp = this->mp_RTPSParticipant->wlp();
-                    if ( wlp != nullptr)
-                    {
-                        wlp->sub_liveliness_manager_->remove_writer(
-                            writer_guid,
-                            liveliness_kind_,
-                            liveliness_lease_duration_);
-                    }
-                    else
-                    {
-                        logError(RTPS_LIVELINESS,
-                                "Finite liveliness lease duration but WLP not enabled, cannot remove writer");
-                    }
-                }
-
                 wproxy = *it;
                 matched_writers_.erase(it);
-                remove_persistence_guid(wproxy->guid(), wproxy->persistence_guid(), removed_by_lease);
                 break;
             }
         }
 
         if (wproxy != nullptr)
         {
+            remove_persistence_guid(wproxy->guid(), wproxy->persistence_guid(), removed_by_lease);
             wproxy->stop();
             matched_writers_pool_.push_back(wproxy);
             return true;
         }
-
-        logInfo(RTPS_READER, "Writer Proxy " << writer_guid << " doesn't exist in reader " << this->getGuid().entityId);
+        else
+        {
+            logInfo(RTPS_READER,
+                    "Writer Proxy " << writer_guid << " doesn't exist in reader " << this->getGuid().entityId);
+        }
     }
     return false;
 }
@@ -719,6 +723,11 @@ bool StatefulReader::change_received(
                         "Writer Proxy " << a_change->writerGUID << " not matched to this Reader " << m_guid.entityId);
                 return false;
             }
+            else if (a_change->kind != eprosima::fastrtps::rtps::ChangeKind_t::ALIVE)
+            {
+                logInfo(RTPS_READER, "Not alive change " << a_change->writerGUID << " has not WriterProxy");
+                return false;
+            }
             else
             {
                 // handle framework messages in a stateless fashion
@@ -744,6 +753,9 @@ bool StatefulReader::change_received(
                     }
                 }
 
+                logInfo(RTPS_READER, "Change received from " << a_change->writerGUID << " with sequence number: "
+                                                             << a_change->sequenceNumber <<
+                        " skipped. Higher sequence numbers have been received.");
                 return false;
             }
         }

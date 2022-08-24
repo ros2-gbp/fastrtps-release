@@ -20,6 +20,17 @@
 #ifndef _TEST_BLACKBOX_PUBSUBREADER_HPP_
 #define _TEST_BLACKBOX_PUBSUBREADER_HPP_
 
+#include <string>
+#include <list>
+#include <atomic>
+#include <condition_variable>
+#include <asio.hpp>
+#include <gtest/gtest.h>
+
+#if _MSC_VER
+#include <Windows.h>
+#endif // _MSC_VER
+
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
@@ -36,13 +47,6 @@
 #include <fastrtps/xmlparser/XMLTree.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
-
-#include <string>
-#include <list>
-#include <atomic>
-#include <condition_variable>
-#include <asio.hpp>
-#include <gtest/gtest.h>
 
 using DomainParticipantFactory = eprosima::fastdds::dds::DomainParticipantFactory;
 using eprosima::fastrtps::rtps::IPLocator;
@@ -491,13 +495,52 @@ public:
         std::cout << "Reader discovery finished..." << std::endl;
     }
 
+    bool wait_participant_discovery(
+            unsigned int min_participants = 1,
+            std::chrono::seconds timeout = std::chrono::seconds::zero())
+    {
+        bool ret_value = true;
+        std::unique_lock<std::mutex> lock(mutexDiscovery_);
+
+        std::cout << "Reader is waiting discovery of at least " << min_participants << " participants..." << std::endl;
+
+        if (timeout == std::chrono::seconds::zero())
+        {
+            cvDiscovery_.wait(lock, [&]()
+                    {
+                        return participant_matched_ >= min_participants;
+                    });
+        }
+        else
+        {
+            if (!cvDiscovery_.wait_for(lock, timeout, [&]()
+                    {
+                        return participant_matched_ >= min_participants;
+                    }))
+            {
+                ret_value = false;
+            }
+        }
+
+        if (ret_value)
+        {
+            std::cout << "Reader participant discovery finished successfully..." << std::endl;
+        }
+        else
+        {
+            std::cout << "Reader participant discovery finished unsuccessfully..." << std::endl;
+        }
+
+        return ret_value;
+    }
+
     bool wait_participant_undiscovery(
             std::chrono::seconds timeout = std::chrono::seconds::zero())
     {
         bool ret_value = true;
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
-        std::cout << "Reader is waiting undiscovery..." << std::endl;
+        std::cout << "Reader is waiting participant undiscovery..." << std::endl;
 
         if (timeout == std::chrono::seconds::zero())
         {
@@ -519,11 +562,11 @@ public:
 
         if (ret_value)
         {
-            std::cout << "Reader undiscovery finished successfully..." << std::endl;
+            std::cout << "Reader participant undiscovery finished successfully..." << std::endl;
         }
         else
         {
-            std::cout << "Reader undiscovery finished unsuccessfully..." << std::endl;
+            std::cout << "Reader participant undiscovery finished unsuccessfully..." << std::endl;
         }
 
         return ret_value;
@@ -881,6 +924,13 @@ public:
         return *this;
     }
 
+    PubSubReader& ignore_participant_flags(
+            eprosima::fastrtps::rtps::ParticipantFilteringFlags_t flags)
+    {
+        participant_qos_.wire_protocol().builtin.discovery_config.ignoreParticipantFlags = flags;
+        return *this;
+    }
+
     PubSubReader& socket_buffer_size(
             uint32_t sockerBufferSize)
     {
@@ -1064,6 +1114,12 @@ public:
     {
         subscriber_qos_.partition().clear();
         subscriber_qos_.partition().push_back(partition.c_str());
+        return (ReturnCode_t::RETCODE_OK == subscriber_->set_qos(subscriber_qos_));
+    }
+
+    bool clear_partitions()
+    {
+        subscriber_qos_.partition().clear();
         return (ReturnCode_t::RETCODE_OK == subscriber_->set_qos(subscriber_qos_));
     }
 
