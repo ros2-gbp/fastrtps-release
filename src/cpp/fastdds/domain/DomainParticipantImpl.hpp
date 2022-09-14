@@ -20,6 +20,10 @@
 #ifndef _FASTDDS_PARTICIPANTIMPL_HPP_
 #define _FASTDDS_PARTICIPANTIMPL_HPP_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
+#include <mutex>
+#include <condition_variable>
+
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/participant/RTPSParticipantListener.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
@@ -28,11 +32,16 @@
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
 #include <fastdds/dds/topic/qos/TopicQos.hpp>
+#include <fastdds/dds/topic/ContentFilteredTopic.hpp>
+#include <fastdds/dds/topic/IContentFilterFactory.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
 
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastrtps/types/TypesBase.h>
+
+#include "fastdds/topic/DDSSQLFilter/DDSFilterFactory.hpp"
+#include <fastdds/topic/TopicProxyFactory.hpp>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -63,6 +72,7 @@ class PublisherListener;
 class Subscriber;
 class SubscriberImpl;
 class SubscriberListener;
+class ReaderFilterCollection;
 
 /**
  * This is the implementation class of the DomainParticipant.
@@ -72,6 +82,7 @@ class DomainParticipantImpl
 {
     friend class DomainParticipantFactory;
     friend class DomainParticipant;
+    friend class ReaderFilterCollection;
 
 protected:
 
@@ -116,6 +127,20 @@ public:
      */
     Publisher* create_publisher(
             const PublisherQos& qos,
+            PublisherListener* listener = nullptr,
+            const StatusMask& mask = StatusMask::all());
+
+    /**
+     * Create a Publisher in this Participant.
+     * @param qos QoS of the Publisher.
+     * @param[out] impl Return a pointer to the created Publisher's implementation.
+     * @param listenerer Pointer to the listener.
+     * @param mask StatusMask
+     * @return Pointer to the created Publisher.
+     */
+    Publisher* create_publisher(
+            const PublisherQos& qos,
+            PublisherImpl** impl,
             PublisherListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all());
 
@@ -193,8 +218,59 @@ public:
             TopicListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all());
 
+    /**
+     * Gives access to an existing (or ready to exist) enabled Topic.
+     * It should be noted that the returned Topic is a local object that acts as a proxy to designate the global
+     * concept of topic.
+     * Topics obtained by means of find_topic, must also be deleted by means of delete_topic so that the local
+     * resources can be released.
+     * If a Topic is obtained multiple times by means of find_topic or create_topic, it must also be deleted that same
+     * number of times using delete_topic.
+     *
+     * @param topic_name Topic name
+     * @param timeout Maximum time to wait for the Topic
+     * @return Pointer to the existing Topic, nullptr in case of error or timeout
+     */
+    Topic* find_topic(
+            const std::string& topic_name,
+            const fastrtps::Duration_t& timeout);
+
+    /**
+     * Implementation of Topic::set_listener that propagates the listener and mask to all the TopicProxy
+     * objects held by the same TopicProxy factory in a thread-safe way.
+     *
+     * @param factory  TopicProxyFactory managing the topic on which the listener should be changed.
+     * @param listener Listener to assign to all the TopicProxy objects owned by the factory.
+     * @param mask     StatusMask to assign to all the TopicProxy objects owned by the factory.
+     */
+    void set_topic_listener(
+            const TopicProxyFactory* factory,
+            TopicImpl* topic,
+            TopicListener* listener,
+            const StatusMask& mask);
+
     ReturnCode_t delete_topic(
             const Topic* topic);
+
+    ContentFilteredTopic* create_contentfilteredtopic(
+            const std::string& name,
+            Topic* related_topic,
+            const std::string& filter_expression,
+            const std::vector<std::string>& expression_parameters,
+            const char* filter_class_name);
+
+    ReturnCode_t delete_contentfilteredtopic(
+            const ContentFilteredTopic* topic);
+
+    ReturnCode_t register_content_filter_factory(
+            const char* filter_class_name,
+            IContentFilterFactory* const filter_factory);
+
+    IContentFilterFactory* lookup_content_filter_factory(
+            const char* filter_class_name);
+
+    ReturnCode_t unregister_content_filter_factory(
+            const char* filter_class_name);
 
     /**
      * Looks up an existing, locally created @ref TopicDescription, based on its name.
@@ -390,6 +466,11 @@ public:
     DomainParticipantListener* get_listener_for(
             const StatusMask& status);
 
+    uint32_t& id_counter()
+    {
+        return id_counter_;
+    }
+
 protected:
 
     //!Domain id
@@ -435,9 +516,13 @@ protected:
     mutable std::mutex mtx_types_;
 
     //!Topic map
-    std::map<std::string, TopicImpl*> topics_;
+    std::map<std::string, TopicProxyFactory*> topics_;
     std::map<InstanceHandle_t, Topic*> topics_by_handle_;
+    std::map<std::string, std::unique_ptr<ContentFilteredTopic>> filtered_topics_;
+    std::map<std::string, IContentFilterFactory*> filter_factories_;
+    DDSSQLFilter::DDSFilterFactory dds_sql_filter_factory_;
     mutable std::mutex mtx_topics_;
+    std::condition_variable cond_topics_;
 
     TopicQos default_topic_qos_;
 
@@ -455,6 +540,8 @@ protected:
 
     // All parent's child requests
     std::map<fastrtps::rtps::SampleIdentity, std::vector<fastrtps::rtps::SampleIdentity>> parent_requests_;
+
+    uint32_t id_counter_ = 0;
 
     class MyRTPSParticipantListener : public fastrtps::rtps::RTPSParticipantListener
     {
@@ -559,7 +646,20 @@ protected:
     std::string get_inner_type_name(
             const fastrtps::rtps::SampleIdentity& id) const;
 
-    static void set_qos(
+    IContentFilterFactory* find_content_filter_factory(
+            const char* filter_class_name);
+
+    /**
+     * Set the DomainParticipantQos checking if the Qos can be updated or not
+     *
+     * @param to DomainParticipantQos to be updated
+     * @param from DomainParticipantQos desired
+     * @param first_time Whether the DomainParticipant has been already initialized or not
+     *
+     * @return true if there has been a changed in one of the attributes that can be updated.
+     * false otherwise.
+     */
+    static bool set_qos(
             DomainParticipantQos& to,
             const DomainParticipantQos& from,
             bool first_time);

@@ -17,43 +17,51 @@
  *
  */
 
+#include <chrono>
+#include <string>
+
+#include <asio.hpp>
+
 #include <fastdds/domain/DomainParticipantImpl.hpp>
 
+#include <fastdds/core/policy/QosPolicyUtils.hpp>
 #include <fastdds/dds/builtin/typelookup/TypeLookupManager.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
-#include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/log/Log.hpp>
-#include <fastdds/dds/publisher/Publisher.hpp>
-#include <fastdds/dds/subscriber/Subscriber.hpp>
-#include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
-
-#include <fastdds/rtps/RTPSDomain.h>
+#include <fastdds/dds/publisher/Publisher.hpp>
+#include <fastdds/dds/subscriber/DataReader.hpp>
+#include <fastdds/dds/subscriber/Subscriber.hpp>
+#include <fastdds/dds/topic/IContentFilterFactory.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
+#include <fastdds/publisher/PublisherImpl.hpp>
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
+#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
 #include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
+#include <fastdds/rtps/RTPSDomain.h>
 #include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
-
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
-
-#include <fastrtps/types/TypeObjectFactory.h>
-#include <fastrtps/types/DynamicTypeBuilderFactory.h>
 #include <fastrtps/types/DynamicPubSubType.h>
 #include <fastrtps/types/DynamicType.h>
+#include <fastrtps/types/DynamicTypeBuilderFactory.h>
 #include <fastrtps/types/DynamicTypeMember.h>
-
+#include <fastrtps/types/TypeObjectFactory.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
-#include <fastdds/publisher/PublisherImpl.hpp>
+#include <fastdds/publisher/DataWriterImpl.hpp>
 #include <fastdds/subscriber/SubscriberImpl.hpp>
+#include <fastdds/topic/ContentFilteredTopicImpl.hpp>
 #include <fastdds/topic/TopicImpl.hpp>
-
+#include <fastdds/topic/TopicProxy.hpp>
+#include <fastdds/topic/TopicProxyFactory.hpp>
 #include <rtps/RTPSDomainImpl.hpp>
-
-#include <chrono>
+#include <utils/SystemInfo.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -99,6 +107,7 @@ static void set_attributes_from_qos(
     attr.sendSocketBufferSize = qos.transport().send_socket_buffer_size;
     attr.listenSocketBufferSize = qos.transport().listen_socket_buffer_size;
     attr.userData = qos.user_data().data_vec();
+    attr.flow_controllers = qos.flow_controllers();
 }
 
 static void set_qos_from_attributes(
@@ -161,6 +170,32 @@ DomainParticipantImpl::DomainParticipantImpl(
     // Pre calculate participant id and generated guid
     participant_id_ = qos_.wire_protocol().participant_id;
     eprosima::fastrtps::rtps::RTPSDomainImpl::create_participant_guid(participant_id_, guid_);
+
+    /* Fill physical data properties if they are found and empty */
+    std::string* property_value = fastrtps::rtps::PropertyPolicyHelper::find_property(
+        qos_.properties(), parameter_policy_physical_data_host);
+    if (nullptr != property_value && property_value->empty())
+    {
+        property_value->assign(asio::ip::host_name() + ":" + std::to_string(utils::default_domain_id()));
+    }
+
+    property_value = fastrtps::rtps::PropertyPolicyHelper::find_property(
+        qos_.properties(), parameter_policy_physical_data_user);
+    if (nullptr != property_value && property_value->empty())
+    {
+        std::string username = "unknown";
+        if (ReturnCode_t::RETCODE_OK == SystemInfo::get_username(username))
+        {
+            property_value->assign(username);
+        }
+    }
+
+    property_value = fastrtps::rtps::PropertyPolicyHelper::find_property(
+        qos_.properties(), parameter_policy_physical_data_process);
+    if (nullptr != property_value && property_value->empty())
+    {
+        property_value->assign(std::to_string(SystemInfo::instance().process_id()));
+    }
 }
 
 void DomainParticipantImpl::disable()
@@ -221,6 +256,8 @@ DomainParticipantImpl::~DomainParticipantImpl()
     {
         std::lock_guard<std::mutex> lock(mtx_topics_);
 
+        filtered_topics_.clear();
+
         for (auto topic_it = topics_.begin(); topic_it != topics_.end(); ++topic_it)
         {
             delete topic_it->second;
@@ -277,7 +314,6 @@ ReturnCode_t DomainParticipantImpl::enable()
 
     guid_ = part->getGuid();
     rtps_participant_ = part;
-    rtps_participant_->enable();
 
     rtps_participant_->set_check_type_function(
         [this](const std::string& type_name) -> bool
@@ -293,7 +329,7 @@ ReturnCode_t DomainParticipantImpl::enable()
 
             for (auto topic : topics_)
             {
-                topic.second->user_topic_->enable();
+                topic.second->enable_topic();
             }
         }
 
@@ -319,6 +355,8 @@ ReturnCode_t DomainParticipantImpl::enable()
         }
     }
 
+    rtps_participant_->enable();
+
     return ReturnCode_t::RETCODE_OK;
 }
 
@@ -342,7 +380,24 @@ ReturnCode_t DomainParticipantImpl::set_qos(
     {
         return ReturnCode_t::RETCODE_IMMUTABLE_POLICY;
     }
-    set_qos(qos_, qos_to_set, !enabled);
+
+    bool qos_should_be_updated = set_qos(qos_, qos_to_set, !enabled);
+    if (enabled)
+    {
+        if (qos_should_be_updated)
+        {
+            // Notify the participant that there is a QoS update
+            fastrtps::rtps::RTPSParticipantAttributes patt;
+            set_attributes_from_qos(patt, qos_);
+            rtps_participant_->update_attributes(patt);
+        }
+        else
+        {
+            // Trigger update of network interfaces by calling update_attributes
+            rtps_participant_->update_attributes(rtps_participant_->getRTPSParticipantAttributes());
+        }
+    }
+
     return ReturnCode_t::RETCODE_OK;
 }
 
@@ -414,6 +469,53 @@ ReturnCode_t DomainParticipantImpl::delete_subscriber(
     return ReturnCode_t::RETCODE_ERROR;
 }
 
+Topic* DomainParticipantImpl::find_topic(
+        const std::string& topic_name,
+        const fastrtps::Duration_t& timeout)
+{
+    auto find_fn = [this, &topic_name]()
+            {
+                return topics_.count(topic_name) > 0;
+            };
+
+    std::unique_lock<std::mutex> lock(mtx_topics_);
+    if (timeout.is_infinite())
+    {
+        cond_topics_.wait(lock, find_fn);
+    }
+    else
+    {
+        auto duration = std::chrono::seconds(timeout.seconds) + std::chrono::nanoseconds(timeout.nanosec);
+        if (!cond_topics_.wait_for(lock, duration, find_fn))
+        {
+            return nullptr;
+        }
+    }
+
+    Topic* ret_val = topics_[topic_name]->create_topic()->get_topic();
+
+    InstanceHandle_t topic_handle;
+    create_instance_handle(topic_handle);
+    ret_val->set_instance_handle(topic_handle);
+    topics_by_handle_[topic_handle] = ret_val;
+
+    return ret_val;
+}
+
+void DomainParticipantImpl::set_topic_listener(
+        const TopicProxyFactory* factory,
+        TopicImpl* impl,
+        TopicListener* listener,
+        const StatusMask& mask)
+{
+    std::lock_guard<std::mutex> lock(mtx_topics_);
+    impl->set_listener(listener);
+    factory->for_each([mask](const std::unique_ptr<TopicProxy>& proxy)
+            {
+                proxy->get_topic()->status_mask_ = mask;
+            });
+}
+
 ReturnCode_t DomainParticipantImpl::delete_topic(
         const Topic* topic)
 {
@@ -422,30 +524,227 @@ ReturnCode_t DomainParticipantImpl::delete_topic(
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 
-    if (participant_ != topic->get_participant())
+    std::lock_guard<std::mutex> lock(mtx_topics_);
+    auto handle_it = std::find_if(topics_by_handle_.begin(), topics_by_handle_.end(),
+                    [topic](const decltype(topics_by_handle_)::value_type& item)
+                    {
+                        return item.second == topic;
+                    });
+    if (handle_it != topics_by_handle_.end())
+    {
+        auto it = topics_.find(topic->get_name());
+        assert(it != topics_.end() && "Topic found by handle but factory not found");
+        InstanceHandle_t handle = topic->get_instance_handle();
+
+        TopicProxy* proxy = dynamic_cast<TopicProxy*>(topic->get_impl());
+        assert(nullptr != proxy);
+        auto ret_code = it->second->delete_topic(proxy);
+        if (ReturnCode_t::RETCODE_OK == ret_code)
+        {
+            topics_by_handle_.erase(handle);
+
+            if (it->second->can_be_deleted())
+            {
+                auto factory = it->second;
+                topics_.erase(it);
+                delete factory;
+            }
+        }
+        return ret_code;
+    }
+
+    return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+}
+
+ContentFilteredTopic* DomainParticipantImpl::create_contentfilteredtopic(
+        const std::string& name,
+        Topic* related_topic,
+        const std::string& filter_expression,
+        const std::vector<std::string>& expression_parameters,
+        const char* filter_class_name)
+{
+    if ((nullptr == related_topic) || (nullptr == filter_class_name))
+    {
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_topics_);
+
+    // Check there is no Topic with the same name
+    if ((topics_.find(name) != topics_.end()) ||
+            (filtered_topics_.find(name) != filtered_topics_.end()))
+    {
+        logError(PARTICIPANT, "Topic with name : " << name << " already exists");
+        return nullptr;
+    }
+
+    if (related_topic->get_participant() != this->participant_)
+    {
+        logError(PARTICIPANT, "Creating ContentFilteredTopic with name " << name <<
+                ": related_topic not from this participant");
+        return nullptr;
+    }
+
+    IContentFilterFactory* filter_factory = find_content_filter_factory(filter_class_name);
+    if (nullptr == filter_factory)
+    {
+        logError(PARTICIPANT, "Could not find factory for filter class " << filter_class_name);
+        return nullptr;
+    }
+
+    TopicProxy* topic_impl = dynamic_cast<TopicProxy*>(related_topic->get_impl());
+    assert(nullptr != topic_impl);
+    const TypeSupport& type = topic_impl->get_type();
+    LoanableSequence<const char*>::size_type n_params;
+    n_params = static_cast<LoanableSequence<const char*>::size_type>(expression_parameters.size());
+    LoanableSequence<const char*> filter_parameters(n_params);
+    filter_parameters.length(n_params);
+    while (n_params > 0)
+    {
+        n_params--;
+        filter_parameters[n_params] = expression_parameters[n_params].c_str();
+    }
+
+    // Tell filter factory to compile the expression
+    IContentFilter* filter_instance = nullptr;
+    if (ReturnCode_t::RETCODE_OK !=
+            filter_factory->create_content_filter(filter_class_name, related_topic->get_type_name().c_str(),
+            type.get(), filter_expression.c_str(), filter_parameters, filter_instance))
+    {
+        logError(PARTICIPANT, "Could not create filter of class " << filter_class_name << " for expression \"" <<
+                filter_expression);
+        return nullptr;
+    }
+
+    ContentFilteredTopic* topic;
+    topic = new ContentFilteredTopic(name, related_topic, filter_expression, expression_parameters);
+    ContentFilteredTopicImpl* content_topic_impl = static_cast<ContentFilteredTopicImpl*>(topic->get_impl());
+    content_topic_impl->filter_property.filter_class_name = filter_class_name;
+    content_topic_impl->filter_factory = filter_factory;
+    content_topic_impl->filter_instance = filter_instance;
+    content_topic_impl->update_signature();
+
+    // Save the topic into the map
+    filtered_topics_.emplace(std::make_pair(name, std::unique_ptr<ContentFilteredTopic>(topic)));
+
+    return topic;
+}
+
+ReturnCode_t DomainParticipantImpl::delete_contentfilteredtopic(
+        const ContentFilteredTopic* topic)
+{
+    if (topic == nullptr)
+    {
+        return ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_topics_);
+    auto it = filtered_topics_.find(topic->get_name());
+
+    if (it != filtered_topics_.end())
+    {
+        if (it->second->get_impl()->is_referenced())
+        {
+            return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+        }
+        filtered_topics_.erase(it);
+        return ReturnCode_t::RETCODE_OK;
+    }
+
+    return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+}
+
+ReturnCode_t DomainParticipantImpl::register_content_filter_factory(
+        const char* filter_class_name,
+        IContentFilterFactory* const filter_factory)
+{
+    if (nullptr == filter_factory || nullptr == filter_class_name || strlen(filter_class_name) > 255)
+    {
+        return ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_topics_);
+    auto it = filter_factories_.find(filter_class_name);
+    if ((it != filter_factories_.end()) || (0 == strcmp(filter_class_name, FASTDDS_SQLFILTER_NAME)))
     {
         return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
 
-    std::lock_guard<std::mutex> lock(mtx_topics_);
-    auto it = topics_.find(topic->get_name());
+    filter_factories_[filter_class_name] = filter_factory;
+    return ReturnCode_t::RETCODE_OK;
+}
 
-    if (it != topics_.end())
+IContentFilterFactory* DomainParticipantImpl::lookup_content_filter_factory(
+        const char* filter_class_name)
+{
+    if (nullptr == filter_class_name)
     {
-        assert(topic->get_instance_handle() == it->second->get_topic()->get_instance_handle()
-                && "The topic instance handle does not match the topic implementation instance handle");
-        if (it->second->is_referenced())
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_topics_);
+    auto it = filter_factories_.find(filter_class_name);
+    if ((it == filter_factories_.end()) || (it->first == FASTDDS_SQLFILTER_NAME))
+    {
+        return nullptr;
+    }
+    return it->second;
+}
+
+ReturnCode_t DomainParticipantImpl::unregister_content_filter_factory(
+        const char* filter_class_name)
+{
+    if (nullptr == filter_class_name)
+    {
+        return ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_topics_);
+    auto it = filter_factories_.find(filter_class_name);
+    if ((it == filter_factories_.end()) || (it->first == FASTDDS_SQLFILTER_NAME))
+    {
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    for (auto& topic : filtered_topics_)
+    {
+        if (topic.second->impl_->filter_property.filter_class_name == filter_class_name)
         {
             return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
         }
-        it->second->set_listener(nullptr);
-        topics_by_handle_.erase(topic->get_instance_handle());
-        delete it->second;
-        topics_.erase(it);
-        return ReturnCode_t::RETCODE_OK;
     }
 
-    return ReturnCode_t::RETCODE_ERROR;
+    for (auto& pub : publishers_)
+    {
+        for (auto& topic : pub.second->writers_)
+        {
+            for (auto& wr : topic.second)
+            {
+                wr->filter_is_being_removed(filter_class_name);
+            }
+        }
+    }
+
+    filter_factories_.erase(it);
+
+    return ReturnCode_t::RETCODE_OK;
+}
+
+IContentFilterFactory* DomainParticipantImpl::find_content_filter_factory(
+        const char* filter_class_name)
+{
+    auto it = filter_factories_.find(filter_class_name);
+    if (it != filter_factories_.end())
+    {
+        return it->second;
+    }
+
+    if (0 != strcmp(filter_class_name, FASTDDS_SQLFILTER_NAME))
+    {
+        return nullptr;
+    }
+
+    return &dds_sql_filter_factory_;
 }
 
 const InstanceHandle_t& DomainParticipantImpl::get_instance_handle() const
@@ -460,6 +759,15 @@ const GUID_t& DomainParticipantImpl::guid() const
 
 Publisher* DomainParticipantImpl::create_publisher(
         const PublisherQos& qos,
+        PublisherListener* listener,
+        const StatusMask& mask)
+{
+    return create_publisher(qos, nullptr, listener, mask);
+}
+
+Publisher* DomainParticipantImpl::create_publisher(
+        const PublisherQos& qos,
+        PublisherImpl** impl,
         PublisherListener* listener,
         const StatusMask& mask)
 {
@@ -495,6 +803,11 @@ Publisher* DomainParticipantImpl::create_publisher(
         ReturnCode_t ret_publisher_enable = pub->enable();
         assert(ReturnCode_t::RETCODE_OK == ret_publisher_enable);
         (void)ret_publisher_enable;
+    }
+
+    if (impl)
+    {
+        *impl = pubimpl;
     }
 
     return pub;
@@ -645,12 +958,12 @@ ReturnCode_t DomainParticipantImpl::delete_contained_entities()
 
     std::lock_guard<std::mutex> lock_topics(mtx_topics_);
 
-    auto it_topics = topics_.begin();
+    filtered_topics_.clear();
+    topics_by_handle_.clear();
 
+    auto it_topics = topics_.begin();
     while (it_topics != topics_.end())
     {
-        it_topics->second->set_listener(nullptr);
-        topics_by_handle_.erase(it_topics->second->get_topic()->get_instance_handle());
         delete it_topics->second;
         it_topics = topics_.erase(it_topics);
     }
@@ -1030,8 +1343,9 @@ Topic* DomainParticipantImpl::create_topic(
 
     std::lock_guard<std::mutex> lock(mtx_topics_);
 
-    //Check there is no Topic with the same name
-    if (topics_.find(topic_name) != topics_.end())
+    // Check there is no Topic with the same name
+    if ((topics_.find(topic_name) != topics_.end()) ||
+            (filtered_topics_.find(topic_name) != filtered_topics_.end()))
     {
         logError(PARTICIPANT, "Topic with name : " << topic_name << " already exists");
         return nullptr;
@@ -1040,15 +1354,14 @@ Topic* DomainParticipantImpl::create_topic(
     InstanceHandle_t topic_handle;
     create_instance_handle(topic_handle);
 
-    //TODO CONSTRUIR LA IMPLEMENTACION DENTRO DEL OBJETO DEL USUARIO.
-    TopicImpl* topic_impl = new TopicImpl(this, type_support, qos, listener);
-    Topic* topic = new Topic(topic_name, type_name, topic_impl, mask);
-    topic_impl->user_topic_ = topic;
+    TopicProxyFactory* factory = new TopicProxyFactory(this, topic_name, mask, type_support, qos, listener);
+    TopicProxy* proxy = factory->create_topic();
+    Topic* topic = proxy->get_topic();
     topic->set_instance_handle(topic_handle);
 
     //SAVE THE TOPIC INTO MAPS
     topics_by_handle_[topic_handle] = topic;
-    topics_[topic_name] = topic_impl;
+    topics_[topic_name] = factory;
 
     // Enable topic if appropriate
     if (enabled && qos_.entity_factory().autoenable_created_entities)
@@ -1057,6 +1370,8 @@ Topic* DomainParticipantImpl::create_topic(
         assert(ReturnCode_t::RETCODE_OK == ret_topic_enable);
         (void)ret_topic_enable;
     }
+
+    cond_topics_.notify_all();
 
     return topic;
 }
@@ -1083,11 +1398,18 @@ Topic* DomainParticipantImpl::create_topic_with_profile(
 TopicDescription* DomainParticipantImpl::lookup_topicdescription(
         const std::string& topic_name) const
 {
-    auto it = topics_.find(topic_name);
+    std::lock_guard<std::mutex> lock(mtx_topics_);
 
+    auto it = topics_.find(topic_name);
     if (it != topics_.end())
     {
-        return it->second->user_topic_;
+        return it->second->get_topic()->get_topic();
+    }
+
+    auto filtered_it = filtered_topics_.find(topic_name);
+    if (filtered_it != filtered_topics_.end())
+    {
+        return filtered_it->second.get();
     }
 
     return nullptr;
@@ -1805,11 +2127,13 @@ bool DomainParticipantImpl::has_active_entities()
     return false;
 }
 
-void DomainParticipantImpl::set_qos(
+bool DomainParticipantImpl::set_qos(
         DomainParticipantQos& to,
         const DomainParticipantQos& from,
         bool first_time)
 {
+    bool qos_should_be_updated = false;
+
     if (!(to.entity_factory() == from.entity_factory()))
     {
         to.entity_factory() = from.entity_factory();
@@ -1818,6 +2142,10 @@ void DomainParticipantImpl::set_qos(
     {
         to.user_data() = from.user_data();
         to.user_data().hasChanged = true;
+        if (!first_time)
+        {
+            qos_should_be_updated = true;
+        }
     }
     if (first_time && !(to.allocation() == from.allocation()))
     {
@@ -1827,9 +2155,14 @@ void DomainParticipantImpl::set_qos(
     {
         to.properties() = from.properties();
     }
-    if (first_time && !(to.wire_protocol() == from.wire_protocol()))
+    if (!(to.wire_protocol() == from.wire_protocol()))
     {
         to.wire_protocol() = from.wire_protocol();
+        to.wire_protocol().hasChanged = true;
+        if (!first_time)
+        {
+            qos_should_be_updated = true;
+        }
     }
     if (first_time && !(to.transport() == from.transport()))
     {
@@ -1839,6 +2172,8 @@ void DomainParticipantImpl::set_qos(
     {
         to.name() = from.name();
     }
+
+    return qos_should_be_updated;
 }
 
 fastrtps::types::ReturnCode_t DomainParticipantImpl::check_qos(
@@ -1869,8 +2204,92 @@ bool DomainParticipantImpl::can_qos_be_updated(
     }
     if (!(to.wire_protocol() == from.wire_protocol()))
     {
-        updatable = false;
-        logWarning(RTPS_QOS_CHECK, "WireProtocolConfigQos cannot be changed after the participant is enabled");
+        // Check that the only modification was in wire_protocol().discovery_config.m_DiscoveryServers
+        if ((to.wire_protocol().builtin.discovery_config.m_DiscoveryServers ==
+                from.wire_protocol().builtin.discovery_config.m_DiscoveryServers) ||
+                (!(to.wire_protocol().builtin.discovery_config.m_DiscoveryServers ==
+                from.wire_protocol().builtin.discovery_config.m_DiscoveryServers) &&
+                (!(to.wire_protocol().prefix == from.wire_protocol().prefix) ||
+                !(to.wire_protocol().participant_id == from.wire_protocol().participant_id) ||
+                !(to.wire_protocol().port == from.wire_protocol().port) ||
+                !(to.wire_protocol().throughput_controller == from.wire_protocol().throughput_controller) ||
+                !(to.wire_protocol().default_unicast_locator_list ==
+                from.wire_protocol().default_unicast_locator_list) ||
+                !(to.wire_protocol().default_multicast_locator_list ==
+                from.wire_protocol().default_multicast_locator_list) ||
+                !(to.wire_protocol().builtin.use_WriterLivelinessProtocol ==
+                from.wire_protocol().builtin.use_WriterLivelinessProtocol) ||
+                !(to.wire_protocol().builtin.typelookup_config.use_client ==
+                from.wire_protocol().builtin.typelookup_config.use_client) ||
+                !(to.wire_protocol().builtin.typelookup_config.use_server ==
+                from.wire_protocol().builtin.typelookup_config.use_server) ||
+                !(to.wire_protocol().builtin.metatrafficUnicastLocatorList ==
+                from.wire_protocol().builtin.metatrafficUnicastLocatorList) ||
+                !(to.wire_protocol().builtin.metatrafficMulticastLocatorList ==
+                from.wire_protocol().builtin.metatrafficMulticastLocatorList) ||
+                !(to.wire_protocol().builtin.initialPeersList == from.wire_protocol().builtin.initialPeersList) ||
+                !(to.wire_protocol().builtin.readerHistoryMemoryPolicy ==
+                from.wire_protocol().builtin.readerHistoryMemoryPolicy) ||
+                !(to.wire_protocol().builtin.readerPayloadSize == from.wire_protocol().builtin.readerPayloadSize) ||
+                !(to.wire_protocol().builtin.writerHistoryMemoryPolicy ==
+                from.wire_protocol().builtin.writerHistoryMemoryPolicy) ||
+                !(to.wire_protocol().builtin.writerPayloadSize == from.wire_protocol().builtin.writerPayloadSize) ||
+                !(to.wire_protocol().builtin.mutation_tries == from.wire_protocol().builtin.mutation_tries) ||
+                !(to.wire_protocol().builtin.avoid_builtin_multicast ==
+                from.wire_protocol().builtin.avoid_builtin_multicast) ||
+                !(to.wire_protocol().builtin.discovery_config.discoveryProtocol ==
+                from.wire_protocol().builtin.discovery_config.discoveryProtocol) ||
+                !(to.wire_protocol().builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol ==
+                from.wire_protocol().builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol) ||
+                !(to.wire_protocol().builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol ==
+                from.wire_protocol().builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol) ||
+                !(to.wire_protocol().builtin.discovery_config.discoveryServer_client_syncperiod ==
+                from.wire_protocol().builtin.discovery_config.discoveryServer_client_syncperiod) ||
+                !(to.wire_protocol().builtin.discovery_config.m_PDPfactory ==
+                from.wire_protocol().builtin.discovery_config.m_PDPfactory) ||
+                !(to.wire_protocol().builtin.discovery_config.leaseDuration ==
+                from.wire_protocol().builtin.discovery_config.leaseDuration) ||
+                !(to.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod ==
+                from.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod) ||
+                !(to.wire_protocol().builtin.discovery_config.initial_announcements ==
+                from.wire_protocol().builtin.discovery_config.initial_announcements) ||
+                !(to.wire_protocol().builtin.discovery_config.m_simpleEDP ==
+                from.wire_protocol().builtin.discovery_config.m_simpleEDP) ||
+                !(strcmp(to.wire_protocol().builtin.discovery_config.static_edp_xml_config(),
+                from.wire_protocol().builtin.discovery_config.static_edp_xml_config()) == 0) ||
+                !(to.wire_protocol().builtin.discovery_config.ignoreParticipantFlags ==
+                from.wire_protocol().builtin.discovery_config.ignoreParticipantFlags))))
+        {
+            updatable = false;
+            logWarning(RTPS_QOS_CHECK, "WireProtocolConfigQos cannot be changed after the participant is enabled, "
+                    << "with the exception of builtin.discovery_config.m_DiscoveryServers");
+        }
+        else
+        {
+            // This means that the only change is in wire_protocol().builtin.discovery_config.m_DiscoveryServers
+            // In that case, we need to ensure that the current list (to) is strictly contained in the incoming
+            // list (from). For that, we check that every server in the current list (to) is also in the incoming one
+            // (from)
+            for (auto existing_server : to.wire_protocol().builtin.discovery_config.m_DiscoveryServers)
+            {
+                bool contained = false;
+                for (auto incoming_server : from.wire_protocol().builtin.discovery_config.m_DiscoveryServers)
+                {
+                    if (existing_server.guidPrefix == incoming_server.guidPrefix)
+                    {
+                        contained = true;
+                        break;
+                    }
+                }
+                if (!contained)
+                {
+                    updatable = false;
+                    logWarning(RTPS_QOS_CHECK,
+                            "Discovery Servers cannot be removed from the list; they can only be added");
+                    break;
+                }
+            }
+        }
     }
     if (!(to.transport() == from.transport()))
     {

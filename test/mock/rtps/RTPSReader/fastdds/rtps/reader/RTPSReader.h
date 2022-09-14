@@ -19,6 +19,8 @@
 #ifndef _FASTDDS_RTPS_READER_RTPSREADER_H_
 #define _FASTDDS_RTPS_READER_RTPSREADER_H_
 
+#include <fastdds/rtps/writer/IReaderDataFilter.hpp>
+
 #include <fastrtps/rtps/Endpoint.h>
 #include <fastrtps/rtps/history/ReaderHistory.h>
 #include <fastrtps/rtps/reader/ReaderListener.h>
@@ -113,6 +115,10 @@ public:
 
     MOCK_METHOD0(get_unread_count, uint64_t());
 
+    MOCK_METHOD1(get_unread_count, uint64_t(bool));
+
+    MOCK_METHOD1(set_content_filter, void (eprosima::fastdds::rtps::IReaderDataFilter* filter));
+
     // *INDENT-ON*
 
 
@@ -176,6 +182,14 @@ public:
         return true;
     }
 
+    void setHistory(
+            ReaderHistory* history)
+    {
+        history->mp_reader = this;
+        history->mp_mutex = &mp_mutex;
+        history_ = history;
+    }
+
     ReaderHistory* getHistory()
     {
         getHistory_mock();
@@ -217,7 +231,7 @@ public:
 
     ReaderListener* listener_;
 
-    const GUID_t m_guid;
+    GUID_t m_guid;
 };
 
 } // namespace rtps

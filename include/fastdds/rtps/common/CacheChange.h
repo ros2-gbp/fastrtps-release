@@ -35,6 +35,34 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+/*!
+ * Specific information for a writer.
+ */
+struct CacheChangeWriterInfo_t
+{
+    //!Number of DATA / DATA_FRAG submessages sent to the transport (only used in Writers)
+    size_t num_sent_submessages = 0;
+    //! Used to link with previous node in a list. Used by FlowControllerImpl.
+    //! Cannot be cached because there are several comparisons without locking.
+    CacheChange_t* volatile previous = nullptr;
+    //! Used to link with next node in a list. Used by FlowControllerImpl.
+    //! Cannot be cached because there are several comparisons without locking.
+    CacheChange_t* volatile next = nullptr;
+};
+
+/*!
+ * Specific information for a reader.
+ */
+struct CacheChangeReaderInfo_t
+{
+    //!Reception TimeStamp (only used in Readers)
+    Time_t receptionTimestamp;
+    //! Disposed generation of the instance when this entry was added to it
+    int32_t disposed_generation_count;
+    //! No-writers generation of the instance when this entry was added to it
+    int32_t no_writers_generation_count;
+};
+
 /**
  * Structure CacheChange_t, contains information on a specific CacheChange.
  * @ingroup COMMON_MODULE
@@ -51,16 +79,16 @@ struct RTPS_DllAPI CacheChange_t
     SequenceNumber_t sequenceNumber{};
     //!Serialized Payload associated with the change.
     SerializedPayload_t serializedPayload{};
+    //!CDR serialization of inlined QoS for this change.
+    SerializedPayload_t inline_qos{};
     //!Indicates if the cache has been read (only used in READERS)
     bool isRead = false;
     //!Source TimeStamp
     Time_t sourceTimestamp{};
     union
     {
-        //!Reception TimeStamp (only used in Readers)
-        Time_t receptionTimestamp;
-        //!Number of DATA / DATA_FRAG submessages sent to the transport (only used in Writers)
-        size_t num_sent_submessages = 0;
+        CacheChangeReaderInfo_t reader_info;
+        CacheChangeWriterInfo_t writer_info;
     };
 
     WriteParams write_params{};
@@ -71,7 +99,9 @@ struct RTPS_DllAPI CacheChange_t
      * Creates an empty CacheChange_t.
      */
     CacheChange_t()
+        : writer_info()
     {
+        inline_qos.encapsulation = DEFAULT_ENDIAN == LITTLEEND ? PL_CDR_LE : PL_CDR_BE;
     }
 
     CacheChange_t(
@@ -105,7 +135,7 @@ struct RTPS_DllAPI CacheChange_t
         instanceHandle = ch_ptr->instanceHandle;
         sequenceNumber = ch_ptr->sequenceNumber;
         sourceTimestamp = ch_ptr->sourceTimestamp;
-        receptionTimestamp = ch_ptr->receptionTimestamp;
+        reader_info.receptionTimestamp = ch_ptr->reader_info.receptionTimestamp;
         write_params = ch_ptr->write_params;
         isRead = ch_ptr->isRead;
         fragment_size_ = ch_ptr->fragment_size_;
@@ -128,7 +158,7 @@ struct RTPS_DllAPI CacheChange_t
         instanceHandle = ch_ptr->instanceHandle;
         sequenceNumber = ch_ptr->sequenceNumber;
         sourceTimestamp = ch_ptr->sourceTimestamp;
-        receptionTimestamp = ch_ptr->receptionTimestamp;
+        reader_info.receptionTimestamp = ch_ptr->reader_info.receptionTimestamp;
         write_params = ch_ptr->write_params;
         isRead = ch_ptr->isRead;
 
@@ -139,7 +169,7 @@ struct RTPS_DllAPI CacheChange_t
         setFragmentSize(ch_ptr->fragment_size_, false);
     }
 
-    ~CacheChange_t()
+    virtual ~CacheChange_t()
     {
         if (payload_owner_ != nullptr)
         {
@@ -173,6 +203,14 @@ struct RTPS_DllAPI CacheChange_t
     bool is_fully_assembled()
     {
         return first_missing_fragment_ >= fragment_count_;
+    }
+
+    /*! Checks if the first fragment is present.
+     * @return true when it contains the first fragment. In other case, false.
+     */
+    bool contains_first_fragment()
+    {
+        return 0 < first_missing_fragment_;
     }
 
     /*!

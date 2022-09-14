@@ -21,7 +21,10 @@
 
 #include <fastrtps/rtps/common/CacheChange.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
+#include <fastdds/dds/core/status/SampleRejectedStatus.hpp>
 #include <fastrtps/utils/TimedMutex.hpp>
+
+#include <mutex>
 
 #include <gmock/gmock.h>
 
@@ -55,6 +58,11 @@ public:
 
     MOCK_METHOD0(getHistorySize, size_t());
 
+    MOCK_METHOD3(get_change, bool(
+            const SequenceNumber_t& seq,
+            const GUID_t& guid,
+            CacheChange_t** change));
+
     MOCK_METHOD1(get_earliest_change, bool(
             CacheChange_t** change));
 
@@ -72,6 +80,15 @@ public:
         return ret;
     }
 
+    virtual bool can_change_be_added_nts(
+            const GUID_t&,
+            uint32_t,
+            size_t,
+            bool&) const
+    {
+        return true;
+    }
+
     virtual bool received_change(
             CacheChange_t*,
             size_t)
@@ -79,8 +96,24 @@ public:
         return true;
     }
 
+    virtual bool received_change(
+            CacheChange_t*,
+            size_t,
+            fastdds::dds::SampleRejectedStatusKind&)
+    {
+        return true;
+    }
+
     virtual bool completed_change(
             rtps::CacheChange_t*)
+    {
+        return true;
+    }
+
+    virtual bool completed_change(
+            rtps::CacheChange_t*,
+            size_t,
+            fastdds::dds::SampleRejectedStatusKind&)
     {
         return true;
     }
@@ -93,7 +126,7 @@ public:
         return ret;
     }
 
-    inline RecursiveTimedMutex* getMutex()
+    inline RecursiveTimedMutex* getMutex() const
     {
         return mp_mutex;
     }
@@ -122,9 +155,21 @@ public:
         return m_changes.erase(removal);
     }
 
+    virtual void writer_unmatched(
+            const GUID_t& /*writer_guid*/,
+            const SequenceNumber_t& /*last_notified_seq*/)
+    {
+    }
+
     HistoryAttributes m_att;
 
 protected:
+
+    template<typename Pred>
+    inline void remove_changes_with_pred(
+            Pred)
+    {
+    }
 
     RTPSReader* mp_reader;
     RecursiveTimedMutex* mp_mutex;

@@ -301,22 +301,23 @@ public:
 
         participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
 
-        ASSERT_NE(participant_, nullptr);
-
-        participant_guid_ = participant_->getGuid();
-
-        // Register type
-        ASSERT_EQ(eprosima::fastrtps::Domain::registerType(participant_, &type_), true);
-
-        //Create subscribe r
-        subscriber_ = eprosima::fastrtps::Domain::createSubscriber(participant_, subscriber_attr, &listener_);
-
-        if (subscriber_ != nullptr)
+        if (participant_ != nullptr)
         {
-            std::cout << "Created subscriber " << subscriber_->getGuid() << " for topic " <<
-                subscriber_attr_.topic.topicName << std::endl;
+            participant_guid_ = participant_->getGuid();
 
-            initialized_ = true;
+            // Register type
+            ASSERT_EQ(eprosima::fastrtps::Domain::registerType(participant_, &type_), true);
+
+            //Create subscribe r
+            subscriber_ = eprosima::fastrtps::Domain::createSubscriber(participant_, subscriber_attr, &listener_);
+
+            if (subscriber_ != nullptr)
+            {
+                std::cout << "Created subscriber " << subscriber_->getGuid() << " for topic " <<
+                    subscriber_attr_.topic.topicName << std::endl;
+
+                initialized_ = true;
+            }
         }
     }
 
@@ -403,11 +404,13 @@ public:
     size_t block_for_at_least(
             size_t at_least)
     {
-        block([this, at_least]() -> bool
+        size_t read_count_locked; // solves TSan data race
+        block([this, &read_count_locked, at_least]() -> bool
                 {
+                    read_count_locked = current_processed_count_;
                     return current_processed_count_ >= at_least;
                 });
-        return current_processed_count_;
+        return read_count_locked;
     }
 
     void block(
@@ -433,7 +436,8 @@ public:
     }
 
     void wait_discovery(
-            std::chrono::seconds timeout = std::chrono::seconds::zero())
+            std::chrono::seconds timeout = std::chrono::seconds::zero(),
+            unsigned int min_writers = 1)
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
@@ -443,18 +447,57 @@ public:
         {
             cvDiscovery_.wait(lock, [&]()
                     {
-                        return matched_ != 0;
+                        return matched_ >= min_writers;
                     });
         }
         else
         {
             cvDiscovery_.wait_for(lock, timeout, [&]()
                     {
-                        return matched_ != 0;
+                        return matched_ >= min_writers;
                     });
         }
 
         std::cout << "Reader discovery finished..." << std::endl;
+    }
+
+    bool wait_participant_discovery(
+            unsigned int min_participants = 1,
+            std::chrono::seconds timeout = std::chrono::seconds::zero())
+    {
+        bool ret_value = true;
+        std::unique_lock<std::mutex> lock(mutexDiscovery_);
+
+        std::cout << "Reader is waiting discovery of at least " << min_participants << " participants..." << std::endl;
+
+        if (timeout == std::chrono::seconds::zero())
+        {
+            cvDiscovery_.wait(lock, [&]()
+                    {
+                        return participant_matched_ >= min_participants;
+                    });
+        }
+        else
+        {
+            if (!cvDiscovery_.wait_for(lock, timeout, [&]()
+                    {
+                        return participant_matched_ >= min_participants;
+                    }))
+            {
+                ret_value = false;
+            }
+        }
+
+        if (ret_value)
+        {
+            std::cout << "Reader participant discovery finished successfully..." << std::endl;
+        }
+        else
+        {
+            std::cout << "Reader participant discovery finished unsuccessfully..." << std::endl;
+        }
+
+        return ret_value;
     }
 
     bool wait_participant_undiscovery(
@@ -1204,6 +1247,11 @@ public:
     bool is_matched() const
     {
         return matched_ > 0;
+    }
+
+    unsigned int get_matched() const
+    {
+        return matched_;
     }
 
 private:

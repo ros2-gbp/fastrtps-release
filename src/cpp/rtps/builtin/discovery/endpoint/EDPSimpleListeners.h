@@ -21,11 +21,13 @@
 #define EDPSIMPLELISTENER_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <fastdds/rtps/reader/ReaderListener.h>
-#include <fastdds/rtps/writer/WriterListener.h>
-
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
+
+#include <fastdds/rtps/builtin/discovery/endpoint/EDPSimple.h>
+
+#include <fastdds/rtps/reader/ReaderListener.h>
+#include <fastdds/rtps/writer/WriterListener.h>
 
 #include <rtps/participant/RTPSParticipantImpl.h>
 
@@ -33,7 +35,6 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-class EDPSimple;
 class RTPSReader;
 struct CacheChange_t;
 
@@ -67,15 +68,7 @@ class EDPBasePUBListener : public EDPListener
 {
 public:
 
-    EDPBasePUBListener(
-            const RemoteLocatorsAllocationAttributes& locators_allocation,
-            const VariableLengthDataLimits& data_limits)
-        : temp_writer_data_(
-            locators_allocation.max_unicast_locators,
-            locators_allocation.max_multicast_locators,
-            data_limits)
-    {
-    }
+    EDPBasePUBListener() = default;
 
     virtual ~EDPBasePUBListener() = default;
 
@@ -87,9 +80,6 @@ protected:
             CacheChange_t* change,
             EDP* edp,
             bool release_change = true);
-
-    //!Temporary structure to avoid allocations
-    WriterProxyData temp_writer_data_;
 };
 
 /**
@@ -100,15 +90,7 @@ class EDPBaseSUBListener : public EDPListener
 {
 public:
 
-    EDPBaseSUBListener(
-            const RemoteLocatorsAllocationAttributes& locators_allocation,
-            const VariableLengthDataLimits& data_limits)
-        : temp_reader_data_(
-            locators_allocation.max_unicast_locators,
-            locators_allocation.max_multicast_locators,
-            data_limits)
-    {
-    }
+    EDPBaseSUBListener() = default;
 
     virtual ~EDPBaseSUBListener() = default;
 
@@ -120,9 +102,6 @@ protected:
             CacheChange_t* change,
             EDP* edp,
             bool release_change = true);
-
-    //!Temporary structure to avoid allocations
-    ReaderProxyData temp_reader_data_;
 };
 
 /*!
@@ -139,9 +118,7 @@ public:
      */
     EDPSimplePUBListener(
             EDPSimple* sedp)
-        : EDPBasePUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators,
-                sedp->mp_RTPSParticipant->getAttributes().allocation.data_limits)
-        , sedp_(sedp)
+        : sedp_(sedp)
     {
     }
 
@@ -187,9 +164,7 @@ public:
      */
     EDPSimpleSUBListener(
             EDPSimple* sedp)
-        : EDPBaseSUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators,
-                sedp->mp_RTPSParticipant->getAttributes().allocation.data_limits)
-        , sedp_(sedp)
+        : sedp_(sedp)
     {
     }
 

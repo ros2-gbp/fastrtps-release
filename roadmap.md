@@ -15,24 +15,28 @@ at any time.
 
 Disclaimer:
 
-* This section has been last updated in May 2020.
+* This section has been last updated in July 2022.
   Please take into account its content could be obsolete.
 
 ## Short term
 
-The following list of features are planned to be addressed in the short term, and incorporated into the coming
-release(s) of the product:
+The following list of features are planned to be addressed in the short term, and incorporated into the following
+minor release of the product:
 
-* Full compliance with DDS minimum-profile
-* Support of DDS-RPC Enhanced Discovery Mechanism
+* Complete support for dynamic network interfaces
+* ReadCondition implementation
+* Secure Discovery Server
+* Android support
+* Support for Ownership and Time-based filter QoS.
+* SNI support for TLS.
 
 ## Medium term
 
 The following list of features are planned to be addressed in the medium term, typically within the subsequent
 release(s) generated in the next **9 months** after next planned release:
 
-* Localhost zero-copy delivery
-* DDS x-types 1.2
+* Service aware DataWriter
+* DDS-XTypes 1.3
 
 ## Long term
 

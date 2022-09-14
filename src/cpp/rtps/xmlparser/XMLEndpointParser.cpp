@@ -21,7 +21,6 @@
 #include <cstdlib>
 
 #include <fastrtps/xmlparser/XMLEndpointParser.h>
-#include <fastrtps/xmlparser/XMLParserCommon.h>
 
 #include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/utils/TimeConversion.h>
@@ -65,15 +64,28 @@ XMLEndpointParser::~XMLEndpointParser()
 XMLP_ret XMLEndpointParser::loadXMLFile(
         std::string& filename)
 {
-    logInfo(RTPS_EDP, "File: " << filename);
-
     tinyxml2::XMLDocument doc;
-    doc.LoadFile(filename.c_str());
-    tinyxml2::XMLError eResult = doc.LoadFile(filename.c_str());
+    tinyxml2::XMLError eResult;
+
+    if (0 == filename.rfind("data://", 0))
+    {
+        logInfo(RTPS_EDP, filename);
+        eResult = doc.Parse(filename.c_str() + 7, filename.size() - 7);
+    }
+    else if (0 == filename.rfind("file://", 0))
+    {
+        logInfo(RTPS_EDP, filename);
+        eResult = doc.LoadFile(filename.substr(7).c_str());
+    }
+    else
+    {
+        logInfo(RTPS_EDP, "FileName: " << filename);
+        eResult = doc.LoadFile(filename.c_str());
+    }
 
     if (tinyxml2::XML_SUCCESS != eResult)
     {
-        logError(RTPS_EDP, filename << " bad file (bad path?)");
+        logError(RTPS_EDP, filename << " bad file");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -83,7 +95,6 @@ XMLP_ret XMLEndpointParser::loadXMLFile(
         logError(RTPS_EDP, filename << " XML has errors");
         return XMLP_ret::XML_ERROR;
     }
-
 
     tinyxml2::XMLElement* xml_RTPSParticipant = root->FirstChildElement();
 
@@ -442,6 +453,15 @@ XMLP_ret XMLEndpointParser::loadXMLReaderEndpoint(
                 }
             }
         }
+        else if (key == DISABLE_POSITIVE_ACKS)
+        {
+            // Disable positive acks
+            if (XMLP_ret::XML_OK !=
+                    XMLParser::getXMLDisablePositiveAcksQos(element, rdata->m_qos.m_disablePositiveACKs, 0))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
         else
         {
             logWarning(RTPS_EDP, "Unkown Endpoint-XML tag, ignoring " << key);
@@ -723,6 +743,15 @@ XMLP_ret XMLEndpointParser::loadXMLWriterEndpoint(
                 {
                     logWarning(RTPS_EDP, "BAD XML:livelinessQos leaseDuration is 0");
                 }
+            }
+        }
+        else if (key == DISABLE_POSITIVE_ACKS)
+        {
+            // Disable positive acks
+            if (XMLP_ret::XML_OK !=
+                    XMLParser::getXMLDisablePositiveAcksQos(element, wdata->m_qos.m_disablePositiveACKs, 0))
+            {
+                return XMLP_ret::XML_ERROR;
             }
         }
         else

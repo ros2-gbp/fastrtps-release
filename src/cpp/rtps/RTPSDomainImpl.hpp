@@ -12,13 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <fastrtps/rtps/RTPSDomain.h>
 
-#include <fastrtps/rtps/reader/RTPSReader.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
+#ifndef _RTPS_RTPSDOMAINIMPL_HPP_
+#define _RTPS_RTPSDOMAINIMPL_HPP_
 
 #include <chrono>
 #include <thread>
+
+#if defined(_WIN32) || defined(__unix__)
+#include <FileWatch.hpp>
+#endif // defined(_WIN32) || defined(__unix__)
+
+#include <fastrtps/rtps/reader/RTPSReader.h>
+#include <fastrtps/rtps/RTPSDomain.h>
+#include <fastrtps/rtps/writer/RTPSWriter.h>
+
+#include <utils/SystemInfo.hpp>
 
 namespace eprosima {
 namespace fastrtps {
@@ -31,6 +40,28 @@ namespace rtps {
 class RTPSDomainImpl
 {
 public:
+
+    /**
+     * Create a RTPSWriter in a participant.
+     * @param p Pointer to the RTPSParticipant.
+     * @param entity_id Specific entity id to use for the created writer.
+     * @param watt Writer Attributes.
+     * @param payload_pool Shared pointer to the IPayloadPool
+     * @param hist Pointer to the WriterHistory.
+     * @param listen Pointer to the WriterListener.
+     * @return Pointer to the created RTPSWriter.
+     *
+     * \warning The returned pointer is invalidated after a call to removeRTPSWriter() or stopAll(),
+     *          so its use may result in undefined behaviour.
+     */
+    static RTPSWriter* create_rtps_writer(
+            RTPSParticipant* p,
+            const EntityId_t& entity_id,
+            WriterAttributes& watt,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            const std::shared_ptr<IChangePool>& change_pool,
+            WriterHistory* hist,
+            WriterListener* listen = nullptr);
 
     /**
      * Creates the guid of a participant given its identifier.
@@ -108,8 +139,17 @@ public:
     static bool should_intraprocess_between(
             const GUID_t& local_guid,
             const GUID_t& matched_guid);
+
+    /**
+     * Callback run when the monitored environment file is modified
+     */
+    static void file_watch_callback();
+
+    static FileWatchHandle file_watch_handle_;
 };
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
+
+#endif  // _RTPS_RTPSDOMAINIMPL_HPP_

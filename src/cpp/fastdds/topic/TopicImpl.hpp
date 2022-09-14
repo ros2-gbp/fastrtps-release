@@ -21,13 +21,11 @@
 #define _FASTDDS_TOPICIMPL_HPP_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-// #include <fastdds/dds/topic/TopicListener.hpp>
-#include <fastdds/dds/topic/qos/TopicQos.hpp>
+#include <fastdds/dds/core/status/StatusMask.hpp>
+#include <fastdds/dds/topic/TopicListener.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
-#include <fastdds/topic/TopicDescriptionImpl.hpp>
+#include <fastdds/dds/topic/qos/TopicQos.hpp>
 #include <fastrtps/types/TypesBase.h>
-
-#include <atomic>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -39,18 +37,18 @@ class DomainParticipantImpl;
 class DomainParticipant;
 class TopicListener;
 class Topic;
+class TopicProxyFactory;
 
-class TopicImpl : public TopicDescriptionImpl
+class TopicImpl
 {
-    friend class DomainParticipantImpl;
+public:
 
     TopicImpl(
+            TopicProxyFactory* factory,
             DomainParticipantImpl* p,
             TypeSupport type_support,
             const TopicQos& qos,
             TopicListener* listen);
-
-public:
 
     static ReturnCode_t check_qos(
             const TopicQos& qos);
@@ -73,12 +71,14 @@ public:
 
     const TopicListener* get_listener() const;
 
-    ReturnCode_t set_listener(
+    void set_listener(
             TopicListener* listener);
 
-    DomainParticipant* get_participant() const;
+    void set_listener(
+            TopicListener* listener,
+            const StatusMask& status);
 
-    const Topic* get_topic() const;
+    DomainParticipant* get_participant() const;
 
     const TypeSupport& get_type() const;
 
@@ -87,15 +87,16 @@ public:
      * or nullptr if there is no appropriate listener.
      */
     TopicListener* get_listener_for(
-            const StatusMask& status);
+            const StatusMask& status,
+            const Topic* topic);
 
 protected:
 
+    TopicProxyFactory* factory_;
     DomainParticipantImpl* participant_;
     TypeSupport type_support_;
     TopicQos qos_;
     TopicListener* listener_;
-    Topic* user_topic_;
 
 };
 

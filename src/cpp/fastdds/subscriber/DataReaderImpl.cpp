@@ -14,12 +14,19 @@
 
 /**
  * @file DataReaderImpl.cpp
- *
  */
+
+#include <memory>
+#include <stdexcept>
+
+#if defined(__has_include) && __has_include(<version>)
+#   include <version>
+#endif // if defined(__has_include) && __has_include(<version>)
 
 #include <fastrtps/config.h>
 
 #include <fastdds/subscriber/DataReaderImpl.hpp>
+#include <fastdds/subscriber/ReadConditionImpl.hpp>
 
 #include <fastdds/dds/core/StackAllocatedSequence.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
@@ -28,66 +35,43 @@
 #include <fastdds/dds/subscriber/SampleInfo.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/subscriber/SubscriberListener.hpp>
-#include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
 
 #include <fastdds/rtps/RTPSDomain.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/reader/RTPSReader.h>
 #include <fastdds/rtps/resources/ResourceEvent.h>
 #include <fastdds/rtps/resources/TimedEvent.h>
+
+#include <fastdds/core/condition/StatusConditionImpl.hpp>
 #include <fastdds/core/policy/QosPolicyUtils.hpp>
+
+#include <fastdds/domain/DomainParticipantImpl.hpp>
 
 #include <fastdds/subscriber/SubscriberImpl.hpp>
 #include <fastdds/subscriber/DataReaderImpl/ReadTakeCommand.hpp>
 #include <fastdds/subscriber/DataReaderImpl/StateFilter.hpp>
 
+#include <fastdds/topic/ContentFilteredTopicImpl.hpp>
+
 #include <fastrtps/utils/TimeConversion.h>
 #include <fastrtps/subscriber/SampleInfo.h>
 
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
 
-using namespace eprosima::fastrtps;
+using eprosima::fastrtps::RecursiveTimedMutex;
+using eprosima::fastrtps::c_TimeInfinite;
+
 using namespace eprosima::fastrtps::rtps;
 using namespace std::chrono;
+
+using eprosima::fastrtps::types::ReturnCode_t;
 
 namespace eprosima {
 namespace fastdds {
 namespace dds {
-
-static void sample_info_to_dds (
-        const SampleInfo_t& rtps_info,
-        SampleInfo* dds_info)
-{
-    dds_info->sample_state = NOT_READ_SAMPLE_STATE;
-    dds_info->view_state = NOT_NEW_VIEW_STATE;
-    dds_info->disposed_generation_count = 0;
-    dds_info->no_writers_generation_count = 1;
-    dds_info->sample_rank = 0;
-    dds_info->generation_rank = 0;
-    dds_info->absoulte_generation_rank = 0;
-    dds_info->source_timestamp = rtps_info.sourceTimestamp;
-    dds_info->reception_timestamp = rtps_info.receptionTimestamp;
-    dds_info->instance_handle = rtps_info.iHandle;
-    dds_info->publication_handle = fastrtps::rtps::InstanceHandle_t(rtps_info.sample_identity.writer_guid());
-    dds_info->sample_identity = rtps_info.sample_identity;
-    dds_info->related_sample_identity = rtps_info.related_sample_identity;
-    dds_info->valid_data = rtps_info.sampleKind == eprosima::fastrtps::rtps::ALIVE ? true : false;
-
-    switch (rtps_info.sampleKind)
-    {
-        case eprosima::fastrtps::rtps::ALIVE:
-            dds_info->instance_state = ALIVE_INSTANCE_STATE;
-            break;
-        case eprosima::fastrtps::rtps::NOT_ALIVE_DISPOSED:
-            dds_info->instance_state = NOT_ALIVE_DISPOSED_INSTANCE_STATE;
-            break;
-        default:
-            //TODO [ILG] change this if the other kinds ever get implemented
-            dds_info->instance_state = ALIVE_INSTANCE_STATE;
-            break;
-    }
-}
 
 static bool collections_have_same_properties(
         const LoanableCollection& data_values,
@@ -124,11 +108,7 @@ DataReaderImpl::DataReaderImpl(
     , topic_(topic)
     , qos_(&qos == &DATAREADER_QOS_DEFAULT ? subscriber_->get_default_datareader_qos() : qos)
 #pragma warning (disable : 4355 )
-    , history_(topic_attributes(),
-            type_.get(),
-            qos_.get_readerqos(subscriber_->get_qos()),
-            type_->m_typeSize + 3,    /* Possible alignment */
-            qos_.endpoint().history_memory_policy)
+    , history_(type, *topic, qos_)
     , listener_(listener)
     , reader_listener_(this)
     , deadline_duration_us_(qos_.deadline().period.to_ns() * 1e-3)
@@ -136,13 +116,21 @@ DataReaderImpl::DataReaderImpl(
     , sample_info_pool_(qos)
     , loan_manager_(qos)
 {
+    EndpointAttributes endpoint_attributes;
+    endpoint_attributes.endpointKind = READER;
+    endpoint_attributes.topicKind = type_->m_isGetKeyDefined ? WITH_KEY : NO_KEY;
+    endpoint_attributes.setEntityID(qos_.endpoint().entity_id);
+    endpoint_attributes.setUserDefinedID(qos_.endpoint().user_defined_id);
+    RTPSParticipantImpl::preprocess_endpoint_attributes<READER, 0x04, 0x07>(
+        EntityId_t::unknown(), subscriber_->get_participant_impl()->id_counter(), endpoint_attributes, guid_.entityId);
+    guid_.guidPrefix = subscriber_->get_participant_impl()->guid().guidPrefix;
 }
 
 ReturnCode_t DataReaderImpl::enable()
 {
     assert(reader_ == nullptr);
 
-    fastrtps::rtps::ReaderAttributes att;
+    ReaderAttributes att;
 
     att.endpoint.durabilityKind = qos_.durability().durabilityKind();
     att.endpoint.endpointKind = READER;
@@ -152,17 +140,8 @@ ReturnCode_t DataReaderImpl::enable()
     att.endpoint.unicastLocatorList = qos_.endpoint().unicast_locator_list;
     att.endpoint.remoteLocatorList = qos_.endpoint().remote_locator_list;
     att.endpoint.properties = qos_.properties();
-
-    if (qos_.endpoint().entity_id > 0)
-    {
-        att.endpoint.setEntityID(static_cast<uint8_t>(qos_.endpoint().entity_id));
-    }
-
-    if (qos_.endpoint().user_defined_id > 0)
-    {
-        att.endpoint.setUserDefinedID(static_cast<uint8_t>(qos_.endpoint().user_defined_id));
-    }
-
+    att.endpoint.setEntityID(qos_.endpoint().entity_id);
+    att.endpoint.setUserDefinedID(qos_.endpoint().user_defined_id);
     att.times = qos_.reliable_reader_qos().times;
     att.liveliness_lease_duration = qos_.liveliness().lease_duration;
     att.liveliness_kind_ = qos_.liveliness().kind;
@@ -175,7 +154,7 @@ ReturnCode_t DataReaderImpl::enable()
     // Insert topic_name and partitions
     Property property;
     property.name("topic_name");
-    property.value(topic_->get_name().c_str());
+    property.value(topic_->get_impl()->get_rtps_topic_name().c_str());
     att.endpoint.properties.properties().push_back(std::move(property));
 
     std::string* endpoint_partitions = PropertyPolicyHelper::find_property(qos_.properties(), "partitions");
@@ -225,6 +204,7 @@ ReturnCode_t DataReaderImpl::enable()
     std::shared_ptr<IPayloadPool> pool = get_payload_pool();
     RTPSReader* reader = RTPSDomain::createRTPSReader(
         subscriber_->rtps_participant(),
+        guid_.entityId,
         att, pool,
         static_cast<ReaderHistory*>(&history_),
         static_cast<ReaderListener*>(&reader_listener_));
@@ -234,6 +214,13 @@ ReturnCode_t DataReaderImpl::enable()
         release_payload_pool();
         logError(DATA_READER, "Problem creating associated Reader");
         return ReturnCode_t::RETCODE_ERROR;
+    }
+
+    auto content_topic = dynamic_cast<ContentFilteredTopicImpl*>(topic_->get_impl());
+    if (nullptr != content_topic)
+    {
+        reader->set_content_filter(content_topic);
+        content_topic->add_reader(this);
     }
 
     reader_ = reader;
@@ -269,7 +256,21 @@ ReturnCode_t DataReaderImpl::enable()
             rqos.m_partition.push_back(partition_name.c_str());
         }
     }
-    subscriber_->rtps_participant()->registerReader(reader_, topic_attributes(), rqos);
+
+    rtps::ContentFilterProperty* filter_property = nullptr;
+    if (nullptr != content_topic && !content_topic->filter_property.filter_expression.empty())
+    {
+        filter_property = &content_topic->filter_property;
+    }
+    if (!subscriber_->rtps_participant()->registerReader(reader_, topic_attributes(), rqos, filter_property))
+    {
+        logError(DATA_READER, "Could not register reader on discovery protocols");
+
+        reader_->setListener(nullptr);
+        stop();
+
+        return ReturnCode_t::RETCODE_ERROR;
+    }
 
     return ReturnCode_t::RETCODE_OK;
 }
@@ -283,28 +284,60 @@ void DataReaderImpl::disable()
     }
 }
 
-DataReaderImpl::~DataReaderImpl()
+void DataReaderImpl::stop()
 {
-    // Disable the datareader to prevent receiving data in the middle of deleting it
-    disable();
     delete lifespan_timer_;
     delete deadline_timer_;
 
+    auto content_topic = dynamic_cast<ContentFilteredTopicImpl*>(topic_->get_impl());
+    if (nullptr != content_topic)
+    {
+        content_topic->remove_reader(this);
+    }
+
     if (reader_ != nullptr)
     {
-        logInfo(DATA_READER, guid().entityId << " in topic: " << topic_->get_name());
+        logInfo(DATA_READER, "Removing " << guid().entityId << " in topic: " << topic_->get_name());
         RTPSDomain::removeRTPSReader(reader_);
+        reader_ = nullptr;
         release_payload_pool();
     }
+}
+
+DataReaderImpl::~DataReaderImpl()
+{
+    // assert there are no pending conditions
+    assert(read_conditions_.empty());
+
+    // Disable the datareader to prevent receiving data in the middle of deleting it
+    disable();
+
+    stop();
 
     delete user_datareader_;
 }
 
-bool DataReaderImpl::can_be_deleted() const
+bool DataReaderImpl::can_be_deleted(
+        bool recursive) const
 {
     if (reader_ != nullptr)
     {
-        std::lock_guard<RecursiveTimedMutex> lock(reader_->getMutex());
+        std::lock_guard<RecursiveTimedMutex> _(reader_->getMutex());
+
+        // According with the standard
+        // delete_datareader() should fail with outstanding ReadConditions
+        // delete_contained_entities() should not
+        if ( !recursive )
+        {
+            std::lock_guard<std::recursive_mutex> __(get_conditions_mutex());
+
+            if (!read_conditions_.empty())
+            {
+                logWarning(DATA_READER, "DataReader " << guid() << " has ReadConditions not yet deleted");
+                return false;
+            }
+        }
+
         return !loan_manager_.has_outstanding_loans();
     }
 
@@ -312,9 +345,19 @@ bool DataReaderImpl::can_be_deleted() const
 }
 
 bool DataReaderImpl::wait_for_unread_message(
-        const fastrtps::Duration_t& timeout)
+        const Duration_t& timeout)
 {
     return reader_ ? reader_->wait_for_unread_cache(timeout) : false;
+}
+
+void DataReaderImpl::set_read_communication_status(
+        bool trigger_value)
+{
+    StatusMask notify_status = StatusMask::data_on_readers();
+    subscriber_->user_subscriber_->get_statuscondition().get_impl()->set_status(notify_status, trigger_value);
+
+    notify_status = StatusMask::data_available();
+    user_datareader_->get_statuscondition().get_impl()->set_status(notify_status, trigger_value);
 }
 
 ReturnCode_t DataReaderImpl::check_collection_preconditions_and_calc_max_samples(
@@ -462,10 +505,19 @@ ReturnCode_t DataReaderImpl::read_or_take(
         return ReturnCode_t::RETCODE_TIMEOUT;
     }
 
-    auto it = history_.lookup_instance(handle, exact_instance);
+    set_read_communication_status(false);
+
+    auto it = history_.lookup_available_instance(handle, exact_instance);
     if (!it.first)
     {
-        return exact_instance ? ReturnCode_t::RETCODE_BAD_PARAMETER : ReturnCode_t::RETCODE_NO_DATA;
+        if (exact_instance && !history_.is_instance_present(handle))
+        {
+            return ReturnCode_t::RETCODE_BAD_PARAMETER;
+        }
+        else
+        {
+            return ReturnCode_t::RETCODE_NO_DATA;
+        }
     }
 
     code = prepare_loan(data_values, sample_infos, max_samples);
@@ -474,12 +526,15 @@ ReturnCode_t DataReaderImpl::read_or_take(
         return code;
     }
 
-    detail::StateFilter states{ sample_states, view_states, instance_states };
+    detail::StateFilter states = { sample_states, view_states, instance_states };
     detail::ReadTakeCommand cmd(*this, data_values, sample_infos, max_samples, states, it.second, single_instance);
     while (!cmd.is_finished())
     {
         cmd.add_instance(should_take);
     }
+
+    try_notify_read_conditions();
+
     return cmd.return_value();
 }
 
@@ -640,7 +695,9 @@ ReturnCode_t DataReaderImpl::read_or_take_next_sample(
         return ReturnCode_t::RETCODE_TIMEOUT;
     }
 
-    auto it = history_.lookup_instance(HANDLE_NIL, false);
+    set_read_communication_status(false);
+
+    auto it = history_.lookup_available_instance(HANDLE_NIL, false);
     if (!it.first)
     {
         return ReturnCode_t::RETCODE_NO_DATA;
@@ -662,6 +719,9 @@ ReturnCode_t DataReaderImpl::read_or_take_next_sample(
     {
         *info = sample_infos[0];
     }
+
+    try_notify_read_conditions();
+
     return code;
 }
 
@@ -687,23 +747,27 @@ ReturnCode_t DataReaderImpl::get_first_untaken_info(
         return ReturnCode_t::RETCODE_NOT_ENABLED;
     }
 
-    SampleInfo_t rtps_info;
-    if (history_.get_first_untaken_info(&rtps_info))
+    if (history_.get_first_untaken_info(*info))
     {
-        sample_info_to_dds(rtps_info, info);
         return ReturnCode_t::RETCODE_OK;
     }
     return ReturnCode_t::RETCODE_NO_DATA;
 }
 
-uint64_t DataReaderImpl::get_unread_count() const
+uint64_t DataReaderImpl::get_unread_count(
+        bool mark_as_read)
 {
-    return reader_ ? reader_->get_unread_count() : 0;
+    uint64_t ret_val = reader_ ? history_.get_unread_count(mark_as_read) : 0;
+    if (mark_as_read)
+    {
+        try_notify_read_conditions();
+    }
+    return ret_val;
 }
 
 const GUID_t& DataReaderImpl::guid() const
 {
-    return reader_ ? reader_->getGuid() : c_Guid_Unknown;
+    return guid_;
 }
 
 InstanceHandle_t DataReaderImpl::get_instance_handle() const
@@ -713,11 +777,21 @@ InstanceHandle_t DataReaderImpl::get_instance_handle() const
 
 void DataReaderImpl::subscriber_qos_updated()
 {
+    update_rtps_reader_qos();
+}
+
+void DataReaderImpl::update_rtps_reader_qos()
+{
     if (reader_)
     {
-        //NOTIFY THE BUILTIN PROTOCOLS THAT THE READER HAS CHANGED
+        rtps::ContentFilterProperty* filter_property = nullptr;
+        auto content_topic = dynamic_cast<ContentFilteredTopicImpl*>(topic_->get_impl());
+        if (nullptr != content_topic && !content_topic->filter_property.filter_expression.empty())
+        {
+            filter_property = &content_topic->filter_property;
+        }
         ReaderQos rqos = qos_.get_readerqos(get_subscriber()->get_qos());
-        subscriber_->rtps_participant()->updateReader(reader_, topic_attributes(), rqos);
+        subscriber_->rtps_participant()->updateReader(reader_, topic_attributes(), rqos, filter_property);
     }
 }
 
@@ -754,9 +828,8 @@ ReturnCode_t DataReaderImpl::set_qos(
 
     if (enabled)
     {
-        //NOTIFY THE BUILTIN PROTOCOLS THAT THE READER HAS CHANGED
-        ReaderQos rqos = qos.get_readerqos(get_subscriber()->get_qos());
-        subscriber_->rtps_participant()->updateReader(reader_, topic_attributes(), rqos);
+        // NOTIFY THE BUILTIN PROTOCOLS THAT THE READER HAS CHANGED
+        update_rtps_reader_qos();
 
         // Deadline
         if (qos_.deadline().period != c_TimeInfinite)
@@ -790,12 +863,19 @@ const DataReaderQos& DataReaderImpl::get_qos() const
     return qos_;
 }
 
-void DataReaderImpl::InnerDataReaderListener::onNewCacheChangeAdded(
+void DataReaderImpl::InnerDataReaderListener::on_data_available(
         RTPSReader* /*reader*/,
-        const CacheChange_t* const change_in)
+        const GUID_t& writer_guid,
+        const SequenceNumber_t& first_sequence,
+        const SequenceNumber_t& last_sequence,
+        bool& should_notify_individual_changes)
 {
-    if (data_reader_->on_new_cache_change_added(change_in))
+    should_notify_individual_changes = false;
+
+    if (data_reader_->on_data_available(writer_guid, first_sequence, last_sequence))
     {
+        auto user_reader = data_reader_->user_datareader_;
+
         //First check if we can handle with on_data_on_readers
         SubscriberListener* subscriber_listener =
                 data_reader_->subscriber_->get_listener_for(StatusMask::data_on_readers());
@@ -809,9 +889,11 @@ void DataReaderImpl::InnerDataReaderListener::onNewCacheChangeAdded(
             DataReaderListener* listener = data_reader_->get_listener_for(StatusMask::data_available());
             if (listener != nullptr)
             {
-                listener->on_data_available(data_reader_->user_datareader_);
+                listener->on_data_available(user_reader);
             }
         }
+
+        data_reader_->set_read_communication_status(true);
     }
 }
 
@@ -819,19 +901,16 @@ void DataReaderImpl::InnerDataReaderListener::onReaderMatched(
         RTPSReader* /*reader*/,
         const SubscriptionMatchedStatus& info)
 {
-    DataReaderListener* listener = data_reader_->get_listener_for(StatusMask::subscription_matched());
-    if (listener != nullptr)
-    {
-        listener->on_subscription_matched(data_reader_->user_datareader_, info);
-    }
+    data_reader_->update_subscription_matched_status(info);
 }
 
 void DataReaderImpl::InnerDataReaderListener::on_liveliness_changed(
         RTPSReader* /*reader*/,
-        const fastrtps::LivelinessChangedStatus& status)
+        const LivelinessChangedStatus& status)
 {
     data_reader_->update_liveliness_status(status);
-    DataReaderListener* listener = data_reader_->get_listener_for(StatusMask::liveliness_changed());
+    StatusMask notify_status = StatusMask::liveliness_changed();
+    DataReaderListener* listener = data_reader_->get_listener_for(notify_status);
     if (listener != nullptr)
     {
         LivelinessChangedStatus callback_status;
@@ -840,14 +919,16 @@ void DataReaderImpl::InnerDataReaderListener::on_liveliness_changed(
             listener->on_liveliness_changed(data_reader_->user_datareader_, callback_status);
         }
     }
+    data_reader_->user_datareader_->get_statuscondition().get_impl()->set_status(notify_status, true);
 }
 
 void DataReaderImpl::InnerDataReaderListener::on_requested_incompatible_qos(
         RTPSReader* /*reader*/,
-        fastdds::dds::PolicyMask qos)
+        PolicyMask qos)
 {
     data_reader_->update_requested_incompatible_qos(qos);
-    DataReaderListener* listener = data_reader_->get_listener_for(StatusMask::requested_incompatible_qos());
+    StatusMask notify_status = StatusMask::requested_incompatible_qos();
+    DataReaderListener* listener = data_reader_->get_listener_for(notify_status);
     if (listener != nullptr)
     {
         RequestedIncompatibleQosStatus callback_status;
@@ -856,6 +937,67 @@ void DataReaderImpl::InnerDataReaderListener::on_requested_incompatible_qos(
             listener->on_requested_incompatible_qos(data_reader_->user_datareader_, callback_status);
         }
     }
+    data_reader_->user_datareader_->get_statuscondition().get_impl()->set_status(notify_status, true);
+}
+
+void DataReaderImpl::InnerDataReaderListener::on_sample_lost(
+        RTPSReader* /*reader*/,
+        int32_t sample_lost_since_last_update)
+{
+    data_reader_->update_sample_lost_status(sample_lost_since_last_update);
+    StatusMask notify_status = StatusMask::sample_lost();
+    DataReaderListener* listener = data_reader_->get_listener_for(notify_status);
+    if (listener != nullptr)
+    {
+        SampleLostStatus callback_status;
+        if (data_reader_->get_sample_lost_status(callback_status) == ReturnCode_t::RETCODE_OK)
+        {
+            listener->on_sample_lost(data_reader_->user_datareader_, callback_status);
+        }
+    }
+    data_reader_->user_datareader_->get_statuscondition().get_impl()->set_status(notify_status, true);
+}
+
+void DataReaderImpl::InnerDataReaderListener::on_sample_rejected(
+        RTPSReader* /*reader*/,
+        SampleRejectedStatusKind reason,
+        const CacheChange_t* const change_in)
+{
+    data_reader_->update_sample_rejected_status(reason, change_in);
+    StatusMask notify_status = StatusMask::sample_rejected();
+    DataReaderListener* listener = data_reader_->get_listener_for(notify_status);
+    if (listener != nullptr)
+    {
+        SampleRejectedStatus callback_status;
+        if (data_reader_->get_sample_rejected_status(callback_status) == ReturnCode_t::RETCODE_OK)
+        {
+            listener->on_sample_rejected(data_reader_->user_datareader_, callback_status);
+        }
+    }
+    data_reader_->user_datareader_->get_statuscondition().get_impl()->set_status(notify_status, true);
+}
+
+bool DataReaderImpl::on_data_available(
+        const GUID_t& writer_guid,
+        const SequenceNumber_t& first_sequence,
+        const SequenceNumber_t& last_sequence)
+{
+    bool ret_val = false;
+
+    std::lock_guard<RecursiveTimedMutex> guard(reader_->getMutex());
+    for (auto seq = first_sequence; seq <= last_sequence; ++seq)
+    {
+        CacheChange_t* change = nullptr;
+
+        if (history_.get_change(seq, writer_guid, &change))
+        {
+            ret_val |= on_new_cache_change_added(change);
+        }
+    }
+
+    try_notify_read_conditions();
+
+    return ret_val;
 }
 
 bool DataReaderImpl::on_new_cache_change_added(
@@ -863,8 +1005,6 @@ bool DataReaderImpl::on_new_cache_change_added(
 {
     if (qos_.deadline().period != c_TimeInfinite)
     {
-        std::unique_lock<RecursiveTimedMutex> lock(reader_->getMutex());
-
         if (!history_.set_next_deadline(
                     change->instanceHandle,
                     steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
@@ -882,6 +1022,7 @@ bool DataReaderImpl::on_new_cache_change_added(
     }
 
     CacheChange_t* new_change = const_cast<CacheChange_t*>(change);
+    history_.update_instance_nts(new_change);
 
     if (qos_.lifespan().duration == c_TimeInfinite)
     {
@@ -924,6 +1065,56 @@ bool DataReaderImpl::on_new_cache_change_added(
     return true;
 }
 
+void DataReaderImpl::update_subscription_matched_status(
+        const SubscriptionMatchedStatus& status)
+{
+    auto count_change = status.current_count_change;
+    subscription_matched_status_.current_count += count_change;
+    subscription_matched_status_.current_count_change += count_change;
+    if (count_change > 0)
+    {
+        subscription_matched_status_.total_count += count_change;
+        subscription_matched_status_.total_count_change += count_change;
+    }
+    subscription_matched_status_.last_publication_handle = status.last_publication_handle;
+
+    if (count_change < 0)
+    {
+        history_.writer_not_alive(iHandle2GUID(status.last_publication_handle));
+        try_notify_read_conditions();
+    }
+
+    StatusMask notify_status = StatusMask::subscription_matched();
+    DataReaderListener* listener = get_listener_for(notify_status);
+    if (listener != nullptr)
+    {
+        listener->on_subscription_matched(user_datareader_, subscription_matched_status_);
+        subscription_matched_status_.current_count_change = 0;
+        subscription_matched_status_.total_count_change = 0;
+    }
+    user_datareader_->get_statuscondition().get_impl()->set_status(notify_status, true);
+}
+
+ReturnCode_t DataReaderImpl::get_subscription_matched_status(
+        SubscriptionMatchedStatus& status)
+{
+    if (reader_ == nullptr)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
+    {
+        std::unique_lock<RecursiveTimedMutex> lock(reader_->getMutex());
+
+        status = subscription_matched_status_;
+        subscription_matched_status_.current_count_change = 0;
+        subscription_matched_status_.total_count_change = 0;
+    }
+
+    user_datareader_->get_statuscondition().get_impl()->set_status(StatusMask::subscription_matched(), false);
+    return ReturnCode_t::RETCODE_OK;
+}
+
 bool DataReaderImpl::deadline_timer_reschedule()
 {
     assert(qos_.deadline().period != c_TimeInfinite);
@@ -951,9 +1142,14 @@ bool DataReaderImpl::deadline_missed()
     deadline_missed_status_.total_count++;
     deadline_missed_status_.total_count_change++;
     deadline_missed_status_.last_instance_handle = timer_owner_;
-    listener_->on_requested_deadline_missed(user_datareader_, deadline_missed_status_);
-    subscriber_->subscriber_listener_.on_requested_deadline_missed(user_datareader_, deadline_missed_status_);
-    deadline_missed_status_.total_count_change = 0;
+    StatusMask notify_status = StatusMask::requested_deadline_missed();
+    auto listener = get_listener_for(notify_status);
+    if (nullptr != listener)
+    {
+        listener->on_requested_deadline_missed(user_datareader_, deadline_missed_status_);
+        deadline_missed_status_.total_count_change = 0;
+    }
+    user_datareader_->get_statuscondition().get_impl()->set_status(notify_status, true);
 
     if (!history_.set_next_deadline(
                 timer_owner_,
@@ -973,10 +1169,14 @@ ReturnCode_t DataReaderImpl::get_requested_deadline_missed_status(
         return ReturnCode_t::RETCODE_NOT_ENABLED;
     }
 
-    std::unique_lock<RecursiveTimedMutex> lock(reader_->getMutex());
+    {
+        std::unique_lock<RecursiveTimedMutex> lock(reader_->getMutex());
 
-    status = deadline_missed_status_;
-    deadline_missed_status_.total_count_change = 0;
+        status = deadline_missed_status_;
+        deadline_missed_status_.total_count_change = 0;
+    }
+
+    user_datareader_->get_statuscondition().get_impl()->set_status(StatusMask::requested_deadline_missed(), false);
     return ReturnCode_t::RETCODE_OK;
 }
 
@@ -1000,6 +1200,8 @@ bool DataReaderImpl::lifespan_expired()
 
         // The earliest change has expired
         history_.remove_change_sub(earliest_change);
+
+        try_notify_read_conditions();
 
         // Set the timer for the next change if there is one
         if (!history_.get_earliest_change(&earliest_change))
@@ -1054,12 +1256,15 @@ ReturnCode_t DataReaderImpl::get_liveliness_changed_status(
         return ReturnCode_t::RETCODE_NOT_ENABLED;
     }
 
-    std::lock_guard<RecursiveTimedMutex> lock(reader_->getMutex());
+    {
+        std::lock_guard<RecursiveTimedMutex> lock(reader_->getMutex());
 
-    status = liveliness_changed_status_;
-    liveliness_changed_status_.alive_count_change = 0u;
-    liveliness_changed_status_.not_alive_count_change = 0u;
+        status = liveliness_changed_status_;
+        liveliness_changed_status_.alive_count_change = 0u;
+        liveliness_changed_status_.not_alive_count_change = 0u;
+    }
 
+    user_datareader_->get_statuscondition().get_impl()->set_status(StatusMask::liveliness_changed(), false);
     return ReturnCode_t::RETCODE_OK;
 }
 
@@ -1071,34 +1276,54 @@ ReturnCode_t DataReaderImpl::get_requested_incompatible_qos_status(
         return ReturnCode_t::RETCODE_NOT_ENABLED;
     }
 
-    std::unique_lock<RecursiveTimedMutex> lock(reader_->getMutex());
+    {
+        std::unique_lock<RecursiveTimedMutex> lock(reader_->getMutex());
 
-    status = requested_incompatible_qos_status_;
-    requested_incompatible_qos_status_.total_count_change = 0u;
+        status = requested_incompatible_qos_status_;
+        requested_incompatible_qos_status_.total_count_change = 0u;
+    }
+
+    user_datareader_->get_statuscondition().get_impl()->set_status(StatusMask::requested_incompatible_qos(), false);
     return ReturnCode_t::RETCODE_OK;
 }
 
-/* TODO
-   bool DataReaderImpl::get_sample_lost_status(
-        SampleLostStatus& status) const
-   {
-    (void)status;
-    // TODO Implement
-    // TODO add callback call subscriber_->subscriber_listener_->on_sample_lost
-    return false;
-   }
- */
+ReturnCode_t DataReaderImpl::get_sample_lost_status(
+        SampleLostStatus& status)
+{
+    if (reader_ == nullptr)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
 
-/* TODO
-   bool DataReaderImpl::get_sample_rejected_status(
-        SampleRejectedStatus& status) const
-   {
-    (void)status;
-    // TODO Implement
-    // TODO add callback call subscriber_->subscriber_listener_->on_sample_rejected
-    return false;
-   }
- */
+    {
+        std::lock_guard<RecursiveTimedMutex> lock(reader_->getMutex());
+
+        status = sample_lost_status_;
+        sample_lost_status_.total_count_change = 0u;
+    }
+
+    user_datareader_->get_statuscondition().get_impl()->set_status(StatusMask::sample_lost(), false);
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataReaderImpl::get_sample_rejected_status(
+        SampleRejectedStatus& status)
+{
+    if (reader_ == nullptr)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
+    {
+        std::lock_guard<RecursiveTimedMutex> lock(reader_->getMutex());
+
+        status = sample_rejected_status_;
+        sample_rejected_status_.total_count_change = 0u;
+    }
+
+    user_datareader_->get_statuscondition().get_impl()->set_status(StatusMask::sample_rejected(), false);
+    return ReturnCode_t::RETCODE_OK;
+}
 
 const Subscriber* DataReaderImpl::get_subscriber() const
 {
@@ -1130,7 +1355,7 @@ RequestedIncompatibleQosStatus& DataReaderImpl::update_requested_incompatible_qo
 {
     ++requested_incompatible_qos_status_.total_count;
     ++requested_incompatible_qos_status_.total_count_change;
-    for (fastrtps::rtps::octet id = 1; id < NEXT_QOS_POLICY_ID; ++id)
+    for (octet id = 1; id < NEXT_QOS_POLICY_ID; ++id)
     {
         if (incompatible_policies.test(id))
         {
@@ -1142,8 +1367,14 @@ RequestedIncompatibleQosStatus& DataReaderImpl::update_requested_incompatible_qo
 }
 
 LivelinessChangedStatus& DataReaderImpl::update_liveliness_status(
-        const fastrtps::LivelinessChangedStatus& status)
+        const LivelinessChangedStatus& status)
 {
+    if (0 < status.not_alive_count_change)
+    {
+        history_.writer_not_alive(iHandle2GUID(status.last_publication_handle));
+        try_notify_read_conditions();
+    }
+
     liveliness_changed_status_.alive_count = status.alive_count;
     liveliness_changed_status_.not_alive_count = status.not_alive_count;
     liveliness_changed_status_.alive_count_change += status.alive_count_change;
@@ -1151,6 +1382,15 @@ LivelinessChangedStatus& DataReaderImpl::update_liveliness_status(
     liveliness_changed_status_.last_publication_handle = status.last_publication_handle;
 
     return liveliness_changed_status_;
+}
+
+const SampleLostStatus& DataReaderImpl::update_sample_lost_status(
+        int32_t sample_lost_since_last_update)
+{
+    sample_lost_status_.total_count += sample_lost_since_last_update;
+    sample_lost_status_.total_count_change += sample_lost_since_last_update;
+
+    return sample_lost_status_;
 }
 
 ReturnCode_t DataReaderImpl::check_qos (
@@ -1361,13 +1601,18 @@ void DataReaderImpl::set_qos(
     {
         to.reader_resource_limits() = from.reader_resource_limits();
     }
+
+    if (first_time && !(to.data_sharing() == from.data_sharing()))
+    {
+        to.data_sharing() = from.data_sharing();
+    }
 }
 
 fastrtps::TopicAttributes DataReaderImpl::topic_attributes() const
 {
     fastrtps::TopicAttributes topic_att;
     topic_att.topicKind = type_->m_isGetKeyDefined ? WITH_KEY : NO_KEY;
-    topic_att.topicName = topic_->get_name();
+    topic_att.topicName = topic_->get_impl()->get_rtps_topic_name();
     topic_att.topicDataType = topic_->get_type_name();
     topic_att.historyQos = qos_.history();
     topic_att.resourceLimitsQos = qos_.resource_limits();
@@ -1414,7 +1659,7 @@ std::shared_ptr<IPayloadPool> DataReaderImpl::get_payload_pool()
 
     if (!payload_pool_)
     {
-        payload_pool_ = TopicPayloadPoolRegistry::get(topic_->get_name(), config);
+        payload_pool_ = TopicPayloadPoolRegistry::get(topic_->get_impl()->get_rtps_topic_name(), config);
         sample_pool_ = std::make_shared<detail::SampleLoanManager>(config, type_);
     }
 
@@ -1524,10 +1769,241 @@ ReturnCode_t DataReaderImpl::get_listening_locators(
 
 ReturnCode_t DataReaderImpl::delete_contained_entities()
 {
-    // Until Query Conditions are implemented, there are no contained entities to destroy, so return OK.
+    std::lock_guard<std::recursive_mutex> _(get_conditions_mutex());
+
+    // Check pending ReadConditions
+    for (detail::ReadConditionImpl* impl : read_conditions_)
+    {
+        // should be alive
+        auto keep_alive = impl->shared_from_this();
+        assert((bool)keep_alive);
+        // free ReadConditions
+        impl->detach_all_conditions();
+    }
+
+    // release the colection
+    read_conditions_.clear();
+
     return ReturnCode_t::RETCODE_OK;
 }
 
-} /* namespace dds */
-} /* namespace fastdds */
-} /* namespace eprosima */
+void DataReaderImpl::filter_has_been_updated()
+{
+    update_rtps_reader_qos();
+}
+
+InstanceHandle_t DataReaderImpl::lookup_instance(
+        const void* instance) const
+{
+    InstanceHandle_t handle = HANDLE_NIL;
+
+    if (instance && type_->m_isGetKeyDefined)
+    {
+        if (type_->getKey(const_cast<void*>(instance), &handle, false))
+        {
+            if (!history_.is_instance_present(handle))
+            {
+                handle = HANDLE_NIL;
+            }
+        }
+    }
+    return handle;
+}
+
+const SampleRejectedStatus& DataReaderImpl::update_sample_rejected_status(
+        SampleRejectedStatusKind reason,
+        const CacheChange_t* const change_in)
+{
+    ++sample_rejected_status_.total_count;
+    ++sample_rejected_status_.total_count_change;
+    sample_rejected_status_.last_reason = reason;
+    sample_rejected_status_.last_instance_handle = change_in->instanceHandle;
+    return sample_rejected_status_;
+}
+
+bool DataReaderImpl::ReadConditionOrder::operator ()(
+        const detail::ReadConditionImpl* lhs,
+        const detail::ReadConditionImpl* rhs) const
+{
+    return less(lhs->get_sample_state_mask(), lhs->get_view_state_mask(), lhs->get_instance_state_mask(),
+                   rhs->get_sample_state_mask(), rhs->get_view_state_mask(), rhs->get_instance_state_mask());
+}
+
+bool DataReaderImpl::ReadConditionOrder::operator ()(
+        const detail::ReadConditionImpl* lhs,
+        const detail::StateFilter& rhs) const
+{
+    return less(lhs->get_sample_state_mask(), lhs->get_view_state_mask(), lhs->get_instance_state_mask(),
+                   rhs.sample_states, rhs.view_states, rhs.instance_states);
+}
+
+bool DataReaderImpl::ReadConditionOrder::operator ()(
+        const detail::StateFilter& lhs,
+        const detail::ReadConditionImpl* rhs) const
+{
+    return less(lhs.sample_states, lhs.view_states, lhs.instance_states,
+                   rhs->get_sample_state_mask(), rhs->get_view_state_mask(), rhs->get_instance_state_mask());
+}
+
+std::recursive_mutex& DataReaderImpl::get_conditions_mutex() const noexcept
+{
+    return conditions_mutex_;
+}
+
+ReadCondition* DataReaderImpl::create_readcondition(
+        SampleStateMask sample_states,
+        ViewStateMask view_states,
+        InstanceStateMask instance_states) noexcept
+{
+    // Check the mask set up makes sense
+    if ( sample_states == 0 && view_states == 0 && instance_states == 0 )
+    {
+        return nullptr;
+    }
+
+    std::lock_guard<std::recursive_mutex> _(get_conditions_mutex());
+
+    // Check if there is an associated ReadConditionImpl object already
+    detail::StateFilter key = {sample_states, view_states, instance_states};
+
+#   ifdef __cpp_lib_generic_associative_lookup
+    // c++14
+    auto it = read_conditions_.find(key);
+#   else
+    // TODO: remove this when C++14 is enforced
+    ReadConditionOrder sort;
+    auto it = lower_bound(read_conditions_.begin(), read_conditions_.end(), key, sort);
+    if (it != read_conditions_.end() &&
+            (sort(*it, key) || sort(key, *it)))
+    {
+        it = read_conditions_.end();
+    }
+#   endif // ifdef __cpp_lib_generic_associative_lookup
+
+    std::shared_ptr<detail::ReadConditionImpl> impl;
+
+    if (it != read_conditions_.end())
+    {
+        // already there
+        impl = (*it)->shared_from_this();
+    }
+    else
+    {
+        // create a new one
+        impl = std::make_shared<detail::ReadConditionImpl>(*this, key);
+        // Add the implementation object to the collection
+        read_conditions_.insert(impl.get());
+    }
+
+    // Now create the ReadCondition and associate it with the implementation
+    ReadCondition* cond = new ReadCondition();
+    auto ret_code = impl->attach_condition(cond);
+
+    // attach cannot fail in this scenario
+    assert(!!ret_code);
+    (void)ret_code;
+
+    return cond;
+}
+
+ReturnCode_t DataReaderImpl::delete_readcondition(
+        ReadCondition* a_condition) noexcept
+{
+    if ( nullptr == a_condition )
+    {
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    detail::ReadConditionImpl* impl = a_condition->get_impl();
+
+    if ( nullptr == impl )
+    {
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    std::lock_guard<std::recursive_mutex> _(get_conditions_mutex());
+
+    // Check if there is an associated ReadConditionImpl object already
+    auto it = read_conditions_.find(impl);
+
+    if ( it == read_conditions_.end())
+    {
+        // The ReadCondition is unknown to this DataReader
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+#   ifdef __cpp_lib_enable_shared_from_this
+    std::weak_ptr<detail::ReadConditionImpl> wp = impl->weak_from_this();
+#   else
+    // remove when C++17 is enforced
+    auto wp = std::weak_ptr<detail::ReadConditionImpl>(impl->shared_from_this());
+#   endif // ifdef __cpp_lib_enable_shared_from_this
+
+    // Detach from the implementation object
+    auto ret_code = impl->detach_condition(a_condition);
+
+    if (!!ret_code)
+    {
+        // delete the condition
+        delete a_condition;
+
+        // check if we must remove the implementation object
+        if (wp.expired())
+        {
+            read_conditions_.erase(it);
+        }
+    }
+
+    return ret_code;
+
+}
+
+const eprosima::fastdds::dds::detail::StateFilter& DataReaderImpl::get_last_mask_state() const
+{
+    if (nullptr == reader_)
+    {
+        throw std::runtime_error("The DataReader has not yet been enabled.");
+    }
+
+    std::lock_guard<RecursiveTimedMutex> _(reader_->getMutex());
+    return last_mask_state_;
+}
+
+void DataReaderImpl::try_notify_read_conditions() noexcept
+{
+    // If disabled ignore always
+    if (nullptr == reader_)
+    {
+        return;
+    }
+
+    // Update and check the mask change requires notification
+    {
+        std::lock_guard<RecursiveTimedMutex> _(reader_->getMutex());
+
+        auto old_mask = last_mask_state_;
+        last_mask_state_ = history_.get_mask_status();
+
+        bool notify = last_mask_state_.sample_states & ~old_mask.sample_states ||
+                last_mask_state_.view_states & ~old_mask.view_states ||
+                last_mask_state_.instance_states & ~old_mask.instance_states;
+
+        if (!notify)
+        {
+            return;
+        }
+    }
+
+    // traverse the conditions notifying
+    std::lock_guard<std::recursive_mutex> _(get_conditions_mutex());
+
+    for (detail::ReadConditionImpl* impl : read_conditions_)
+    {
+        impl->notify();
+    }
+}
+
+}  // namespace dds
+}  // namespace fastdds
+}  // namespace eprosima
+

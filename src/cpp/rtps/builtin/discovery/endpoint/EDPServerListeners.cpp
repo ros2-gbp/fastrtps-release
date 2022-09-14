@@ -43,9 +43,7 @@ PDPServer* EDPServerPUBListener::get_pdp()
 
 EDPServerPUBListener::EDPServerPUBListener(
         EDPServer* sedp)
-    : EDPBasePUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators,
-            sedp->mp_RTPSParticipant->getAttributes().allocation.data_limits)
-    , sedp_(sedp)
+    : sedp_(sedp)
 {
 }
 
@@ -79,6 +77,11 @@ void EDPServerPUBListener::onNewCacheChangeAdded(
         change->write_params.related_sample_identity(change->write_params.sample_identity());
     }
 
+    // Reset the internal CacheChange_t union.
+    change->writer_info.next = nullptr;
+    change->writer_info.previous = nullptr;
+    change->writer_info.num_sent_submessages = 0;
+
     // String to store the topic of the writer
     std::string topic_name = "";
 
@@ -91,9 +94,10 @@ void EDPServerPUBListener::onNewCacheChangeAdded(
 
         // Retrieve the topic after creating the WriterProxyData (in add_writer_from_change()). This way, not matter
         // whether the DATA(w) is a new one or an update, the WriterProxyData exists, and so the topic can be retrieved
-        if (get_pdp()->lookupWriterProxyData(auxGUID, temp_writer_data_))
+        auto temp_writer_data = get_pdp()->get_temporary_writer_proxies_pool().get();
+        if (get_pdp()->lookupWriterProxyData(auxGUID, *temp_writer_data))
         {
-            topic_name = temp_writer_data_.topicName().to_string();
+            topic_name = temp_writer_data->topicName().to_string();
         }
     }
     // DATA(Uw) case
@@ -102,9 +106,10 @@ void EDPServerPUBListener::onNewCacheChangeAdded(
         logInfo(RTPS_EDP_LISTENER, "Disposed Remote Writer, removing...");
 
         // Retrieve the topic before removing the WriterProxyData. We need it to add the DATA(Uw) to the database
-        if (get_pdp()->lookupWriterProxyData(auxGUID, temp_writer_data_))
+        auto temp_writer_data = get_pdp()->get_temporary_writer_proxies_pool().get();
+        if (get_pdp()->lookupWriterProxyData(auxGUID, *temp_writer_data))
         {
-            topic_name = temp_writer_data_.topicName().to_string();
+            topic_name = temp_writer_data->topicName().to_string();
         }
         else
         {
@@ -152,9 +157,7 @@ PDPServer* EDPServerSUBListener::get_pdp()
 
 EDPServerSUBListener::EDPServerSUBListener(
         EDPServer* sedp)
-    : EDPBaseSUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators,
-            sedp->mp_RTPSParticipant->getAttributes().allocation.data_limits)
-    , sedp_(sedp)
+    : sedp_(sedp)
 {
 }
 
@@ -177,6 +180,18 @@ void EDPServerSUBListener::onNewCacheChangeAdded(
         logWarning(RTPS_EDP_LISTENER, "Received change with no Key");
     }
 
+    // Related_sample_identity could be lost in message delivered, so we set as sample_identity
+    // An empty related_sample_identity could lead into an empty sample_identity when resending this msg
+    if (change->write_params.related_sample_identity() == SampleIdentity::unknown())
+    {
+        change->write_params.related_sample_identity(change->write_params.sample_identity());
+    }
+
+    // Reset the internal CacheChange_t union.
+    change->writer_info.next = nullptr;
+    change->writer_info.previous = nullptr;
+    change->writer_info.num_sent_submessages = 0;
+
     // Get readers's GUID and EDP subscriptions' reader history
     GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
     ReaderHistory* reader_history = sedp_->subscriptions_reader_.second;
@@ -193,9 +208,10 @@ void EDPServerSUBListener::onNewCacheChangeAdded(
 
         // Retrieve the topic after creating the ReaderProxyData (in add_reader_from_change()). This way, not matter
         // whether the DATA(r) is a new one or an update, the ReaderProxyData exists, and so the topic can be retrieved
-        if (get_pdp()->lookupReaderProxyData(auxGUID, temp_reader_data_))
+        auto temp_reader_data = get_pdp()->get_temporary_reader_proxies_pool().get();
+        if (get_pdp()->lookupReaderProxyData(auxGUID, *temp_reader_data))
         {
-            topic_name = temp_reader_data_.topicName().to_string();
+            topic_name = temp_reader_data->topicName().to_string();
         }
         else
         {
@@ -209,9 +225,10 @@ void EDPServerSUBListener::onNewCacheChangeAdded(
         logInfo(RTPS_EDP_LISTENER, "Disposed Remote Reader, removing...");
 
         // Retrieve the topic before removing the ReaderProxyData. We need it to add the DATA(Ur) to the database
-        if (get_pdp()->lookupReaderProxyData(auxGUID, temp_reader_data_))
+        auto temp_reader_data = get_pdp()->get_temporary_reader_proxies_pool().get();
+        if (get_pdp()->lookupReaderProxyData(auxGUID, *temp_reader_data))
         {
-            topic_name = temp_reader_data_.topicName().to_string();
+            topic_name = temp_reader_data->topicName().to_string();
         }
 
         // Remove ReaderProxy data information

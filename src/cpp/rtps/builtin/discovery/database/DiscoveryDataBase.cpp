@@ -18,6 +18,7 @@
  */
 
 #include <mutex>
+#include <set>
 
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/common/EntityId_t.hpp>
@@ -37,7 +38,7 @@ namespace ddb {
 
 DiscoveryDataBase::DiscoveryDataBase(
         fastrtps::rtps::GuidPrefix_t server_guid_prefix,
-        std::vector<fastrtps::rtps::GuidPrefix_t> servers)
+        std::set<fastrtps::rtps::GuidPrefix_t> servers)
     : server_guid_prefix_(server_guid_prefix)
     , server_acked_by_all_(servers.size() == 0)
     , servers_(servers)
@@ -65,7 +66,7 @@ void DiscoveryDataBase::add_server(
         fastrtps::rtps::GuidPrefix_t server)
 {
     logInfo(DISCOVERY_DATABASE, "Server " << server << " added");
-    servers_.push_back(server);
+    servers_.insert(server);
 }
 
 std::vector<fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::clear()
@@ -83,18 +84,18 @@ std::vector<fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::clear()
     /* Clear receive queues. Set changes inside to release */
     while (!pdp_data_queue_.Empty())
     {
-        DiscoveryPDPDataQueueInfo data_queue_info = pdp_data_queue_.Front();
+        // This moves the value, do not copy it
+        DiscoveryPDPDataQueueInfo data_queue_info = pdp_data_queue_.FrontAndPop();
         changes_to_release_.push_back(data_queue_info.change());
-        pdp_data_queue_.Pop();
     }
     pdp_data_queue_.Clear(
 
         );
     while (!edp_data_queue_.Empty())
     {
-        DiscoveryEDPDataQueueInfo data_queue_info = edp_data_queue_.Front();
+        // This moves the value, do not copy it
+        DiscoveryEDPDataQueueInfo data_queue_info = edp_data_queue_.FrontAndPop();
         changes_to_release_.push_back(data_queue_info.change());
-        edp_data_queue_.Pop();
     }
     edp_data_queue_.Clear();
 
@@ -338,7 +339,7 @@ bool DiscoveryDataBase::update(
         return false;
     }
     logInfo(DISCOVERY_DATABASE, "Adding DATA(p|Up) to the queue: " << change->instanceHandle);
-    //  Add the DATA(p|Up) to the PDP queue to process
+    // Add the DATA(p|Up) to the PDP queue to process
     pdp_data_queue_.Push(eprosima::fastdds::rtps::ddb::DiscoveryPDPDataQueueInfo(change, participant_change_data));
     return true;
 }
@@ -467,8 +468,8 @@ void DiscoveryDataBase::process_pdp_data_queue()
     // Process all messages in the queque
     while (!pdp_data_queue_.Empty())
     {
-        // Process each message with Front()
-        DiscoveryPDPDataQueueInfo data_queue_info = pdp_data_queue_.Front();
+        // Process each message with FrontAndPop(). Move it, do not copy it
+        DiscoveryPDPDataQueueInfo data_queue_info = pdp_data_queue_.FrontAndPop();
 
         // If the change is a DATA(p)
         if (data_queue_info.change()->kind == eprosima::fastrtps::rtps::ALIVE)
@@ -485,9 +486,6 @@ void DiscoveryDataBase::process_pdp_data_queue()
                     " received from: " << data_queue_info.change()->writerGUID);
             process_dispose_participant_(data_queue_info.change());
         }
-
-        // Pop the message from the queue
-        pdp_data_queue_.Pop();
     }
 }
 
@@ -513,8 +511,8 @@ bool DiscoveryDataBase::process_edp_data_queue()
     // Process all messages in the queque
     while (!edp_data_queue_.Empty())
     {
-        // Process each message with Front()
-        DiscoveryEDPDataQueueInfo data_queue_info = edp_data_queue_.Front();
+        // Process each message with FrontAndPop(). Move it, do not copy it
+        DiscoveryEDPDataQueueInfo data_queue_info = edp_data_queue_.FrontAndPop();
         change = data_queue_info.change();
         topic_name = data_queue_info.topic();
 
@@ -553,9 +551,6 @@ bool DiscoveryDataBase::process_edp_data_queue()
                 process_dispose_reader_(change);
             }
         }
-
-        // Pop the message from the queue
-        edp_data_queue_.Pop();
     }
 
     return is_dirty_topic;
@@ -619,6 +614,9 @@ void DiscoveryDataBase::create_virtual_endpoints_(
     virtual_writer_writer_params.sample_identity(virtual_writer_sample_id);
     virtual_writer_writer_params.related_sample_identity(virtual_writer_sample_id);
     virtual_writer_change->write_params = std::move(virtual_writer_writer_params);
+    virtual_writer_change->writer_info.previous = nullptr;
+    virtual_writer_change->writer_info.next = nullptr;
+    virtual_writer_change->writer_info.num_sent_submessages = 0;
     // Create the virtual writer
     create_writers_from_change_(virtual_writer_change, virtual_topic_);
 
@@ -642,6 +640,9 @@ void DiscoveryDataBase::create_virtual_endpoints_(
     virtual_reader_writer_params.sample_identity(virtual_reader_sample_id);
     virtual_reader_writer_params.related_sample_identity(virtual_reader_sample_id);
     virtual_reader_change->write_params = std::move(virtual_reader_writer_params);
+    virtual_reader_change->writer_info.previous = nullptr;
+    virtual_reader_change->writer_info.next = nullptr;
+    virtual_reader_change->writer_info.num_sent_submessages = 0;
     // Create the virtual reader
     create_readers_from_change_(virtual_reader_change, virtual_topic_);
 }
@@ -1615,6 +1616,10 @@ bool DiscoveryDataBase::server_acked_by_my_servers()
 
     // Find the server's participant and check whether all its servers have ACKed the server's DATA(p)
     auto this_server = participants_.find(server_guid_prefix_);
+
+    // check it is always there
+    assert(this_server != participants_.end());
+
     for (auto prefix : servers_)
     {
         if (!this_server->second.is_matched(prefix))
@@ -1710,7 +1715,7 @@ void DiscoveryDataBase::AckedFunctor::operator () (
         {
             // If the reader proxy is from a server that we are pinging, we may not want to wait
             // for it to be acked as the routine will not stop
-            for (auto it = db_->servers_.begin(); it < db_->servers_.end(); ++it)
+            for (auto it = db_->servers_.begin(); it != db_->servers_.end(); ++it)
             {
                 if (reader_proxy->guid().guidPrefix == *it)
                 {
