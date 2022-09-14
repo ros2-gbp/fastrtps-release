@@ -160,15 +160,15 @@ macro(add_blackbox_gtest)
 
         # add filtering statement if required
         if(GTEST_IGNORE)
-            set(command "${command} --gtest_filter=${GTEST_IGNORE}")
+            set(gtest_filter "--gtest_filter=${GTEST_IGNORE}")
         endif()
 
-        add_test(NAME ${test} COMMAND ${command})
+        add_test(NAME ${test} COMMAND ${command} ${gtest_filter})
 
         # Add environment
         if(WIN32)
             set(WIN_PATH "$ENV{PATH}")
-            get_target_property(LINK_LIBRARIES_ ${command} LINK_LIBRARIES)
+            get_target_property(LINK_LIBRARIES_ ${test} LINK_LIBRARIES)
             if(NOT "${LINK_LIBRARIES_}" STREQUAL "LINK_LIBRARIES_-NOTFOUND")
                 foreach(LIBRARY_LINKED ${LINK_LIBRARIES_})
                     if(TARGET ${LIBRARY_LINKED})
@@ -189,6 +189,8 @@ macro(add_blackbox_gtest)
 
         # Add labels
         set_property(TEST ${test} PROPERTY LABELS "${GTEST_LABELS}")
+
+        unset(gtest_filter)
     endif()
 endmacro()
 
@@ -299,6 +301,7 @@ set(DDS_BLACKBOXTESTS_SOURCE
     ${DDS_BLACKBOXTESTS_TEST_SOURCE}
     ${BLACKBOXTESTS_SOURCE}
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/ServerAttributes.cpp
     )
 
 # Prepare static discovery xml file for blackbox tests.
@@ -335,6 +338,7 @@ if(FASTRTPS_API_TESTS)
         ${BLACKBOXTESTS_SOURCE}
         api/fastrtps_deprecated/ReqRepHelloWorldRequester.cpp
         api/fastrtps_deprecated/ReqRepHelloWorldReplier.cpp
+        ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/ServerAttributes.cpp
         )
 
     add_executable(BlackboxTests_FastRTPS ${BLACKBOXTESTS_FASTRTPS_SOURCE})

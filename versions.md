@@ -1,3 +1,31 @@
+Version 2.7.1
+-------------
+
+* ReadCondition implementation according to DDS version 1.4 standard document
+* Added a new CMake option to allow users to force the use of our third party shared_mutex
+
+Version 2.7.0
+-------------
+
+* Implementation of DataWriter methods write_w_timestamp, register_instance_w_timestamp,
+  unregister_instance_w_timestamp, and dispose_w_timestamp (ABI break)
+* Support of `SampleRejectedStatus` in DDS API (API extensions on RTPS layer)
+* Implementation of DomainParticipant method find_topic
+* Include Server Name Indication (SNI) empty API (ABI break on transport layer)
+* CacheChange_t destructor made virtual (ABI break on RTPS layer)
+* Added DDS APIs for ReadCondition (API extension)
+* Added bulk notification interface to RTPS reader listener (API extension)
+* Refactor of auxiliary utils class DBQueue (ABI break)
+* Added configuration data for external locators feature (ABI break)
+
+Version 2.6.1
+-------------
+
+* Writer side content filter.
+* Implementation for DataWriter::get_key_value.
+* Implementation for DataReader::lookup_instance.
+* Support of `SampleLostStatus` in DDS API.
+
 Version 2.6.0
 -------------
 

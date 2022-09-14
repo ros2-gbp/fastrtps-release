@@ -42,17 +42,17 @@ namespace dds {
 class DomainParticipant;
 class TopicListener;
 class DomainParticipantImpl;
-class TopicImpl;
+class TopicProxy;
 
 /**
- * Class TopicDescription, represents the fact that both publications
+ * Class Topic, represents the fact that both publications
  * and subscriptions are tied to a single data-type
  *
  * @ingroup FASTDDS_MODULE
  */
 class Topic : public DomainEntity, public TopicDescription
 {
-    friend class TopicImpl;
+    friend class TopicProxy;
     friend class DomainParticipantImpl;
 
     /**
@@ -62,7 +62,7 @@ class Topic : public DomainEntity, public TopicDescription
     Topic(
             const std::string& topic_name,
             const std::string& type_name,
-            TopicImpl* p,
+            TopicProxy* p,
             const StatusMask& mask = StatusMask::all());
 
     Topic(
@@ -75,9 +75,6 @@ class Topic : public DomainEntity, public TopicDescription
 
 public:
 
-    /**
-     * @brief Destructor
-     */
     virtual ~Topic();
 
     /**
@@ -92,6 +89,7 @@ public:
      *
      * @param status [out] Status to be retrieved.
      * @return RETCODE_OK
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     ReturnCode_t get_inconsistent_topic_status(
             InconsistentTopicStatus& status);
@@ -142,16 +140,11 @@ public:
             TopicListener* listener,
             const StatusMask& mask = StatusMask::all());
 
-    /**
-     * @brief Getter for the TopicDescriptionImpl
-     *
-     * @return pointer to TopicDescriptionImpl
-     */
     TopicDescriptionImpl* get_impl() const override;
 
 protected:
 
-    TopicImpl* impl_;
+    TopicProxy* impl_;
 
     friend class ::dds::topic::Topic;
 

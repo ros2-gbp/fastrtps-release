@@ -19,14 +19,14 @@
 #ifndef _RTPS_PARTICIPANT_RTPSPARTICIPANTIMPL_H_
 #define _RTPS_PARTICIPANT_RTPSPARTICIPANTIMPL_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
+#include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <list>
-#include <sys/types.h>
 #include <mutex>
-#include <atomic>
-#include <chrono>
-#include <fastrtps/utils/Semaphore.h>
+#include <sys/types.h>
 
 #if defined(_WIN32)
 #include <process.h>
@@ -45,6 +45,9 @@
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 
+#include <fastdds/rtps/history/IChangePool.h>
+#include <fastdds/rtps/history/IPayloadPool.h>
+
 #include <fastdds/rtps/network/NetworkFactory.h>
 #include <fastdds/rtps/network/ReceiverResource.h>
 #include <fastdds/rtps/network/SenderResource.h>
@@ -61,6 +64,9 @@
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <rtps/security/SecurityManager.h>
 #endif // if HAVE_SECURITY
+
+#include <fastrtps/utils/Semaphore.h>
+#include <fastrtps/utils/shared_mutex.hpp>
 
 namespace eprosima {
 
@@ -367,9 +373,14 @@ public:
         return security_attributes_;
     }
 
-    bool is_secure() const
+    inline bool is_security_initialized() const
     {
-        return m_is_security_active;
+        return m_security_manager.is_security_initialized();
+    }
+
+    inline bool is_secure() const
+    {
+        return m_security_manager.is_security_active();
     }
 
     bool pairing_remote_reader_with_local_writer_after_security(
@@ -522,7 +533,9 @@ private:
     //!Id counter to correctly assign the ids to writers and readers.
     uint32_t IdCounter;
     //! Mutex to safely access endpoints collections
-    std::mutex endpoints_list_mutex;
+    mutable shared_mutex endpoints_list_mutex;
+    //! This member avoids shared_mutex reentrancy by tracking last participant into traversing the endpoints collections
+    static thread_local RTPSParticipantImpl* collections_mutex_owner_;
     //!Writer List.
     std::vector<RTPSWriter*> m_allWriterList;
     //!Reader List
@@ -553,8 +566,6 @@ private:
 #if HAVE_SECURITY
     // Security manager
     security::SecurityManager m_security_manager;
-    // Security activation flag
-    bool m_is_security_active = false;
 #endif // if HAVE_SECURITY
 
     //! Encapsulates all associated resources on a Receiving element.
@@ -763,6 +774,28 @@ public:
             bool isBuiltin = false);
 
     /**
+     * Create a Writer in this RTPSParticipant with a custom payload pool.
+     * @param Writer Pointer to pointer of the Writer, used as output. Only valid if return==true.
+     * @param watt WriterAttributes to define the Writer.
+     * @param payload_pool Shared pointer to the IPayloadPool
+     * @param change_pool Shared pointer to the IChangePool
+     * @param hist Pointer to the WriterHistory.
+     * @param listen Pointer to the WriterListener.
+     * @param entityId EntityId assigned to the Writer.
+     * @param isBuiltin Bool value indicating if the Writer is builtin (Discovery or Liveliness protocol) or is created for the end user.
+     * @return True if the Writer was correctly created.
+     */
+    bool create_writer(
+            RTPSWriter** Writer,
+            WriterAttributes& watt,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            const std::shared_ptr<IChangePool>& change_pool,
+            WriterHistory* hist,
+            WriterListener* listen,
+            const EntityId_t& entityId = c_EntityId_Unknown,
+            bool isBuiltin = false);
+
+    /**
      * Create a Reader in this RTPSParticipant.
      * @param Reader Pointer to pointer of the Reader, used as output. Only valid if return==true.
      * @param param ReaderAttributes to define the Reader.
@@ -884,42 +917,76 @@ public:
      * @return True on success
      */
     bool deleteUserEndpoint(
-            Endpoint*);
+            const GUID_t&);
 
-    /**
-     * Get the begin of the user reader list
-     * @return Iterator pointing to the begin of the user reader list
+    //! Delete all user endpoints, builtin are disposed in its related classes
+    void deleteAllUserEndpoints();
+
+    /** Traverses the user writers collection transforming its elements with a provided functor
+     * @param f - Functor applied to each element. Must accept a reference as parameter. Should return true to keep iterating.
+     * @return Functor provided in order to allow aggregates retrieval
      */
-    std::vector<RTPSReader*>::iterator userReadersListBegin()
+    template<class Functor>
+    Functor forEachUserWriter(
+            Functor f)
     {
-        return m_userReaderList.begin();
+        // check if we are reentrying
+        shared_lock<shared_mutex> may_lock;
+        RTPSParticipantImpl* previous_owner = collections_mutex_owner_;
+
+        if (collections_mutex_owner_ != this)
+        {
+            shared_lock<shared_mutex> lock(endpoints_list_mutex);
+            may_lock = std::move(lock);
+            collections_mutex_owner_ = this;
+        }
+
+        // traverse the list
+        for ( RTPSWriter* pw : m_userWriterList)
+        {
+            if (!f(*pw))
+            {
+                break;
+            }
+        }
+
+        // restore tls former value
+        std::swap(collections_mutex_owner_, previous_owner);
+
+        return f;
     }
 
-    /**
-     * Get the end of the user reader list
-     * @return Iterator pointing to the end of the user reader list
+    /** Traverses the user readers collection transforming its elements with a provided functor
+     * @param f - Functor applied to each element. Must accept a reference as parameter. Should return true to keep iterating.
+     * @return Functor provided in order to allow aggregates retrieval
      */
-    std::vector<RTPSReader*>::iterator userReadersListEnd()
+    template<class Functor>
+    Functor forEachUserReader(
+            Functor f)
     {
-        return m_userReaderList.end();
-    }
+        // check if we are reentrying
+        shared_lock<shared_mutex> may_lock;
+        RTPSParticipantImpl* previous_owner = collections_mutex_owner_;
 
-    /**
-     * Get the begin of the user writer list
-     * @return Iterator pointing to the begin of the user writer list
-     */
-    std::vector<RTPSWriter*>::iterator userWritersListBegin()
-    {
-        return m_userWriterList.begin();
-    }
+        if (collections_mutex_owner_ != this)
+        {
+            shared_lock<shared_mutex> lock(endpoints_list_mutex);
+            may_lock = std::move(lock);
+            collections_mutex_owner_ = this;
+        }
 
-    /**
-     * Get the end of the user writer list
-     * @return Iterator pointing to the end of the user writer list
-     */
-    std::vector<RTPSWriter*>::iterator userWritersListEnd()
-    {
-        return m_userWriterList.end();
+        for ( RTPSReader* pr : m_userReaderList)
+        {
+            if (!f(*pr))
+            {
+                break;
+            }
+        }
+
+        // restore tls former value
+        std::swap(collections_mutex_owner_, previous_owner);
+
+        return f;
     }
 
     /** Helper function that creates ReceiverResources based on a Locator_t List, possibly mutating

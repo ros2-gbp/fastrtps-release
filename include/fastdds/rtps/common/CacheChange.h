@@ -99,7 +99,9 @@ struct RTPS_DllAPI CacheChange_t
      * Creates an empty CacheChange_t.
      */
     CacheChange_t()
+        : writer_info()
     {
+        inline_qos.encapsulation = DEFAULT_ENDIAN == LITTLEEND ? PL_CDR_LE : PL_CDR_BE;
     }
 
     CacheChange_t(
@@ -167,7 +169,7 @@ struct RTPS_DllAPI CacheChange_t
         setFragmentSize(ch_ptr->fragment_size_, false);
     }
 
-    ~CacheChange_t()
+    virtual ~CacheChange_t()
     {
         if (payload_owner_ != nullptr)
         {
@@ -201,6 +203,14 @@ struct RTPS_DllAPI CacheChange_t
     bool is_fully_assembled()
     {
         return first_missing_fragment_ >= fragment_count_;
+    }
+
+    /*! Checks if the first fragment is present.
+     * @return true when it contains the first fragment. In other case, false.
+     */
+    bool contains_first_fragment()
+    {
+        return 0 < first_missing_fragment_;
     }
 
     /*!
