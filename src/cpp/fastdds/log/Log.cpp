@@ -107,6 +107,7 @@ void Log::Reset()
     resources_.functions = true;
     resources_.verbosity = Log::Error;
     resources_.consumers.clear();
+
 #if STDOUTERR_LOG_CONSUMER
     resources_.consumers.emplace_back(new StdoutErrConsumer);
 #else
@@ -173,14 +174,16 @@ void Log::run()
             while (!resources_.logs.Empty())
             {
                 std::unique_lock<std::mutex> configGuard(resources_.config_mutex);
-                if (preprocess(resources_.logs.Front()))
+
+                Log::Entry& entry = resources_.logs.Front();
+                if (preprocess(entry))
                 {
                     for (auto& consumer : resources_.consumers)
                     {
-                        consumer->Consume(resources_.logs.Front());
+                        consumer->Consume(entry);
                     }
                 }
-
+                // This Pop() is also a barrier for Log::Flush wait condition
                 resources_.logs.Pop();
             }
         }

@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
 #include <regex>
 #include <string>
 #include <thread>
@@ -45,7 +46,6 @@
 #include <rtps/common/GuidUtils.hpp>
 #include <utils/Host.hpp>
 #include <utils/SystemInfo.hpp>
-
 
 namespace eprosima {
 namespace fastrtps {
@@ -226,6 +226,13 @@ RTPSParticipant* RTPSDomain::createParticipant(
         m_RTPSParticipants.push_back(t_p_RTPSParticipant(p, pimpl));
     }
 
+    // Check the environment file in case it was modified during participant creation leading to a missed callback.
+    if ((PParam.builtin.discovery_config.discoveryProtocol != DiscoveryProtocol_t::CLIENT) &&
+            RTPSDomainImpl::file_watch_handle_)
+    {
+        pimpl->environment_file_has_changed();
+    }
+
     if (enabled)
     {
         // Start protocols
@@ -328,6 +335,28 @@ RTPSWriter* RTPSDomain::createRTPSWriter(
     return nullptr;
 }
 
+RTPSWriter* RTPSDomainImpl::create_rtps_writer(
+        RTPSParticipant* p,
+        const EntityId_t& entity_id,
+        WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+{
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
+    {
+        RTPSWriter* ret_val = nullptr;
+        if (impl->create_writer(&ret_val, watt, payload_pool, change_pool, hist, listen, entity_id))
+        {
+            return ret_val;
+        }
+    }
+
+    return nullptr;
+}
+
 bool RTPSDomain::removeRTPSWriter(
         RTPSWriter* writer)
 {
@@ -340,7 +369,7 @@ bool RTPSDomain::removeRTPSWriter(
             {
                 t_p_RTPSParticipant participant = *it;
                 lock.unlock();
-                return participant.second->deleteUserEndpoint((Endpoint*)writer);
+                return participant.second->deleteUserEndpoint(writer->getGuid());
             }
         }
     }
@@ -416,7 +445,7 @@ bool RTPSDomain::removeRTPSReader(
             {
                 t_p_RTPSParticipant participant = *it;
                 lock.unlock();
-                return participant.second->deleteUserEndpoint((Endpoint*)reader);
+                return participant.second->deleteUserEndpoint(reader->getGuid());
             }
         }
     }
@@ -451,7 +480,8 @@ RTPSParticipant* RTPSDomain::clientServerEnvironmentCreationOverride(
     }
 
     logInfo(DOMAIN, "Detected auto client-server environment variable."
-            "Trying to create client with the default server setup.");
+            << "Trying to create client with the default server setup: "
+            << client_att.builtin.discovery_config.m_DiscoveryServers);
 
     client_att.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::CLIENT;
     // RemoteServerAttributes already fill in above
@@ -577,8 +607,11 @@ bool RTPSDomainImpl::should_intraprocess_between(
 
 void RTPSDomainImpl::file_watch_callback()
 {
+    auto _1s = std::chrono::seconds(1);
+
     // Ensure that all changes have been saved by the OS
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    SystemInfo::wait_for_file_closure(SystemInfo::get_environment_file(), _1s);
+
     // For all RTPSParticipantImpl registered in the RTPSDomain, call RTPSParticipantImpl::environment_file_has_changed
     std::lock_guard<std::mutex> guard(RTPSDomain::m_mutex);
     for (auto participant : RTPSDomain::m_RTPSParticipants)
