@@ -270,11 +270,11 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc} --os-name rhel
     devel_branch: 2.7.x
-    last_release: v2.6.0
-    last_version: 2.6.0
+    last_release: v2.7.1
+    last_version: 2.7.1
     name: fastrtps
     patches: null
-    release_inc: '3'
+    release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/fastrtps-release.git
     release_tag: v:{version}
     ros_distro: rolling
