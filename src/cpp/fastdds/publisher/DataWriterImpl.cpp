@@ -47,10 +47,13 @@
 #include <fastdds/core/policy/QosPolicyUtils.hpp>
 
 #include <fastdds/domain/DomainParticipantImpl.hpp>
+#include <fastdds/publisher/filtering/DataWriterFilteredChangePool.hpp>
 
-#include <rtps/history/TopicPayloadPoolRegistry.hpp>
 #include <rtps/DataSharing/DataSharingPayloadPool.hpp>
+#include <rtps/history/CacheChangePool.h>
+#include <rtps/history/TopicPayloadPoolRegistry.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/RTPSDomainImpl.hpp>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -59,6 +62,19 @@ using namespace std::chrono;
 namespace eprosima {
 namespace fastdds {
 namespace dds {
+
+static ChangeKind_t unregister_change_kind(
+        bool dispose,
+        const DataWriterQos& qos)
+{
+    if (dispose)
+    {
+        return NOT_ALIVE_DISPOSED;
+    }
+
+    return qos.writer_data_lifecycle().autodispose_unregistered_instances ?
+           NOT_ALIVE_DISPOSED_UNREGISTERED : NOT_ALIVE_UNREGISTERED;
+}
 
 static bool qos_has_pull_mode_request(
         const DataWriterQos& qos)
@@ -256,6 +272,21 @@ ReturnCode_t DataWriterImpl::enable()
         w_att.endpoint.set_data_sharing_configuration(datasharing);
     }
 
+    bool filtering_enabled =
+            qos_.liveliness().lease_duration.is_infinite() &&
+            (0 < qos_.writer_resource_limits().reader_filters_allocation.maximum);
+    if (filtering_enabled)
+    {
+        reader_filters_.reset(new ReaderFilterCollection(qos_.writer_resource_limits().reader_filters_allocation));
+    }
+
+    auto change_pool = get_change_pool();
+    if (!change_pool)
+    {
+        logError(DATA_WRITER, "Problem creating change pool for associated Writer");
+        return ReturnCode_t::RETCODE_ERROR;
+    }
+
     auto pool = get_payload_pool();
     if (!pool)
     {
@@ -263,10 +294,12 @@ ReturnCode_t DataWriterImpl::enable()
         return ReturnCode_t::RETCODE_ERROR;
     }
 
-    RTPSWriter* writer =  RTPSDomain::createRTPSWriter(
+    RTPSWriter* writer =  RTPSDomainImpl::create_rtps_writer(
         publisher_->rtps_participant(),
         guid_.entityId,
-        w_att, pool,
+        w_att,
+        pool,
+        change_pool,
         static_cast<WriterHistory*>(&history_),
         static_cast<WriterListener*>(&writer_listener_));
 
@@ -287,9 +320,12 @@ ReturnCode_t DataWriterImpl::enable()
             return ReturnCode_t::RETCODE_ERROR;
         }
 
-        writer = RTPSDomain::createRTPSWriter(
+        writer = RTPSDomainImpl::create_rtps_writer(
             publisher_->rtps_participant(),
-            w_att, pool,
+            guid_.entityId,
+            w_att,
+            pool,
+            change_pool,
             static_cast<WriterHistory*>(&history_),
             static_cast<WriterListener*>(&writer_listener_));
     }
@@ -301,6 +337,10 @@ ReturnCode_t DataWriterImpl::enable()
     }
 
     writer_ = writer;
+    if (filtering_enabled)
+    {
+        writer_->reader_data_filter(this);
+    }
 
     // In case it has been loaded from the persistence DB, rebuild instances on history
     history_.rebuild_instances();
@@ -376,7 +416,7 @@ DataWriterImpl::~DataWriterImpl()
 
     if (writer_ != nullptr)
     {
-        logInfo(PUBLISHER, guid().entityId << " in topic: " << type_->getName());
+        logInfo(DATA_WRITER, guid().entityId << " in topic: " << type_->getName());
         RTPSDomain::removeRTPSWriter(writer_);
         release_payload_pool();
     }
@@ -518,16 +558,16 @@ bool DataWriterImpl::write(
     return ReturnCode_t::RETCODE_OK == create_new_change_with_params(ALIVE, data, params);
 }
 
-ReturnCode_t DataWriterImpl::write(
+ReturnCode_t DataWriterImpl::check_write_preconditions(
         void* data,
-        const InstanceHandle_t& handle)
+        const InstanceHandle_t& handle,
+        InstanceHandle_t& instance_handle)
 {
     if (writer_ == nullptr)
     {
         return ReturnCode_t::RETCODE_NOT_ENABLED;
     }
 
-    InstanceHandle_t instance_handle;
     if (type_.get()->m_isGetKeyDefined)
     {
         bool is_key_protected = false;
@@ -543,38 +583,139 @@ ReturnCode_t DataWriterImpl::write(
     {
         return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
-    logInfo(DATA_WRITER, "Writing new data with Handle");
-    WriteParams wparams;
-    return create_new_change_with_params(ALIVE, data, wparams, instance_handle);
+
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataWriterImpl::write(
+        void* data,
+        const InstanceHandle_t& handle)
+{
+    InstanceHandle_t instance_handle;
+    ReturnCode_t ret = check_write_preconditions(data, handle, instance_handle);
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        logInfo(DATA_WRITER, "Writing new data with Handle");
+        WriteParams wparams;
+        ret = create_new_change_with_params(ALIVE, data, wparams, instance_handle);
+    }
+
+    return ret;
+}
+
+ReturnCode_t DataWriterImpl::write_w_timestamp(
+        void* data,
+        const InstanceHandle_t& handle,
+        const fastrtps::Time_t& timestamp)
+{
+    InstanceHandle_t instance_handle;
+    ReturnCode_t ret = ReturnCode_t::RETCODE_OK;
+    if (timestamp.is_infinite() || timestamp.seconds < 0)
+    {
+        ret = ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        ret = check_write_preconditions(data, handle, instance_handle);
+    }
+
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        logInfo(DATA_WRITER, "Writing new data with Handle and timestamp");
+        WriteParams wparams;
+        wparams.source_timestamp(timestamp);
+        ret = create_new_change_with_params(ALIVE, data, wparams, instance_handle);
+    }
+
+    return ret;
+}
+
+ReturnCode_t DataWriterImpl::check_instance_preconditions(
+        void* data,
+        const InstanceHandle_t& handle,
+        InstanceHandle_t& instance_handle)
+{
+    if (nullptr == writer_)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
+    if (nullptr == data)
+    {
+        logError(DATA_WRITER, "Data pointer not valid");
+        return ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+
+    if (!type_->m_isGetKeyDefined)
+    {
+        logError(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    instance_handle = handle;
+
+#if defined(NDEBUG)
+    if (!instance_handle.isDefined())
+#endif // if !defined(NDEBUG)
+    {
+        bool is_key_protected = false;
+#if HAVE_SECURITY
+        is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
+#endif // if HAVE_SECURITY
+        type_->getKey(data, &instance_handle, is_key_protected);
+    }
+
+#if !defined(NDEBUG)
+    if (handle.isDefined() && instance_handle != handle)
+    {
+        logError(DATA_WRITER, "handle differs from data's key.");
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+#endif // if !defined(NDEBUG)
+
+    return ReturnCode_t::RETCODE_OK;
 }
 
 InstanceHandle_t DataWriterImpl::register_instance(
         void* key)
 {
     /// Preconditions
-    if (writer_ == nullptr)
+    InstanceHandle_t instance_handle;
+    if (ReturnCode_t::RETCODE_OK != check_instance_preconditions(key, HANDLE_NIL, instance_handle))
     {
-        return c_InstanceHandle_Unknown;
+        return HANDLE_NIL;
     }
 
-    if (key == nullptr)
+    WriteParams wparams;
+    return do_register_instance(key, instance_handle, wparams);
+}
+
+InstanceHandle_t DataWriterImpl::register_instance_w_timestamp(
+        void* key,
+        const fastrtps::Time_t& timestamp)
+{
+    /// Preconditions
+    InstanceHandle_t instance_handle;
+    if (timestamp.is_infinite() || timestamp.seconds < 0 ||
+            (ReturnCode_t::RETCODE_OK != check_instance_preconditions(key, HANDLE_NIL, instance_handle)))
     {
-        logError(PUBLISHER, "Data pointer not valid");
-        return c_InstanceHandle_Unknown;
+        return HANDLE_NIL;
     }
 
-    if (!type_->m_isGetKeyDefined)
-    {
-        logError(PUBLISHER, "Topic is NO_KEY, operation not permitted");
-        return c_InstanceHandle_Unknown;
-    }
+    WriteParams wparams;
+    wparams.source_timestamp(timestamp);
+    return do_register_instance(key, instance_handle, wparams);
+}
 
-    InstanceHandle_t instance_handle = c_InstanceHandle_Unknown;
-    bool is_key_protected = false;
-#if HAVE_SECURITY
-    is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif // if HAVE_SECURITY
-    type_->getKey(key, &instance_handle, is_key_protected);
+InstanceHandle_t DataWriterImpl::do_register_instance(
+        void* key,
+        const InstanceHandle_t instance_handle,
+        WriteParams& wparams)
+{
+    // TODO(MiguelCompany): wparams should be used when propagating the register_instance operation to the DataReader.
+    // See redmine issue #14494
+    static_cast<void>(wparams);
 
     // Block lowlevel writer
     auto max_blocking_time = std::chrono::steady_clock::now() +
@@ -587,13 +728,30 @@ InstanceHandle_t DataWriterImpl::register_instance(
     std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex());
 #endif // if HAVE_STRICT_REALTIME
     {
-        if (history_.register_instance(instance_handle, lock, max_blocking_time))
+        SerializedPayload_t* payload = nullptr;
+        if (history_.register_instance(instance_handle, lock, max_blocking_time, payload))
         {
+            // Keep serialization of sample inside the instance
+            assert(nullptr != payload);
+            if (0 == payload->length || nullptr == payload->data)
+            {
+                uint32_t size = fixed_payload_size_ ? fixed_payload_size_ : type_->getSerializedSizeProvider(key)();
+                payload->reserve(size);
+                if (!type_->serialize(key, payload))
+                {
+                    logWarning(DATA_WRITER, "Key data serialization failed");
+
+                    // Serialization of the sample failed. Remove the instance to keep original state.
+                    // Note that we will only end-up here if the instance has just been created, so it will be empty
+                    // and removing its changes will remove the instance completely.
+                    history_.remove_instance_changes(instance_handle, SequenceNumber_t());
+                }
+            }
             return instance_handle;
         }
     }
 
-    return c_InstanceHandle_Unknown;
+    return HANDLE_NIL;
 }
 
 ReturnCode_t DataWriterImpl::unregister_instance(
@@ -601,65 +759,102 @@ ReturnCode_t DataWriterImpl::unregister_instance(
         const InstanceHandle_t& handle,
         bool dispose)
 {
-    /// Preconditions
-    if (writer_ == nullptr)
+    // Preconditions
+    InstanceHandle_t ih;
+    ReturnCode_t returned_value = check_instance_preconditions(instance, handle, ih);
+    if (ReturnCode_t::RETCODE_OK == returned_value && !history_.is_key_registered(ih))
     {
-        return ReturnCode_t::RETCODE_NOT_ENABLED;
+        returned_value = ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
 
-    if (instance == nullptr)
+    // Operation
+    if (ReturnCode_t::RETCODE_OK == returned_value)
     {
-        logError(PUBLISHER, "Data pointer not valid");
+        WriteParams wparams;
+        ChangeKind_t change_kind = unregister_change_kind(dispose, qos_);
+        returned_value = create_new_change_with_params(change_kind, instance, wparams, ih);
+    }
+
+    return returned_value;
+}
+
+ReturnCode_t DataWriterImpl::unregister_instance_w_timestamp(
+        void* instance,
+        const InstanceHandle_t& handle,
+        const fastrtps::Time_t& timestamp,
+        bool dispose)
+{
+    // Preconditions
+    InstanceHandle_t instance_handle;
+    ReturnCode_t ret = ReturnCode_t::RETCODE_OK;
+    if (timestamp.is_infinite() || timestamp.seconds < 0)
+    {
+        ret = ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        ret = check_instance_preconditions(instance, handle, instance_handle);
+    }
+    if (ReturnCode_t::RETCODE_OK == ret && !history_.is_key_registered(instance_handle))
+    {
+        ret = ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    // Operation
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        WriteParams wparams;
+        wparams.source_timestamp(timestamp);
+        ChangeKind_t change_kind = unregister_change_kind(dispose, qos_);
+        ret = create_new_change_with_params(change_kind, instance, wparams, instance_handle);
+    }
+
+    return ret;
+}
+
+ReturnCode_t DataWriterImpl::get_key_value(
+        void* key_holder,
+        const InstanceHandle_t& handle)
+{
+    /// Preconditions
+    if (key_holder == nullptr || !handle.isDefined())
+    {
+        logError(DATA_WRITER, "Key holder pointer not valid");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 
     if (!type_->m_isGetKeyDefined)
     {
-        logError(PUBLISHER, "Topic is NO_KEY, operation not permitted");
-        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+        logError(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
+        return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
     }
 
-    ReturnCode_t returned_value = ReturnCode_t::RETCODE_ERROR;
-    InstanceHandle_t ih = handle;
-
-#if defined(NDEBUG)
-    if (c_InstanceHandle_Unknown == ih)
-#endif // if !defined(NDEBUG)
+    if (writer_ == nullptr)
     {
-        bool is_key_protected = false;
-#if HAVE_SECURITY
-        is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif // if HAVE_SECURITY
-        type_->getKey(instance, &ih, is_key_protected);
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
     }
 
-#if !defined(NDEBUG)
-    if (c_InstanceHandle_Unknown != handle && ih != handle)
+    // Block lowlevel writer
+#if HAVE_STRICT_REALTIME
+    auto max_blocking_time = std::chrono::steady_clock::now() +
+            std::chrono::microseconds(::TimeConv::Time_t2MicroSecondsInt64(qos_.reliability().max_blocking_time));
+    std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex(), std::defer_lock);
+    if (!lock.try_lock_until(max_blocking_time))
     {
-        logError(PUBLISHER, "handle differs from data's key.");
-        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+        return ReturnCode_t::RETCODE_TIMEOUT;
     }
-#endif // if !defined(NDEBUG)
+#else
+    std::lock_guard<RecursiveTimedMutex> lock(writer_->getMutex());
+#endif // if HAVE_STRICT_REALTIME
 
-    if (history_.is_key_registered(ih))
+    SerializedPayload_t* payload = history_.get_key_value(handle);
+    if (nullptr == payload)
     {
-        WriteParams wparams;
-        ChangeKind_t change_kind = NOT_ALIVE_DISPOSED;
-        if (!dispose)
-        {
-            change_kind = qos_.writer_data_lifecycle().autodispose_unregistered_instances ?
-                    NOT_ALIVE_DISPOSED_UNREGISTERED :
-                    NOT_ALIVE_UNREGISTERED;
-        }
-
-        returned_value = create_new_change_with_params(change_kind, instance, wparams, ih);
-    }
-    else
-    {
-        returned_value = ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+        return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 
-    return returned_value;
+    type_->deserialize(payload, key_holder);
+    return ReturnCode_t::RETCODE_OK;
 }
 
 ReturnCode_t DataWriterImpl::create_new_change(
@@ -677,7 +872,7 @@ ReturnCode_t DataWriterImpl::check_new_change_preconditions(
     // Preconditions
     if (data == nullptr)
     {
-        logError(PUBLISHER, "Data pointer not valid");
+        logError(DATA_WRITER, "Data pointer not valid");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 
@@ -687,7 +882,7 @@ ReturnCode_t DataWriterImpl::check_new_change_preconditions(
     {
         if (!type_->m_isGetKeyDefined)
         {
-            logError(PUBLISHER, "Topic is NO_KEY, operation not permitted");
+            logError(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
             return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
         }
     }
@@ -726,7 +921,7 @@ ReturnCode_t DataWriterImpl::perform_create_new_change(
 
         if ((ALIVE == change_kind) && !type_->serialize(data, &payload.payload))
         {
-            logWarning(RTPS_WRITER, "RTPSWriter:Serialization returns false");
+            logWarning(DATA_WRITER, "Data serialization returned false");
             return_payload_to_pool(payload);
             return ReturnCode_t::RETCODE_ERROR;
         }
@@ -737,7 +932,23 @@ ReturnCode_t DataWriterImpl::perform_create_new_change(
     {
         payload.move_into_change(*ch);
 
-        if (!this->history_.add_pub_change(ch, wparams, lock, max_blocking_time))
+        bool added = false;
+        if (reader_filters_)
+        {
+            auto related_sample_identity = wparams.related_sample_identity();
+            auto filter_hook = [&related_sample_identity, this](CacheChange_t& ch)
+                    {
+                        reader_filters_->update_filter_info(static_cast<DataWriterFilteredChange&>(ch),
+                                related_sample_identity);
+                    };
+            added = history_.add_pub_change_with_commit_hook(ch, wparams, filter_hook, lock, max_blocking_time);
+        }
+        else
+        {
+            added = history_.add_pub_change(ch, wparams, lock, max_blocking_time);
+        }
+
+        if (!added)
         {
             if (was_loaned)
             {
@@ -754,7 +965,7 @@ ReturnCode_t DataWriterImpl::perform_create_new_change(
                         handle,
                         steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
             {
-                logError(PUBLISHER, "Could not set the next deadline in the history");
+                logError(DATA_WRITER, "Could not set the next deadline in the history");
             }
             else
             {
@@ -1002,14 +1213,40 @@ void DataWriterImpl::InnerDataWriterListener::on_liveliness_lost(
         fastrtps::rtps::RTPSWriter* /*writer*/,
         const fastrtps::LivelinessLostStatus& status)
 {
+    data_writer_->update_liveliness_lost_status(status);
     StatusMask notify_status = StatusMask::liveliness_lost();
     DataWriterListener* listener = data_writer_->get_listener_for(notify_status);
     if (listener != nullptr)
     {
-        listener->on_liveliness_lost(
-            data_writer_->user_datawriter_, status);
+        LivelinessLostStatus callback_status;
+        if (ReturnCode_t::RETCODE_OK == data_writer_->get_liveliness_lost_status(callback_status))
+        {
+            listener->on_liveliness_lost(data_writer_->user_datawriter_, callback_status);
+        }
     }
     data_writer_->user_datawriter_->get_statuscondition().get_impl()->set_status(notify_status, true);
+}
+
+void DataWriterImpl::InnerDataWriterListener::on_reader_discovery(
+        fastrtps::rtps::RTPSWriter* writer,
+        fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS reason,
+        const fastrtps::rtps::GUID_t& reader_guid,
+        const fastrtps::rtps::ReaderProxyData* reader_info)
+{
+    if (!fastrtps::rtps::RTPSDomainImpl::should_intraprocess_between(writer->getGuid(), reader_guid))
+    {
+        switch (reason)
+        {
+            case fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS::REMOVED_READER:
+                data_writer_->remove_reader_filter(reader_guid);
+                break;
+
+            case fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS::DISCOVERED_READER:
+            case fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS::CHANGED_QOS_READER:
+                data_writer_->process_reader_filter_info(reader_guid, *reader_info);
+                break;
+        }
+    }
 }
 
 ReturnCode_t DataWriterImpl::wait_for_acknowledgments(
@@ -1032,44 +1269,13 @@ ReturnCode_t DataWriterImpl::wait_for_acknowledgments(
         const InstanceHandle_t& handle,
         const Duration_t& max_wait)
 {
-    /// Preconditions
-    if (nullptr == writer_)
+    // Preconditions
+    InstanceHandle_t ih;
+    ReturnCode_t returned_value = check_instance_preconditions(instance, handle, ih);
+    if (ReturnCode_t::RETCODE_OK != returned_value)
     {
-        return ReturnCode_t::RETCODE_NOT_ENABLED;
+        return returned_value;
     }
-
-    if (nullptr == instance)
-    {
-        logError(PUBLISHER, "Data pointer not valid");
-        return ReturnCode_t::RETCODE_BAD_PARAMETER;
-    }
-
-    if (!type_->m_isGetKeyDefined)
-    {
-        logError(PUBLISHER, "Topic is NO_KEY, operation not permitted");
-        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
-    }
-
-    InstanceHandle_t ih = handle;
-
-#if defined(NDEBUG)
-    if (c_InstanceHandle_Unknown == ih)
-#endif // NDEBUG
-    {
-        bool is_key_protected = false;
-#if HAVE_SECURITY
-        is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif // HAVE_SECURITY
-        type_->getKey(instance, &ih, is_key_protected);
-    }
-
-#if !defined(NDEBUG)
-    if (c_InstanceHandle_Unknown != handle && ih != handle)
-    {
-        logError(PUBLISHER, "handle differs from data's key");
-        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
-    }
-#endif // NDEBUG */
 
     // Block low-level writer
     auto max_blocking_time = steady_clock::now() +
@@ -1151,7 +1357,7 @@ bool DataWriterImpl::deadline_timer_reschedule()
     steady_clock::time_point next_deadline_us;
     if (!history_.get_next_deadline(timer_owner_, next_deadline_us))
     {
-        logError(PUBLISHER, "Could not get the next deadline from the history");
+        logError(DATA_WRITER, "Could not get the next deadline from the history");
         return false;
     }
 
@@ -1182,7 +1388,7 @@ bool DataWriterImpl::deadline_missed()
                 timer_owner_,
                 steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
     {
-        logError(PUBLISHER, "Could not set the next deadline in the history");
+        logError(DATA_WRITER, "Could not set the next deadline in the history");
         return false;
     }
     return deadline_timer_reschedule();
@@ -1279,10 +1485,8 @@ ReturnCode_t DataWriterImpl::get_liveliness_lost_status(
     {
         std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex());
 
-        status.total_count = writer_->liveliness_lost_status_.total_count;
-        status.total_count_change = writer_->liveliness_lost_status_.total_count_change;
-
-        writer_->liveliness_lost_status_.total_count_change = 0u;
+        status = liveliness_lost_status_;
+        liveliness_lost_status_.total_count_change = 0u;
     }
 
     user_datawriter_->get_statuscondition().get_impl()->set_status(StatusMask::liveliness_lost(), false);
@@ -1362,6 +1566,14 @@ OfferedIncompatibleQosStatus& DataWriterImpl::update_offered_incompatible_qos(
         }
     }
     return offered_incompatible_qos_status_;
+}
+
+LivelinessLostStatus& DataWriterImpl::update_liveliness_lost_status(
+        const fastrtps::LivelinessLostStatus& liveliness_lost_status)
+{
+    liveliness_lost_status_.total_count = liveliness_lost_status.total_count;
+    liveliness_lost_status_.total_count_change += liveliness_lost_status.total_count_change;
+    return liveliness_lost_status_;
 }
 
 void DataWriterImpl::set_qos(
@@ -1608,6 +1820,18 @@ DataWriterListener* DataWriterImpl::get_listener_for(
     return publisher_->get_listener_for(status);
 }
 
+std::shared_ptr<IChangePool> DataWriterImpl::get_change_pool() const
+{
+    PoolConfig config = PoolConfig::from_history_attributes(history_.m_att);
+    if (reader_filters_)
+    {
+        return std::make_shared<DataWriterFilteredChangePool>(
+            config, qos_.writer_resource_limits().reader_filters_allocation);
+    }
+
+    return std::make_shared<fastrtps::rtps::CacheChangePool>(config);
+}
+
 std::shared_ptr<IPayloadPool> DataWriterImpl::get_payload_pool()
 {
     if (!payload_pool_)
@@ -1765,6 +1989,48 @@ ReturnCode_t DataWriterImpl::check_datasharing_compatible(
             logError(DATA_WRITER, "Unknown data sharing kind.");
             return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
+}
+
+void DataWriterImpl::remove_reader_filter(
+        const fastrtps::rtps::GUID_t& reader_guid)
+{
+    if (reader_filters_)
+    {
+        reader_filters_->remove_reader(reader_guid);
+    }
+}
+
+void DataWriterImpl::process_reader_filter_info(
+        const fastrtps::rtps::GUID_t& reader_guid,
+        const fastrtps::rtps::ReaderProxyData& reader_info)
+{
+    if (reader_filters_ &&
+            !writer_->is_datasharing_compatible_with(reader_info) &&
+            reader_info.remote_locators().multicast.empty())
+    {
+        reader_filters_->process_reader_filter_info(reader_guid, reader_info.content_filter(),
+                publisher_->get_participant_impl(), topic_);
+    }
+}
+
+void DataWriterImpl::filter_is_being_removed(
+        const char* filter_class_name)
+{
+    if (reader_filters_)
+    {
+        assert(writer_);
+        std::lock_guard<RecursiveTimedMutex> guard(writer_->getMutex());
+        reader_filters_->remove_filters(filter_class_name);
+    }
+}
+
+bool DataWriterImpl::is_relevant(
+        const fastrtps::rtps::CacheChange_t& change,
+        const fastrtps::rtps::GUID_t& reader_guid) const
+{
+    assert(reader_filters_);
+    const DataWriterFilteredChange& writer_change = static_cast<const DataWriterFilteredChange&>(change);
+    return writer_change.is_relevant_for(reader_guid);
 }
 
 } // namespace dds

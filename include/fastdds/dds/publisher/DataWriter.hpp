@@ -167,8 +167,6 @@ public:
             const InstanceHandle_t& handle);
 
     /**
-     * NOT YET IMPLEMENTED
-     *
      * @brief This operation performs the same function as write except that it also provides the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp" that is made available to DataReader
      * objects by means of the @ref eprosima::fastdds::dds::SampleInfo::source_timestamp attribute "source_timestamp"
@@ -211,8 +209,6 @@ public:
             void* instance);
 
     /**
-     * NOT YET IMPLEMENTED
-     *
      * @brief This operation performs the same function as register_instance and can be used instead of
      * @ref register_instance in the cases where the application desires to specify the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp".
@@ -258,8 +254,6 @@ public:
             const InstanceHandle_t& handle);
 
     /**
-     * NOT YET IMPLEMENTED
-     *
      * @brief This operation performs the same function as @ref unregister_instance and can be used instead of
      * @ref unregister_instance in the cases where the application desires to specify the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp".
@@ -293,8 +287,6 @@ public:
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
     /**
-     * NOT YET IMPLEMENTED
-     *
      * This operation can be used to retrieve the instance key that corresponds to an
      * @ref eprosima::fastdds::dds::Entity::instance_handle_ "instance_handle".
      * The operation will only fill the fields that form the key inside the key_holder instance.
@@ -303,8 +295,8 @@ public:
      * data-object known to the DataWriter. If the implementation is not able to check invalid handles then the result
      * in this situation is unspecified.
      *
-     * @param[in,out] key_holder
-     * @param[in] handle
+     * @param[in,out] key_holder  Sample where the key fields will be returned.
+     * @param[in] handle          Handle to the instance to retrieve the key values from.
      *
      * @return Any of the standard return codes.
      */
@@ -443,12 +435,6 @@ public:
             DataWriterListener* listener,
             const StatusMask& mask);
 
-    /* TODO
-       bool get_key_value(
-            void* key_holder,
-            const InstanceHandle_t& handle);
-     */
-
     /**
      * @brief This operation requests the middleware to delete the data (the actual deletion is postponed until there is no
      * more use for that data in the whole system). In general, applications are made aware of the deletion by means of
@@ -528,7 +514,7 @@ public:
      * @param[out] subscription_data subscription data struct
      * @param subscription_handle InstanceHandle_t of the subscription
      * @return RETCODE_OK
-     *
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_matched_subscription_data(
             builtin::SubscriptionBuiltinTopicData& subscription_data,
@@ -539,6 +525,7 @@ public:
      *
      * @param[out] subscription_handles Vector where the InstanceHandle_t are returned
      * @return RETCODE_OK
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_matched_subscriptions(
             std::vector<InstanceHandle_t>& subscription_handles) const;

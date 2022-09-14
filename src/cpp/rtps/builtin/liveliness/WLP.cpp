@@ -139,8 +139,8 @@ WLP::~WLP()
 #if HAVE_SECURITY
     if (mp_participant->is_secure())
     {
-        mp_participant->deleteUserEndpoint(mp_builtinReaderSecure);
-        mp_participant->deleteUserEndpoint(mp_builtinWriterSecure);
+        mp_participant->deleteUserEndpoint(mp_builtinReaderSecure->getGuid());
+        mp_participant->deleteUserEndpoint(mp_builtinWriterSecure->getGuid());
 
         if (mp_builtinReaderSecureHistory)
         {
@@ -158,8 +158,8 @@ WLP::~WLP()
     }
 #endif // if HAVE_SECURITY
 
-    mp_participant->deleteUserEndpoint(mp_builtinReader);
-    mp_participant->deleteUserEndpoint(mp_builtinWriter);
+    mp_participant->deleteUserEndpoint(mp_builtinReader->getGuid());
+    mp_participant->deleteUserEndpoint(mp_builtinWriter->getGuid());
 
     if (mp_builtinReaderHistory)
     {
@@ -736,6 +736,7 @@ bool WLP::remove_local_writer(
             }
         }
         automatic_liveliness_assertion_->update_interval_millisec(min_automatic_ms_);
+        return true;
     }
     else if (W->get_liveliness_kind() == MANUAL_BY_PARTICIPANT_LIVELINESS_QOS)
     {

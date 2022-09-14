@@ -91,9 +91,12 @@ set(${PROJECT_NAME}_source_files
     fastrtps_deprecated/subscriber/SubscriberHistory.cpp
     fastdds/publisher/DataWriter.cpp
     fastdds/publisher/DataWriterImpl.cpp
+    fastdds/publisher/DataWriterHistory.cpp
     fastdds/topic/ContentFilteredTopic.cpp
+    fastdds/topic/ContentFilteredTopicImpl.cpp
     fastdds/topic/Topic.cpp
     fastdds/topic/TopicImpl.cpp
+    fastdds/topic/TopicProxyFactory.cpp
     fastdds/topic/TypeSupport.cpp
     fastdds/topic/qos/TopicQos.cpp
     fastdds/publisher/qos/DataWriterQos.cpp
@@ -106,6 +109,7 @@ set(${PROJECT_NAME}_source_files
     fastdds/subscriber/Subscriber.cpp
     fastdds/subscriber/DataReader.cpp
     fastdds/subscriber/DataReaderImpl.cpp
+    fastdds/subscriber/ReadCondition.cpp
     fastdds/subscriber/history/DataReaderHistory.cpp
     fastdds/domain/DomainParticipantFactory.cpp
     fastdds/domain/DomainParticipantImpl.cpp
@@ -175,6 +179,7 @@ set(${PROJECT_NAME}_source_files
     rtps/builtin/BuiltinProtocols.cpp
     rtps/builtin/discovery/participant/DirectMessageSender.cpp
     rtps/builtin/discovery/participant/PDP.cpp
+    rtps/builtin/discovery/participant/ServerAttributes.cpp
     rtps/builtin/discovery/participant/PDPSimple.cpp
     rtps/builtin/discovery/participant/PDPListener.cpp
     rtps/builtin/discovery/endpoint/EDP.cpp
@@ -330,6 +335,8 @@ if(SQLITE3_SUPPORT)
         ${${PROJECT_NAME}_sqlite3_source_files}
         )
     set(HAVE_SQLITE3 1)
+    # sqlite.c requires a C compiler
+    enable_language(C)
 else()
     set(HAVE_SQLITE3 0)
 endif()
@@ -344,9 +351,11 @@ if(TINYXML2_SOURCE_DIR)
 endif()
 
 if(ANDROID)
-    list(APPEND ${PROJECT_NAME}_source_files
-        ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-        )
+    if((ANDROID_PLATFORM LESS_EQUAL 23) OR (ANDROID_NATIVE_API_LEVEL LESS_EQUAL 23))
+        list(APPEND ${PROJECT_NAME}_source_files
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
 endif()
 
 # Option to enable strict real-time. In this case, several API functions have a real-time behaviour.
@@ -556,10 +565,10 @@ endif()
 
 install(TARGETS ${PROJECT_NAME} eProsima_atomic
     EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
-    RUNTIME DESTINATION ${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-    LIBRARY DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-    ARCHIVE DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
     COMPONENT libraries
+    RUNTIME DESTINATION "${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
+    LIBRARY DESTINATION "${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
+    ARCHIVE DESTINATION "${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
     )
 
 export(TARGETS ${PROJECT_NAME} eProsima_atomic FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-${FASTDDS_LINKING}-targets.cmake)
