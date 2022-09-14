@@ -133,6 +133,152 @@ TEST_P(DDSDataWriter, WaitForAcknowledgmentInstance)
 
 }
 
+/**
+ * Test that checks DataWriter::get_key_value
+ */
+TEST_P(DDSDataWriter, GetKeyValue)
+{
+    using namespace eprosima::fastdds::dds;
+
+    // Test variables
+    KeyedHelloWorld data;
+    eprosima::fastrtps::rtps::InstanceHandle_t wrong_handle;
+    wrong_handle.value[0] = 0xee;
+    eprosima::fastrtps::rtps::InstanceHandle_t valid_handle;
+    KeyedHelloWorld valid_data;
+    valid_data.key(27);
+    valid_data.index(1);
+    valid_data.message("HelloWorld");
+
+    // Create and initialize writers
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME + "_KEY");
+    PubSubWriter<KeyedHelloWorldPubSubType> keyed_writer(TEST_TOPIC_NAME + "_KEY");
+    writer.init();
+    keyed_writer.init();
+
+    DataWriter* datawriter = &writer.get_native_writer();
+    DataWriter* instance_datawriter = &keyed_writer.get_native_writer();
+
+    // 1. Check nullptr on key_holder
+    EXPECT_EQ(ReturnCode_t::RETCODE_BAD_PARAMETER, datawriter->get_key_value(nullptr, wrong_handle));
+    EXPECT_EQ(ReturnCode_t::RETCODE_BAD_PARAMETER, instance_datawriter->get_key_value(nullptr, wrong_handle));
+
+    // 2. Check HANDLE_NIL
+    EXPECT_EQ(ReturnCode_t::RETCODE_BAD_PARAMETER, datawriter->get_key_value(&data, HANDLE_NIL));
+    EXPECT_EQ(ReturnCode_t::RETCODE_BAD_PARAMETER, instance_datawriter->get_key_value(&data, HANDLE_NIL));
+
+    // 3. Check type should have keys
+    EXPECT_EQ(ReturnCode_t::RETCODE_ILLEGAL_OPERATION, datawriter->get_key_value(&data, wrong_handle));
+
+    // 4. Calling get_key_value with a key not yet registered returns RETCODE_BAD_PARAMETER
+    EXPECT_EQ(ReturnCode_t::RETCODE_BAD_PARAMETER, instance_datawriter->get_key_value(&data, wrong_handle));
+
+    // 5. Calling get_key_value on a registered instance should work.
+    valid_handle = instance_datawriter->register_instance(&valid_data);
+    EXPECT_NE(HANDLE_NIL, valid_handle);
+    data.key(0);
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, instance_datawriter->get_key_value(&data, valid_handle));
+    EXPECT_EQ(valid_data.key(), data.key());
+
+    // 6. Calling get_key_value on an unregistered instance should return RETCODE_BAD_PARAMETER.
+    ASSERT_EQ(ReturnCode_t::RETCODE_OK, instance_datawriter->unregister_instance(&valid_data, valid_handle));
+    EXPECT_EQ(ReturnCode_t::RETCODE_BAD_PARAMETER, instance_datawriter->get_key_value(&data, valid_handle));
+
+    // 7. Calling get_key_value with a valid instance should work
+    ASSERT_EQ(ReturnCode_t::RETCODE_OK, instance_datawriter->write(&valid_data, HANDLE_NIL));
+    data.key(0);
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, instance_datawriter->get_key_value(&data, valid_handle));
+    EXPECT_EQ(valid_data.key(), data.key());
+
+    // 8. Calling get_key_value on a disposed instance should work.
+    ASSERT_EQ(ReturnCode_t::RETCODE_OK, instance_datawriter->dispose(&valid_data, valid_handle));
+    data.key(0);
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, instance_datawriter->get_key_value(&data, valid_handle));
+    EXPECT_EQ(valid_data.key(), data.key());
+}
+
+TEST_P(DDSDataWriter, WithTimestampOperations)
+{
+    using namespace eprosima::fastdds::dds;
+
+    // Test variables
+    eprosima::fastrtps::Time_t ts;
+
+    KeyedHelloWorld valid_data;
+    valid_data.key(27);
+    valid_data.index(1);
+    valid_data.message("HelloWorld");
+
+    // Create and initialize reader
+    PubSubReader<KeyedHelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    reader.durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
+            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
+            .history_depth(10)
+            .init();
+    ASSERT_TRUE(reader.isInitialized());
+    DataReader& datareader = reader.get_native_reader();
+
+    // Create and initialize writer
+    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    writer.durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
+            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
+            .history_depth(10)
+            .init();
+    ASSERT_TRUE(writer.isInitialized());
+    DataWriter& datawriter = writer.get_native_writer();
+    DataWriterQos qos = datawriter.get_qos();
+    qos.writer_data_lifecycle().autodispose_unregistered_instances = false;
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.set_qos(qos));
+
+    // Wait discovery, since we are going to unregister an instance
+    reader.wait_discovery();
+    writer.wait_discovery();
+
+    ts.seconds = 0;
+    ts.nanosec = 1;
+    // Register with custom timestamp
+    EXPECT_NE(HANDLE_NIL, datawriter.register_instance_w_timestamp(&valid_data, ts));
+    // TODO(MiguelCompay): Remove the following line when register_instance operation gets propagated to the reader.
+    // See redmine issue #14494
+    ts.nanosec--;
+    // Write with custom timestamp
+    ts.nanosec++;
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.write_w_timestamp(&valid_data, HANDLE_NIL, ts));
+    // Dispose with custom timestamp
+    ts.nanosec++;
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.dispose_w_timestamp(&valid_data, HANDLE_NIL, ts));
+    // Write with custom timestamp
+    ts.nanosec++;
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.write_w_timestamp(&valid_data, HANDLE_NIL, ts));
+    // Unregister with custom timestamp
+    ts.nanosec++;
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.unregister_instance_w_timestamp(&valid_data, HANDLE_NIL, ts));
+
+    // Wait and take all data
+    auto num_samples = ts.nanosec;
+    while (num_samples != datareader.get_unread_count())
+    {
+        EXPECT_TRUE(datareader.wait_for_unread_message({ 10, 0 }));
+    }
+
+    FASTDDS_CONST_SEQUENCE(DataSeq, KeyedHelloWorld);
+    SampleInfoSeq infos;
+    DataSeq datas;
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datareader.take(datas, infos));
+
+    // Check received timestamps
+    ts.seconds = 0;
+    ts.nanosec = 1;
+    EXPECT_EQ(static_cast<decltype(num_samples)>(infos.length()), num_samples);
+    for (SampleInfoSeq::size_type n = 0; n < infos.length(); ++n)
+    {
+        EXPECT_EQ(ts, infos[n].source_timestamp);
+        ts.nanosec++;
+    }
+
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datareader.return_loan(datas, infos));
+}
+
 #ifdef INSTANTIATE_TEST_SUITE_P
 #define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
 #else

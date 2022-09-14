@@ -115,7 +115,7 @@ public:
     //! Returns the logging engine to configuration defaults.
     RTPS_DllAPI static void Reset();
 
-    //! Waits until no more log info is available
+    //! Waits until all info logged up to the call time is consumed
     RTPS_DllAPI static void Flush();
 
     //! Stops the logging thread. It will re-launch on the next call to a successful log macro.
@@ -179,27 +179,27 @@ public:
 
 protected:
 
-    void print_timestamp(
+    RTPS_DllAPI void print_timestamp(
             std::ostream& stream,
             const Log::Entry&,
             bool color) const;
 
-    void print_header(
+    RTPS_DllAPI void print_header(
             std::ostream& stream,
             const Log::Entry&,
             bool color) const;
 
-    void print_context(
+    RTPS_DllAPI void print_context(
             std::ostream& stream,
             const Log::Entry&,
             bool color) const;
 
-    void print_message(
+    RTPS_DllAPI void print_message(
             std::ostream& stream,
             const Log::Entry&,
             bool color) const;
 
-    void print_new_line(
+    RTPS_DllAPI void print_new_line(
             std::ostream& stream,
             bool color) const;
 };

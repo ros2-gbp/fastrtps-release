@@ -46,6 +46,7 @@
 
 #include <fastrtps/utils/TimeConversion.h>
 #include <fastrtps/utils/IPLocator.h>
+#include "fastrtps/utils/shared_mutex.hpp"
 
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
@@ -95,10 +96,15 @@ PDP::PDP (
     , mp_listener(nullptr)
     , mp_PDPWriterHistory(nullptr)
     , mp_PDPReaderHistory(nullptr)
-    , temp_reader_data_(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators,
-            allocation.data_limits, allocation.content_filter)
-    , temp_writer_data_(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators,
-            allocation.data_limits)
+    , temp_reader_proxies_({
+                allocation.locators.max_unicast_locators,
+                allocation.locators.max_multicast_locators,
+                allocation.data_limits,
+                allocation.content_filter})
+    , temp_writer_proxies_({
+                allocation.locators.max_unicast_locators,
+                allocation.locators.max_multicast_locators,
+                allocation.data_limits})
     , mp_mutex(new std::recursive_mutex())
     , resend_participant_info_event_(nullptr)
 {
@@ -128,8 +134,8 @@ PDP::~PDP()
     delete resend_participant_info_event_;
     mp_RTPSParticipant->disableReader(mp_PDPReader);
     delete mp_EDP;
-    mp_RTPSParticipant->deleteUserEndpoint(mp_PDPWriter);
-    mp_RTPSParticipant->deleteUserEndpoint(mp_PDPReader);
+    mp_RTPSParticipant->deleteUserEndpoint(mp_PDPWriter->getGuid());
+    mp_RTPSParticipant->deleteUserEndpoint(mp_PDPReader->getGuid());
 
     if (mp_PDPWriterHistory)
     {
@@ -1123,7 +1129,6 @@ ParticipantProxyData* PDP::get_participant_proxy_data(
 
 std::list<eprosima::fastdds::rtps::RemoteServerAttributes>& PDP::remote_server_attributes()
 {
-    std::unique_lock<std::recursive_mutex> lock(*getMutex());
     return mp_builtin->m_DiscoveryServers;
 }
 
