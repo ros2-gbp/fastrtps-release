@@ -15,8 +15,8 @@
 ###############################################################################
 # CMake build rules for Fast DDS
 ###############################################################################
-cmake_minimum_required(VERSION 3.5)
-cmake_policy(VERSION 3.5...3.13)
+cmake_minimum_required(VERSION 3.16.3)
+cmake_policy(VERSION 3.16.3...3.20.3)
 
 # Set CMAKE_BUILD_TYPE to Release by default.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -30,7 +30,7 @@ endif()
 ###############################################################################
 # Project                                                                     #
 ###############################################################################
-project(fastrtps VERSION "2.6.0" LANGUAGES C CXX)
+project(fastrtps VERSION "2.7.1" LANGUAGES C CXX)
 
 set(PROJECT_NAME_LARGE "Fast RTPS")
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
@@ -62,7 +62,8 @@ if(MSVC OR MSVC_IDE)
     # C4555  expression has no effect; expected expression with side-effect
     # C4715: 'Test': not all control paths return a value
     # C5038 data member 'member1' will be initialized after data member 'member2'
-    add_compile_options(/w34101 /w34189 /w34555 /w34715 /w35038)
+    # C4100 'identifier' : unreferenced formal parameter (matches clang -Wunused-lambda-capture)
+    add_compile_options(/w34101 /w34189 /w34555 /w34715 /w35038 /w44100)
 
     if(EPROSIMA_BUILD)
         string(REPLACE "/DNDEBUG" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
@@ -94,12 +95,12 @@ endif()
 ###############################################################################
 # Test system configuration
 ###############################################################################
+
 include(${PROJECT_SOURCE_DIR}/cmake/common/check_configuration.cmake)
 
 set(FORCE_CXX "11" CACHE STRING "C++ standard fulfillment selection")
-check_stdcxx()
+check_stdcxx(${FORCE_CXX})
 
-check_compile_feature()
 check_endianness()
 
 ###############################################################################
@@ -168,7 +169,9 @@ message(STATUS "Found foonathan_memory: ${foonathan_memory_DIR}")
 find_package(ThirdpartyBoost REQUIRED)
 
 if(ANDROID)
-    eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
+    if((ANDROID_PLATFORM LESS_EQUAL 23) OR (ANDROID_NATIVE_API_LEVEL LESS_EQUAL 23))
+        eprosima_find_thirdparty(android-ifaddrs android-ifaddrs)
+    endif()
 endif()
 
 include_directories(thirdparty/nlohmann-json)
@@ -203,6 +206,15 @@ else()
 endif()
 
 option(SQLITE3_SUPPORT "Activate SQLITE3 support" ON)
+
+option(USE_THIRDPARTY_SHARED_MUTEX [=[
+Forces the use of a Boost-based shared_mutex implementation
+instead of the framework one. Useful to cope with issues on
+framework implementations like misguided sanitizer reports.
+This implementation will be used by default on frameworks
+lacking the shared_mutex feature like those not fulfilling
+C++17.
+]=] OFF)
 
 ###############################################################################
 # SHM as Default transport
@@ -353,12 +365,6 @@ if(BUILD_DOCUMENTATION)
     endif()
 
     if(NOT CHECK_DOCUMENTATION)
-        find_program(WGET_EXE wget)
-        if(WGET_EXE)
-            message(STATUS "Found WGet: ${WGET_EXE}")
-        else()
-            message(FATAL_ERROR "wget is needed to build the documentation. Please install it correctly")
-        endif()
         find_program(UNZIP_EXE unzip)
         if(UNZIP_EXE)
             message(STATUS "Found Unzip: ${UNZIP_EXE}")
@@ -403,12 +409,23 @@ if(BUILD_DOCUMENTATION)
 
     ### ReadTheDocs ########################
     if(NOT CHECK_DOCUMENTATION)
+
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom_template.cmake [=[
+
+            file(DOWNLOAD "https://fast-dds.docs.eprosima.com/_/downloads/en/v${PROJECT_VERSION}/htmlzip/" "./eprosima-fast-rtps.zip")
+            # TODO: when windows ci CMake version surpasses 17 favor file() instead of UNZIP as in the next line
+            # file(ARCHIVE_EXTRACT INPUT "./eprosima-fast-rtps.zip" DESTINATION  "${PROJECT_BINARY_DIR}/doc/")
+            execute_process(COMMAND "${UNZIP_EXE}" "./eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/")
+            file(REMOVE_RECURSE "${PROJECT_BINARY_DIR}/doc/manual")
+            file(RENAME "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual")
+            file(REMOVE  "./eprosima-fast-rtps.zip")
+
+            ]=])
+
+        configure_file(${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom_template.cmake  ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom.cmake)
+
         add_custom_target(readthedocs
-            COMMAND "${WGET_EXE}" "https://media.readthedocs.org/htmlzip/eprosima-fast-rtps/v${PROJECT_VERSION}/eprosima-fast-rtps.zip"
-            COMMAND "${UNZIP_EXE}" "eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/"
-            COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}/doc/manual"
-            COMMAND ${CMAKE_COMMAND} -E rename "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual"
-            COMMAND ${CMAKE_COMMAND} -E remove "eprosima-fast-rtps.zip"
+            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom.cmake 
             )
 
         add_dependencies(readthedocs docdirs)
@@ -436,7 +453,7 @@ option(INSTALL_EXAMPLES "Install example" OFF)
 
 if(INSTALL_EXAMPLES)
   # Install examples
-  install(DIRECTORY ${PROJECT_SOURCE_DIR}/examples/C++
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/examples/cpp
       DESTINATION examples/
       COMPONENT examples
       PATTERN "examples/CMakeLists.txt" EXCLUDE

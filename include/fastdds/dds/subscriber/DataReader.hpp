@@ -136,6 +136,7 @@ public:
      *
      * @param[in] max_wait Max blocking time for this operation.
      * @return RETCODE_OK if there is new unread message, ReturnCode_t::RETCODE_TIMEOUT if timeout
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t wait_for_historical_data(
             const fastrtps::Duration_t& max_wait) const;
@@ -333,15 +334,15 @@ public:
      * @param[in,out] data_values     A LoanableCollection object where the received data samples will be returned.
      * @param[in,out] sample_infos    A SampleInfoSeq object where the received sample info will be returned.
      * @param[in]     max_samples     The maximum number of samples to be returned.
-     * @param[in]     a_condition     A ReadCondition that returned @c sample_states must pass
+     * @param[in]     a_condition     A ReadCondition that returned @c data_values must pass
      *
      * @return Any of the standard return codes.
      */
     RTPS_DllAPI ReturnCode_t read_w_condition(
             LoanableCollection& data_values,
             SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            ReadCondition* a_condition = nullptr);
+            int32_t max_samples,
+            ReadCondition* a_condition);
 
     /**
      * Access a collection of data samples from the DataReader.
@@ -478,16 +479,16 @@ public:
      *                                available, up to the limits described in the documentation for @ref read().
      * @param[in]     previous_handle The 'next smallest' instance with a value greater than this value that has
      *                                available samples will be returned.
-     * @param[in]     a_condition     A ReadCondition that returned @c sample_states must pass
+     * @param[in]     a_condition     A ReadCondition that returned @c data_values must pass
      *
      * @return Any of the standard return codes.
      */
     RTPS_DllAPI ReturnCode_t read_next_instance_w_condition(
             LoanableCollection& data_values,
             SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            const InstanceHandle_t& previous_handle = HANDLE_NIL,
-            ReadCondition* a_condition = nullptr);
+            int32_t max_samples,
+            const InstanceHandle_t& previous_handle,
+            ReadCondition* a_condition);
 
     /**
      * @brief This operation copies the next, non-previously accessed Data value from the DataReader; the operation
@@ -570,15 +571,15 @@ public:
      * @param[in,out] sample_infos    A SampleInfoSeq object where the received sample info will be returned.
      * @param[in]     max_samples     The maximum number of samples to be returned. If the special value
      *                                @ref LENGTH_UNLIMITED is provided, as many samples will be returned as are.
-     * @param[in]     a_condition     A ReadCondition that returned @c sample_states must pass
+     * @param[in]     a_condition     A ReadCondition that returned @c data_values must pass
      *
      * @return Any of the standard return codes.
      */
     RTPS_DllAPI ReturnCode_t take_w_condition(
             LoanableCollection& data_values,
             SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            ReadCondition* a_condition = nullptr);
+            int32_t max_samples,
+            ReadCondition* a_condition);
 
     /**
      * Access a collection of data samples from the DataReader.
@@ -682,16 +683,16 @@ public:
      *                                available, up to the limits described in the documentation for @ref read().
      * @param[in]     previous_handle The 'next smallest' instance with a value greater than this value that has
      *                                available samples will be returned.
-     * @param[in]     a_condition     A ReadCondition that returned @c sample_states must pass
+     * @param[in]     a_condition     A ReadCondition that returned @c data_values must pass
      *
      * @return Any of the standard return codes.
      */
     RTPS_DllAPI ReturnCode_t take_next_instance_w_condition(
             LoanableCollection& data_values,
             SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            const InstanceHandle_t& previous_handle = HANDLE_NIL,
-            ReadCondition* a_condition = nullptr);
+            int32_t max_samples,
+            const InstanceHandle_t& previous_handle,
+            ReadCondition* a_condition);
 
     /**
      * @brief This operation copies the next, non-previously accessed Data value from the DataReader and ‘removes’ it
@@ -771,6 +772,7 @@ public:
      * @param[in] handle
      *
      * @return Any of the standard return codes.
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_key_value(
             void* key_holder,
@@ -783,7 +785,9 @@ public:
      *
      * @param [in] instance Data pointer to the sample
      *
-     * @return handle of the given instance
+     * @return handle of the given @c instance.
+     * @return HANDLE_NIL if @c instance is nullptr.
+     * @return HANDLE_NIL if there is no instance on the DataReader's history with the same key as @c instance.
      */
     RTPS_DllAPI InstanceHandle_t lookup_instance(
             const void* instance) const;
@@ -808,11 +812,28 @@ public:
     RTPS_DllAPI uint64_t get_unread_count() const;
 
     /**
+     * Get the number of samples pending to be read.
+     *
+     * @param mark_as_read  Whether the unread samples should be marked as read or not.
+     *
+     * @return the number of samples on the reader history that have never been read.
+     */
+    RTPS_DllAPI uint64_t get_unread_count(
+            bool mark_as_read) const;
+
+    /**
      * Get associated GUID.
      *
      * @return Associated GUID
      */
     RTPS_DllAPI const fastrtps::rtps::GUID_t& guid();
+
+    /**
+     * Get associated GUID.
+     *
+     * @return Associated GUID
+     */
+    RTPS_DllAPI const fastrtps::rtps::GUID_t& guid() const;
 
     /**
      * @brief Getter for the associated InstanceHandle.
@@ -961,7 +982,7 @@ public:
      * @param[out] publication_data publication data struct
      * @param publication_handle InstanceHandle_t of the publication
      * @return RETCODE_OK
-     *
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_matched_publication_data(
             builtin::PublicationBuiltinTopicData& publication_data,
@@ -972,6 +993,7 @@ public:
      *
      * @param[out] publication_handles Vector where the InstanceHandle_t are returned
      * @return RETCODE_OK
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_matched_publications(
             std::vector<InstanceHandle_t>& publication_handles) const;
@@ -980,31 +1002,33 @@ public:
      * @brief This operation creates a ReadCondition. The returned ReadCondition will be attached and belong to the
      * DataReader.
      *
-     * @param sample_states Vector of SampleStateKind
-     * @param view_states Vector of ViewStateKind
-     * @param instance_states Vector of InstanceStateKind
-     * @return ReadCondition pointer
+     * @param [in] sample_states   Only data samples with @c sample_state matching one of these will trigger the created condition.
+     * @param [in] view_states     Only data samples with @c view_state matching one of these will trigger the created condition.
+     * @param [in] instance_states Only data samples with @c instance_state matching one of these will trigger the created condition.
+     *
+     * @return pointer to the created ReadCondition, nullptr in case of error.
      */
     RTPS_DllAPI ReadCondition* create_readcondition(
-            const std::vector<SampleStateKind>& sample_states,
-            const std::vector<ViewStateKind>& view_states,
-            const std::vector<InstanceStateKind>& instance_states);
+            SampleStateMask sample_states,
+            ViewStateMask view_states,
+            InstanceStateMask instance_states);
 
     /**
      * @brief This operation creates a QueryCondition. The returned QueryCondition will be attached and belong to the
      * DataReader.
      *
-     * @param sample_states Vector of SampleStateKind
-     * @param view_states Vector of ViewStateKind
-     * @param instance_states Vector of InstanceStateKind
-     * @param query_expression string containing query
-     * @param query_parameters Vector of strings containing parameters of query expression
-     * @return QueryCondition pointer
+     * @param [in] sample_states    Only data samples with @c sample_state matching one of these will trigger the created condition.
+     * @param [in] view_states      Only data samples with @c view_state matching one of these will trigger the created condition.
+     * @param [in] instance_states  Only data samples with @c instance_state matching one of these will trigger the created condition.
+     * @param [in] query_expression Only data samples matching this query will trigger the created condition.
+     * @param [in] query_parameters Value of the parameters on the query expression.
+     *
+     * @return pointer to the created QueryCondition, nullptr in case of error.
      */
     RTPS_DllAPI QueryCondition* create_querycondition(
-            const std::vector<SampleStateKind>& sample_states,
-            const std::vector<ViewStateKind>& view_states,
-            const std::vector<InstanceStateKind>& instance_states,
+            SampleStateMask sample_states,
+            ViewStateMask view_states,
+            InstanceStateMask instance_states,
             const std::string& query_expression,
             const std::vector<std::string>& query_parameters);
 
@@ -1015,7 +1039,7 @@ public:
      * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t delete_readcondition(
-            const ReadCondition* a_condition);
+            ReadCondition* a_condition);
 
     /**
      * @brief Getter for the Subscriber
@@ -1035,10 +1059,13 @@ public:
     RTPS_DllAPI ReturnCode_t delete_contained_entities();
 
     /**
-     * Checks whether the sample is still valid or is corrupted
+     * Checks whether a loaned sample is still valid or is corrupted.
+     * Calling this method on a sample which has not been loaned, or one for which the loan has been returned
+     * yields undefined behavior.
      *
      * @param data Pointer to the sample data to check
      * @param info Pointer to the SampleInfo related to \c data
+     *
      * @return true if the sample is valid
      */
     RTPS_DllAPI bool is_sample_valid(

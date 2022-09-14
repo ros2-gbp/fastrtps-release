@@ -312,9 +312,7 @@ StatefulWriter::~StatefulWriter()
 {
     logInfo(RTPS_WRITER, "StatefulWriter destructor");
 
-    // This must be the first action, because free CacheChange_t from async thread.
-    deinit();
-
+    // Disable timed events, because their callbacks use cache changes
     if (disable_positive_acks_)
     {
         delete(ack_event_);
@@ -326,6 +324,9 @@ StatefulWriter::~StatefulWriter()
         delete(nack_response_event_);
         nack_response_event_ = nullptr;
     }
+
+    // This must be the next action, as it frees CacheChange_t from the async thread.
+    deinit();
 
     // Stop all active proxies and pass them to the pool
     {
@@ -353,7 +354,8 @@ StatefulWriter::~StatefulWriter()
         }
     }
 
-    // Destroy heartbeat event
+    // PeriodicHeartbeatEvent must be released after releasing all proxies
+    // because proxy's NackSuppressionEvent could restart this event.
     if (periodic_hb_event_ != nullptr)
     {
         delete(periodic_hb_event_);
@@ -637,7 +639,7 @@ void StatefulWriter::deliver_sample_to_intraprocesses(
         SequenceNumber_t gap_seq;
         FragmentNumber_t dummy = 0;
         bool dumb = false;
-        if (remoteReader->change_is_unsent(change->sequenceNumber, dummy, gap_seq, dumb))
+        if (remoteReader->change_is_unsent(change->sequenceNumber, dummy, gap_seq, get_seq_num_min(), dumb))
         {
             // If there is a hole (removed from history or not relevants) between previous sample and this one,
             // send it a personal GAP.
@@ -672,7 +674,7 @@ void StatefulWriter::deliver_sample_to_datasharing(
         SequenceNumber_t gap_seq;
         FragmentNumber_t dummy = 0;
         bool dumb = false;
-        if (remoteReader->change_is_unsent(change->sequenceNumber, dummy, gap_seq, dumb))
+        if (remoteReader->change_is_unsent(change->sequenceNumber, dummy, gap_seq, get_seq_num_min(), dumb))
         {
             if (!remoteReader->is_reliable())
             {
@@ -717,7 +719,7 @@ DeliveryRetCode StatefulWriter::deliver_sample_to_network(
         {
             SequenceNumber_t gap_seq;
             FragmentNumber_t next_unsent_frag = 0;
-            if ((*remote_reader)->change_is_unsent(change->sequenceNumber, next_unsent_frag, gap_seq,
+            if ((*remote_reader)->change_is_unsent(change->sequenceNumber, next_unsent_frag, gap_seq, get_seq_num_min(),
                     need_reactivate_periodic_heartbeat) &&
                     (0 == n_fragments || min_unsent_fragment >= next_unsent_frag))
             {
@@ -737,7 +739,7 @@ DeliveryRetCode StatefulWriter::deliver_sample_to_network(
                 // send it a personal GAP.
                 if (SequenceNumber_t::unknown() != gap_seq)
                 {
-                    if (SequenceNumber_t::unknown() == gap_seq_for_all) // Calculate if the hole is for all readers
+                    if (SequenceNumber_t::unknown() == gap_seq_for_all)     // Calculate if the hole is for all readers
                     {
                         History::const_iterator chit = mp_history->find_change_nts(change);
 
@@ -756,12 +758,13 @@ DeliveryRetCode StatefulWriter::deliver_sample_to_network(
                         }
                     }
 
-                    if (gap_seq_for_all != gap_seq) // If it is an individual GAP, sent it to repective reader.
+                    if (gap_seq_for_all != gap_seq)     // If it is an individual GAP, sent it to repective reader.
                     {
                         group.sender(this, (*remote_reader)->message_sender());
-                        group.add_gap(gap_seq, SequenceNumberSet_t(change->sequenceNumber), (*remote_reader)->guid());
+                        group.add_gap(gap_seq, SequenceNumberSet_t(change->sequenceNumber),
+                                (*remote_reader)->guid());
                         send_heartbeat_nts_(1u, group, disable_positive_acks_);
-                        group.sender(this, &locator_selector); // This makes the flush_and_reset().
+                        group.sender(this, &locator_selector);     // This makes the flush_and_reset().
                     }
                 }
             }
@@ -1008,9 +1011,9 @@ bool StatefulWriter::matched_reader_add(
         return false;
     }
 
-    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
-    std::lock_guard<LocatorSelectorSender> guard_locator_selector_general(locator_selector_general_);
-    std::lock_guard<LocatorSelectorSender> guard_locator_selector_async(locator_selector_async_);
+    std::unique_lock<RecursiveTimedMutex> guard(mp_mutex);
+    std::unique_lock<LocatorSelectorSender> guard_locator_selector_general(locator_selector_general_);
+    std::unique_lock<LocatorSelectorSender> guard_locator_selector_async(locator_selector_async_);
 
     // Check if it is already matched.
     if (for_matched_readers(matched_local_readers_, matched_datasharing_readers_, matched_remote_readers_,
@@ -1029,6 +1032,15 @@ bool StatefulWriter::matched_reader_add(
                 return false;
             }))
     {
+        if (nullptr != mp_listener)
+        {
+            // call the listener without locks taken
+            guard_locator_selector_async.unlock();
+            guard_locator_selector_general.unlock();
+            guard.unlock();
+
+            mp_listener->on_reader_discovery(this, ReaderDiscoveryInfo::CHANGED_QOS_READER, rdata.guid(), &rdata);
+        }
         return false;
     }
 
@@ -1087,6 +1099,15 @@ bool StatefulWriter::matched_reader_add(
 
     if (rp->is_datasharing_reader())
     {
+        if (nullptr != mp_listener)
+        {
+            // call the listener without locks taken
+            guard_locator_selector_async.unlock();
+            guard_locator_selector_general.unlock();
+            guard.unlock();
+
+            mp_listener->on_reader_discovery(this, ReaderDiscoveryInfo::DISCOVERED_READER, rdata.guid(), &rdata);
+        }
         return true;
     }
 
@@ -1176,6 +1197,15 @@ bool StatefulWriter::matched_reader_add(
                                          << rdata.remote_locators().multicast.size() <<
             "(m) locators");
 
+    if (nullptr != mp_listener)
+    {
+        // call the listener without locks taken
+        guard_locator_selector_async.unlock();
+        guard_locator_selector_general.unlock();
+        guard.unlock();
+
+        mp_listener->on_reader_discovery(this, ReaderDiscoveryInfo::DISCOVERED_READER, rdata.guid(), &rdata);
+    }
     return true;
 }
 
@@ -1184,8 +1214,8 @@ bool StatefulWriter::matched_reader_remove(
 {
     ReaderProxy* rproxy = nullptr;
     std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
-    std::lock_guard<LocatorSelectorSender> guard_locator_selector_general(locator_selector_general_);
-    std::lock_guard<LocatorSelectorSender> guard_locator_selector_async(locator_selector_async_);
+    std::unique_lock<LocatorSelectorSender> guard_locator_selector_general(locator_selector_general_);
+    std::unique_lock<LocatorSelectorSender> guard_locator_selector_async(locator_selector_async_);
 
     for (ReaderProxyIterator it = matched_local_readers_.begin();
             it != matched_local_readers_.end(); ++it)
@@ -1246,6 +1276,15 @@ bool StatefulWriter::matched_reader_remove(
 
         check_acked_status();
 
+        if (nullptr != mp_listener)
+        {
+            // call the listener without locks taken
+            guard_locator_selector_async.unlock();
+            guard_locator_selector_general.unlock();
+            lock.unlock();
+
+            mp_listener->on_reader_discovery(this, ReaderDiscoveryInfo::REMOVED_READER, reader_guid, nullptr);
+        }
         return true;
     }
 
@@ -1302,7 +1341,7 @@ bool StatefulWriter::is_acked_by_all(
 {
     assert(mp_history->next_sequence_number() > seq);
     return (seq < next_all_acked_notify_sequence_) ||
-           !for_matched_readers(matched_local_readers_, matched_remote_readers_,
+           !for_matched_readers(matched_local_readers_, matched_datasharing_readers_, matched_remote_readers_,
                    [seq](const ReaderProxy* reader)
                    {
                        return !(reader->change_is_acked(seq));
@@ -1872,6 +1911,7 @@ bool StatefulWriter::process_acknack(
                                         {
                                             // Send heartbeat if requested
                                             send_heartbeat_to_nts(*remote_reader, false, true);
+                                            periodic_hb_event_->restart_timer();
                                         }
                                     }
 
