@@ -229,6 +229,8 @@ bool PDPServer::createPDPEndpoints()
 {
     logInfo(RTPS_PDP_SERVER, "Beginning PDPServer Endpoints creation");
 
+    const RTPSParticipantAttributes& pattr = mp_RTPSParticipant->getRTPSParticipantAttributes();
+
     /***********************************
     * PDP READER
     ***********************************/
@@ -245,6 +247,8 @@ bool PDPServer::createPDPEndpoints()
     ratt.endpoint.endpointKind = READER;
     ratt.endpoint.multicastLocatorList = mp_builtin->m_metatrafficMulticastLocatorList;
     ratt.endpoint.unicastLocatorList = mp_builtin->m_metatrafficUnicastLocatorList;
+    ratt.endpoint.external_unicast_locators = mp_builtin->m_att.metatraffic_external_unicast_locators;
+    ratt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     ratt.endpoint.topicKind = WITH_KEY;
     // change depending of backup mode
     ratt.endpoint.durabilityKind = durability_;
@@ -316,6 +320,8 @@ bool PDPServer::createPDPEndpoints()
     watt.endpoint.topicKind = WITH_KEY;
     watt.endpoint.multicastLocatorList = mp_builtin->m_metatrafficMulticastLocatorList;
     watt.endpoint.unicastLocatorList = mp_builtin->m_metatrafficUnicastLocatorList;
+    watt.endpoint.external_unicast_locators = mp_builtin->m_att.metatraffic_external_unicast_locators;
+    watt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     watt.times.heartbeatPeriod = pdp_heartbeat_period;
     watt.times.nackResponseDelay = pdp_nack_response_delay;
     watt.times.nackSupressionDuration = pdp_nack_supression_duration;
@@ -1046,7 +1052,7 @@ bool PDPServer::process_disposals()
     for (auto change: disposals)
     {
         logInfo(RTPS_PDP_SERVER, "Process disposal change from: " << change->instanceHandle);
-        // No check is performed on whether the change is an actual disposal, leaving the responsability of correctly
+        // No check is performed on whether the change is an actual disposal, leaving the responsibility of correctly
         // populating the disposals list to discovery_db_.process_data_queue().
 
         // Get the identity of the participant from which the change came.

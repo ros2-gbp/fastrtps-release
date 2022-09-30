@@ -134,12 +134,15 @@ ReturnCode_t DataReaderImpl::enable()
 
     att.endpoint.durabilityKind = qos_.durability().durabilityKind();
     att.endpoint.endpointKind = READER;
-    att.endpoint.multicastLocatorList = qos_.endpoint().multicast_locator_list;
     att.endpoint.reliabilityKind = qos_.reliability().kind == RELIABLE_RELIABILITY_QOS ? RELIABLE : BEST_EFFORT;
     att.endpoint.topicKind = type_->m_isGetKeyDefined ? WITH_KEY : NO_KEY;
+    att.endpoint.multicastLocatorList = qos_.endpoint().multicast_locator_list;
     att.endpoint.unicastLocatorList = qos_.endpoint().unicast_locator_list;
     att.endpoint.remoteLocatorList = qos_.endpoint().remote_locator_list;
+    att.endpoint.external_unicast_locators = qos_.endpoint().external_unicast_locators;
+    att.endpoint.ignore_non_matching_locators = qos_.endpoint().ignore_non_matching_locators;
     att.endpoint.properties = qos_.properties();
+    att.endpoint.ownershipKind = qos_.ownership().kind;
     att.endpoint.setEntityID(qos_.endpoint().entity_id);
     att.endpoint.setUserDefinedID(qos_.endpoint().user_defined_id);
     att.times = qos_.reliable_reader_qos().times;
@@ -812,7 +815,7 @@ ReturnCode_t DataReaderImpl::set_qos(
             return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
         }
 
-        ReturnCode_t check_result = check_qos(qos_to_set);
+        ReturnCode_t check_result = check_qos_including_resource_limits(qos_to_set, type_);
         if (!check_result)
         {
             return check_result;
@@ -1003,6 +1006,15 @@ bool DataReaderImpl::on_data_available(
 bool DataReaderImpl::on_new_cache_change_added(
         const CacheChange_t* const change)
 {
+    std::lock_guard<RecursiveTimedMutex> guard(reader_->getMutex());
+
+    CacheChange_t* new_change = const_cast<CacheChange_t*>(change);
+    if (!history_.update_instance_nts(new_change))
+    {
+        history_.remove_change_sub(new_change);
+        return false;
+    }
+
     if (qos_.deadline().period != c_TimeInfinite)
     {
         if (!history_.set_next_deadline(
@@ -1020,9 +1032,6 @@ bool DataReaderImpl::on_new_cache_change_added(
             }
         }
     }
-
-    CacheChange_t* new_change = const_cast<CacheChange_t*>(change);
-    history_.update_instance_nts(new_change);
 
     if (qos_.lifespan().duration == c_TimeInfinite)
     {
@@ -1153,7 +1162,7 @@ bool DataReaderImpl::deadline_missed()
 
     if (!history_.set_next_deadline(
                 timer_owner_,
-                steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
+                steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_), true))
     {
         logError(SUBSCRIBER, "Could not set next deadline in the history");
         return false;
@@ -1227,12 +1236,14 @@ bool DataReaderImpl::lifespan_expired()
 ReturnCode_t DataReaderImpl::set_listener(
         DataReaderListener* listener)
 {
+    std::lock_guard<std::mutex> _(listener_mutex_);
     listener_ = listener;
     return ReturnCode_t::RETCODE_OK;
 }
 
 const DataReaderListener* DataReaderImpl::get_listener() const
 {
+    std::lock_guard<std::mutex> _(listener_mutex_);
     return listener_;
 }
 
@@ -1393,7 +1404,20 @@ const SampleLostStatus& DataReaderImpl::update_sample_lost_status(
     return sample_lost_status_;
 }
 
-ReturnCode_t DataReaderImpl::check_qos (
+ReturnCode_t DataReaderImpl::check_qos_including_resource_limits(
+        const DataReaderQos& qos,
+        const TypeSupport& type)
+{
+    ReturnCode_t check_qos_return = check_qos(qos);
+    if (ReturnCode_t::RETCODE_OK == check_qos_return &&
+            type->m_isGetKeyDefined)
+    {
+        check_qos_return = check_allocation_consistency(qos);
+    }
+    return check_qos_return;
+}
+
+ReturnCode_t DataReaderImpl::check_qos(
         const DataReaderQos& qos)
 {
     if (qos.durability().kind == PERSISTENT_DURABILITY_QOS)
@@ -1406,11 +1430,6 @@ ReturnCode_t DataReaderImpl::check_qos (
         logError(DDS_QOS_CHECK, "BY SOURCE TIMESTAMP DestinationOrder not supported");
         return ReturnCode_t::RETCODE_UNSUPPORTED;
     }
-    if (qos.reliability().kind == BEST_EFFORT_RELIABILITY_QOS && qos.ownership().kind == EXCLUSIVE_OWNERSHIP_QOS)
-    {
-        logError(DDS_QOS_CHECK, "BEST_EFFORT incompatible with EXCLUSIVE ownership");
-        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
-    }
     if (qos.reader_resource_limits().max_samples_per_read <= 0)
     {
         logError(DDS_QOS_CHECK, "max_samples_per_read should be strictly possitive");
@@ -1419,6 +1438,27 @@ ReturnCode_t DataReaderImpl::check_qos (
     if (qos_has_unique_network_request(qos) && qos_has_specific_locators(qos))
     {
         logError(DDS_QOS_CHECK, "unique_network_request cannot be set along specific locators");
+        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+    }
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataReaderImpl::check_allocation_consistency(
+        const DataReaderQos& qos)
+{
+    if ((qos.resource_limits().max_samples > 0) &&
+            (qos.resource_limits().max_samples <
+            (qos.resource_limits().max_instances * qos.resource_limits().max_samples_per_instance)))
+    {
+        logError(DDS_QOS_CHECK,
+                "max_samples should be greater than max_instances * max_samples_per_instance");
+        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+    }
+    if ((qos.resource_limits().max_instances <= 0 || qos.resource_limits().max_samples_per_instance <= 0) &&
+            (qos.resource_limits().max_samples > 0))
+    {
+        logError(DDS_QOS_CHECK,
+                "max_samples should be infinite when max_instances or max_samples_per_instance are infinite");
         return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
     }
     return ReturnCode_t::RETCODE_OK;
@@ -1637,11 +1677,16 @@ fastrtps::TopicAttributes DataReaderImpl::topic_attributes() const
 DataReaderListener* DataReaderImpl::get_listener_for(
         const StatusMask& status)
 {
-    if (listener_ != nullptr &&
-            user_datareader_->get_status_mask().is_active(status))
     {
-        return listener_;
+        std::lock_guard<std::mutex> _(listener_mutex_);
+
+        if (listener_ != nullptr &&
+                user_datareader_->get_status_mask().is_active(status))
+        {
+            return listener_;
+        }
     }
+
     return subscriber_->get_listener_for(status);
 }
 
@@ -2006,4 +2051,3 @@ void DataReaderImpl::try_notify_read_conditions() noexcept
 }  // namespace dds
 }  // namespace fastdds
 }  // namespace eprosima
-
