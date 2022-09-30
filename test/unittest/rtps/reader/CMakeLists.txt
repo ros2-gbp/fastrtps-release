@@ -19,7 +19,7 @@ set(WRITERPROXYTESTS_SOURCE WriterProxyTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    )
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
 
 if(WIN32)
     add_definitions(-D_WIN32_WINNT=0x0601)
@@ -33,6 +33,7 @@ target_compile_definitions(WriterProxyTests PRIVATE FASTRTPS_NO_LIB
 target_include_directories(WriterProxyTests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/reader
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
+    ${PROJECT_SOURCE_DIR}/test/mock/rtps/ExternalLocatorsProcessor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSReader
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSWriter
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
@@ -49,3 +50,7 @@ target_link_libraries(WriterProxyTests foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
 add_gtest(WriterProxyTests SOURCES ${WRITERPROXYTESTS_SOURCE})
+
+if(ANDROID)
+    set_property(TARGET WriterProxyTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

@@ -19,11 +19,20 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../profiles/test_xml_profiles.xml
 set(PARTICIPANTTESTS_SOURCE
     ParticipantTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/ServerAttributes.cpp
-    )
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
 
 if(WIN32)
     add_definitions(-D_WIN32_WINNT=0x0601)
 endif()
+
+if(ANDROID)
+    if (ANDROID_NATIVE_API_LEVEL LESS 24)
+        list(APPEND PARTICIPANTTESTS_SOURCE
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
+endif()
+
 
 add_executable(ParticipantTests ${PARTICIPANTTESTS_SOURCE})
 target_compile_definitions(ParticipantTests PRIVATE FASTRTPS_NO_LIB
@@ -37,4 +46,15 @@ target_include_directories(ParticipantTests PRIVATE
 target_link_libraries(ParticipantTests fastrtps fastcdr foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
-add_gtest(ParticipantTests SOURCES ${PARTICIPANTTESTS_SOURCE})
+
+if(EPROSIMA_TEST_DNS_NOT_SET_UP)
+    set(dns_filter "ParticipantTests.SimpleParticipantRemoteServerListConfigurationDNS")
+endif()
+
+add_gtest(ParticipantTests SOURCES ${PARTICIPANTTESTS_SOURCE} IGNORE ${dns_filter})
+
+unset(dns_filter)
+
+if(ANDROID)
+    set_property(TARGET ParticipantTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

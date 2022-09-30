@@ -247,7 +247,6 @@ bool RTPSDomain::removeRTPSParticipant(
     if (p != nullptr)
     {
         assert((p->mp_impl != nullptr) && "This participant has been previously invalidated");
-        p->mp_impl->disable();
 
         std::unique_lock<std::mutex> lock(m_mutex);
         for (auto it = m_RTPSParticipants.begin(); it != m_RTPSParticipants.end(); ++it)
@@ -270,6 +269,7 @@ bool RTPSDomain::removeRTPSParticipant(
 void RTPSDomain::removeRTPSParticipant_nts(
         RTPSDomain::t_p_RTPSParticipant& participant)
 {
+    participant.second->disable();
     // The destructor of RTPSParticipantImpl already deletes the associated RTPSParticipant and sets
     // its pointer to the RTPSParticipant to nullptr, so there is no need to do it here manually.
     delete(participant.second);
@@ -312,6 +312,39 @@ RTPSWriter* RTPSDomain::createRTPSWriter(
     }
 
     return nullptr;
+}
+
+RTPSWriter* RTPSDomain::createRTPSWriter(
+        RTPSParticipant* p,
+        WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+{
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
+    {
+        RTPSWriter* ret_val = nullptr;
+        if (impl->create_writer(&ret_val, watt, payload_pool, change_pool, hist, listen))
+        {
+            return ret_val;
+        }
+    }
+
+    return nullptr;
+}
+
+RTPSWriter* RTPSDomain::createRTPSWriter(
+        RTPSParticipant* p,
+        const EntityId_t& entity_id,
+        WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+{
+    return RTPSDomainImpl::create_rtps_writer(p, entity_id, watt, payload_pool, change_pool, hist, listen);
 }
 
 RTPSWriter* RTPSDomain::createRTPSWriter(
@@ -466,17 +499,31 @@ RTPSParticipant* RTPSDomain::clientServerEnvironmentCreationOverride(
         return nullptr;
     }
 
-    // we only make the attributes copy when we are sure is worth
+    // We only make the attributes copy when we are sure is worth
+    // Is up to the caller guarantee the att argument is not modified during the call
     RTPSParticipantAttributes client_att(att);
 
     // Retrieve the info from the environment variable
-    // TODO(jlbueno) This should be protected with the PDP mutex.
-    if (load_environment_server_info(client_att.builtin.discovery_config.m_DiscoveryServers) &&
-            client_att.builtin.discovery_config.m_DiscoveryServers.empty())
+    RemoteServerList_t& server_list = client_att.builtin.discovery_config.m_DiscoveryServers;
+    if (load_environment_server_info(server_list) && server_list.empty())
     {
         // it's not an error, the environment variable may not be set. Any issue with environment
         // variable syntax is logError already
         return nullptr;
+    }
+
+    // check if some server requires the UDPv6 transport
+    for (auto& server : server_list)
+    {
+        if (server.requires_transport<LOCATOR_KIND_UDPv6>())
+        {
+            // extend builtin transports with the UDPv6 transport
+            auto descriptor = std::make_shared<fastdds::rtps::UDPv6TransportDescriptor>();
+            descriptor->sendBufferSize = client_att.sendSocketBufferSize;
+            descriptor->receiveBufferSize = client_att.listenSocketBufferSize;
+            client_att.userTransports.push_back(std::move(descriptor));
+            break;
+        }
     }
 
     logInfo(DOMAIN, "Detected auto client-server environment variable."

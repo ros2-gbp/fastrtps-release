@@ -14,7 +14,11 @@
 //
 #include <cstring>
 #include <regex>
+#include <string>
+#include <unordered_map>
+
 #include <tinyxml2.h>
+
 #include <fastrtps/xmlparser/XMLParserCommon.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
@@ -416,6 +420,7 @@ XMLP_ret XMLParser::getXMLBuiltinAttributes(
         <xs:all minOccurs="0">
             <xs:element name="discovery_config" type="discoverySettingsType" minOccurs="0"/>
             <xs:element name="use_WriterLivelinessProtocol" type="boolType" minOccurs="0"/>
+            <xs:element name="metatraffic_external_unicast_locators" type="externalLocatorListType" minOccurs="0"/>
             <xs:element name="metatrafficUnicastLocatorList" type="locatorListType" minOccurs="0"/>
             <xs:element name="metatrafficMulticastLocatorList" type="locatorListType" minOccurs="0"/>
             <xs:element name="initialPeersList" type="locatorListType" minOccurs="0"/>
@@ -426,11 +431,21 @@ XMLP_ret XMLParser::getXMLBuiltinAttributes(
        </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+
+        if (tags_present[name])
+        {
+            logError(XMLPARSER, "Duplicated element found in 'builtinAttributesType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, DISCOVERY_SETTINGS) == 0)
         {
             // discovery_config - DiscoverySettings
@@ -443,6 +458,15 @@ XMLP_ret XMLParser::getXMLBuiltinAttributes(
         {
             // use_WriterLivelinessProtocol - boolType
             if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &builtin.use_WriterLivelinessProtocol, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, META_EXT_UNI_LOC_LIST) == 0)
+        {
+            // metatraffic_external_unicast_locators - externalLocatorListType
+            if (XMLP_ret::XML_OK !=
+                    getXMLExternalLocatorList(p_aux0, builtin.metatraffic_external_unicast_locators, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -1178,15 +1202,12 @@ XMLP_ret XMLParser::getXMLWriterQosPolicies(
             }
         }
         else if (strcmp(name, DURABILITY_SRV) == 0 ||
-                strcmp(name, TIME_FILTER) == 0 || strcmp(name, OWNERSHIP) == 0 ||
-                strcmp(name, OWNERSHIP_STRENGTH) == 0 || strcmp(name, DEST_ORDER) == 0 ||
+                strcmp(name, TIME_FILTER) == 0 || strcmp(name, DEST_ORDER) == 0 ||
                 strcmp(name, PRESENTATION) == 0)
         {
             // TODO: Do not supported for now
             //if (nullptr != (p_aux = elem->FirstChildElement(    DURABILITY_SRV))) getXMLDurabilityServiceQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(       TIME_FILTER))) getXMLTimeBasedFilterQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(         OWNERSHIP))) getXMLOwnershipQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(OWNERSHIP_STRENGTH))) getXMLOwnershipStrengthQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(        DEST_ORDER))) getXMLDestinationOrderQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(      PRESENTATION))) getXMLPresentationQos(p_aux, ident);
             logError(XMLPARSER, "Quality of Service '" << p_aux0->Value() << "' do not supported for now");
@@ -1195,6 +1216,22 @@ XMLP_ret XMLParser::getXMLWriterQosPolicies(
         {
             //data sharing
             if (XMLP_ret::XML_OK != getXMLDataSharingQos(p_aux0, qos.data_sharing, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, OWNERSHIP) == 0)
+        {
+            //ownership
+            if (XMLP_ret::XML_OK != getXMLOwnershipQos(p_aux0, qos.m_ownership, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, OWNERSHIP_STRENGTH) == 0)
+        {
+            //ownership
+            if (XMLP_ret::XML_OK != getXMLOwnershipStrengthQos(p_aux0, qos.m_ownershipStrength, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -1338,14 +1375,12 @@ XMLP_ret XMLParser::getXMLReaderQosPolicies(
             }
         }
         else if (strcmp(name, DURABILITY_SRV) == 0 ||
-                strcmp(name, TIME_FILTER) == 0 || strcmp(name, OWNERSHIP) == 0 ||
-                strcmp(name, OWNERSHIP_STRENGTH) == 0 || strcmp(name, DEST_ORDER) == 0 ||
+                strcmp(name, TIME_FILTER) == 0 || strcmp(name, DEST_ORDER) == 0 ||
                 strcmp(name, PRESENTATION) == 0)
         {
             // TODO: Do not supported for now
             //if (nullptr != (p_aux = elem->FirstChildElement(    DURABILITY_SRV))) getXMLDurabilityServiceQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(       TIME_FILTER))) getXMLTimeBasedFilterQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(         OWNERSHIP))) getXMLOwnershipQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(        DEST_ORDER))) getXMLDestinationOrderQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(      PRESENTATION))) getXMLPresentationQos(p_aux, ident);
             logError(XMLPARSER, "Quality of Service '" << p_aux0->Value() << "' do not supported for now");
@@ -1354,6 +1389,14 @@ XMLP_ret XMLParser::getXMLReaderQosPolicies(
         {
             //data sharing
             if (XMLP_ret::XML_OK != getXMLDataSharingQos(p_aux0, qos.data_sharing, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, OWNERSHIP) == 0)
+        {
+            //ownership
+            if (XMLP_ret::XML_OK != getXMLOwnershipQos(p_aux0, qos.m_ownership, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -2103,13 +2146,12 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
    }
  */
 
-// TODO Implement OwnershipQos
-/*
-   XMLP_ret XMLParser::getXMLOwnershipQos(
+XMLP_ret XMLParser::getXMLOwnershipQos(
         tinyxml2::XMLElement* elem,
         OwnershipQosPolicy& ownership,
         uint8_t ident)
-   {
+{
+    (void)ident;
 
     //    <xs:complexType name="ownershipQosPolicyType">
     //        <xs:all>
@@ -2168,17 +2210,14 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
     }
 
     return XMLP_ret::
-    XML_OK;
-   }
- */
+                   XML_OK;
+}
 
-// TODO Implement OwnershipStrengthQos
-/*
-   XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
+XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
         tinyxml2::XMLElement* elem,
         OwnershipStrengthQosPolicy& ownershipStrength,
         uint8_t ident)
-   {
+{
 
     //    <xs:complexType name="ownershipStrengthQosPolicyType">
     //        <xs:all>
@@ -2214,9 +2253,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
     }
 
     return XMLP_ret::XML_OK;
-   }
- */
-
+}
 
 // TODO Implement DestinationOrderQos
 /*
@@ -2758,12 +2795,21 @@ XMLP_ret XMLParser::getXMLLocatorUDPv4(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     locator.kind = LOCATOR_KIND_UDPv4;
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            logError(XMLPARSER, "Duplicated element found in 'udpv4LocatorType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, PORT) == 0)
         {
             // port - uint32Type
@@ -2822,12 +2868,21 @@ XMLP_ret XMLParser::getXMLLocatorUDPv6(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     locator.kind = LOCATOR_KIND_UDPv6;
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            logError(XMLPARSER, "Duplicated element found in 'udpv6LocatorType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, PORT) == 0)
         {
             // port - uint32Type
@@ -2889,12 +2944,21 @@ XMLP_ret XMLParser::getXMLLocatorTCPv4(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     locator.kind = LOCATOR_KIND_TCPv4;
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            logError(XMLPARSER, "Duplicated element found in 'tcpv4LocatorType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, PORT) == 0)
         {
             // port - uint16Type
@@ -2969,12 +3033,21 @@ XMLP_ret XMLParser::getXMLLocatorTCPv6(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     locator.kind = LOCATOR_KIND_TCPv6;
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            logError(XMLPARSER, "Duplicated element found in 'tcpv6LocatorType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, PORT) == 0)
         {
             // port - uint16Type
@@ -3011,6 +3084,132 @@ XMLP_ret XMLParser::getXMLLocatorTCPv6(
             return XMLP_ret::XML_ERROR;
         }
     }
+    return XMLP_ret::XML_OK;
+}
+
+template<typename T>
+static XMLP_ret process_unsigned_attribute(
+        const tinyxml2::XMLElement* elem,
+        const char* name,
+        T& value,
+        const unsigned int min_value,
+        const unsigned int max_value)
+{
+    auto attribute = elem->FindAttribute(name);
+    if (nullptr != attribute)
+    {
+        unsigned int v = 0;
+        if (tinyxml2::XMLError::XML_SUCCESS == attribute->QueryUnsignedValue(&v))
+        {
+            if (min_value <= v && v <= max_value)
+            {
+                value = static_cast<T>(v);
+                return XMLP_ret::XML_OK;
+            }
+        }
+
+        logError(XMLPARSER, "Wrong value '" << attribute->Value() << "' for attribute '" << name << "' on '" <<
+                elem->Name() << "'");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    return XMLP_ret::XML_OK;
+}
+
+static XMLP_ret process_external_locator_attributes(
+        const tinyxml2::XMLElement* elem,
+        eprosima::fastdds::rtps::LocatorWithMask& locator,
+        eprosima::fastdds::rtps::ExternalLocators& external_locators)
+{
+    static const char* EXTERNALITY_ATTR_NAME = "externality";
+    static const char* COST_ATTR_NAME = "cost";
+    static const char* MASK_ATTR_NAME = "mask";
+
+    // Attributes initialized with default value
+    uint8_t externality = 1;
+    uint8_t cost = 0;
+    uint8_t mask = 24;
+
+    if (XMLP_ret::XML_OK != process_unsigned_attribute(elem, EXTERNALITY_ATTR_NAME, externality, 1, 255) ||
+            XMLP_ret::XML_OK != process_unsigned_attribute(elem, COST_ATTR_NAME, cost, 0, 255) ||
+            XMLP_ret::XML_OK != process_unsigned_attribute(elem, MASK_ATTR_NAME, mask, 1, 127))
+    {
+        return XMLP_ret::XML_ERROR;
+    }
+
+    locator.mask(mask);
+    external_locators[externality][cost].push_back(locator);
+
+    return XMLP_ret::XML_OK;
+}
+
+XMLP_ret XMLParser::getXMLExternalLocatorList(
+        tinyxml2::XMLElement* elem,
+        eprosima::fastdds::rtps::ExternalLocators& external_locators,
+        uint8_t ident)
+{
+    /*
+        <xs:complexType name="externalLocatorListType">
+            <xs:sequence>
+              <xs:choice>
+                <xs:element name="udpv4" type="udpExternalLocatorType"/>
+                <xs:element name="udpv6" type="udpExternalLocatorType"/>
+              </xs:choice>
+            </xs:sequence>
+        </xs:complexType>
+     */
+
+    external_locators.clear();
+
+    tinyxml2::XMLElement* child = nullptr;
+    for (child = elem->FirstChildElement(); nullptr != child; child = child->NextSiblingElement())
+    {
+        fastdds::rtps::LocatorWithMask locator;
+        const char* name = child->Name();
+        if (strcmp(name, UDPv4_LOCATOR) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLLocatorUDPv4(child, locator, ident + 1))
+            {
+                external_locators.clear();
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, UDPv6_LOCATOR) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLLocatorUDPv6(child, locator, ident + 1))
+            {
+                external_locators.clear();
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else
+        {
+            logError(XMLPARSER, "Invalid element found inside 'externalLocatorListType'. Name: " << name);
+            external_locators.clear();
+            return XMLP_ret::XML_ERROR;
+        }
+
+        if (IPLocator::isAny(locator) || 0 == locator.port)
+        {
+            logError(XMLPARSER, "Address and port are mandatory for 'udpExternalLocatorType'.");
+            external_locators.clear();
+            return XMLP_ret::XML_ERROR;
+        }
+
+        if (IPLocator::isMulticast(locator))
+        {
+            logError(XMLPARSER, "Address should be unicast for 'udpExternalLocatorType'.");
+            external_locators.clear();
+            return XMLP_ret::XML_ERROR;
+        }
+
+        if (XMLP_ret::XML_OK != process_external_locator_attributes(child, locator, external_locators))
+        {
+            external_locators.clear();
+            return XMLP_ret::XML_ERROR;
+        }
+    }
+
     return XMLP_ret::XML_OK;
 }
 
@@ -3756,6 +3955,8 @@ XMLP_ret XMLParser::getXMLPublisherAttributes(
                 <xs:element name="topic" type="topicAttributesType" minOccurs="0"/>
                 <xs:element name="qos" type="writerQosPoliciesType" minOccurs="0"/>
                 <xs:element name="times" type="writerTimesType" minOccurs="0"/>
+                <xs:element name="external_unicast_locators" type="externalLocatorListType" minOccurs="0"/>
+                <xs:element name="ignore_non_matching_locators" type="boolType" minOccurs="0"/>
                 <xs:element name="unicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="multicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="throughputController" type="throughputControllerType" minOccurs="0"/>
@@ -3769,11 +3970,20 @@ XMLP_ret XMLParser::getXMLPublisherAttributes(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            logError(XMLPARSER, "Duplicated element found in 'publisherProfileType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, TOPIC) == 0)
         {
             // topic
@@ -3794,6 +4004,22 @@ XMLP_ret XMLParser::getXMLPublisherAttributes(
         {
             // times
             if (XMLP_ret::XML_OK != getXMLWriterTimes(p_aux0, publisher.times, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, IGN_NON_MATCHING_LOCS) == 0)
+        {
+            // ignore_non_matching_locators - boolType
+            if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &publisher.ignore_non_matching_locators, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, EXT_UNI_LOC_LIST) == 0)
+        {
+            // external_unicast_locators - externalLocatorListType
+            if (XMLP_ret::XML_OK != getXMLExternalLocatorList(p_aux0, publisher.external_unicast_locators, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -3896,6 +4122,8 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
                 <xs:element name="topic" type="topicAttributesType" minOccurs="0"/>
                 <xs:element name="qos" type="readerQosPoliciesType" minOccurs="0"/>
                 <xs:element name="times" type="readerTimesType" minOccurs="0"/>
+                <xs:element name="external_unicast_locators" type="externalLocatorListType" minOccurs="0"/>
+                <xs:element name="ignore_non_matching_locators" type="boolType" minOccurs="0"/>
                 <xs:element name="unicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="multicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="expectsInlineQos" type="boolType" minOccurs="0"/>
@@ -3909,11 +4137,20 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            logError(XMLPARSER, "Duplicated element found in 'subscriberProfileType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, TOPIC) == 0)
         {
             // topic
@@ -3934,6 +4171,22 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
         {
             // times
             if (XMLP_ret::XML_OK != getXMLReaderTimes(p_aux0, subscriber.times, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, IGN_NON_MATCHING_LOCS) == 0)
+        {
+            // ignore_non_matching_locators - boolType
+            if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &subscriber.ignore_non_matching_locators, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, EXT_UNI_LOC_LIST) == 0)
+        {
+            // external_unicast_locators - externalLocatorListType
+            if (XMLP_ret::XML_OK != getXMLExternalLocatorList(p_aux0, subscriber.external_unicast_locators, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }

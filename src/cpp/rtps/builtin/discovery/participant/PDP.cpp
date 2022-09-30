@@ -58,6 +58,7 @@
 #include <fastdds/dds/log/Log.hpp>
 
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
+#include <rtps/network/ExternalLocatorsProcessor.hpp>
 
 #include <mutex>
 #include <chrono>
@@ -240,7 +241,9 @@ ParticipantProxyData* PDP::add_participant_proxy_data(
 void PDP::initializeParticipantProxyData(
         ParticipantProxyData* participant_data)
 {
-    participant_data->m_leaseDuration = mp_RTPSParticipant->getAttributes().builtin.discovery_config.leaseDuration;
+    RTPSParticipantAttributes& attributes = mp_RTPSParticipant->getAttributes();
+
+    participant_data->m_leaseDuration = attributes.builtin.discovery_config.leaseDuration;
     //set_VendorId_eProsima(participant_data->m_VendorId);
     participant_data->m_VendorId = c_VendorId_eProsima;
 
@@ -252,7 +255,7 @@ void PDP::initializeParticipantProxyData(
     participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_SECURE_DETECTOR;
 #endif // if HAVE_SECURITY
 
-    if (mp_RTPSParticipant->getAttributes().builtin.use_WriterLivelinessProtocol)
+    if (attributes.builtin.use_WriterLivelinessProtocol)
     {
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_WRITER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_READER;
@@ -263,13 +266,13 @@ void PDP::initializeParticipantProxyData(
 #endif // if HAVE_SECURITY
     }
 
-    if (mp_RTPSParticipant->getAttributes().builtin.typelookup_config.use_server)
+    if (attributes.builtin.typelookup_config.use_server)
     {
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REQUEST_DATA_READER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REPLY_DATA_WRITER;
     }
 
-    if (mp_RTPSParticipant->getAttributes().builtin.typelookup_config.use_client)
+    if (attributes.builtin.typelookup_config.use_client)
     {
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REQUEST_DATA_WRITER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REPLY_DATA_READER;
@@ -279,11 +282,11 @@ void PDP::initializeParticipantProxyData(
     participant_data->m_availableBuiltinEndpoints |= mp_RTPSParticipant->security_manager().builtin_endpoints();
 #endif // if HAVE_SECURITY
 
-    for (const Locator_t& loc : mp_RTPSParticipant->getAttributes().defaultUnicastLocatorList)
+    for (const Locator_t& loc : attributes.defaultUnicastLocatorList)
     {
         participant_data->default_locators.add_unicast_locator(loc);
     }
-    for (const Locator_t& loc : mp_RTPSParticipant->getAttributes().defaultMulticastLocatorList)
+    for (const Locator_t& loc : attributes.defaultMulticastLocatorList)
     {
         participant_data->default_locators.add_multicast_locator(loc);
     }
@@ -300,7 +303,7 @@ void PDP::initializeParticipantProxyData(
         // If it has not been set, use guid
         if (persistent == c_GuidPrefix_Unknown)
         {
-            persistent = mp_RTPSParticipant->getAttributes().prefix;
+            persistent = attributes.prefix;
         }
 
         // If persistent is set, set it into the participant proxy
@@ -328,9 +331,13 @@ void PDP::initializeParticipantProxyData(
         }
     }
 
-    participant_data->m_participantName = std::string(mp_RTPSParticipant->getAttributes().getName());
+    fastdds::rtps::ExternalLocatorsProcessor::add_external_locators(*participant_data,
+            attributes.builtin.metatraffic_external_unicast_locators,
+            attributes.default_external_unicast_locators);
 
-    participant_data->m_userData = mp_RTPSParticipant->getAttributes().userData;
+    participant_data->m_participantName = std::string(attributes.getName());
+
+    participant_data->m_userData = attributes.userData;
 
 #if HAVE_SECURITY
     IdentityToken* identity_token = nullptr;
@@ -361,27 +368,8 @@ void PDP::initializeParticipantProxyData(
     }
 #endif // if HAVE_SECURITY
 
-    // Set participant type property
-    std::stringstream participant_type;
-    participant_type << mp_RTPSParticipant->getAttributes().builtin.discovery_config.discoveryProtocol;
-    auto ptype = participant_type.str();
-    participant_data->m_properties.push_back(fastdds::dds::parameter_property_participant_type, ptype);
-
-    /* Add physical properties if present */
-    std::vector<std::string> physical_property_names = {
-        fastdds::dds::parameter_policy_physical_data_host,
-        fastdds::dds::parameter_policy_physical_data_user,
-        fastdds::dds::parameter_policy_physical_data_process
-    };
-    for (auto physical_property_name : physical_property_names)
-    {
-        std::string* physical_property = PropertyPolicyHelper::find_property(
-            mp_RTPSParticipant->getAttributes().properties, physical_property_name);
-        if (nullptr != physical_property)
-        {
-            participant_data->m_properties.push_back(physical_property_name, *physical_property);
-        }
-    }
+    // Set properties that will be sent to Proxy Data
+    set_external_participant_properties_(participant_data);
 }
 
 bool PDP::initPDP(
@@ -1255,6 +1243,43 @@ void PDP::set_initial_announcement_interval()
         initial_announcements_.period = { 0, 1000000 };
     }
     set_next_announcement_interval();
+}
+
+void PDP::set_external_participant_properties_(
+        ParticipantProxyData* participant_data)
+{
+    // For each property add it if it should be sent (it is propagated)
+    for (auto const& property : mp_RTPSParticipant->getAttributes().properties.properties())
+    {
+        if (property.propagate())
+        {
+            participant_data->m_properties.push_back(property.name(), property.value());
+        }
+    }
+
+    // Set participant type property
+    // TODO: This could be done somewhere else that makes more sense.
+    std::stringstream participant_type;
+    participant_type << mp_RTPSParticipant->getAttributes().builtin.discovery_config.discoveryProtocol;
+    auto ptype = participant_type.str();
+    participant_data->m_properties.push_back(fastdds::dds::parameter_property_participant_type, ptype);
+
+    // Add physical properties if present
+    // TODO: This should be done using propagate value, however this cannot be done without breaking compatibility
+    std::vector<std::string> physical_property_names = {
+        fastdds::dds::parameter_policy_physical_data_host,
+        fastdds::dds::parameter_policy_physical_data_user,
+        fastdds::dds::parameter_policy_physical_data_process
+    };
+    for (auto physical_property_name : physical_property_names)
+    {
+        std::string* physical_property = PropertyPolicyHelper::find_property(
+            mp_RTPSParticipant->getAttributes().properties, physical_property_name);
+        if (nullptr != physical_property)
+        {
+            participant_data->m_properties.push_back(physical_property_name, *physical_property);
+        }
+    }
 }
 
 } /* namespace rtps */
