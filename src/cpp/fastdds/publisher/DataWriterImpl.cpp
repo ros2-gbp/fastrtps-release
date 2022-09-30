@@ -197,14 +197,17 @@ ReturnCode_t DataWriterImpl::enable()
     w_att.throughputController = qos_.throughput_controller();
     w_att.endpoint.durabilityKind = qos_.durability().durabilityKind();
     w_att.endpoint.endpointKind = WRITER;
-    w_att.endpoint.multicastLocatorList = qos_.endpoint().multicast_locator_list;
     w_att.endpoint.reliabilityKind = qos_.reliability().kind == RELIABLE_RELIABILITY_QOS ? RELIABLE : BEST_EFFORT;
     w_att.endpoint.topicKind = type_->m_isGetKeyDefined ? WITH_KEY : NO_KEY;
+    w_att.endpoint.multicastLocatorList = qos_.endpoint().multicast_locator_list;
     w_att.endpoint.unicastLocatorList = qos_.endpoint().unicast_locator_list;
     w_att.endpoint.remoteLocatorList = qos_.endpoint().remote_locator_list;
+    w_att.endpoint.external_unicast_locators = qos_.endpoint().external_unicast_locators;
+    w_att.endpoint.ignore_non_matching_locators = qos_.endpoint().ignore_non_matching_locators;
     w_att.mode = qos_.publish_mode().kind == SYNCHRONOUS_PUBLISH_MODE ? SYNCHRONOUS_WRITER : ASYNCHRONOUS_WRITER;
     w_att.flow_controller_name = qos_.publish_mode().flow_controller_name;
     w_att.endpoint.properties = qos_.properties();
+    w_att.endpoint.ownershipKind = qos_.ownership().kind;
     w_att.endpoint.setEntityID(qos_.endpoint().entity_id);
     w_att.endpoint.setUserDefinedID(qos_.endpoint().user_defined_id);
     w_att.times = qos_.reliable_writer_qos().times;
@@ -1086,7 +1089,7 @@ ReturnCode_t DataWriterImpl::set_qos(
     // Default qos is always considered consistent
     if (&qos != &DATAWRITER_QOS_DEFAULT)
     {
-        ReturnCode_t ret_val = check_qos(qos_to_set);
+        ReturnCode_t ret_val = check_qos_including_resource_limits(qos_to_set, type_);
         if (!ret_val)
         {
             return ret_val;
@@ -1690,6 +1693,19 @@ void DataWriterImpl::set_qos(
     }
 }
 
+ReturnCode_t DataWriterImpl::check_qos_including_resource_limits(
+        const DataWriterQos& qos,
+        const TypeSupport& type)
+{
+    ReturnCode_t check_qos_return = check_qos(qos);
+    if (ReturnCode_t::RETCODE_OK == check_qos_return &&
+            type->m_isGetKeyDefined)
+    {
+        check_qos_return = check_allocation_consistency(qos);
+    }
+    return check_qos_return;
+}
+
 ReturnCode_t DataWriterImpl::check_qos(
         const DataWriterQos& qos)
 {
@@ -1722,11 +1738,6 @@ ReturnCode_t DataWriterImpl::check_qos(
             return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
         }
     }
-    if (qos.reliability().kind == BEST_EFFORT_RELIABILITY_QOS && qos.ownership().kind == EXCLUSIVE_OWNERSHIP_QOS)
-    {
-        logError(RTPS_QOS_CHECK, "BEST_EFFORT incompatible with EXCLUSIVE ownership");
-        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
-    }
     if (qos.liveliness().kind == AUTOMATIC_LIVELINESS_QOS ||
             qos.liveliness().kind == MANUAL_BY_PARTICIPANT_LIVELINESS_QOS)
     {
@@ -1742,6 +1753,27 @@ ReturnCode_t DataWriterImpl::check_qos(
             qos.endpoint().history_memory_policy != PREALLOCATED_WITH_REALLOC_MEMORY_MODE))
     {
         logError(RTPS_QOS_CHECK, "DATA_SHARING cannot be used with memory policies other than PREALLOCATED.");
+        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+    }
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataWriterImpl::check_allocation_consistency(
+        const DataWriterQos& qos)
+{
+    if ((qos.resource_limits().max_samples > 0) &&
+            (qos.resource_limits().max_samples <
+            (qos.resource_limits().max_instances * qos.resource_limits().max_samples_per_instance)))
+    {
+        logError(DDS_QOS_CHECK,
+                "max_samples should be greater than max_instances * max_samples_per_instance");
+        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+    }
+    if ((qos.resource_limits().max_instances <= 0 || qos.resource_limits().max_samples_per_instance <= 0) &&
+            (qos.resource_limits().max_samples > 0))
+    {
+        logError(DDS_QOS_CHECK,
+                "max_samples should be infinite when max_instances or max_samples_per_instance are infinite");
         return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
     }
     return ReturnCode_t::RETCODE_OK;
