@@ -1,4 +1,4 @@
-From 989b6112207d18cf21687c267256d777eba9b1d6 Mon Sep 17 00:00:00 2001
+From 66019035610b21c5cdfbb526ee7a7f608925fe8d Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?=
  <nuclearsandwich@users.noreply.github.com>
 Date: Tue, 15 Feb 2022 17:09:05 -0500
@@ -33,7 +33,7 @@ index 2a2d782d..d534e842 100644
                  RESULT_VARIABLE EXECUTE_RESULT
                  )
 diff --git a/package.xml b/package.xml
-index 93dca133..f2dbb4c2 100644
+index 0b378262..ec53c6a5 100644
 --- a/package.xml
 +++ b/package.xml
 @@ -14,8 +14,6 @@
@@ -46,7 +46,7 @@ index 93dca133..f2dbb4c2 100644
    <depend>foonathan_memory_vendor</depend>
    <depend>libssl-dev</depend>
 diff --git a/rpm/ros-rolling-fastrtps.spec b/rpm/ros-rolling-fastrtps.spec
-index 8a2dd57f..85f5d562 100644
+index e4791baa..9076ad40 100644
 --- a/rpm/ros-rolling-fastrtps.spec
 +++ b/rpm/ros-rolling-fastrtps.spec
 @@ -19,7 +19,6 @@ Requires:       ros-rolling-fastcdr
@@ -57,7 +57,7 @@ index 8a2dd57f..85f5d562 100644
  BuildRequires:  cmake3
  BuildRequires:  openssl-devel
  BuildRequires:  ros-rolling-fastcdr
-@@ -62,6 +61,7 @@ mkdir -p obj-%{_target_platform} && cd obj-%{_target_platform}
+@@ -65,6 +64,7 @@ mkdir -p .obj-%{_target_platform} && cd .obj-%{_target_platform}
      -DINSTALL_EXAMPLES=OFF \
      -DSECURITY=ON \
      -DAPPEND_PROJECT_NAME_TO_INCLUDEDIR=ON \
@@ -66,5 +66,5 @@ index 8a2dd57f..85f5d562 100644
  
  %make_build
 -- 
-2.37.3
+2.25.1
 
