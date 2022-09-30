@@ -75,6 +75,7 @@ set(${PROJECT_NAME}_source_files
     rtps/messages/submessages/DataMsg.hpp
     rtps/messages/submessages/GapMsg.hpp
     rtps/messages/submessages/HeartbeatMsg.hpp
+    rtps/network/ExternalLocatorsProcessor.cpp
     rtps/network/NetworkFactory.cpp
     rtps/network/ReceiverResource.cpp
     rtps/participant/RTPSParticipant.cpp
@@ -176,6 +177,7 @@ set(${PROJECT_NAME}_source_files
     fastdds/core/policy/QosPolicyUtils.cpp
     fastdds/publisher/qos/WriterQos.cpp
     fastdds/subscriber/qos/ReaderQos.cpp
+    fastdds/utils/QosConverters.cpp
     rtps/builtin/BuiltinProtocols.cpp
     rtps/builtin/discovery/participant/DirectMessageSender.cpp
     rtps/builtin/discovery/participant/PDP.cpp

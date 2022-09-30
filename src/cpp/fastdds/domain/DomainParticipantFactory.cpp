@@ -29,6 +29,7 @@
 #include <fastrtps/xmlparser/XMLEndpointParser.h>
 
 #include <fastdds/domain/DomainParticipantImpl.hpp>
+#include <fastdds/utils/QosConverters.hpp>
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
 #include <statistics/fastdds/domain/DomainParticipantImpl.hpp>
 #include <utils/SystemInfo.hpp>
@@ -49,60 +50,10 @@ namespace eprosima {
 namespace fastdds {
 namespace dds {
 
-/**
- * @brief Fill DomainParticipantQos from a given attributes RTPSParticipantAttributes object
- *
- * For the case of the non-binary properties, instead of the RTPSParticipantAttributes overriding the
- * property list in the DomainParticipantQos, a merge is performed in the following manner:
- *
- * - If any property from the RTPSParticipantAttributes is not in the DomainParticipantQos, then it is appended
- *   to the DomainParticipantQos.
- * - If any property from the RTPSParticipantAttributes property is also in the DomainParticipantQos, then the
- *   value in the DomainParticipantQos is overridden with that of the RTPSParticipantAttributes.
- *
- * @param[in, out] qos The DomainParticipantQos to set
- * @param[in] attr The RTPSParticipantAttributes from which the @c qos is set.
- */
-static void set_qos_from_attributes(
-        DomainParticipantQos& qos,
-        const eprosima::fastrtps::rtps::RTPSParticipantAttributes& attr)
-{
-    qos.user_data().setValue(attr.userData);
-    qos.allocation() = attr.allocation;
-    qos.wire_protocol().prefix = attr.prefix;
-    qos.wire_protocol().participant_id = attr.participantID;
-    qos.wire_protocol().builtin = attr.builtin;
-    qos.wire_protocol().port = attr.port;
-    qos.wire_protocol().throughput_controller = attr.throughputController;
-    qos.wire_protocol().default_unicast_locator_list = attr.defaultUnicastLocatorList;
-    qos.wire_protocol().default_multicast_locator_list = attr.defaultMulticastLocatorList;
-    qos.transport().user_transports = attr.userTransports;
-    qos.transport().use_builtin_transports = attr.useBuiltinTransports;
-    qos.transport().send_socket_buffer_size = attr.sendSocketBufferSize;
-    qos.transport().listen_socket_buffer_size = attr.listenSocketBufferSize;
-    qos.name() = attr.getName();
-    qos.flow_controllers() = attr.flow_controllers;
-
-    // Merge attributes and qos properties
-    for (auto property : attr.properties.properties())
-    {
-        std::string* property_value = fastrtps::rtps::PropertyPolicyHelper::find_property(
-            qos.properties(), property.name());
-        if (nullptr == property_value)
-        {
-            qos.properties().properties().emplace_back(property);
-        }
-        else
-        {
-            *property_value = property.value();
-        }
-    }
-    qos.properties().binary_properties() = attr.properties.binary_properties();
-}
-
 DomainParticipantFactory::DomainParticipantFactory()
     : default_xml_profiles_loaded(false)
     , default_participant_qos_(PARTICIPANT_QOS_DEFAULT)
+    , topic_pool_(fastrtps::rtps::TopicPayloadPoolRegistry::instance())
 {
 }
 
@@ -132,6 +83,11 @@ DomainParticipantFactory::~DomainParticipantFactory()
 
 DomainParticipantFactory* DomainParticipantFactory::get_instance()
 {
+    return get_shared_instance().get();
+}
+
+std::shared_ptr<DomainParticipantFactory> DomainParticipantFactory::get_shared_instance()
+{
     /*
      * The first time an interprocess synchronization object is created by boost, a singleton is instantiated and
      * its destructor is registered with std::atexit(&atexit_work).
@@ -153,12 +109,14 @@ DomainParticipantFactory* DomainParticipantFactory::get_instance()
     };
     static AuxiliaryBoostFunctor boost_functor;
 
-    // Keep a reference to the topic payload pool to avoid it to be destroyed before our own instance
-    using pool_registry_ref = eprosima::fastrtps::rtps::TopicPayloadPoolRegistry::reference;
-    static pool_registry_ref topic_pool_registry = eprosima::fastrtps::rtps::TopicPayloadPoolRegistry::instance();
-
-    static DomainParticipantFactory instance;
-    return &instance;
+    // Note we need a custom deleter, since the destructor is protected.
+    static std::shared_ptr<DomainParticipantFactory> instance(
+        new DomainParticipantFactory(),
+        [](DomainParticipantFactory* p)
+        {
+            delete p;
+        });
+    return instance;
 }
 
 ReturnCode_t DomainParticipantFactory::delete_participant(
@@ -270,7 +228,7 @@ DomainParticipant* DomainParticipantFactory::create_participant_with_profile(
     if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr))
     {
         DomainParticipantQos qos = default_participant_qos_;
-        set_qos_from_attributes(qos, attr.rtps);
+        utils::set_qos_from_attributes(qos, attr.rtps);
         return create_participant(did, qos, listen, mask);
     }
 
@@ -289,7 +247,7 @@ DomainParticipant* DomainParticipantFactory::create_participant_with_profile(
     if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr))
     {
         DomainParticipantQos qos = default_participant_qos_;
-        set_qos_from_attributes(qos, attr.rtps);
+        utils::set_qos_from_attributes(qos, attr.rtps);
         return create_participant(attr.domainId, qos, listen, mask);
     }
 
@@ -367,7 +325,7 @@ ReturnCode_t DomainParticipantFactory::get_participant_qos_from_profile(
     if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr))
     {
         qos = default_participant_qos_;
-        set_qos_from_attributes(qos, attr.rtps);
+        utils::set_qos_from_attributes(qos, attr.rtps);
         return ReturnCode_t::RETCODE_OK;
     }
 
@@ -459,7 +417,7 @@ void DomainParticipantFactory::reset_default_participant_qos()
     {
         eprosima::fastrtps::ParticipantAttributes attr;
         XMLProfileManager::getDefaultParticipantAttributes(attr);
-        set_qos_from_attributes(default_participant_qos_, attr.rtps);
+        utils::set_qos_from_attributes(default_participant_qos_, attr.rtps);
     }
 }
 

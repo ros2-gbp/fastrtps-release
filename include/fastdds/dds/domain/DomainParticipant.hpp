@@ -34,6 +34,7 @@
 #include <fastdds/dds/topic/IContentFilterFactory.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
+#include <fastdds/dds/topic/TopicListener.hpp>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/common/SampleIdentity.h>
@@ -783,6 +784,8 @@ public:
 
     /**
      * @brief Getter for the resource event
+     *
+     * @pre The DomainParticipant is enabled.
      *
      * @return A reference to the resource event
      */
