@@ -17,6 +17,7 @@ set(LOG_SOURCES
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
 )
 
 if(WIN32)
@@ -116,3 +117,10 @@ target_include_directories(WaitSetImplTests PRIVATE
     )
 target_link_libraries(WaitSetImplTests GTest::gtest GTest::gmock)
 add_gtest(WaitSetImplTests SOURCES ${WAITSET_IMPL_TESTS_SOURCE})
+
+if(ANDROID)
+    set_property(TARGET ConditionTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET ConditionNotifierTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET StatusConditionImplTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET WaitSetImplTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()
