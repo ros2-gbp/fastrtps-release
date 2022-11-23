@@ -332,7 +332,7 @@ public:
 
     DomainId_t get_domain_id() const;
 
-    ReturnCode_t delete_contained_entities();
+    virtual ReturnCode_t delete_contained_entities();
 
     ReturnCode_t assert_liveliness();
 
@@ -496,7 +496,7 @@ protected:
     fastrtps::rtps::GUID_t guid_;
 
     //!For instance handle creation
-    uint32_t next_instance_id_;
+    std::atomic<uint32_t> next_instance_id_;
 
     //!Participant Qos
     DomainParticipantQos qos_;

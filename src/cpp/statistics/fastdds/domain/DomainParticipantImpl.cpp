@@ -141,6 +141,8 @@ ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter(
             auto data_writer = builtin_publisher_impl_->create_datawriter(topic, writer_impl, efd::StatusMask::all());
             if (nullptr == data_writer)
             {
+                // Remove already created Impl
+                delete writer_impl;
                 // Remove topic and type
                 delete_topic_and_type(use_topic_name);
                 logError(STATISTICS_DOMAIN_PARTICIPANT, topic_name << " DataWriter creation has failed");
@@ -263,6 +265,19 @@ void DomainParticipantImpl::disable()
         rtps_participant_->remove_statistics_listener(statistics_listener_, participant_statistics_mask);
     }
     efd::DomainParticipantImpl::disable();
+}
+
+ReturnCode_t DomainParticipantImpl::delete_contained_entities()
+{
+    ReturnCode_t ret = efd::DomainParticipantImpl::delete_contained_entities();
+
+    if (ret == ReturnCode_t::RETCODE_OK)
+    {
+        builtin_publisher_impl_ = nullptr;
+        builtin_publisher_ = nullptr;
+    }
+
+    return ret;
 }
 
 efd::PublisherImpl* DomainParticipantImpl::create_publisher_impl(
