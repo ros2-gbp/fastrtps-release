@@ -17,21 +17,18 @@
  *
  */
 
-#include <memory>
-
-#include <rtps/builtin/discovery/participant/PDPServerListener.hpp>
-
 #include <fastdds/dds/log/Log.hpp>
 
-#include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
 #include <fastdds/rtps/history/ReaderHistory.h>
-#include <fastdds/rtps/participant/RTPSParticipantListener.h>
 #include <fastdds/rtps/reader/RTPSReader.h>
-
-#include <rtps/builtin/discovery/database/DiscoveryParticipantChangeData.hpp>
-#include <rtps/builtin/discovery/participant/PDPServer.hpp>
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
+#include <fastdds/rtps/participant/RTPSParticipantListener.h>
+
+#include <rtps/builtin/discovery/participant/PDPServerListener.hpp>
+#include <rtps/builtin/discovery/participant/PDPServer.hpp>
+#include <rtps/builtin/discovery/database/DiscoveryParticipantChangeData.hpp>
+
+#include <memory>
 
 namespace eprosima {
 namespace fastdds {
@@ -111,10 +108,6 @@ void PDPServerListener::onNewCacheChangeAdded(
         change->write_params.related_sample_identity(change->write_params.sample_identity());
     }
 
-    // Reset the internal CacheChange_t union.
-    change->writer_info.next = nullptr;
-    change->writer_info.previous = nullptr;
-    change->writer_info.num_sent_submessages = 0;
 
     // DATA(p) case
     if (change->kind == ALIVE)
@@ -140,11 +133,6 @@ void PDPServerListener::onNewCacheChangeAdded(
                     pdp_server()->getRTPSParticipant()->network_factory(),
                     pdp_server()->getRTPSParticipant()->has_shm_transport()))
         {
-            const auto& pattr = pdp_server()->getRTPSParticipant()->getAttributes();
-            fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators(participant_data,
-                    pattr.builtin.metatraffic_external_unicast_locators, pattr.default_external_unicast_locators,
-                    pattr.ignore_non_matching_locators);
-
             /* Check PID_VENDOR_ID */
             if (participant_data.m_VendorId != fastrtps::rtps::c_VendorId_eProsima)
             {

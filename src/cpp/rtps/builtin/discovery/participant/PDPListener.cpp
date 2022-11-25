@@ -32,7 +32,6 @@
 #include <fastrtps/utils/TimeConversion.h>
 
 #include <fastdds/core/policy/ParameterList.hpp>
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <mutex>
@@ -108,12 +107,6 @@ void PDPListener::onNewCacheChangeAdded(
             change->instanceHandle = temp_participant_data_.m_key;
             guid = temp_participant_data_.m_guid;
 
-            // Filter locators
-            const auto& pattr = parent_pdp_->getRTPSParticipant()->getAttributes();
-            fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators(temp_participant_data_,
-                    pattr.builtin.metatraffic_external_unicast_locators, pattr.default_external_unicast_locators,
-                    pattr.ignore_non_matching_locators);
-
             // Check if participant already exists (updated info)
             ParticipantProxyData* pdata = nullptr;
             for (ParticipantProxyData* it : parent_pdp_->participant_proxies_)
@@ -142,18 +135,6 @@ void PDPListener::onNewCacheChangeAdded(
                             << pdata->m_guid << " at "
                             << "MTTLoc: " << pdata->metatraffic_locators
                             << " DefLoc:" << pdata->default_locators);
-
-                    RTPSParticipantListener* listener = parent_pdp_->getRTPSParticipant()->getListener();
-                    if (listener != nullptr)
-                    {
-                        std::lock_guard<std::mutex> cb_lock(parent_pdp_->callback_mtx_);
-                        ParticipantDiscoveryInfo info(*pdata);
-                        info.status = status;
-
-                        listener->onParticipantDiscovery(
-                            parent_pdp_->getRTPSParticipant()->getUserRTPSParticipant(),
-                            std::move(info));
-                    }
 
                     // Assigning remote endpoints implies sending a DATA(p) to all matched and fixed readers, since
                     // StatelessWriter::matched_reader_add marks the entire history as unsent if the added reader's
@@ -185,7 +166,10 @@ void PDPListener::onNewCacheChangeAdded(
                 }
 
                 lock.unlock();
+            }
 
+            if (pdata != nullptr)
+            {
                 RTPSParticipantListener* listener = parent_pdp_->getRTPSParticipant()->getListener();
                 if (listener != nullptr)
                 {

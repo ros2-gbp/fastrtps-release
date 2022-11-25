@@ -13,12 +13,6 @@
 // limitations under the License.
 //
 #include <fastrtps/xmlparser/XMLParser.h>
-
-#include <cstdlib>
-#include <iostream>
-#include <string>
-#include <unordered_map>
-
 #include <fastrtps/xmlparser/XMLParserCommon.h>
 #include <fastrtps/xmlparser/XMLTree.h>
 
@@ -35,6 +29,8 @@
 #include <fastdds/dds/log/StdoutErrConsumer.hpp>
 
 #include <tinyxml2.h>
+#include <iostream>
+#include <cstdlib>
 
 namespace eprosima {
 namespace fastrtps {
@@ -983,13 +979,6 @@ XMLP_ret XMLParser::parse_tls_config(
                 }
             }
         }
-        else if (config.compare(TLS_SERVER_NAME) == 0)
-        {
-            if (XMLP_ret::XML_OK != getXMLString(p_aux0, &pTCPDesc->tls_config.server_name, 0))
-            {
-                ret = XMLP_ret::XML_ERROR;
-            }
-        }
         else if (config.compare(TLS_VERIFY_MODE) == 0)
         {
             tinyxml2::XMLElement* p_verify = p_aux0->FirstChildElement();
@@ -1725,8 +1714,6 @@ XMLP_ret XMLParser::fillDataNode(
                 <xs:element name="domainId" type="uint32Type" minOccurs="0"/>
                 <xs:element name="allocation" type="rtpsParticipantAllocationAttributesType" minOccurs="0"/>
                 <xs:element name="prefix" type="guid" minOccurs="0"/>
-                <xs:element name="default_external_unicast_locators" type="externalLocatorListType" minOccurs="0"/>
-                <xs:element name="ignore_non_matching_locators" type="boolType" minOccurs="0"/>
                 <xs:element name="defaultUnicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="defaultMulticastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="sendSocketBufferSize" type="uint32Type" minOccurs="0"/>
@@ -1772,19 +1759,9 @@ XMLP_ret XMLParser::fillDataNode(
 
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
-
-    std::unordered_map<std::string, bool> tags_present;
-
     for (p_aux0 = p_element->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
-
-        if (tags_present[name])
-        {
-            logError(XMLPARSER, "Duplicated element found in 'rtpsParticipantAttributesType'. Name: " << name);
-            return XMLP_ret::XML_ERROR;
-        }
-        tags_present[name] = true;
 
         if (strcmp(name, ALLOCATION) == 0)
         {
@@ -1800,25 +1777,6 @@ XMLP_ret XMLParser::fillDataNode(
             // prefix
             if (XMLP_ret::XML_OK !=
                     getXMLguidPrefix(p_aux0, participant_node.get()->rtps.prefix, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, IGN_NON_MATCHING_LOCS) == 0)
-        {
-            // ignore_non_matching_locators - boolType
-            if (XMLP_ret::XML_OK !=
-                    getXMLBool(p_aux0, &participant_node.get()->rtps.ignore_non_matching_locators, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, DEF_EXT_UNI_LOC_LIST) == 0)
-        {
-            // default_external_unicast_locators - externalLocatorListType
-            if (XMLP_ret::XML_OK !=
-                    getXMLExternalLocatorList(p_aux0, participant_node.get()->rtps.default_external_unicast_locators,
-                    ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -1873,11 +1831,12 @@ XMLP_ret XMLParser::fillDataNode(
                 return XMLP_ret::XML_ERROR;
             }
         }
-        else if (0 == strcmp(name, USER_DATA))
+        else if (strcmp(name, USER_DATA) == 0)
         {
             // userData
             if (XMLP_ret::XML_OK != getXMLOctetVector(p_aux0, participant_node.get()->rtps.userData, ident))
             {
+                // Not supported for now - returns Error
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -1889,7 +1848,7 @@ XMLP_ret XMLParser::fillDataNode(
                 return XMLP_ret::XML_ERROR;
             }
         }
-        else if (strcmp(name, THROUGHPUT_CONT) == 0)    // TODO (Ricardo) Deprecated. Remove in the future.
+        else if (strcmp(name, THROUGHPUT_CONT) == 0)
         {
             // throughputController
             if (XMLP_ret::XML_OK !=
@@ -1897,7 +1856,6 @@ XMLP_ret XMLParser::fillDataNode(
             {
                 return XMLP_ret::XML_ERROR;
             }
-            logWarning(XML_PARSER, THROUGHPUT_CONT << " XML tag is deprecated");
         }
         else if (strcmp(name, USER_TRANS) == 0)
         {

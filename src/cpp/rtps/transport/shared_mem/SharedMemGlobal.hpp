@@ -778,8 +778,6 @@ public:
                 uint32_t listener_index,
                 const BufferDescriptor& buffer_descriptor)
         {
-            std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
-
             node_->listeners_status[listener_index].descriptor = buffer_descriptor;
             node_->listeners_status[listener_index].is_processing = true;
         }
@@ -791,8 +789,6 @@ public:
         void listener_processing_stop(
                 uint32_t listener_index)
         {
-            std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
-
             node_->listeners_status[listener_index].is_processing = false;
         }
 

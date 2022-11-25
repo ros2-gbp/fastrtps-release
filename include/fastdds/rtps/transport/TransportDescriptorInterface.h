@@ -15,11 +15,7 @@
 #ifndef _FASTDDS_TRANSPORT_DESCRIPTOR_INTERFACE_H_
 #define _FASTDDS_TRANSPORT_DESCRIPTOR_INTERFACE_H_
 
-#include <fastrtps/fastrtps_dll.h>
-
-#ifdef _WIN32
 #include <cstdint>
-#endif // ifdef _WIN32
 #include <vector>
 #include <string>
 
@@ -41,7 +37,7 @@ class TransportInterface;
  *
  * @ingroup RTPS_MODULE
  * */
-struct RTPS_DllAPI TransportDescriptorInterface
+struct TransportDescriptorInterface
 {
     //! Constructor
     TransportDescriptorInterface(

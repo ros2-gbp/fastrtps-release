@@ -16,18 +16,20 @@
  * @file PublisherHistory.cpp
  *
  */
-#include <fastrtps/publisher/PublisherHistory.h>
+#include <fastrtps/config.h>
 
-#include <chrono>
-#include <limits>
 #include <mutex>
 
-#include <fastdds/rtps/common/InstanceHandle.h>
-#include <fastdds/rtps/common/Time_t.h>
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/writer/RTPSWriter.h>
-#include <fastrtps/config.h>
+#include <fastrtps/publisher/PublisherHistory.h>
+
 #include <fastrtps_deprecated/publisher/PublisherImpl.h>
+
+#include <fastdds/rtps/writer/RTPSWriter.h>
+
+#include <fastdds/dds/log/Log.hpp>
+
+#include <limits>
+#include <mutex>
 
 namespace eprosima {
 namespace fastrtps {
@@ -111,8 +113,9 @@ bool PublisherHistory::register_instance(
     return find_or_add_key(instance_handle, &vit);
 }
 
-bool PublisherHistory::prepare_change(
+bool PublisherHistory::add_pub_change(
         CacheChange_t* change,
+        WriteParams& wparams,
         std::unique_lock<RecursiveTimedMutex>& lock,
         const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
 {
@@ -137,6 +140,8 @@ bool PublisherHistory::prepare_change(
     }
 
     assert(!m_isHistoryFull);
+
+    bool returnedValue = false;
 
     // For NO_KEY we can directly add the change
     bool add = (topic_att_.getTopicKind() == NO_KEY);
@@ -206,18 +211,6 @@ bool PublisherHistory::prepare_change(
             vit->second.cache_changes.push_back(change);
         }
     }
-
-    return add;
-}
-
-bool PublisherHistory::add_pub_change(
-        CacheChange_t* change,
-        WriteParams& wparams,
-        std::unique_lock<RecursiveTimedMutex>& lock,
-        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
-{
-    bool returnedValue = false;
-    bool add = prepare_change(change, lock, max_blocking_time);
 
     if (add)
     {
@@ -307,6 +300,7 @@ bool PublisherHistory::removeMinChange()
 bool PublisherHistory::remove_change_pub(
         CacheChange_t* change)
 {
+
     if (mp_writer == nullptr || mp_mutex == nullptr)
     {
         logError(RTPS_HISTORY, "You need to create a Writer with this History before using it");
@@ -483,24 +477,6 @@ bool PublisherHistory::is_key_registered(
            )
            )
            );
-}
-
-bool PublisherHistory::wait_for_acknowledgement_last_change(
-        const InstanceHandle_t& handle,
-        std::unique_lock<RecursiveTimedMutex>& lock,
-        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
-{
-    if (WITH_KEY == topic_att_.getTopicKind())
-    {
-        // Find the instance
-        t_m_Inst_Caches::iterator vit = keyed_changes_.find(handle);
-        if (vit != keyed_changes_.end())
-        {
-            SequenceNumber_t seq = vit->second.cache_changes.back()->sequenceNumber;
-            return mp_writer->wait_for_acknowledgement(seq, max_blocking_time, lock);
-        }
-    }
-    return false;
 }
 
 }  // namespace fastrtps

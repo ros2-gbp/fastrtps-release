@@ -26,10 +26,6 @@
 // it is more performant
 #define BOOST_INTERPROCESS_FORCE_NATIVE_EMULATION
 
-#ifdef ANDROID
-#define BOOST_INTERPROCESS_SHARED_DIR_PATH "/data/local/tmp"
-#endif
-
 #ifdef _MSC_VER
 
 #include <stdlib.h>

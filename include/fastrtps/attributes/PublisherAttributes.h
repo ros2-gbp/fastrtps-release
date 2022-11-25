@@ -21,17 +21,16 @@
 
 #include <fastdds/rtps/resources/ResourceManagement.h>
 
-#include <fastdds/rtps/attributes/ExternalLocators.hpp>
-#include <fastdds/rtps/attributes/PropertyPolicy.h>
-#include <fastdds/rtps/attributes/WriterAttributes.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/Time_t.h>
+#include <fastdds/rtps/attributes/WriterAttributes.h>
 #include <fastdds/rtps/flowcontrol/ThroughputControllerDescriptor.h>
 #include <fastrtps/attributes/TopicAttributes.h>
 #include <fastrtps/qos/WriterQos.h>
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
 
 namespace eprosima {
-namespace fastrtps {
+namespace fastrtps{
 
 /**
  * Class PublisherAttributes, used by the user to define the attributes of a Publisher.
@@ -40,13 +39,15 @@ namespace fastrtps {
 class PublisherAttributes
 {
 public:
+    PublisherAttributes()
+        : historyMemoryPolicy(rtps::PREALLOCATED_MEMORY_MODE)
+        , m_userDefinedID(-1)
+        , m_entityID(-1)
+    {}
 
-    PublisherAttributes() = default;
+    virtual ~PublisherAttributes(){}
 
-    virtual ~PublisherAttributes() = default;
-
-    bool operator ==(
-            const PublisherAttributes& b) const
+    bool operator==(const PublisherAttributes& b) const
     {
         return (this->m_userDefinedID == b.m_userDefinedID) &&
                (this->m_entityID == b.m_entityID) &&
@@ -60,89 +61,65 @@ public:
                (this->properties == b.properties);
     }
 
-    //! Topic Attributes for the Publisher
+    //!Topic Attributes for the Publisher
     TopicAttributes topic;
 
-    //! QOS for the Publisher
+    //!QOS for the Publisher
     WriterQos qos;
 
-    //! Writer Attributes
+    //!Writer Attributes
     rtps::WriterTimes times;
 
-    //! Unicast locator list
+    //!Unicast locator list
     rtps::LocatorList_t unicastLocatorList;
 
-    //! Multicast locator list
+    //!Multicast locator list
     rtps::LocatorList_t multicastLocatorList;
 
-    //! Remote locator list
+    //!Remote locator list
     rtps::LocatorList_t remoteLocatorList;
 
-    //! The collection of external locators to use for communication.
-    fastdds::rtps::ExternalLocators external_unicast_locators;
-
-    //! Whether locators that don't match with the announced locators should be kept.
-    bool ignore_non_matching_locators = false;
-
-    //! Throughput controller
+    //!Throughput controller
     rtps::ThroughputControllerDescriptor throughputController;
 
-    //! Underlying History memory policy
-    rtps::MemoryManagementPolicy_t historyMemoryPolicy = rtps::MemoryManagementPolicy_t::PREALLOCATED_MEMORY_MODE;
+    //!Underlying History memory policy
+    rtps::MemoryManagementPolicy_t historyMemoryPolicy;
 
-    //! Properties
+    //!Properties
     rtps::PropertyPolicy properties;
-
-    //! Allocation limits on the matched subscribers collections
     ResourceLimitedContainerConfig matched_subscriber_allocation;
 
     /**
      * Get the user defined ID
      * @return User defined ID
      */
-    inline int16_t getUserDefinedID() const
-    {
-        return m_userDefinedID;
-    }
+    inline int16_t getUserDefinedID() const { return m_userDefinedID; }
 
     /**
      * Get the entity defined ID
      * @return Entity ID
      */
-    inline int16_t getEntityID() const
-    {
-        return m_entityID;
-    }
+    inline int16_t getEntityID() const { return m_entityID; }
 
     /**
      * Set the user defined ID
      * @param id User defined ID to be set
      */
-    inline void setUserDefinedID(
-            uint8_t id)
-    {
-        m_userDefinedID = id;
-    }
+    inline void setUserDefinedID(uint8_t id) { m_userDefinedID = id; }
 
     /**
      * Set the entity ID
      * @param id Entity ID to be set
      */
-    inline void setEntityID(
-            uint8_t id)
-    {
-        m_entityID = id;
-    }
-
+    inline void setEntityID(uint8_t id) { m_entityID = id; }
 private:
-
-    //! User Defined ID, used for StaticEndpointDiscovery, default value -1.
-    int16_t m_userDefinedID = -1;
-    //! Entity ID, if the user want to specify the EntityID of the enpoint, default value -1.
-    int16_t m_entityID = -1;
+    //!User Defined ID, used for StaticEndpointDiscovery, default value -1.
+    int16_t m_userDefinedID;
+    //!Entity ID, if the user want to specify the EntityID of the enpoint, default value -1.
+    int16_t m_entityID;
 };
 
-} // namespace fastrtps
-} // namespace eprosima
+}
+} /* namespace eprosima */
 
 #endif /* PUBLISHERATTRIBUTES_H_ */

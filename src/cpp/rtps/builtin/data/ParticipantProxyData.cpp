@@ -376,8 +376,14 @@ bool ParticipantProxyData::readFromCDRMessage(
         const NetworkFactory& network,
         bool is_shm_transport_available)
 {
-    auto param_process = [this, &network, &is_shm_transport_available](
-        CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
+    bool are_shm_metatraffic_locators_present = false;
+    bool are_shm_default_locators_present = false;
+    bool is_shm_transport_possible = false;
+
+    auto param_process = [this, &network, &is_shm_transport_possible,
+                    &are_shm_metatraffic_locators_present,
+                    &are_shm_default_locators_present,
+                    &is_shm_transport_available](CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
                 switch (pid)
                 {
@@ -462,7 +468,9 @@ bool ParticipantProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                metatraffic_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_metatraffic_locators_present,
+                                &metatraffic_locators,
                                 temp_locator,
                                 false);
                         }
@@ -482,7 +490,9 @@ bool ParticipantProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                metatraffic_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_metatraffic_locators_present,
+                                &metatraffic_locators,
                                 temp_locator,
                                 true);
                         }
@@ -502,7 +512,9 @@ bool ParticipantProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                default_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &default_locators,
                                 temp_locator,
                                 true);
                         }
@@ -522,7 +534,9 @@ bool ParticipantProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                default_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &default_locators,
                                 temp_locator,
                                 false);
                         }

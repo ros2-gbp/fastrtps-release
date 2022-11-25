@@ -46,8 +46,7 @@ public:
     virtual ~CacheChangePool();
 
     /**
-     * Construct and initialize a CacheChangePool.
-     *
+     * Constructor.
      * @param config   Pool configuration (member @c payload_initial_size is not being used).
      * @param f        Functor to be called on all preallocated elements.
      */
@@ -55,21 +54,17 @@ public:
     CacheChangePool(
             const PoolConfig& config,
             UnaryFunction f)
+        : CacheChangePool(config)
     {
-        init(config);
         std::for_each(all_caches_.begin(), all_caches_.end(), f);
     }
 
     /**
-     * Construct and initialize a CacheChangePool.
-     *
+     * Constructor.
      * @param config   Pool configuration (member @c payload_initial_size is not being used).
      */
     CacheChangePool(
-            const PoolConfig& config)
-    {
-        init(config);
-    }
+            const PoolConfig& config);
 
     bool reserve_cache(
             CacheChange_t*& cache_change) override;
@@ -87,27 +82,6 @@ public:
     size_t get_freeCachesSize()
     {
         return free_caches_.size();
-    }
-
-protected:
-
-    /**
-     * Construct a CacheChangePool without initialization.
-     */
-    CacheChangePool() = default;
-
-    void init(
-            const PoolConfig& config);
-
-    virtual CacheChange_t* create_change() const
-    {
-        return new CacheChange_t();
-    }
-
-    virtual void destroy_change(
-            CacheChange_t* change) const
-    {
-        delete change;
     }
 
 private:

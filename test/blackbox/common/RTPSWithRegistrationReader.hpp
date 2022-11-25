@@ -53,12 +53,6 @@ public:
     typedef TypeSupport type_support;
     typedef typename type_support::type type;
 
-    using OnWriterDiscoveryFunctor = std::function<void (
-                        eprosima::fastrtps::rtps::WriterDiscoveryInfo::DISCOVERY_STATUS,
-                        const eprosima::fastrtps::rtps::GUID_t&,
-                        const eprosima::fastrtps::rtps::WriterProxyData*
-                        )>;
-
 private:
 
     class Listener : public eprosima::fastrtps::rtps::ReaderListener
@@ -97,15 +91,6 @@ private:
             {
                 reader_.unmatched();
             }
-        }
-
-        void on_writer_discovery(
-                eprosima::fastrtps::rtps::RTPSReader* reader,
-                eprosima::fastrtps::rtps::WriterDiscoveryInfo::DISCOVERY_STATUS reason,
-                const eprosima::fastrtps::rtps::GUID_t& writer_guid,
-                const eprosima::fastrtps::rtps::WriterProxyData* writer_info) override
-        {
-            reader_.on_writer_discovery(reader, reason, writer_guid, writer_info);
         }
 
     private:
@@ -185,17 +170,9 @@ public:
             return;
         }
 
-        initialized_ = participant_->registerReader(reader_, topic_attr_, reader_qos_, content_filter_property_);
-    }
+        ASSERT_EQ(participant_->registerReader(reader_, topic_attr_, reader_qos_), true);
 
-    void update()
-    {
-        if (reader_ == nullptr)
-        {
-            return;
-        }
-
-        initialized_ = participant_->updateReader(reader_, topic_attr_, reader_qos_, content_filter_property_);
+        initialized_ = true;
     }
 
     bool isInitialized() const
@@ -281,28 +258,18 @@ public:
     }
 
     void block(
-            std::function<bool()> checker,
-            std::chrono::seconds timeout = std::chrono::seconds::zero())
+            std::function<bool()> checker)
     {
         std::unique_lock<std::mutex> lock(mutex_);
-
-        if (std::chrono::seconds::zero() == timeout)
-        {
-            cv_.wait(lock, checker);
-        }
-        else
-        {
-            cv_.wait_for(lock, timeout, checker);
-        }
+        cv_.wait(lock, checker);
     }
 
-    void block_for_all(
-            std::chrono::seconds timeout = std::chrono::seconds::zero())
+    void block_for_all()
     {
         block([this]() -> bool
                 {
                     return number_samples_expected_ == current_received_count_;
-                }, timeout);
+                });
     }
 
     size_t block_for_at_least(
@@ -329,26 +296,19 @@ public:
         return last_seq_;
     }
 
-    void wait_discovery(
-            std::chrono::seconds timeout = std::chrono::seconds::zero())
+    void wait_discovery()
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
-        if (matched_ == 0 && timeout == std::chrono::seconds::zero())
+        if (matched_ == 0)
         {
             cvDiscovery_.wait(lock, [this]() -> bool
                     {
                         return matched_ != 0;
                     });
-            EXPECT_NE(matched_, 0u);
         }
-        else
-        {
-            cv_.wait_for(lock, timeout, [&]()
-                    {
-                        return matched_ != 0;
-                    });
-        }
+
+        EXPECT_NE(matched_, 0u);
     }
 
     void wait_undiscovery()
@@ -388,7 +348,7 @@ public:
 
     unsigned int getReceivedCount() const
     {
-        return static_cast<unsigned int>(current_received_count_);
+        return current_received_count_;
     }
 
     /*** Function to change QoS ***/
@@ -404,13 +364,6 @@ public:
             const eprosima::fastrtps::rtps::MemoryManagementPolicy_t memoryPolicy)
     {
         hattr_.memoryPolicy = memoryPolicy;
-        return *this;
-    }
-
-    RTPSWithRegistrationReader& history_depth(
-            const int32_t depth)
-    {
-        topic_attr_.historyQos.depth = depth;
         return *this;
     }
 
@@ -470,11 +423,6 @@ public:
         return *this;
     }
 
-    uint32_t get_matched() const
-    {
-        return matched_;
-    }
-
 #if HAVE_SQLITE3
     RTPSWithRegistrationReader& make_persistent(
             const std::string& filename,
@@ -492,39 +440,6 @@ public:
     }
 
 #endif // if HAVE_SQLITE3
-
-    RTPSWithRegistrationReader& user_data(
-            const std::vector<eprosima::fastrtps::rtps::octet>& user_data)
-    {
-        reader_qos_.m_userData = user_data;
-        return *this;
-    }
-
-    RTPSWithRegistrationReader& set_on_writer_discovery(
-            const OnWriterDiscoveryFunctor& functor)
-    {
-        on_writer_discovery_functor = functor;
-        return *this;
-    }
-
-    RTPSWithRegistrationReader& partitions(
-            std::vector<std::string>& partitions)
-    {
-        reader_qos_.m_partition.setNames(partitions);
-        return *this;
-    }
-
-    RTPSWithRegistrationReader& content_filter_property(
-            const eprosima::fastdds::rtps::ContentFilterProperty& content_filter_property)
-    {
-        content_filter_property_ = &content_filter_property;
-        return *this;
-    }
-
-    const eprosima::fastrtps::rtps::GUID_t& guid() const
-    {
-        return reader_->getGuid();
-    }
 
 private:
 
@@ -578,20 +493,6 @@ private:
         }
     }
 
-    void on_writer_discovery(
-            eprosima::fastrtps::rtps::RTPSReader* reader,
-            eprosima::fastrtps::rtps::WriterDiscoveryInfo::DISCOVERY_STATUS reason,
-            const eprosima::fastrtps::rtps::GUID_t& writer_guid,
-            const eprosima::fastrtps::rtps::WriterProxyData* writer_info)
-    {
-        ASSERT_EQ(reader_, reader);
-
-        if (on_writer_discovery_functor)
-        {
-            on_writer_discovery_functor(reason, writer_guid, writer_info);
-        }
-    }
-
     RTPSWithRegistrationReader& operator =(
             const RTPSWithRegistrationReader&) = delete;
 
@@ -609,15 +510,13 @@ private:
     std::mutex mutexDiscovery_;
     std::condition_variable cvDiscovery_;
     bool receiving_;
-    uint32_t matched_;
+    unsigned int matched_;
     eprosima::fastrtps::rtps::SequenceNumber_t last_seq_;
     size_t current_received_count_;
     size_t number_samples_expected_;
     type_support type_;
     std::shared_ptr<eprosima::fastrtps::rtps::IPayloadPool> payload_pool_;
     bool has_payload_pool_ = false;
-    OnWriterDiscoveryFunctor on_writer_discovery_functor;
-    const eprosima::fastdds::rtps::ContentFilterProperty* content_filter_property_ = nullptr;
 };
 
 #endif // _TEST_BLACKBOX_RTPSWITHREGISTRATIONREADER_HPP_

@@ -53,10 +53,7 @@ public:
 
         // We cannot destroy the objects in the SHM, as the Reader may still be using them.
         // We just remove the segment, and when the Reader closes it, it will be removed from the system.
-        if (segment_)
-        {
-            segment_->remove();
-        }
+        segment_->remove(segment_name_);
     }
 
     bool get_payload(
@@ -139,10 +136,9 @@ public:
         return DataSharingPayloadPool::release_payload(cache_change);
     }
 
-    template <typename T>
-    bool init_shared_segment(
+    bool init_shared_memory(
             const RTPSWriter* writer,
-            const std::string& shared_dir)
+            const std::string& shared_dir) override
     {
         writer_ = writer;
         segment_id_ = writer_->getGuid();
@@ -151,7 +147,8 @@ public:
         // We need to reserve the whole segment at once, and the underlying classes use uint32_t as size type.
         // In order to avoid overflows, we will calculate using uint64 and check the casting
         bool overflow = false;
-        size_t per_allocation_extra_size = T::compute_per_allocation_extra_size(
+
+        size_t per_allocation_extra_size = fastdds::rtps::SharedMemSegment::compute_per_allocation_extra_size(
             alignof(PayloadNode), DataSharingPayloadPool::domain_name());
         size_t payload_size = DataSharingPayloadPool::node_size(max_data_size_);
 
@@ -181,14 +178,13 @@ public:
         }
 
         //Open the segment
-        T::remove(segment_name_);
-        std::unique_ptr<T> local_segment;
+        fastdds::rtps::SharedMemSegment::remove(segment_name_);
         try
         {
-            local_segment = std::unique_ptr<T>(
-                new T(boost::interprocess::create_only,
+            segment_ = std::unique_ptr<Segment>(
+                new Segment(boost::interprocess::create_only,
                 segment_name_,
-                segment_size + T::EXTRA_SEGMENT_SIZE));
+                segment_size + fastdds::rtps::SharedMemSegment::EXTRA_SEGMENT_SIZE));
         }
         catch (const std::exception& e)
         {
@@ -202,7 +198,7 @@ public:
             // Alloc the memory for the pool
             // Cannot use 'construct' because we need to reserve extra space for the data,
             // which is not considered in sizeof(PayloadNode).
-            payloads_pool_ = static_cast<octet*>(local_segment->get().allocate(size_for_payloads_pool));
+            payloads_pool_ = static_cast<octet*>(segment_->get().allocate(size_for_payloads_pool));
 
             // Initialize each node in the pool
             free_payloads_.init(pool_size_);
@@ -218,10 +214,10 @@ public:
             }
 
             //Alloc the memory for the history
-            history_ = local_segment->get().template construct<Segment::Offset>(history_chunk_name())[pool_size_ + 1]();
+            history_ = segment_->get().construct<Segment::Offset>(history_chunk_name())[pool_size_ + 1]();
 
             //Alloc the memory for the descriptor
-            descriptor_ = local_segment->get().template construct<PoolDescriptor>(descriptor_chunk_name())();
+            descriptor_ = segment_->get().construct<PoolDescriptor>(descriptor_chunk_name())();
 
             // Initialize the data in the descriptor
             descriptor_->history_size = pool_size_ + 1;
@@ -233,30 +229,15 @@ public:
         }
         catch (std::exception& e)
         {
-            T::remove(segment_name_);
+            Segment::remove(segment_name_);
 
             logError(DATASHARING_PAYLOADPOOL, "Failed to initialize segment " << segment_name_
                                                                               << ": " << e.what());
             return false;
         }
 
-        segment_ = std::move(local_segment);
         is_initialized_ = true;
         return true;
-    }
-
-    bool init_shared_memory(
-            const RTPSWriter* writer,
-            const std::string& shared_dir) override
-    {
-        if (shared_dir.empty())
-        {
-            return init_shared_segment<fastdds::rtps::SharedMemSegment>(writer, shared_dir);
-        }
-        else
-        {
-            return init_shared_segment<fastdds::rtps::SharedFileSegment>(writer, shared_dir);
-        }
     }
 
     /**

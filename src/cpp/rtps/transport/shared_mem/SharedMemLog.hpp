@@ -18,7 +18,6 @@
 #include <fastdds/rtps/common/Locator.h>
 #include <fastrtps/utils/DBQueue.h>
 #include <rtps/transport/shared_mem/SharedMemManager.hpp>
-#include <utils/SystemInfo.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -85,7 +84,7 @@ public:
     }
 
     void dump_packet(
-            const std::string& timestamp,
+            const std::string timestamp,
             const Locator& from,
             const Locator& to,
             const fastrtps::rtps::octet* buf,
@@ -318,7 +317,24 @@ public:
 
     std::string now()
     {
-        return SystemInfo::get_timestamp("%T");
+        std::stringstream stream;
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+        std::chrono::system_clock::duration tp = now.time_since_epoch();
+        tp -= std::chrono::duration_cast<std::chrono::seconds>(tp);
+        auto ms = static_cast<unsigned>(tp / std::chrono::milliseconds(1));
+
+    #if defined(_WIN32)
+        struct tm timeinfo;
+        localtime_s(&timeinfo, &now_c);
+        stream << std::put_time(&timeinfo, "%T") << "." << std::setw(3) << std::setfill('0') << ms << " ";
+        //#elif defined(__clang__) && !defined(std::put_time) // TODO arm64 doesn't seem to support std::put_time
+        //    (void)now_c;
+        //    (void)ms;
+    #else
+        stream << std::put_time(localtime(&now_c), "%T") << "." << std::setw(3) << std::setfill('0') << ms << " ";
+    #endif // if defined(_WIN32)
+        return stream.str();
     }
 
 private:
@@ -370,13 +386,12 @@ private:
                 while (!resources_.logs.Empty())
                 {
                     std::unique_lock<std::mutex> configGuard(resources_.config_mutex);
-
-                    // This value is moved and not copied
-                    auto value_dequeue = resources_.logs.FrontAndPop();
                     for (auto& consumer : resources_.consumers)
                     {
-                        consumer->Consume(value_dequeue);
+                        consumer->Consume(resources_.logs.Front());
                     }
+
+                    resources_.logs.Pop();
                 }
             }
             guard.lock();

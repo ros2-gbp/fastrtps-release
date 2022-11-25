@@ -156,11 +156,6 @@ public:
 
     const DomainParticipant* get_participant() const;
 
-    DomainParticipantImpl* get_participant_impl()
-    {
-        return participant_;
-    }
-
     const fastrtps::rtps::RTPSParticipant* rtps_participant() const
     {
         return rtps_participant_;

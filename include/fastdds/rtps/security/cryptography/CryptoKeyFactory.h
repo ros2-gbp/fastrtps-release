@@ -22,8 +22,6 @@
 #include <fastdds/rtps/security/accesscontrol/EndpointSecurityAttributes.h>
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 
-#include <memory>
-
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
@@ -47,7 +45,7 @@ public:
      * @param exception (out) Security exception
      * @return ParticipantCryptoHandle with generated key material
      */
-    virtual std::shared_ptr<ParticipantCryptoHandle> register_local_participant(
+    virtual ParticipantCryptoHandle* register_local_participant(
             const IdentityHandle& participant_identity,
             const PermissionsHandle& participant_permissions,
             const PropertySeq& participant_properties,
@@ -64,11 +62,11 @@ public:
      * @param exception (out) Security exception
      * @return ParticipantCryptoHandle with generated key material
      */
-    virtual std::shared_ptr<ParticipantCryptoHandle> register_matched_remote_participant(
+    virtual ParticipantCryptoHandle* register_matched_remote_participant(
             const ParticipantCryptoHandle& local_participant_crypto_handle,
             const IdentityHandle& remote_participant_identity,
             const PermissionsHandle& remote_participant_permissions,
-            const SecretHandle& shared_secret,
+            const SharedSecretHandle& shared_secret,
             SecurityException& exception) = 0;
 
     /**
@@ -99,7 +97,7 @@ public:
     virtual DatareaderCryptoHandle* register_matched_remote_datareader(
             DatawriterCryptoHandle& local_datawriter_crypto_handle,
             ParticipantCryptoHandle& remote_participant_crypto,
-            const SecretHandle& shared_secret,
+            const SharedSecretHandle& shared_secret,
             const bool relay_only,
             SecurityException& exception) = 0;
 
@@ -130,7 +128,7 @@ public:
     virtual DatawriterCryptoHandle* register_matched_remote_datawriter(
             DatareaderCryptoHandle& local_datareader_crypto_handle,
             ParticipantCryptoHandle& remote_participant_crypt,
-            const SecretHandle& shared_secret,
+            const SharedSecretHandle& shared_secret,
             SecurityException& exception) = 0;
 
     /**
@@ -140,82 +138,29 @@ public:
      * @return TRUE is successful
      */
     virtual bool unregister_participant(
-            std::shared_ptr<ParticipantCryptoHandle>& participant_crypto_handle,
+            ParticipantCryptoHandle* participant_crypto_handle,
             SecurityException& exception) = 0;
 
     /**
-     * Releases resources associated with a DataWriter. The Crypto Handle may become unusable after this
+     * Releases resources associated with a DataWriter. The Crypto Handle becomes unusable after this
      * @param datawriter_crypto_handle Belonging to the DataWriter that awaits termination
      * @param exception (out) Security exception
      * @return TRUE is successful
      */
     virtual bool unregister_datawriter(
-            std::shared_ptr<DatawriterCryptoHandle>& datawriter_crypto_handle,
+            DatawriterCryptoHandle* datawriter_crypto_handle,
             SecurityException& exception) = 0;
 
     /**
-     * Convenient override for raw pointers arguments.
-     * @param datawriter_crypto_handle Belonging to the DataWriter that awaits termination
-     * @param exception (out) Security exception
-     * @return TRUE is successful
-     */
-    bool unregister_datawriter(
-            DatawriterCryptoHandle* datawriter_crypto_handle,
-            SecurityException& exception)
-    {
-
-        if (nullptr == datawriter_crypto_handle)
-        {
-            return false;
-        }
-
-        try
-        {
-            auto temp = datawriter_crypto_handle->shared_from_this();
-            return unregister_datawriter(temp, exception);
-        }
-        catch (std::bad_weak_ptr&)
-        {
-            return false;
-        }
-    }
-
-    /**
-     * Releases resources associated with a DataReader. The Crypto Handle may become unusable after this
+     * Releases resources associated with a DataReader. The Crypto Handle becomes unusable after this
      * @param datareader_crypto_handle Belonging to the DataReader that awaits termination
      * @param exception (out) Security exception
      * @return TRUE is successful
      */
     virtual bool unregister_datareader(
-            std::shared_ptr<DatareaderCryptoHandle>& datareader_crypto_handle,
+            DatareaderCryptoHandle* datareader_crypto_handle,
             SecurityException& exception) = 0;
 
-    /**
-     * Convenient override for raw pointers arguments.
-     * @param datareader_crypto_handle Belonging to the DataWriter that awaits termination
-     * @param exception (out) Security exception
-     * @return TRUE is successful
-     */
-    bool unregister_datareader(
-            DatareaderCryptoHandle* datareader_crypto_handle,
-            SecurityException& exception)
-    {
-
-        if (nullptr == datareader_crypto_handle)
-        {
-            return false;
-        }
-
-        try
-        {
-            auto temp = datareader_crypto_handle->shared_from_this();
-            return unregister_datareader(temp, exception);
-        }
-        catch (std::bad_weak_ptr&)
-        {
-            return false;
-        }
-    }
 
 };
 

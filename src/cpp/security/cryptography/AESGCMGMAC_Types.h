@@ -26,10 +26,8 @@
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <fastdds/rtps/security/accesscontrol/EndpointSecurityAttributes.h>
 
-#include <cassert>
-#include <functional>
-#include <limits>
 #include <mutex>
+#include <limits>
 
 // Fix compilation error on Windows
 #if defined(WIN32) && defined(max)
@@ -146,16 +144,13 @@ struct EntityKeyHandle
 {
     static const char* const class_id_;
 
-    // Reference to an auxiliary exception object on destruction
-    SecurityException* exception_ = {nullptr};
-
     //Plugin security options
     PluginEndpointSecurityAttributesMask EndpointPluginAttributes = 0;
     //Storage for the LocalCryptoHandle master_key, not used in RemoteCryptoHandles
     KeyMaterial_AES_GCM_GMAC_Seq EntityKeyMaterial;
     //KeyId of the master_key of the parent Participant and pointer to the relevant CryptoHandle
     CryptoTransformKeyId Participant_master_key_id = c_transformKeyIdZero;
-    std::weak_ptr<ParticipantCryptoHandle> Parent_participant;
+    ParticipantCryptoHandle* Parent_participant = nullptr;
 
     //(Direct) ReceiverSpecific Keys - Inherently hold the master_key of the writer
     KeyMaterial_AES_GCM_GMAC_Seq Entity2RemoteKeyMaterial;
@@ -170,18 +165,13 @@ struct EntityKeyHandle
     std::mutex mutex_;
 };
 
-class AESGCMGMAC_KeyFactory;
-
-typedef HandleImpl<EntityKeyHandle, AESGCMGMAC_KeyFactory> AESGCMGMAC_WriterCryptoHandle;
-typedef HandleImpl<EntityKeyHandle, AESGCMGMAC_KeyFactory> AESGCMGMAC_ReaderCryptoHandle;
-typedef HandleImpl<EntityKeyHandle, AESGCMGMAC_KeyFactory> AESGCMGMAC_EntityCryptoHandle;
+typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_WriterCryptoHandle;
+typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_ReaderCryptoHandle;
+typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_EntityCryptoHandle;
 
 struct ParticipantKeyHandle
 {
     static const char* const class_id_;
-
-    // Reference to an auxiliary exception object on destruction
-    SecurityException* exception_ = {nullptr};
 
     //Plugin security options
     PluginParticipantSecurityAttributesMask ParticipantPluginAttributes = 0;
@@ -194,17 +184,17 @@ struct ParticipantKeyHandle
     //(Reverse) ReceiverSpecific Keys - Inherently hold the master_key of the remote readers
     std::vector<KeyMaterial_AES_GCM_GMAC> RemoteParticipant2ParticipantKeyMaterial;
     //List of Pointers to the CryptoHandles of all matched Writers
-    std::vector<std::shared_ptr<DatawriterCryptoHandle>> Writers;
+    std::vector<DatawriterCryptoHandle*> Writers;
     //List of Pointers to the CryptoHandles of all matched Readers
-    std::vector<std::shared_ptr<DatareaderCryptoHandle>> Readers;
+    std::vector<DatareaderCryptoHandle*> Readers;
 
     //Data used to store the current session keys and to determine when it has to be updated
     KeySessionData Session;
-    uint64_t max_blocks_per_session = {0};
+    uint64_t max_blocks_per_session = 0;
     std::mutex mutex_;
 };
 
-typedef HandleImpl<ParticipantKeyHandle, AESGCMGMAC_KeyFactory> AESGCMGMAC_ParticipantCryptoHandle;
+typedef HandleImpl<ParticipantKeyHandle> AESGCMGMAC_ParticipantCryptoHandle;
 
 } //namespaces security
 } //namespace rtps

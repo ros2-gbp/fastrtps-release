@@ -15,7 +15,6 @@
 #ifndef _FASTDDS_PARTICIPANTIMPL_HPP_
 #define _FASTDDS_PARTICIPANTIMPL_HPP_
 
-#include <atomic>
 #include <map>
 #include <mutex>
 #include <string>
@@ -45,7 +44,6 @@
 #include <fastdds/publisher/PublisherImpl.hpp>
 #include <fastdds/subscriber/SubscriberImpl.hpp>
 #include <fastdds/topic/TopicImpl.hpp>
-#include <fastdds/topic/TopicProxy.hpp>
 
 using ReturnCode_t = eprosima::fastrtps::types::ReturnCode_t;
 
@@ -78,7 +76,6 @@ protected:
         , default_pub_qos_(PUBLISHER_QOS_DEFAULT)
         , default_sub_qos_(SUBSCRIBER_QOS_DEFAULT)
         , default_topic_qos_(TOPIC_QOS_DEFAULT)
-        , id_counter_(0)
 #pragma warning (disable : 4355)
         , rtps_listener_(this)
     {
@@ -95,13 +92,6 @@ protected:
         if (rtps_participant_ != nullptr)
         {
             eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(rtps_participant_);
-        }
-
-        if (participant_)
-        {
-            participant_->impl_ = nullptr;
-            delete participant_;
-            participant_ = nullptr;
         }
     }
 
@@ -149,15 +139,6 @@ public:
 
     Publisher* create_publisher(
             const PublisherQos& qos,
-            PublisherListener* listener,
-            const StatusMask& mask)
-    {
-        return create_publisher(qos, nullptr, listener, mask);
-    }
-
-    Publisher* create_publisher(
-            const PublisherQos& qos,
-            PublisherImpl** impl,
             PublisherListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all())
     {
@@ -168,12 +149,6 @@ public:
         std::lock_guard<std::mutex> lock(mtx_pubs_);
         publishers_[pub] = pubimpl;
         pub->enable();
-
-        if (impl)
-        {
-            *impl = pubimpl;
-        }
-
         return pub;
     }
 
@@ -273,11 +248,10 @@ public:
         {
             return nullptr;
         }
-        TopicImpl* topic_impl = new TopicImpl(nullptr, this, type_support, qos, listener);
-        TopicProxy* proxy = new TopicProxy(topic_name, type_name, mask, topic_impl);
-        Topic* topic = proxy->get_topic();
-        topics_[topic_name] = proxy;
-        topics_impl_[topic_name] = topic_impl;
+        TopicImpl* topic_impl = new TopicImpl(this, type_support, qos, listener);
+        Topic* topic = new Topic(topic_name, type_name, topic_impl, mask);
+        topic_impl->user_topic_ = topic;
+        topics_[topic_name] = topic_impl;
         topic->enable();
         return topic;
     }
@@ -292,26 +266,9 @@ public:
         return create_topic(topic_name, type_name, TOPIC_QOS_DEFAULT, listener, mask);
     }
 
-    Topic* find_topic(
-            const std::string& /*topic_name*/,
-            const fastrtps::Duration_t& /*timeout*/)
-    {
-        return nullptr;
-    }
-
-    void set_topic_listener(
-            const TopicProxyFactory* /*factory*/,
-            TopicImpl* /*impl*/,
-            TopicListener* /*listener*/,
-            const StatusMask& /*mask*/)
-    {
-    }
-
     ReturnCode_t delete_topic(
             const Topic* topic)
     {
-        auto topic_name = topic->get_name();
-
         if (delete_topic_mock())
         {
             return ReturnCode_t::RETCODE_ERROR;
@@ -324,9 +281,8 @@ public:
         {
             return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
         }
-
         std::lock_guard<std::mutex> lock(mtx_topics_);
-        auto it = topics_.find(topic_name);
+        auto it = topics_.find(topic->get_name());
         if (it != topics_.end())
         {
             if (it->second->is_referenced())
@@ -335,38 +291,10 @@ public:
             }
             delete it->second;
             topics_.erase(it);
-
-            // Destroy also impl, that must exist
-            delete topics_impl_[topic_name];
-            topics_impl_.erase(topic_name);
-
             return ReturnCode_t::RETCODE_OK;
         }
         return ReturnCode_t::RETCODE_ERROR;
     }
-
-    MOCK_METHOD5(create_contentfilteredtopic, ContentFilteredTopic * (
-                const std::string& name,
-                Topic * related_topic,
-                const std::string& filter_expression,
-                const std::vector<std::string>& expression_parameters,
-                const char* filter_class_name));
-
-    MOCK_METHOD1(delete_contentfilteredtopic, ReturnCode_t(
-                const ContentFilteredTopic * topic));
-
-    MOCK_METHOD2(register_content_filter_factory, ReturnCode_t(
-                const char* filter_class_name,
-                IContentFilterFactory* const filter_factory));
-
-    MOCK_METHOD1(lookup_content_filter_factory, IContentFilterFactory * (
-                const char* filter_class_name));
-
-    MOCK_METHOD1(unregister_content_filter_factory, ReturnCode_t (
-                const char* filter_class_name));
-
-    MOCK_METHOD1(find_content_filter_factory, IContentFilterFactory * (
-                const char* filter_class_name));
 
     TopicDescription* lookup_topicdescription(
             const std::string& topic_name) const
@@ -374,7 +302,7 @@ public:
         auto it = topics_.find(topic_name);
         if (it != topics_.end())
         {
-            return it->second->get_topic();
+            return it->second->user_topic_;
         }
         return nullptr;
     }
@@ -520,7 +448,7 @@ public:
         return participant_;
     }
 
-    fastrtps::rtps::RTPSParticipant* get_rtps_participant()
+    fastrtps::rtps::RTPSParticipant* rtps_participant()
     {
         return rtps_participant_;
     }
@@ -607,7 +535,7 @@ public:
         return false;
     }
 
-    virtual ReturnCode_t delete_contained_entities()
+    ReturnCode_t delete_contained_entities()
     {
         bool can_be_deleted = true;
 
@@ -677,6 +605,7 @@ public:
 
         while (it_topics != topics_.end())
         {
+            it_topics->second->set_listener(nullptr);
             delete it_topics->second;
             it_topics = topics_.erase(it_topics);
         }
@@ -688,11 +617,6 @@ public:
             const StatusMask& /*status*/)
     {
         return nullptr;
-    }
-
-    std::atomic<uint32_t>& id_counter()
-    {
-        return id_counter_;
     }
 
 protected:
@@ -709,13 +633,11 @@ protected:
     std::map<Subscriber*, SubscriberImpl*> subscribers_;
     mutable std::mutex mtx_subs_;
     SubscriberQos default_sub_qos_;
-    std::map<std::string, TopicProxy*> topics_;
-    std::map<std::string, TopicImpl*> topics_impl_;
+    std::map<std::string, TopicImpl*> topics_;
     mutable std::mutex mtx_topics_;
     std::map<std::string, TypeSupport> types_;
     mutable std::mutex mtx_types_;
     TopicQos default_topic_qos_;
-    std::atomic<uint32_t> id_counter_;
 
     class MyRTPSParticipantListener : public fastrtps::rtps::RTPSParticipantListener
     {
@@ -748,12 +670,11 @@ protected:
         return new SubscriberImpl(this, qos, listener);
     }
 
-    static bool set_qos(
+    static void set_qos(
             DomainParticipantQos& /*to*/,
             const DomainParticipantQos& /*from*/,
             bool /*first_time*/)
     {
-        return false;
     }
 
     static ReturnCode_t check_qos(

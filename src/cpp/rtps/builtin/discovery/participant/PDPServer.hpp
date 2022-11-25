@@ -22,17 +22,11 @@
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include <fastdds/rtps/builtin/discovery/participant/PDP.h>
-
-#include <set>
-#include <sstream>
-#include <string>
-#include <vector>
-
-#include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/history/History.h>
 #include <fastdds/rtps/resources/ResourceEvent.h>
-#include <rtps/builtin/discovery/database/DiscoveryDataBase.hpp>
+
 #include <rtps/builtin/discovery/database/DiscoveryDataFilter.hpp>
+#include <rtps/builtin/discovery/database/DiscoveryDataBase.hpp>
 #include <rtps/builtin/discovery/participant/timedevent/DServerEvent.hpp>
 
 namespace eprosima {
@@ -170,19 +164,8 @@ public:
      */
     bool server_update_routine();
 
-    /*
-     * Update the list of remote servers
-     */
-    void update_remote_servers_list();
-
     fastdds::rtps::ddb::DiscoveryDataBase& discovery_db();
 
-    /**
-     * Access to the remote servers list
-     * This method is not thread safe.
-     * The return reference may be invalidated if the user modifies simultaneously the remote server list.
-     * @return constant reference to the remote servers list
-     */
     const RemoteServerList_t& servers();
 
 protected:
@@ -266,7 +249,7 @@ protected:
             nlohmann::json& ddb_json,
             std::vector<nlohmann::json>& new_changes);
 
-    std::set<fastrtps::rtps::GuidPrefix_t> servers_prefixes();
+    std::vector<fastrtps::rtps::GuidPrefix_t> servers_prefixes();
 
     // General file name for the prefix of every backup file
     std::ostringstream get_persistence_file_name_() const;
@@ -277,22 +260,6 @@ protected:
     // queues empty. If not, there will be some information that could be lost. For this, the lock_incoming_data()
     // from DDB must be called during this process
     void process_backup_store();
-
-    /**
-     * Manually match the local PDP reader with the PDP writer of a given server. The function is
-     * not thread safe (nts) in the sense that it does not take the PDP mutex. It does however take
-     * temp_data_lock_
-     */
-    void match_pdp_writer_nts_(
-            const eprosima::fastdds::rtps::RemoteServerAttributes& server_att);
-
-    /**
-     * Manually match the local PDP writer with the PDP reader of a given server. The function is
-     * not thread safe (nts) in the sense that it does not take the PDP mutex. It does however take
-     * temp_data_lock_
-     */
-    void match_pdp_reader_nts_(
-            const eprosima::fastdds::rtps::RemoteServerAttributes& server_att);
 
 private:
 

@@ -268,8 +268,8 @@ protected:
 
     /**
      * @brief Report a change on the number of DATA / DATAFRAG submessages sent for a specific sample.
-     * Parameter: SampleIdentity of the affected sample.
-     * Parameter: Current total number of submessages sent for the affected sample.
+     * @param SampleIdentity of the affected sample.
+     * @param Current total number of submessages sent for the affected sample.
      */
     inline void on_sample_datas(
             const fastrtps::rtps::SampleIdentity&,
@@ -279,7 +279,7 @@ protected:
 
     /**
      * @brief Report that a HEARTBEAT message is sent
-     * Parameter: current count of heartbeats
+     * @param current count of heartbeats
      */
     inline void on_heartbeat(
             uint32_t)
@@ -288,7 +288,7 @@ protected:
 
     /**
      * @brief Report that a DATA / DATA_FRAG message is generated
-     * Parameter: number of locators to which the message will be sent
+     * @param number of locators to which the message will be sent
      */
     inline void on_data_generated(
             size_t)
@@ -302,7 +302,7 @@ protected:
 
     /**
      * @brief Reports publication throughtput based on last added sample to writer's history
-     * Parameter: size of the message sent
+     * @param size of the message sent
      */
     inline void on_publish_throughput(
             uint32_t)
@@ -316,7 +316,7 @@ protected:
 
     /*
      * @brief Report that several changes are marked for redelivery
-     * Parameter: number of changes to redeliver
+     * @param number of changes to redeliver
      */
     inline void on_resent_data(
             uint32_t)
@@ -335,8 +335,8 @@ protected:
 
     /**
      * @brief Report that a sample has been notified to the user.
-     * Parameter: GUID of the writer from where the sample was received.
-     * Parameter: Source timestamp received from the writer for the sample being notified.
+     * @param GUID of the writer from where the sample was received.
+     * @param Source timestamp received from the writer for the sample being notified.
      */
     inline void on_data_notify(
             const fastrtps::rtps::GUID_t&,
@@ -346,7 +346,7 @@ protected:
 
     /**
      * @brief Report that an ACKNACK message is sent
-     * Parameter: current count of ACKNACKs
+     * @param current count of ACKNACKs
      */
     inline void on_acknack(
             int32_t)
@@ -355,7 +355,7 @@ protected:
 
     /**
      * @brief Report that a NACKFRAG message is sent
-     * Parameter: current count of NACKFRAGs
+     * @param current count of NACKFRAGs
      */
     inline void on_nackfrag(
             int32_t)
@@ -364,7 +364,7 @@ protected:
 
     /**
      * @brief Reports subscription throughtput based on last added sample to reader's history
-     * Parameter: size of the message received
+     * @param size of the message received
      */
     inline void on_subscribe_throughput(
             uint32_t)

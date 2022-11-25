@@ -167,14 +167,11 @@ public:
      * and depending on the implementation performs different actions.
      * @param a_change Pointer of the change to add.
      * @param prox Pointer to the WriterProxy that adds the Change.
-     * @param unknown_missing_changes_up_to The number of changes from the same writer with a lower sequence number that
-     *                                      could potentially be received in the future.
      * @return True if added.
      */
     bool change_received(
             CacheChange_t* a_change,
-            WriterProxy* prox,
-            size_t unknown_missing_changes_up_to);
+            WriterProxy* prox);
 
     /**
      * Get the RTPS participant
@@ -249,7 +246,7 @@ public:
     void send_acknack(
             const WriterProxy* writer,
             const SequenceNumberSet_t& sns,
-            RTPSMessageSenderInterface* sender,
+            const RTPSMessageSenderInterface& sender,
             bool is_final);
 
     /**
@@ -260,7 +257,7 @@ public:
      */
     void send_acknack(
             const WriterProxy* writer,
-            RTPSMessageSenderInterface* sender,
+            const RTPSMessageSenderInterface& sender,
             bool heartbeat_was_final);
 
     /**
@@ -316,7 +313,7 @@ public:
      */
     void change_read_by_user(
             CacheChange_t* change,
-            WriterProxy* writer,
+            const WriterProxy* writer,
             bool mark_as_read = true) override;
 
 private:

@@ -63,7 +63,6 @@ class Topic;
 
 /**
  * Class DataWriter, contains the actual implementation of the behaviour of the DataWriter.
- *
  * @ingroup FASTDDS_MODULE
  */
 class DataWriter : public DomainEntity
@@ -77,11 +76,11 @@ protected:
      * Create a data writer, assigning its pointer to the associated implementation.
      * Don't use directly, create DataWriter using create_datawriter from Publisher.
      */
-    DataWriter(
+    RTPS_DllAPI DataWriter(
             DataWriterImpl* impl,
             const StatusMask& mask = StatusMask::all());
 
-    DataWriter(
+    RTPS_DllAPI DataWriter(
             Publisher* pub,
             Topic* topic,
             const DataWriterQos& qos = DATAWRITER_QOS_DEFAULT,
@@ -121,11 +120,10 @@ public:
         CONSTRUCTED_LOAN_INITIALIZATION
     };
 
-    virtual ~DataWriter();
+    RTPS_DllAPI virtual ~DataWriter();
 
     /**
      * @brief This operation enables the DataWriter
-     *
      * @return RETCODE_OK is successfully enabled. RETCODE_PRECONDITION_NOT_MET if the Publisher creating this
      *         DataWriter is not enabled.
      */
@@ -133,7 +131,6 @@ public:
 
     /**
      * Write data to the topic.
-     *
      * @param data Pointer to the data
      * @return True if correct, false otherwise
      */
@@ -142,7 +139,6 @@ public:
 
     /**
      * Write data with params to the topic.
-     *
      * @param data Pointer to the data
      * @param params Extra write parameters.
      * @return True if correct, false otherwise
@@ -166,7 +162,7 @@ public:
             void* data,
             const InstanceHandle_t& handle);
 
-    /**
+    /** NOT YET IMPLEMENTED
      * @brief This operation performs the same function as write except that it also provides the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp" that is made available to DataReader
      * objects by means of the @ref eprosima::fastdds::dds::SampleInfo::source_timestamp attribute "source_timestamp"
@@ -185,21 +181,11 @@ public:
     RTPS_DllAPI ReturnCode_t write_w_timestamp(
             void* data,
             const InstanceHandle_t& handle,
-            const fastrtps::Time_t& timestamp);
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-    FASTDDS_DEPRECATED_UNTIL(3, "eprosima::fastdds::dds:DataWriter::write_w_timestamp()",
-            "In favor of version using eprosima::fastrtps::Time_t.")
-    RTPS_DllAPI ReturnCode_t write_w_timestamp(
-            void* data,
-            const InstanceHandle_t& handle,
             const fastrtps::rtps::Time_t& timestamp);
-#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     /*!
      * @brief Informs that the application will be modifying a particular instance.
      * It gives an opportunity to the middleware to pre-configure itself to improve performance.
-     *
      * @param[in] instance Sample used to get the instance's key.
      * @return Handle containing the instance's key.
      * This handle could be used in successive `write` or `dispose` operations.
@@ -208,7 +194,7 @@ public:
     RTPS_DllAPI InstanceHandle_t register_instance(
             void* instance);
 
-    /**
+    /** NOT YET IMPLEMENTED
      * @brief This operation performs the same function as register_instance and can be used instead of
      * @ref register_instance in the cases where the application desires to specify the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp".
@@ -228,22 +214,13 @@ public:
      */
     RTPS_DllAPI InstanceHandle_t register_instance_w_timestamp(
             void* instance,
-            const fastrtps::Time_t& timestamp);
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-    FASTDDS_DEPRECATED_UNTIL(3, "eprosima::fastdds::dds:DataWriter::register_instance_w_timestamp()",
-            "In favor of version using eprosima::fastrtps::Time_t.")
-    RTPS_DllAPI InstanceHandle_t register_instance_w_timestamp(
-            void* instance,
             const fastrtps::rtps::Time_t& timestamp);
-#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     /*!
      * @brief This operation reverses the action of `register_instance`.
      * It should only be called on an instance that is currently registered.
      * Informs the middleware that the DataWriter is not intending to modify any more of that data instance.
      * Also indicates that the middleware can locally remove all information regarding that instance.
-     *
      * @param[in] instance Sample used to deduce instance's key in case of `handle` parameter is HANDLE_NIL.
      * @param[in] handle Instance's key to be unregistered.
      * @return Returns the operation's result.
@@ -253,7 +230,7 @@ public:
             void* instance,
             const InstanceHandle_t& handle);
 
-    /**
+    /** NOT YET IMPLEMENTED
      * @brief This operation performs the same function as @ref unregister_instance and can be used instead of
      * @ref unregister_instance in the cases where the application desires to specify the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp".
@@ -275,18 +252,9 @@ public:
     RTPS_DllAPI ReturnCode_t unregister_instance_w_timestamp(
             void* instance,
             const InstanceHandle_t& handle,
-            const fastrtps::Time_t& timestamp);
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-    FASTDDS_DEPRECATED_UNTIL(3, "eprosima::fastdds::dds:DataWriter::unregister_instance_w_timestamp()",
-            "In favor of version using eprosima::fastrtps::Time_t.")
-    RTPS_DllAPI ReturnCode_t unregister_instance_w_timestamp(
-            void* instance,
-            const InstanceHandle_t& handle,
             const fastrtps::rtps::Time_t& timestamp);
-#endif // DOXYGEN_SHOULD_SKIP_THIS
 
-    /**
+    /** NOT YET IMPLEMENTED
      * This operation can be used to retrieve the instance key that corresponds to an
      * @ref eprosima::fastdds::dds::Entity::instance_handle_ "instance_handle".
      * The operation will only fill the fields that form the key inside the key_holder instance.
@@ -295,8 +263,8 @@ public:
      * data-object known to the DataWriter. If the implementation is not able to check invalid handles then the result
      * in this situation is unspecified.
      *
-     * @param[in,out] key_holder  Sample where the key fields will be returned.
-     * @param[in] handle          Handle to the instance to retrieve the key values from.
+     * @param[in,out] key_holder
+     * @param[in] handle
      *
      * @return Any of the standard return codes.
      */
@@ -304,9 +272,7 @@ public:
             void* key_holder,
             const InstanceHandle_t& handle);
 
-    /**
-     * NOT YET IMPLEMENTED
-     *
+    /** NOT YET IMPLEMENTED
      * Takes as a parameter an instance and returns a handle that can be used in subsequent operations that accept an
      * instance handle as an argument. The instance parameter is only used for the purpose of examining the fields that
      * define the key.
@@ -320,28 +286,24 @@ public:
 
     /**
      * Returns the DataWriter's GUID
-     *
      * @return Reference to the DataWriter GUID
      */
     RTPS_DllAPI const fastrtps::rtps::GUID_t& guid() const;
 
     /**
      * Returns the DataWriter's InstanceHandle
-     *
      * @return Copy of the DataWriter InstanceHandle
      */
     RTPS_DllAPI InstanceHandle_t get_instance_handle() const;
 
     /**
      * Get data type associated to the DataWriter
-     *
      * @return Copy of the TypeSupport
      */
     RTPS_DllAPI TypeSupport get_type() const;
 
     /**
      * Waits the current thread until all writers have received their acknowledgments.
-     *
      * @param max_wait Maximum blocking time for this operation
      * @return RETCODE_OK if the DataWriter receive the acknowledgments before the time expires and RETCODE_ERROR otherwise
      */
@@ -350,7 +312,6 @@ public:
 
     /**
      * @brief Returns the offered deadline missed status
-     *
      * @param[out] status Deadline missed status struct
      * @return RETCODE_OK
      */
@@ -359,7 +320,6 @@ public:
 
     /**
      * @brief Returns the offered incompatible qos status
-     *
      * @param[out] status Offered incompatible qos status struct
      * @return RETCODE_OK
      */
@@ -368,7 +328,6 @@ public:
 
     /**
      * @brief Returns the publication matched status
-     *
      * @param[out] status publication matched status struct
      * @return RETCODE_OK
      */
@@ -377,7 +336,6 @@ public:
 
     /**
      * Establishes the DataWriterQos for this DataWriter.
-     *
      * @param qos DataWriterQos to be set
      * @return RETCODE_IMMUTABLE_POLICY if any of the Qos cannot be changed, RETCODE_INCONSISTENT_POLICY if the Qos is not
      * self consistent and RETCODE_OK if the qos is changed correctly.
@@ -387,14 +345,12 @@ public:
 
     /**
      * Retrieves the DataWriterQos for this DataWriter.
-     *
      * @return Reference to the current DataWriterQos
      */
     RTPS_DllAPI const DataWriterQos& get_qos() const;
 
     /**
      * Fills the DataWriterQos with the values of this DataWriter.
-     *
      * @param qos DataWriterQos object where the qos is returned.
      * @return RETCODE_OK
      */
@@ -403,21 +359,18 @@ public:
 
     /**
      * Retrieves the topic for this DataWriter.
-     *
      * @return Pointer to the associated Topic
      */
     RTPS_DllAPI Topic* get_topic() const;
 
     /**
      * Retrieves the listener for this DataWriter.
-     *
      * @return Pointer to the DataWriterListener
      */
     RTPS_DllAPI const DataWriterListener* get_listener() const;
 
     /**
      * Modifies the DataWriterListener, sets the mask to StatusMask::all()
-     *
      * @param listener new value for the DataWriterListener
      * @return RETCODE_OK
      */
@@ -426,7 +379,6 @@ public:
 
     /**
      * Modifies the DataWriterListener.
-     *
      * @param listener new value for the DataWriterListener
      * @param mask StatusMask that holds statuses the listener responds to (default: all).
      * @return RETCODE_OK
@@ -434,6 +386,12 @@ public:
     RTPS_DllAPI ReturnCode_t set_listener(
             DataWriterListener* listener,
             const StatusMask& mask);
+
+    /* TODO
+       bool get_key_value(
+            void* key_holder,
+            const InstanceHandle_t& handle);
+     */
 
     /**
      * @brief This operation requests the middleware to delete the data (the actual deletion is postponed until there is no
@@ -444,7 +402,6 @@ public:
      * available to DataReader objects by means of the source_timestamp attribute inside the SampleInfo. The constraints
      * on the values of the handle parameter and the corresponding error behavior are the same specified for the
      * unregister_instance operation.
-     *
      * @param[in] data Sample used to deduce instance's key in case of `handle` parameter is HANDLE_NIL.
      * @param[in] handle InstanceHandle of the data
      * @return RETCODE_PRECONDITION_NOT_MET if the handle introduced does not match with the one associated to the data,
@@ -469,18 +426,15 @@ public:
      * This operation may return RETCODE_TIMEOUT and RETCODE_OUT_OF_RESOURCES under the same circumstances described
      * for the @ref write operation.
      *
-     * @param instance  Sample used to deduce instance's key in case of `handle` parameter is HANDLE_NIL.
-     * @param handle Instance's key to be disposed.
-     * @param timestamp Time_t used to set the source_timestamp.
+     * @param data Pointer to the data.
+     * @param handle InstanceHandle_t
      * @return RTPS_DllAPI
      */
     RTPS_DllAPI ReturnCode_t dispose_w_timestamp(
-            void* instance,
-            const InstanceHandle_t& handle,
-            const fastrtps::Time_t& timestamp);
+            void* data,
+            const InstanceHandle_t& handle);
     /**
      * @brief Returns the liveliness lost status
-     *
      * @param status Liveliness lost status struct
      * @return RETCODE_OK
      */
@@ -489,7 +443,6 @@ public:
 
     /**
      * @brief Getter for the Publisher that creates this DataWriter
-     *
      * @return Pointer to the Publisher
      */
     RTPS_DllAPI const Publisher* get_publisher() const;
@@ -499,47 +452,34 @@ public:
      * LivelinessQosPolicy to indicate to the Service that the entity remains active.
      * This operation need only be used if the LIVELINESS setting is either MANUAL_BY_PARTICIPANT or MANUAL_BY_TOPIC.
      * Otherwise, it has no effect.
-     *
      * @note Writing data via the write operation on a DataWriter asserts liveliness on the DataWriter itself and its
      * DomainParticipant. Consequently the use of assert_liveliness is only needed if the application is not writing data
      * regularly.
-     *
      * @return RETCODE_OK if asserted, RETCODE_ERROR otherwise
      */
     RTPS_DllAPI ReturnCode_t assert_liveliness();
 
     /**
      * @brief Retrieves in a subscription associated with the DataWriter
-     *
      * @param[out] subscription_data subscription data struct
      * @param subscription_handle InstanceHandle_t of the subscription
      * @return RETCODE_OK
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
+     *
      */
     RTPS_DllAPI ReturnCode_t get_matched_subscription_data(
             builtin::SubscriptionBuiltinTopicData& subscription_data,
-            const InstanceHandle_t& subscription_handle) const;
+            const fastrtps::rtps::InstanceHandle_t& subscription_handle) const;
 
     /**
      * @brief Fills the given vector with the InstanceHandle_t of matched DataReaders
-     *
      * @param[out] subscription_handles Vector where the InstanceHandle_t are returned
      * @return RETCODE_OK
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_matched_subscriptions(
-            std::vector<InstanceHandle_t>& subscription_handles) const;
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-    FASTDDS_DEPRECATED_UNTIL(3, "eprosima::fastdds::dds:DataWriter::get_matched_subscriptions()",
-            "In favor of version using std::vector<fastrtps::rtps::InstanceHandle_t>.")
-    RTPS_DllAPI ReturnCode_t get_matched_subscriptions(
-            std::vector<InstanceHandle_t*>& subscription_handles) const;
-#endif // DOXYGEN_SHOULD_SKIP_THIS
+            std::vector<fastrtps::rtps::InstanceHandle_t*>& subscription_handles) const;
 
     /**
      * @brief Clears the DataWriter history
-     *
      * @param removed size_t pointer to return the size of the data removed
      * @return RETCODE_OK if the samples are removed and RETCODE_ERROR otherwise
      */
@@ -600,27 +540,6 @@ public:
      */
     RTPS_DllAPI ReturnCode_t get_sending_locators(
             rtps::LocatorList& locators) const;
-
-    /**
-     * Block the current thread until the writer has received the acknowledgment corresponding to the given instance.
-     * Operations performed on the same instance while the current thread is waiting will not be taken into
-     * consideration, i.e. this method may return `RETCODE_OK` with those operations unacknowledged.
-     *
-     * @param instance Sample used to deduce instance's key in case of `handle` parameter is HANDLE_NIL.
-     * @param handle Instance handle of the data.
-     * @param max_wait Maximum blocking time for this operation.
-     *
-     * @return RETCODE_NOT_ENABLED if the writer has not been enabled.
-     * @return RETCODE_BAD_PARAMETER if `instance` is not a valid pointer.
-     * @return RETCODE_PRECONDITION_NOT_MET if the topic does not have a key, the key is unknown to the writer,
-     *         or the key is not consistent with `handle`.
-     * @return RETCODE_OK if the DataWriter received the acknowledgments before the time expired.
-     * @return RETCODE_TIMEOUT otherwise.
-     */
-    RTPS_DllAPI ReturnCode_t wait_for_acknowledgments(
-            void* instance,
-            const InstanceHandle_t& handle,
-            const fastrtps::Duration_t& max_wait);
 
 protected:
 

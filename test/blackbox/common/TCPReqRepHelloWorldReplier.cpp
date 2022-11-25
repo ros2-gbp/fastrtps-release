@@ -17,7 +17,6 @@
  *
  */
 
-#include "BlackboxTests.hpp"
 #include "TCPReqRepHelloWorldReplier.hpp"
 
 #include <fastrtps/Domain.h>
@@ -30,7 +29,6 @@
 #include <fastrtps/publisher/Publisher.h>
 
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
-#include <fastrtps/transport/TCPv6TransportDescriptor.h>
 #include <fastrtps/utils/IPLocator.h>
 
 #include <gtest/gtest.h>
@@ -79,16 +77,8 @@ void TCPReqRepHelloWorldReplier::init(
     //uint32_t kind = LOCATOR_KIND_TCPv4;
 
     pattr.rtps.useBuiltinTransports = false;
-    std::shared_ptr<TCPTransportDescriptor> descriptor;
-    if (use_ipv6)
-    {
-        descriptor = std::make_shared<TCPv6TransportDescriptor>();
-    }
-    else
-    {
-        descriptor = std::make_shared<TCPv4TransportDescriptor>();
-    }
 
+    std::shared_ptr<TCPv4TransportDescriptor> descriptor = std::make_shared<TCPv4TransportDescriptor>();
     descriptor->sendBufferSize = 0;
     descriptor->receiveBufferSize = 0;
     if (maxInitialPeer > 0)
@@ -123,14 +113,14 @@ void TCPReqRepHelloWorldReplier::init(
 
     //Create subscriber
     sattr.topic.topicKind = NO_KEY;
-    sattr.topic.topicDataType = type_.getName();
+    sattr.topic.topicDataType = "HelloWorldType";
     configSubscriber("Request");
     request_subscriber_ = Domain::createSubscriber(participant_, sattr, &request_listener_);
     ASSERT_NE(request_subscriber_, nullptr);
 
     //Create publisher
     puattr.topic.topicKind = NO_KEY;
-    puattr.topic.topicDataType = type_.getName();
+    puattr.topic.topicDataType = "HelloWorldType";
     puattr.topic.topicName = "HelloWorldTopicReply";
     configPublisher("Reply");
     reply_publisher_ = Domain::createPublisher(participant_, puattr, &reply_listener_);

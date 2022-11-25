@@ -33,34 +33,21 @@ namespace fastdds {
 namespace dds {
 
 TopicImpl::TopicImpl(
-        TopicProxyFactory* factory,
         DomainParticipantImpl* p,
         TypeSupport type_support,
         const TopicQos& qos,
         TopicListener* listen)
-    : factory_(factory)
-    , participant_(p)
+    : participant_(p)
     , type_support_(type_support)
     , qos_(&qos == &TOPIC_QOS_DEFAULT ? participant_->get_default_topic_qos() : qos)
     , listener_(listen)
+    , user_topic_(nullptr)
 {
 }
 
 TopicImpl::~TopicImpl()
 {
-}
-
-ReturnCode_t TopicImpl::check_qos_including_resource_limits(
-        const TopicQos& qos,
-        const TypeSupport& type)
-{
-    ReturnCode_t check_qos_return = check_qos(qos);
-    if (ReturnCode_t::RETCODE_OK == check_qos_return &&
-            type->m_isGetKeyDefined)
-    {
-        check_qos_return = check_allocation_consistency(qos);
-    }
-    return check_qos_return;
+    delete user_topic_;
 }
 
 ReturnCode_t TopicImpl::check_qos(
@@ -76,6 +63,12 @@ ReturnCode_t TopicImpl::check_qos(
         logError(DDS_QOS_CHECK, "BY SOURCE TIMESTAMP DestinationOrder not supported");
         return ReturnCode_t::RETCODE_UNSUPPORTED;
     }
+    if (BEST_EFFORT_RELIABILITY_QOS == qos.reliability().kind &&
+            EXCLUSIVE_OWNERSHIP_QOS == qos.ownership().kind)
+    {
+        logError(DDS_QOS_CHECK, "BEST_EFFORT incompatible with EXCLUSIVE ownership");
+        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+    }
     if (AUTOMATIC_LIVELINESS_QOS == qos.liveliness().kind ||
             MANUAL_BY_PARTICIPANT_LIVELINESS_QOS == qos.liveliness().kind)
     {
@@ -85,27 +78,6 @@ ReturnCode_t TopicImpl::check_qos(
             logError(DDS_QOS_CHECK, "lease_duration <= announcement period.");
             return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
         }
-    }
-    return ReturnCode_t::RETCODE_OK;
-}
-
-ReturnCode_t TopicImpl::check_allocation_consistency(
-        const TopicQos& qos)
-{
-    if ((qos.resource_limits().max_samples > 0) &&
-            (qos.resource_limits().max_samples <
-            (qos.resource_limits().max_instances * qos.resource_limits().max_samples_per_instance)))
-    {
-        logError(DDS_QOS_CHECK,
-                "max_samples should be greater than max_instances * max_samples_per_instance");
-        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
-    }
-    if ((qos.resource_limits().max_instances <= 0 || qos.resource_limits().max_samples_per_instance <= 0) &&
-            (qos.resource_limits().max_samples > 0))
-    {
-        logError(DDS_QOS_CHECK,
-                "max_samples should be infinite when max_instances or max_samples_per_instance are infinite");
-        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
     }
     return ReturnCode_t::RETCODE_OK;
 }
@@ -151,7 +123,7 @@ ReturnCode_t TopicImpl::set_qos(
         return ReturnCode_t::RETCODE_OK;
     }
 
-    ReturnCode_t ret_val = check_qos_including_resource_limits(qos, type_support_);
+    ReturnCode_t ret_val = check_qos(qos);
     if (!ret_val)
     {
         return ret_val;
@@ -171,22 +143,21 @@ const TopicListener* TopicImpl::get_listener() const
     return listener_;
 }
 
-void TopicImpl::set_listener(
+ReturnCode_t TopicImpl::set_listener(
         TopicListener* listener)
 {
     listener_ = listener;
-}
-
-void TopicImpl::set_listener(
-        TopicListener* listener,
-        const StatusMask& mask)
-{
-    participant_->set_topic_listener(factory_, this, listener, mask);
+    return ReturnCode_t::RETCODE_OK;
 }
 
 DomainParticipant* TopicImpl::get_participant() const
 {
     return participant_->get_participant();
+}
+
+const Topic* TopicImpl::get_topic() const
+{
+    return user_topic_;
 }
 
 const TypeSupport& TopicImpl::get_type() const
@@ -195,11 +166,10 @@ const TypeSupport& TopicImpl::get_type() const
 }
 
 TopicListener* TopicImpl::get_listener_for(
-        const StatusMask& status,
-        const Topic* topic)
+        const StatusMask& status)
 {
     if (listener_ != nullptr &&
-            topic->get_status_mask().is_active(status))
+            user_topic_->get_status_mask().is_active(status))
     {
         return listener_;
     }

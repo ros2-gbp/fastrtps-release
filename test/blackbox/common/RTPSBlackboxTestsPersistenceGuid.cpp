@@ -86,7 +86,7 @@ protected:
 TEST_P(PersistenceGuid, SetPersistenceGuidThroughRTPSLayer)
 {
     // Create RTPSWriter and configure the durability and property list
-    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
     writer.durability(TRANSIENT);
     writer.reliability(RELIABLE);
     writer.add_property("dds.persistence.plugin", "builtin.SQLITE3");
@@ -97,7 +97,7 @@ TEST_P(PersistenceGuid, SetPersistenceGuidThroughRTPSLayer)
     ASSERT_TRUE(writer.isInitialized());
 
     // Create RTPSReader and configure the durability and property list
-    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     reader.durability(TRANSIENT);
     reader.reliability(RELIABLE);
     reader.add_property("dds.persistence.plugin", "builtin.SQLITE3");
@@ -166,7 +166,7 @@ TEST_P(PersistenceGuid, CheckPrevalenceBetweenManualAndPropertyConfiguration)
     entityId.value[3] = 1;
 
     // Create RTPSWriter that use the already created attributes
-    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
     writer.durability(TRANSIENT);
     writer.reliability(RELIABLE);
     writer.add_property("dds.persistence.plugin", "builtin.SQLITE3");
@@ -180,7 +180,7 @@ TEST_P(PersistenceGuid, CheckPrevalenceBetweenManualAndPropertyConfiguration)
     guidPrefix.value[11] = 2;
 
     // Create RTPSReader that use the already created attributes
-    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     reader.durability(TRANSIENT);
     reader.reliability(RELIABLE);
     reader.add_property("dds.persistence.plugin", "builtin.SQLITE3");

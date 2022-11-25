@@ -29,7 +29,6 @@
 #include "ProxyDataFilters.hpp"
 
 using ParameterList = eprosima::fastdds::dds::ParameterList;
-using ContentFilterProperty = eprosima::fastdds::rtps::ContentFilterProperty;
 
 namespace eprosima {
 namespace fastrtps {
@@ -38,8 +37,7 @@ namespace rtps {
 
 ReaderProxyData::ReaderProxyData (
         const size_t max_unicast_locators,
-        const size_t max_multicast_locators,
-        const fastdds::rtps::ContentFilterProperty::AllocationConfiguration& content_filter_limits)
+        const size_t max_multicast_locators)
     : m_expectsInlineQos(false)
 #if HAVE_SECURITY
     , security_attributes_(0UL)
@@ -52,7 +50,6 @@ ReaderProxyData::ReaderProxyData (
     , m_type_id(nullptr)
     , m_type(nullptr)
     , m_type_information(nullptr)
-    , content_filter_(content_filter_limits)
 {
     // As DDS-XTypes, v1.2 (page 182) document stablishes, local default is ALLOW_TYPE_COERCION,
     // but when remotes doesn't send TypeConsistencyQos, we must assume DISALLOW.
@@ -62,9 +59,8 @@ ReaderProxyData::ReaderProxyData (
 ReaderProxyData::ReaderProxyData (
         const size_t max_unicast_locators,
         const size_t max_multicast_locators,
-        const VariableLengthDataLimits& data_limits,
-        const fastdds::rtps::ContentFilterProperty::AllocationConfiguration& content_filter_limits)
-    : ReaderProxyData(max_unicast_locators, max_multicast_locators, content_filter_limits)
+        const VariableLengthDataLimits& data_limits)
+    : ReaderProxyData(max_unicast_locators, max_multicast_locators)
 {
     m_qos.m_userData.set_max_size(static_cast<uint32_t>(data_limits.max_user_data));
     m_qos.m_partition.set_max_size(static_cast<uint32_t>(data_limits.max_partitions));
@@ -101,7 +97,6 @@ ReaderProxyData::ReaderProxyData(
     , m_type(nullptr)
     , m_type_information(nullptr)
     , m_properties(readerInfo.m_properties)
-    , content_filter_(readerInfo.content_filter_)
 {
     if (readerInfo.m_type_id)
     {
@@ -141,7 +136,6 @@ ReaderProxyData& ReaderProxyData::operator =(
     m_topicKind = readerInfo.m_topicKind;
     m_qos.setQos(readerInfo.m_qos, true);
     m_properties = readerInfo.m_properties;
-    content_filter_ = readerInfo.content_filter_;
 
     if (readerInfo.m_type_id)
     {
@@ -310,13 +304,6 @@ uint32_t ReaderProxyData::get_serialized_size(
     {
         // PID_PROPERTY_LIST
         ret_val += fastdds::dds::ParameterSerializer<ParameterPropertyList_t>::cdr_serialized_size(m_properties);
-    }
-
-    // PID_CONTENT_FILTER_PROPERTY
-    // Take into count only when filter_class_name and filter_expression are not empty.
-    if (0 < content_filter_.filter_class_name.size() && 0 < content_filter_.filter_expression.size())
-    {
-        ret_val += fastdds::dds::ParameterSerializer<ContentFilterProperty>::cdr_serialized_size(content_filter_);
     }
 
 #if HAVE_SECURITY
@@ -557,15 +544,6 @@ bool ReaderProxyData::writeToCDRMessage(
         }
     }
 
-    // Serialize ContentFilterProperty only when filter_class_name and filter_expression are not empty.
-    if (0 < content_filter_.filter_class_name.size() && 0 < content_filter_.filter_expression.size())
-    {
-        if (!fastdds::dds::ParameterSerializer<ContentFilterProperty>::add_to_cdr_message(content_filter_, msg))
-        {
-            return false;
-        }
-    }
-
 #if HAVE_SECURITY
     if ((security_attributes_ != 0UL) || (plugin_security_attributes_ != 0UL))
     {
@@ -620,8 +598,13 @@ bool ReaderProxyData::readFromCDRMessage(
         const NetworkFactory& network,
         bool is_shm_transport_available)
 {
-    auto param_process = [this, &network, &is_shm_transport_available](
-        CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
+    bool are_shm_default_locators_present = false;
+    bool is_shm_transport_possible = false;
+
+    auto param_process = [this, &network,
+                    &is_shm_transport_available,
+                    &is_shm_transport_possible,
+                    &are_shm_default_locators_present](CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
                 switch (pid)
                 {
@@ -805,7 +788,8 @@ bool ReaderProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        m_RTPSParticipantKey = p.guid;
+                        memcpy(m_RTPSParticipantKey.value, p.guid.guidPrefix.value, 12);
+                        memcpy(m_RTPSParticipantKey.value + 12, p.guid.entityId.value, 4);
                         break;
                     }
                     case fastdds::dds::PID_ENDPOINT_GUID:
@@ -818,7 +802,8 @@ bool ReaderProxyData::readFromCDRMessage(
                         }
 
                         m_guid = p.guid;
-                        m_key = p.guid;
+                        memcpy(m_key.value, p.guid.guidPrefix.value, 12);
+                        memcpy(m_key.value + 12, p.guid.entityId.value, 4);
                         break;
                     }
                     case fastdds::dds::PID_UNICAST_LOCATOR:
@@ -835,7 +820,9 @@ bool ReaderProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                remote_locators_,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &remote_locators_,
                                 temp_locator,
                                 true);
                         }
@@ -855,7 +842,9 @@ bool ReaderProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                remote_locators_,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &remote_locators_,
                                 temp_locator,
                                 false);
                         }
@@ -966,16 +955,6 @@ bool ReaderProxyData::readFromCDRMessage(
                         break;
                     }
 
-                    case fastdds::dds::PID_CONTENT_FILTER_PROPERTY:
-                    {
-                        if (!fastdds::dds::ParameterSerializer<ContentFilterProperty>::read_from_cdr_message(
-                                    content_filter_, msg, plength))
-                        {
-                            return false;
-                        }
-                        break;
-                    }
-
                     case fastdds::dds::PID_DATASHARING:
                     {
                         if (!fastdds::dds::QosPoliciesSerializer<DataSharingQosPolicy>::read_from_cdr_message(
@@ -1020,7 +999,8 @@ bool ReaderProxyData::readFromCDRMessage(
             {
                 GUID_t tmp_guid = m_guid;
                 tmp_guid.entityId = c_EntityId_RTPSParticipant;
-                m_RTPSParticipantKey = tmp_guid;
+                memcpy(m_RTPSParticipantKey.value, tmp_guid.guidPrefix.value, 12);
+                memcpy(m_RTPSParticipantKey.value + 12, tmp_guid.entityId.value, 4);
             }
 
             return true;
@@ -1054,11 +1034,6 @@ void ReaderProxyData::clear()
     m_qos.clear();
     m_properties.clear();
     m_properties.length = 0;
-    content_filter_.filter_class_name = "";
-    content_filter_.content_filtered_topic_name = "";
-    content_filter_.related_topic_name = "";
-    content_filter_.filter_expression = "";
-    content_filter_.expression_parameters.clear();
 
     if (m_type_id)
     {
@@ -1098,7 +1073,6 @@ void ReaderProxyData::update(
     m_qos.setQos(rdata->m_qos, false);
     m_isAlive = rdata->m_isAlive;
     m_expectsInlineQos = rdata->m_expectsInlineQos;
-    content_filter_ = rdata->content_filter_;
 }
 
 void ReaderProxyData::copy(
@@ -1116,7 +1090,6 @@ void ReaderProxyData::copy(
     m_isAlive = rdata->m_isAlive;
     m_topicKind = rdata->m_topicKind;
     m_properties = rdata->m_properties;
-    content_filter_ = rdata->content_filter_;
 
     if (rdata->m_type_id)
     {

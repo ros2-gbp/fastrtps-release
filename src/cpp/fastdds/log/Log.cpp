@@ -16,14 +16,11 @@
 #include <iomanip>
 #include <mutex>
 
-#include <fastrtps/utils/DBQueue.h>
-
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/dds/log/OStreamConsumer.hpp>
 #include <fastdds/dds/log/StdoutConsumer.hpp>
 #include <fastdds/dds/log/StdoutErrConsumer.hpp>
 #include <fastdds/dds/log/Colors.hpp>
-#include <utils/SystemInfo.hpp>
 #include <iostream>
 
 using namespace std;
@@ -31,53 +28,27 @@ namespace eprosima {
 namespace fastdds {
 namespace dds {
 
-struct Resources
+struct Log::Resources Log::resources_;
+
+Log::Resources::Resources()
+    : logging(false)
+    , work(false)
+    , current_loop(0)
+    , filenames(false)
+    , functions(true)
+    , verbosity(Log::Error)
 {
-    fastrtps::DBQueue<Log::Entry> logs;
-    std::vector<std::unique_ptr<LogConsumer>> consumers;
-    std::unique_ptr<std::thread> logging_thread;
-
-    // Condition variable segment.
-    std::condition_variable cv;
-    std::mutex cv_mutex;
-    bool logging;
-    bool work;
-    int current_loop;
-
-    // Context configuration.
-    std::mutex config_mutex;
-    bool filenames;
-    bool functions;
-    std::unique_ptr<std::regex> category_filter;
-    std::unique_ptr<std::regex> filename_filter;
-    std::unique_ptr<std::regex> error_string_filter;
-
-    std::atomic<Log::Kind> verbosity;
-
-    Resources()
-        : logging(false)
-        , work(false)
-        , current_loop(0)
-        , filenames(false)
-        , functions(true)
-        , verbosity(Log::Error)
-    {
 #if STDOUTERR_LOG_CONSUMER
-        consumers.emplace_back(new StdoutErrConsumer);
+    resources_.consumers.emplace_back(new StdoutErrConsumer);
 #else
-        consumers.emplace_back(new StdoutConsumer);
+    resources_.consumers.emplace_back(new StdoutConsumer);
 #endif // STDOUTERR_LOG_CONSUMER
-    }
+}
 
-    ~Resources()
-    {
-        Log::KillThread();
-    }
-
-};
-
-static struct Resources resources_;
-
+Log::Resources::~Resources()
+{
+    Log::KillThread();
+}
 
 void Log::RegisterConsumer(
         std::unique_ptr<LogConsumer>&& consumer)
@@ -108,7 +79,6 @@ void Log::Reset()
     resources_.functions = true;
     resources_.verbosity = Log::Error;
     resources_.consumers.clear();
-
 #if STDOUTERR_LOG_CONSUMER
     resources_.consumers.emplace_back(new StdoutErrConsumer);
 #else
@@ -175,16 +145,14 @@ void Log::run()
             while (!resources_.logs.Empty())
             {
                 std::unique_lock<std::mutex> configGuard(resources_.config_mutex);
-
-                Log::Entry& entry = resources_.logs.Front();
-                if (preprocess(entry))
+                if (preprocess(resources_.logs.Front()))
                 {
                     for (auto& consumer : resources_.consumers)
                     {
-                        consumer->Consume(entry);
+                        consumer->Consume(resources_.logs.Front());
                     }
                 }
-                // This Pop() is also a barrier for Log::Flush wait condition
+
                 resources_.logs.Pop();
             }
         }
@@ -276,7 +244,8 @@ void Log::QueueLog(
         }
     }
 
-    std::string timestamp = SystemInfo::get_timestamp();
+    std::string timestamp;
+    get_timestamp(timestamp);
     resources_.logs.Push(Log::Entry{message, context, kind, timestamp});
     {
         std::unique_lock<std::mutex> guard(resources_.cv_mutex);
@@ -318,13 +287,36 @@ void Log::SetErrorStringFilter(
     resources_.error_string_filter.reset(new std::regex(filter));
 }
 
+void Log::get_timestamp(
+        std::string& timestamp)
+{
+    std::stringstream stream;
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::chrono::system_clock::duration tp = now.time_since_epoch();
+    tp -= std::chrono::duration_cast<std::chrono::seconds>(tp);
+    auto ms = static_cast<unsigned>(tp / std::chrono::milliseconds(1));
+
+#if defined(_WIN32)
+    struct tm timeinfo;
+    localtime_s(&timeinfo, &now_c);
+    stream << std::put_time(&timeinfo, "%F %T") << "." << std::setw(3) << std::setfill('0') << ms << " ";
+    //#elif defined(__clang__) && !defined(std::put_time) // TODO arm64 doesn't seem to support std::put_time
+    //    (void)now_c;
+    //    (void)ms;
+#else
+    stream << std::put_time(localtime(&now_c), "%F %T") << "." << std::setw(3) << std::setfill('0') << ms << " ";
+#endif // if defined(_WIN32)
+    timestamp = stream.str();
+}
+
 void LogConsumer::print_timestamp(
         std::ostream& stream,
         const Log::Entry& entry,
         bool color) const
 {
     std::string white = (color) ? C_B_WHITE : "";
-    stream << white << entry.timestamp << " ";
+    stream << white << entry.timestamp;
 }
 
 void LogConsumer::print_header(

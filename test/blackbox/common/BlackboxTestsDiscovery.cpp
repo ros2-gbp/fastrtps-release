@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _WIN32
-#include <stdlib.h>
-#endif // _WIN32
-
 #include "BlackboxTests.hpp"
 
 #include "PubSubWriterReader.hpp"
@@ -28,8 +24,6 @@
 #include <rtps/transport/test_UDPv4Transport.h>
 
 #include <fastdds/rtps/attributes/ServerAttributes.h>
-
-#include <utils/SystemInfo.hpp>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -87,8 +81,8 @@ public:
 
 TEST_P(Discovery, ParticipantRemoval)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     reader.reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
 
@@ -117,11 +111,9 @@ TEST_P(Discovery, ParticipantRemoval)
     reader.wait_participant_undiscovery();
 }
 
-void static_discovery_test(
-        const std::string& reader_property_value,
-        const std::string& writer_property_value,
-        bool discovery_will_be_success = true)
+TEST(Discovery, StaticDiscovery)
 {
+    //Log::SetVerbosity(eprosima::fastdds::dds::Log::Info);
     char* value = nullptr;
     std::string TOPIC_RANDOM_NUMBER;
     std::string W_UNICAST_PORT_RANDOM_NUMBER_STR;
@@ -168,10 +160,7 @@ void static_discovery_test(
     }
     int32_t MULTICAST_PORT_RANDOM_NUMBER = stoi(MULTICAST_PORT_RANDOM_NUMBER_STR);
 
-    PropertyPolicy writer_property_policy;
-    writer_property_policy.properties().push_back({"dds.discovery.static_edp.exchange_format", writer_property_value});
-
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     LocatorList_t WriterUnicastLocators;
     Locator_t LocatorBuffer;
@@ -186,28 +175,17 @@ void static_discovery_test(
     LocatorBuffer.port = static_cast<uint16_t>(MULTICAST_PORT_RANDOM_NUMBER);
     WriterMulticastLocators.push_back(LocatorBuffer);
 
-    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-            .durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .property_policy(writer_property_policy);
+    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
+            durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS);
     writer.static_discovery("file://PubSubWriter.xml").reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
             unicastLocatorList(WriterUnicastLocators).multicastLocatorList(WriterMulticastLocators).
             setPublisherIDs(1,
             2).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
 
 
-    if (discovery_will_be_success)
-    {
-        ASSERT_TRUE(writer.isInitialized());
-    }
-    else
-    {
-        ASSERT_FALSE(writer.isInitialized());
-    }
+    ASSERT_TRUE(writer.isInitialized());
 
-    PropertyPolicy reader_property_policy;
-    reader_property_policy.properties().push_back({"dds.discovery.static_edp.exchange_format", reader_property_value});
-
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
 
     LocatorList_t ReaderUnicastLocators;
 
@@ -220,57 +198,29 @@ void static_discovery_test(
     ReaderMulticastLocators.push_back(LocatorBuffer);
 
 
-    reader.reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
-            .durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .property_policy(reader_property_policy);
+    reader.reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
+            history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
+            durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS);
     reader.static_discovery("file://PubSubReader.xml").
             unicastLocatorList(ReaderUnicastLocators).multicastLocatorList(ReaderMulticastLocators).
             setSubscriberIDs(3,
             4).setManualTopicName(std::string("BlackBox_StaticDiscovery_") + TOPIC_RANDOM_NUMBER).init();
 
-    if (discovery_will_be_success)
-    {
-        ASSERT_TRUE(reader.isInitialized());
+    ASSERT_TRUE(reader.isInitialized());
 
-        // Because its volatile the durability
-        // Wait for discovery.
-        writer.wait_discovery();
-        reader.wait_discovery();
+    // Because its volatile the durability
+    // Wait for discovery.
+    writer.wait_discovery();
+    reader.wait_discovery();
 
-        auto data = default_helloworld_data_generator();
-        auto expected_data(data);
+    auto data = default_helloworld_data_generator();
+    auto expected_data(data);
 
-        writer.send(data);
-        ASSERT_TRUE(data.empty());
+    writer.send(data);
+    ASSERT_TRUE(data.empty());
 
-        reader.startReception(expected_data);
-        reader.block_for_all();
-    }
-    else
-    {
-        ASSERT_FALSE(reader.isInitialized());
-    }
-}
-
-TEST(Discovery, StaticDiscovery_v1)
-{
-    static_discovery_test("v1", "v1");
-}
-
-TEST(Discovery, StaticDiscovery_v1_Reduced)
-{
-    static_discovery_test("v1_Reduced", "v1_Reduced");
-}
-
-TEST(Discovery, StaticDiscovery_v1_Mixed)
-{
-    static_discovery_test("v1", "v1_Reduced");
-}
-
-TEST(Discovery, StaticDiscovery_wrong_exchange_format)
-{
-    static_discovery_test("wrong", "wrong", false);
+    reader.startReception(expected_data);
+    reader.block_for_all();
 }
 
 /*!
@@ -313,7 +263,7 @@ TEST(Discovery, StaticDiscoveryFromString)
         TOPIC_RANDOM_NUMBER = "1";
     }
 
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
             history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
@@ -328,7 +278,7 @@ TEST(Discovery, StaticDiscoveryFromString)
             "<topicName>BlackBox_StaticDiscoveryFromString_" +
             TOPIC_RANDOM_NUMBER +
             std::string("</topicName>" \
-                    "<topicDataType>HelloWorld</topicDataType>" \
+                    "<topicDataType>HelloWorldType</topicDataType>" \
                     "<topicKind>NO_KEY</topicKind>" \
                     "<reliabilityQos>RELIABLE_RELIABILITY_QOS</reliabilityQos>" \
                     "<durabilityQos>TRANSIENT_LOCAL_DURABILITY_QOS</durabilityQos>" \
@@ -341,7 +291,7 @@ TEST(Discovery, StaticDiscoveryFromString)
 
     ASSERT_TRUE(writer.isInitialized());
 
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
 
 
     reader.reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
@@ -358,7 +308,7 @@ TEST(Discovery, StaticDiscoveryFromString)
             TOPIC_RANDOM_NUMBER +
             std::string(
         "</topicName>" \
-        "<topicDataType>HelloWorld</topicDataType>" \
+        "<topicDataType>HelloWorldType</topicDataType>" \
         "<topicKind>NO_KEY</topicKind>" \
         "<reliabilityQos>RELIABLE_RELIABILITY_QOS</reliabilityQos>" \
         "<durabilityQos>TRANSIENT_LOCAL_DURABILITY_QOS</durabilityQos>" \
@@ -388,9 +338,9 @@ TEST(Discovery, StaticDiscoveryFromString)
 
 TEST_P(Discovery, EDPSlaveReaderAttachment)
 {
-    PubSubWriter<HelloWorldPubSubType> checker(TEST_TOPIC_NAME);
-    PubSubReader<HelloWorldPubSubType>* reader = new PubSubReader<HelloWorldPubSubType>(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType>* writer = new PubSubWriter<HelloWorldPubSubType>(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> checker(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType>* reader = new PubSubReader<HelloWorldType>(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType>* writer = new PubSubWriter<HelloWorldType>(TEST_TOPIC_NAME);
 
     checker.init();
 
@@ -421,8 +371,8 @@ TEST_P(Discovery, EDPSlaveReaderAttachment)
 // Used to detect Github issue #155
 TEST(Discovery, EndpointRediscovery)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     auto testTransport = std::make_shared<test_UDPv4TransportDescriptor>();
     reader.disable_builtin_transport();
@@ -460,8 +410,8 @@ TEST(Discovery, EndpointRediscovery)
 // Used to detect Github issue #457
 TEST(Discovery, EndpointRediscovery_2)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     auto testTransport = std::make_shared<test_UDPv4TransportDescriptor>();
 
@@ -492,8 +442,8 @@ TEST(Discovery, EndpointRediscovery_2)
 // Regression for bug #9629
 TEST(Discovery, EndpointRediscoveryWithTransientLocalData)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     auto testTransport = std::make_shared<test_UDPv4TransportDescriptor>();
 
@@ -556,8 +506,8 @@ TEST(Discovery, EndpointRediscoveryWithTransientLocalData)
  */
 TEST(Discovery, ParticipantLivelinessAssertion)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     auto test_transport = std::make_shared<test_UDPv4TransportDescriptor>();
 
@@ -599,8 +549,8 @@ TEST(Discovery, ParticipantLivelinessAssertion)
 // Regression test of Refs #2535, github micro-RTPS #1
 TEST(Discovery, PubXmlLoadedPartition)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     reader.partition("A").init();
 
@@ -612,7 +562,7 @@ TEST(Discovery, PubXmlLoadedPartition)
     <topic>
       <name>)" + writer.topic_name() +
             R"(</name>
-      <dataType>HelloWorld</dataType>
+      <dataType>HelloWorldType</dataType>
     </topic>
     <qos>
       <partition>
@@ -632,10 +582,11 @@ TEST(Discovery, PubXmlLoadedPartition)
     writer.wait_discovery();
 }
 
+// Used to detect Github issue #154
 TEST(Discovery, LocalInitialPeers)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     Locator_t loc_initial_peer, loc_default_unicast;
     LocatorList_t reader_initial_peers;
@@ -685,8 +636,8 @@ TEST(Discovery, LocalInitialPeers)
 // It also checks https://github.com/eProsima/Fast-DDS/issues/2107
 TEST_P(Discovery, PubSubAsReliableHelloworldPartitions)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     reader.history_depth(10).
             partition("PartitionTests").
@@ -752,131 +703,10 @@ TEST_P(Discovery, PubSubAsReliableHelloworldPartitions)
     reader.block_for_all();
 }
 
-/*!
- * @test: Regression test for redmine issue #15839
- *
- * This test creates one writer and two readers, listening for metatraffic on different ports.
- *
- */
-TEST(Discovery, LocalInitialPeersDiferrentLocators)
-{
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
-    PubSubReader<HelloWorldPubSubType> readers[2]{ {TEST_TOPIC_NAME}, {TEST_TOPIC_NAME} };
-
-    static const uint32_t writer_port = global_port;
-    static const uint32_t reader_ports[] = { global_port + 1u, global_port + 2u };
-
-    // Checks that the wrong locator is only accessed when necessary
-    struct Checker
-    {
-        // Maximum number of times the locator of the first reader is expected when the second one is initiated.
-        // We allow for one DATA(p) to be sent.
-        const size_t max_allowed_times = 1;
-        // Flag to indicate whether the locator of the first reader is expected.
-        bool first_reader_locator_allowed = true;
-        // Counts the number of times the locator of the first reader is used after the second one is initiated
-        size_t wrong_times = 0;
-
-        void check(
-                const eprosima::fastdds::rtps::Locator& destination)
-        {
-            if (!first_reader_locator_allowed && destination.port == reader_ports[0])
-            {
-                ++wrong_times;
-                EXPECT_LE(wrong_times, max_allowed_times);
-            }
-        }
-
-    };
-
-    // Install hook on the test transport to check for destination locators on the writer participant
-    Checker checker;
-    auto locator_printer = [&checker](const eprosima::fastdds::rtps::Locator& destination)
-            {
-                checker.check(destination);
-                return false;
-            };
-
-    auto old_locator_filter = test_UDPv4Transport::locator_filter;
-    test_UDPv4Transport::locator_filter = locator_printer;
-
-    // Configure writer participant:
-    // - Uses the test transport, to check destination behavior
-    // - Listens for metatraffic on `writer_port`
-    // - Has no automatic announcements
-    {
-        auto test_transport = std::make_shared<test_UDPv4TransportDescriptor>();
-
-        LocatorList_t writer_metatraffic_unicast;
-        Locator_t locator;
-        locator.port = static_cast<uint16_t>(writer_port);
-        writer_metatraffic_unicast.push_back(locator);
-
-        writer.disable_builtin_transport().
-                add_user_transport_to_pparams(test_transport).
-                metatraffic_unicast_locator_list(writer_metatraffic_unicast).
-                lease_duration(c_TimeInfinite, { 3600, 0 }).
-                initial_announcements(0, {}).
-                reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS);
-    }
-
-    // Configure reader participants:
-    // - Use (non-testing) UDP transport only
-    // - Listen on different ports
-    // - Announce only once to the port of the writer only
-    //   (i.e. no communication between reader participants will happen)
-    auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-    for (uint16_t i = 0; i < 2; ++i)
-    {
-        LocatorList_t reader_metatraffic_unicast;
-        Locator_t locator;
-        locator.port = static_cast<uint16_t>(reader_ports[i]);
-        reader_metatraffic_unicast.push_back(locator);
-
-        LocatorList_t reader_initial_peers;
-        Locator_t loc_initial_peer;
-        IPLocator::setIPv4(loc_initial_peer, 127, 0, 0, 1);
-        loc_initial_peer.port = static_cast<uint16_t>(writer_port);
-        reader_initial_peers.push_back(loc_initial_peer);
-
-        readers[i].disable_builtin_transport().
-                add_user_transport_to_pparams(udp_transport).
-                lease_duration(c_TimeInfinite, {3600, 0}).
-                initial_announcements(1, {0, 100 * 1000 * 1000}).
-                metatraffic_unicast_locator_list(reader_metatraffic_unicast).
-                initial_peers(reader_initial_peers).
-                reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS);
-    }
-
-    // Start writer and first reader, and wait for them to discover
-    writer.init();
-    ASSERT_TRUE(writer.isInitialized());
-
-    readers[0].init();
-    ASSERT_TRUE(readers[0].isInitialized());
-
-    writer.wait_discovery();
-    readers[0].wait_discovery();
-
-    // Wait a bit (in case some additional ACKNACK / DATA(p) is exchanged after discovery)
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-
-    // Check that, when initializing the second reader, the writer does not communicate with the first reader,
-    // except for a single DATA(p)
-    checker.first_reader_locator_allowed = false;
-
-    readers[1].init();
-    ASSERT_TRUE(readers[1].isInitialized());
-    readers[1].wait_discovery();
-
-    // Restore filter before deleting the participants
-    test_UDPv4Transport::locator_filter = old_locator_filter;
-}
-
 TEST_P(Discovery, PubSubAsReliableHelloworldParticipantDiscovery)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.history_depth(100).init();
 
@@ -920,8 +750,8 @@ TEST_P(Discovery, PubSubAsReliableHelloworldParticipantDiscovery)
 
 TEST_P(Discovery, PubSubAsReliableHelloworldUserData)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.history_depth(100).
             userData({'a', 'b', 'c', 'd'}).init();
@@ -958,8 +788,8 @@ TEST_P(Discovery, PubSubAsReliableHelloworldUserData)
 // Regression test for #8690.
 TEST_P(Discovery, PubSubAsReliableHelloworldEndpointUserData)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.history_depth(100).
             endpoint_userData({'a', 'b', 'c', 'd'}).init();
@@ -1002,12 +832,12 @@ static void discoverParticipantsTest(
         const std::string& topic_name,
         ParticipantConfigurator participant_configurator)
 {
-    std::vector<std::shared_ptr<PubSubWriterReader<HelloWorldPubSubType>>> pubsub;
+    std::vector<std::shared_ptr<PubSubWriterReader<HelloWorldType>>> pubsub;
     pubsub.reserve(n_participants);
 
     for (size_t i = 0; i < n_participants; ++i)
     {
-        pubsub.emplace_back(std::make_shared<PubSubWriterReader<HelloWorldPubSubType>>(topic_name));
+        pubsub.emplace_back(std::make_shared<PubSubWriterReader<HelloWorldType>>(topic_name));
     }
 
     // Initialization of all the participants
@@ -1061,7 +891,7 @@ static void discoverParticipantsTest(
         uint32_t wait_ms,
         const std::string& topic_name)
 {
-    auto no_op = [](const std::shared_ptr<PubSubWriterReader<HelloWorldPubSubType>>&)
+    auto no_op = [](const std::shared_ptr<PubSubWriterReader<HelloWorldType>>&)
             {
             };
     discoverParticipantsTest(avoid_multicast, n_participants, wait_ms, topic_name, no_op);
@@ -1077,7 +907,7 @@ TEST(Discovery, TwentyParticipantsMulticast)
 TEST(Discovery, TwentyParticipantsMulticastLocalhostOnly)
 {
     auto test_transport = std::make_shared<test_UDPv4TransportDescriptor>();
-    auto participant_config = [&test_transport](const std::shared_ptr<PubSubWriterReader<HelloWorldPubSubType>>& part)
+    auto participant_config = [&test_transport](const std::shared_ptr<PubSubWriterReader<HelloWorldType>>& part)
             {
                 part->disable_builtin_transport().add_user_transport_to_pparams(test_transport);
             };
@@ -1103,12 +933,12 @@ static void discoverParticipantsSeveralEndpointsTest(
     // Total number of discovered endpoints
     size_t n_total_endpoints = n_participants * n_topics;
 
-    std::vector<std::shared_ptr<PubSubWriterReader<HelloWorldPubSubType>>> pubsub;
+    std::vector<std::shared_ptr<PubSubWriterReader<HelloWorldType>>> pubsub;
     pubsub.reserve(n_participants);
 
     for (unsigned int i = 0; i < n_participants; i++)
     {
-        pubsub.emplace_back(std::make_shared<PubSubWriterReader<HelloWorldPubSubType>>(topic_name));
+        pubsub.emplace_back(std::make_shared<PubSubWriterReader<HelloWorldType>>(topic_name));
     }
 
     // Initialization of all the participants
@@ -1171,9 +1001,9 @@ TEST_P(Discovery, TwentyParticipantsSeveralEndpointsUnicast)
 //! Regression test for support case 7552 (CRM #353)
 TEST_P(Discovery, RepeatPubGuid)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_kind(eprosima::fastrtps::KEEP_LAST_HISTORY_QOS)
@@ -1239,7 +1069,7 @@ TEST_P(Discovery, EndpointCreationMultithreaded)
     constexpr std::chrono::milliseconds creation_sleep = std::chrono::milliseconds(10);
 
     std::atomic_bool stop(false);
-    PubSubWriterReader<HelloWorldPubSubType> participant_1(TEST_TOPIC_NAME);
+    PubSubWriterReader<HelloWorldType> participant_1(TEST_TOPIC_NAME);
 
     // First participant is initialized
     participant_1.init();
@@ -1262,7 +1092,7 @@ TEST_P(Discovery, EndpointCreationMultithreaded)
     auto second_participant_process = [&participant_1]()
             {
                 {
-                    PubSubWriterReader<HelloWorldPubSubType> participant_2(TEST_TOPIC_NAME);
+                    PubSubWriterReader<HelloWorldType> participant_2(TEST_TOPIC_NAME);
                     participant_2.init();
 
                     // Ensure first participant has discovered the second one
@@ -1316,7 +1146,7 @@ TEST(Discovery, ServerClientEnvironmentSetUp)
 
     RemoteServerList_t output, standard;
     RemoteServerAttributes att;
-    Locator_t loc, loc6(LOCATOR_KIND_UDPv6, 0);
+    Locator_t loc;
 
     // We are going to use several test string and check they are properly parsed and turn into RemoteServerList_t
     // 1. single server address without specific port provided
@@ -1334,22 +1164,7 @@ TEST(Discovery, ServerClientEnvironmentSetUp)
     ASSERT_TRUE(load_environment_server_info(text, output));
     ASSERT_EQ(output, standard);
 
-    // 2. single server IPv6 address without specific port provided
-    text = "2a02:26f0:dd:499::356e";
-
-    att.clear();
-    output.clear();
-    standard.clear();
-    IPLocator::setIPv6(loc6, text);
-    IPLocator::setPhysicalPort(loc6, DEFAULT_ROS2_SERVER_PORT);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // 3. single server address specifying a custom listening port
+    // 2. single server address specifying a custom listening port
     text = "192.168.36.34:14520";
 
     att.clear();
@@ -1364,57 +1179,34 @@ TEST(Discovery, ServerClientEnvironmentSetUp)
     ASSERT_TRUE(load_environment_server_info(text, output));
     ASSERT_EQ(output, standard);
 
-    // 4. single server IPv6 address specifying a custom listening port
-    text = "[2001:470:142:5::116]:14520";
+    // 3. check any locator is turned into localhost
+    text = "0.0.0.0:14520";
 
     att.clear();
     output.clear();
     standard.clear();
-    IPLocator::setIPv6(loc6, "2001:470:142:5::116");
-    IPLocator::setPhysicalPort(loc6, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // 5. check any locator is turned into localhost
-    text = "0.0.0.0:14520;[::]:14520";
-
-    att.clear();
-    output.clear();
-    standard.clear();
-    IPLocator::setIPv4(loc, "127.0.0.1");
+    IPLocator::setIPv4(loc, string("127.0.0.1"));
     IPLocator::setPhysicalPort(loc, 14520);
     att.metatrafficUnicastLocatorList.push_back(loc);
     get_server_client_default_guidPrefix(0, att.guidPrefix);
     standard.push_back(att);
 
-    att.clear();
-    IPLocator::setIPv6(loc6, "::1");
-    IPLocator::setPhysicalPort(loc6, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(1, att.guidPrefix);
-    standard.push_back(att);
-
     ASSERT_TRUE(load_environment_server_info(text, output));
     ASSERT_EQ(output, standard);
 
-    // 6. check empty string scenario is handled
+    // 4. check empty string scenario is handled
     text = "";
     output.clear();
 
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_TRUE(output.empty());
+    ASSERT_FALSE(load_environment_server_info(text, output));
 
-    // 7. check at least one server be present scenario is hadled
+    // 5. check at least one server be present scenario is hadled
     text = ";;;;";
     output.clear();
 
     ASSERT_FALSE(load_environment_server_info(text, output));
 
-    // 8. check several server scenario
+    // 6. check several server scenario
     text = "192.168.36.34:14520;172.29.55.77:8783;172.30.80.1:31090";
 
     output.clear();
@@ -1444,60 +1236,7 @@ TEST(Discovery, ServerClientEnvironmentSetUp)
     ASSERT_TRUE(load_environment_server_info(text, output));
     ASSERT_EQ(output, standard);
 
-    // 9. check several server scenario with IPv6 addresses too
-    text = "192.168.36.34:14520;[2a02:ec80:600:ed1a::3]:8783;172.30.80.1:31090";
-
-    output.clear();
-    standard.clear();
-
-    att.clear();
-    IPLocator::setIPv4(loc, "192.168.36.34");
-    IPLocator::setPhysicalPort(loc, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    att.clear();
-    IPLocator::setIPv6(loc6, "2a02:ec80:600:ed1a::3");
-    IPLocator::setPhysicalPort(loc6, 8783);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(1, att.guidPrefix);
-    standard.push_back(att);
-
-    att.clear();
-    IPLocator::setIPv4(loc, string("172.30.80.1"));
-    IPLocator::setPhysicalPort(loc, 31090);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(2, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // 10. check multicast addresses are identified as such
-    text = "239.255.0.1;ff1e::ffff:efff:1";
-
-    output.clear();
-    standard.clear();
-
-    att.clear();
-    IPLocator::setIPv4(loc, "239.255.0.1");
-    IPLocator::setPhysicalPort(loc, DEFAULT_ROS2_SERVER_PORT);
-    att.metatrafficMulticastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    att.clear();
-    IPLocator::setIPv6(loc6, "ff1e::ffff:efff:1");
-    IPLocator::setPhysicalPort(loc6, DEFAULT_ROS2_SERVER_PORT);
-    att.metatrafficMulticastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(1, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // 11. check ignore some servers scenario
+    // 7. check ignore some servers scenario
     text = ";192.168.36.34:14520;;172.29.55.77:8783;172.30.80.1:31090;";
 
     output.clear();
@@ -1527,7 +1266,7 @@ TEST(Discovery, ServerClientEnvironmentSetUp)
     ASSERT_TRUE(load_environment_server_info(text, output));
     ASSERT_EQ(output, standard);
 
-    // 12. Check that env var cannot specify more than 256 servers
+    // 7. check ignore some servers scenario
     text = ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;"
             ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;"
             ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;192.168.36.34:14520";
@@ -1535,200 +1274,10 @@ TEST(Discovery, ServerClientEnvironmentSetUp)
 
     ASSERT_FALSE(load_environment_server_info(text, output));
 
-    // 13. Check addresses as dns name (test domain urls are checked on a specific test)
-    text = "localhost:12345";
-
-    output.clear();
-    standard.clear();
-
-    att.clear();
-    IPLocator::setIPv4(loc, "127.0.0.1");
-    IPLocator::setPhysicalPort(loc, 12345);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    IPLocator::setIPv6(loc6, "::1");
-    IPLocator::setPhysicalPort(loc6, 12345);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // 14. Check mixed scenario with addresses and dns
+    // 8. check non-consistent addresses scenario
     text = "192.168.36.34:14520;localhost:12345;172.30.80.1:31090;";
-
-    output.clear();
-    standard.clear();
-
-    att.clear();
-    IPLocator::setIPv4(loc, string("192.168.36.34"));
-    IPLocator::setPhysicalPort(loc, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    att.clear();
-    IPLocator::setIPv4(loc, string("127.0.0.1"));
-    IPLocator::setPhysicalPort(loc, 12345);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    IPLocator::setIPv6(loc6, string("::1"));
-    IPLocator::setPhysicalPort(loc6, 12345);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(1, att.guidPrefix);
-    standard.push_back(att);
-
-    att.clear();
-    IPLocator::setIPv4(loc, string("172.30.80.1"));
-    IPLocator::setPhysicalPort(loc, 31090);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(2, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-}
-
-//! Tests the server-client setup using environment variable works fine using DNS
-TEST(Discovery, ServerClientEnvironmentSetUpDNS)
-{
-    using namespace std;
-    using namespace eprosima::fastdds::rtps;
-
-    RemoteServerList_t output, standard;
-    RemoteServerAttributes att;
-    Locator_t loc, loc6(LOCATOR_KIND_UDPv6, 0);
-
-    // 1. single server DNS address resolution without specific port provided
-    std::string text = "www.acme.com.test";
-
-    att.clear();
-    output.clear();
-    standard.clear();
-    IPLocator::setIPv6(loc6, "2a00:1450:400e:803::2004");
-    IPLocator::setPhysicalPort(loc6, DEFAULT_ROS2_SERVER_PORT);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    IPLocator::setIPv4(loc, "216.58.215.164");
-    IPLocator::setPhysicalPort(loc, DEFAULT_ROS2_SERVER_PORT);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // 2. single server DNS address specifying a custom listening port
-    text = "www.acme.com.test:14520";
-
-    att.clear();
-    output.clear();
-    standard.clear();
-    IPLocator::setIPv6(loc6, "2a00:1450:400e:803::2004");
-    IPLocator::setPhysicalPort(loc6, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    IPLocator::setIPv4(loc, "216.58.215.164");
-    IPLocator::setPhysicalPort(loc, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // 3. single server DNS address specifying a custom locator type
-    // UDPv4
-    text = "UDPv4:[www.acme.com.test]";
-
-    att.clear();
-    output.clear();
-    standard.clear();
-    IPLocator::setIPv4(loc, "216.58.215.164");
-    IPLocator::setPhysicalPort(loc, DEFAULT_ROS2_SERVER_PORT);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // UDPv6
-    text = "UDPv6:[www.acme.com.test]";
-
-    att.clear();
-    output.clear();
-    standard.clear();
-    IPLocator::setIPv6(loc6, "2a00:1450:400e:803::2004");
-    IPLocator::setPhysicalPort(loc6, DEFAULT_ROS2_SERVER_PORT);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // 4. single server DNS address specifying a custom locator type and listening port
-    // UDPv4
-    text = "UDPv4:[www.acme.com.test]:14520";
-
-    att.clear();
-    output.clear();
-    standard.clear();
-    IPLocator::setIPv4(loc, "216.58.215.164");
-    IPLocator::setPhysicalPort(loc, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // UDPv6
-    text = "UDPv6:[www.acme.com.test]:14520";
-
-    att.clear();
-    output.clear();
-    standard.clear();
-    IPLocator::setIPv6(loc6, "2a00:1450:400e:803::2004");
-    IPLocator::setPhysicalPort(loc6, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
-
-    // Any other Locator kind should fail
-    text = "TCPv4:[www.acme.com.test]";
 
     output.clear();
     ASSERT_FALSE(load_environment_server_info(text, output));
 
-    // 5. Check mixed scenario with addresses and dns
-    text = "192.168.36.34:14520;UDPv6:[www.acme.com.test]:14520;172.30.80.1:31090;";
-
-    output.clear();
-    standard.clear();
-
-    att.clear();
-    IPLocator::setIPv4(loc, string("192.168.36.34"));
-    IPLocator::setPhysicalPort(loc, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(0, att.guidPrefix);
-    standard.push_back(att);
-
-    att.clear();
-    IPLocator::setIPv6(loc6, "2a00:1450:400e:803::2004");
-    IPLocator::setPhysicalPort(loc6, 14520);
-    att.metatrafficUnicastLocatorList.push_back(loc6);
-    get_server_client_default_guidPrefix(1, att.guidPrefix);
-    standard.push_back(att);
-
-    att.clear();
-    IPLocator::setIPv4(loc, string("172.30.80.1"));
-    IPLocator::setPhysicalPort(loc, 31090);
-    att.metatrafficUnicastLocatorList.push_back(loc);
-    get_server_client_default_guidPrefix(2, att.guidPrefix);
-    standard.push_back(att);
-
-    ASSERT_TRUE(load_environment_server_info(text, output));
-    ASSERT_EQ(output, standard);
 }

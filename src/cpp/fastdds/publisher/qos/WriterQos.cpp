@@ -78,7 +78,7 @@ void WriterQos::setQos(
         m_destinationOrder = qos.m_destinationOrder;
         m_destinationOrder.hasChanged = true;
     }
-    if (first_time || m_userData.data_vec() != qos.m_userData.data_vec())
+    if (m_userData.data_vec() != qos.m_userData.data_vec())
     {
         m_userData = qos.m_userData;
         m_userData.hasChanged = true;
@@ -95,18 +95,18 @@ void WriterQos::setQos(
         m_presentation = qos.m_presentation;
         m_presentation.hasChanged = true;
     }
-    if (first_time || qos.m_partition.names().size() > 0)
+    if (qos.m_partition.names().size() > 0)
     {
         m_partition = qos.m_partition;
         m_partition.hasChanged = true;
     }
 
-    if (first_time || m_topicData.getValue() != qos.m_topicData.getValue())
+    if (m_topicData.getValue() != qos.m_topicData.getValue())
     {
         m_topicData = qos.m_topicData;
         m_topicData.hasChanged = true;
     }
-    if (first_time || m_groupData.getValue() != qos.m_groupData.getValue())
+    if (m_groupData.getValue() != qos.m_groupData.getValue())
     {
         m_groupData = qos.m_groupData;
         m_groupData.hasChanged = true;
@@ -162,6 +162,11 @@ bool WriterQos::checkQos() const
     if (m_destinationOrder.kind == BY_SOURCE_TIMESTAMP_DESTINATIONORDER_QOS)
     {
         logError(RTPS_QOS_CHECK, "BY SOURCE TIMESTAMP DestinationOrder not supported");
+        return false;
+    }
+    if (m_reliability.kind == BEST_EFFORT_RELIABILITY_QOS && m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS)
+    {
+        logError(RTPS_QOS_CHECK, "BEST_EFFORT incompatible with EXCLUSIVE ownership");
         return false;
     }
     if (m_liveliness.kind == AUTOMATIC_LIVELINESS_QOS || m_liveliness.kind == MANUAL_BY_PARTICIPANT_LIVELINESS_QOS)

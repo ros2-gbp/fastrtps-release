@@ -13,11 +13,6 @@
 // limitations under the License.
 
 #include <map>
-#if defined(_WIN32)
-#include <process.h>
-#else
-#include <unistd.h>
-#endif // if defined(_WIN32)
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -236,13 +231,7 @@ public:
         p_attr.userTransports.push_back(descriptor);
 
         // random domain_id
-#if defined(__cplusplus_winrt)
-        uint32_t domain_id = static_cast<uint32_t>(GetCurrentProcessId()) % 100;
-#elif defined(_WIN32)
-        uint32_t domain_id = static_cast<uint32_t>(_getpid()) % 100;
-#else
-        uint32_t domain_id = static_cast<uint32_t>(getpid()) % 100;
-#endif // if defined(__cplusplus_winrt)
+        uint32_t domain_id = SystemInfo::instance().process_id() % 100;
 
         participant_ = RTPSDomain::createParticipant(
             domain_id, true, p_attr);
@@ -847,8 +836,6 @@ TEST_F(RTPSStatisticsTests, statistics_rpts_listener_gap_callback)
     // add a second sample and remove it to generate the gap
     write_small_sample(length);
     ASSERT_TRUE(writer_history_->remove_change(SequenceNumber_t{0, 2}));
-    // add a third sample in order to force the gap
-    write_small_sample(length);
 
     // create the late joiner as VOLATILE
     create_reader(length, RELIABLE, VOLATILE);

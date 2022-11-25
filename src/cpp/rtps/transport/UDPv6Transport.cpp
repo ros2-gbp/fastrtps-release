@@ -226,7 +226,7 @@ void UDPv6Transport::endpoint_to_locator(
 void UDPv6Transport::fill_local_ip(
         Locator& loc) const
 {
-    loc.kind = kind();
+    loc.kind = LOCATOR_KIND_UDPv6;
     IPLocator::setIPv6(loc, "::1");
 }
 
@@ -557,14 +557,6 @@ void UDPv6Transport::SetSocketOutboundInterface(
         eProsimaUDPSocket& socket,
         const std::string& sIp)
 {
-#ifdef __APPLE__
-    Locator loc;
-    IPLocator::createLocator(LOCATOR_KIND_UDPv6, sIp, 0, loc);
-    if (IPLocator::isLocal(loc))
-    {
-        return;
-    }
-#endif // ifdef __APPLE__
     getSocketPtr(socket)->set_option(ip::multicast::outbound_interface(
                 asio::ip::address_v6::from_string(sIp).scope_id()));
 }
@@ -583,12 +575,6 @@ bool UDPv6Transport::compare_ips(
         return true;
     }
     return false;
-}
-
-void UDPv6Transport::update_network_interfaces()
-{
-    UDPTransportInterface::update_network_interfaces();
-    // TODO(jlbueno)
 }
 
 } // namespace rtps

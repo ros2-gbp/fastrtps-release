@@ -41,6 +41,7 @@ public:
     {
     }
 
+
     bool is_referenced() const
     {
         return num_refs_ != 0u;
@@ -56,10 +57,7 @@ public:
         --num_refs_;
     }
 
-    virtual const std::string& get_rtps_topic_name() const = 0;
-
 private:
-
     std::atomic_size_t num_refs_;
 
 };

@@ -46,23 +46,23 @@ public:
     RTPS_DllAPI UDPv6Transport(
             const UDPv6TransportDescriptor&);
 
-    ~UDPv6Transport() override;
+    virtual ~UDPv6Transport() override;
 
-    const UDPTransportDescriptor* configuration() const override;
+    virtual const UDPTransportDescriptor* configuration() const override;
 
     /**
      * Starts listening on the specified port, and if the specified address is in the
      * multicast range, it joins the specified multicast group,
      */
-    bool OpenInputChannel(
+    virtual bool OpenInputChannel(
             const Locator&,
             TransportReceiverInterface*,
             uint32_t) override;
 
-    LocatorList NormalizeLocator(
+    virtual LocatorList NormalizeLocator(
             const Locator& locator) override;
 
-    bool is_local_locator(
+    virtual bool is_local_locator(
             const Locator& locator) const override;
 
     TransportDescriptorInterface* get_configuration() override
@@ -70,11 +70,11 @@ public:
         return &configuration_;
     }
 
-    bool getDefaultMetatrafficMulticastLocators(
+    virtual bool getDefaultMetatrafficMulticastLocators(
             LocatorList& locators,
             uint32_t metatraffic_multicast_port) const override;
 
-    bool getDefaultMetatrafficUnicastLocators(
+    virtual bool getDefaultMetatrafficUnicastLocators(
             LocatorList& locators,
             uint32_t metatraffic_unicast_port) const override;
 
@@ -82,10 +82,8 @@ public:
             LocatorList& locators,
             uint32_t unicast_port) const override;
 
-    void AddDefaultOutputLocator(
+    virtual void AddDefaultOutputLocator(
             LocatorList& defaultList) override;
-
-    void update_network_interfaces() override;
 
 protected:
 
@@ -93,65 +91,65 @@ protected:
     UDPv6Transport();
     UDPv6TransportDescriptor configuration_;
 
-    bool compare_locator_ip(
+    virtual bool compare_locator_ip(
             const Locator& lh,
             const Locator& rh) const override;
-    bool compare_locator_ip_and_port(
+    virtual bool compare_locator_ip_and_port(
             const Locator& lh,
             const Locator& rh) const override;
 
-    void endpoint_to_locator(
+    virtual void endpoint_to_locator(
             asio::ip::udp::endpoint& endpoint,
             Locator& locator) override;
-    void fill_local_ip(
+    virtual void fill_local_ip(
             Locator& loc) const override;
 
-    asio::ip::udp::endpoint GenerateAnyAddressEndpoint(
+    virtual asio::ip::udp::endpoint GenerateAnyAddressEndpoint(
             uint16_t port) override;
-    asio::ip::udp::endpoint generate_endpoint(
+    virtual asio::ip::udp::endpoint generate_endpoint(
             uint16_t port) override;
-    asio::ip::udp::endpoint generate_endpoint(
+    virtual asio::ip::udp::endpoint generate_endpoint(
             const std::string& sIp,
             uint16_t port) override;
-    asio::ip::udp::endpoint generate_endpoint(
+    virtual asio::ip::udp::endpoint generate_endpoint(
             const Locator& loc,
             uint16_t port) override;
-    asio::ip::udp::endpoint generate_local_endpoint(
+    virtual asio::ip::udp::endpoint generate_local_endpoint(
             const Locator& loc,
             uint16_t port) override;
-    asio::ip::udp generate_protocol() const override;
-    void get_ips(
+    virtual asio::ip::udp generate_protocol() const override;
+    virtual void get_ips(
             std::vector<fastrtps::rtps::IPFinder::info_IP>& locNames,
             bool return_loopback = false) override;
-    const std::string& localhost_name() override;
+    virtual const std::string& localhost_name() override;
     eProsimaUDPSocket OpenAndBindInputSocket(
             const std::string& sIp,
             uint16_t port,
             bool is_multicast) override;
 
     //! Checks for whether locator is allowed.
-    bool is_locator_allowed(
+    virtual bool is_locator_allowed(
             const Locator&) const override;
 
     /**
      * Method to get a list of interfaces to bind the socket associated to the given locator.
      * @return Vector of interfaces in string format.
      */
-    std::vector<std::string> get_binding_interfaces_list() override;
+    virtual std::vector<std::string> get_binding_interfaces_list() override;
 
     //! Checks if the given interface is allowed by the white list.
-    bool is_interface_allowed(
+    virtual bool is_interface_allowed(
             const std::string& interface) const override;
 
     //! Checks if the interfaces white list is empty.
-    bool is_interface_whitelist_empty() const override;
+    virtual bool is_interface_whitelist_empty() const override;
     std::vector<asio::ip::address_v6> interface_whitelist_;
 
-    void set_receive_buffer_size(
+    virtual void set_receive_buffer_size(
             uint32_t size) override;
-    void set_send_buffer_size(
+    virtual void set_send_buffer_size(
             uint32_t size) override;
-    void SetSocketOutboundInterface(
+    virtual void SetSocketOutboundInterface(
             eProsimaUDPSocket&,
             const std::string&) override;
 

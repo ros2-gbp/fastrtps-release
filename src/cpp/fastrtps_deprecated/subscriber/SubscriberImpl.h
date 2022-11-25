@@ -54,7 +54,6 @@ class Subscriber;
 class SubscriberImpl
 {
     friend class ParticipantImpl;
-    using LivelinessChangedStatus = eprosima::fastdds::dds::LivelinessChangedStatus;
 
 public:
 

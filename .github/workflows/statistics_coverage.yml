@@ -15,6 +15,7 @@ jobs:
           path: src/Fast-DDS
 
       - uses: ./src/Fast-DDS/.github/actions/install-apt-packages
+      - uses: ./src/Fast-DDS/.github/actions/install-gtest
       - uses: ./src/Fast-DDS/.github/actions/install-python-packages
       - uses: ./src/Fast-DDS/.github/actions/fetch-fastdds-repos
 
@@ -65,7 +66,6 @@ jobs:
           --exclude='.*test/.*' \
           --exclude='.*/sqlite3.c' \
           --exclude='.*/optionparser.h' \
-          --exclude='.*/optionparser.hpp' \
           --exclude-unreachable-branches
 
       - name: Upload coverage

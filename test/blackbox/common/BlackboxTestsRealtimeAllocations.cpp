@@ -74,9 +74,9 @@ public:
 
 TEST_P(RealtimeAllocations, PubSubReliableWithLimitedSubscribers)
 {
-    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubReader<FixedSizedPubSubType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -126,9 +126,9 @@ TEST_P(RealtimeAllocations, PubSubReliableWithLimitedSubscribers)
 
 TEST_P(RealtimeAllocations, AsyncPubSubReliableWithLimitedSubscribers)
 {
-    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubReader<FixedSizedPubSubType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -179,9 +179,9 @@ TEST_P(RealtimeAllocations, AsyncPubSubReliableWithLimitedSubscribers)
 
 TEST_P(RealtimeAllocations, PubSubBestEffortWithLimitedSubscribers)
 {
-    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubReader<FixedSizedPubSubType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -230,9 +230,9 @@ TEST_P(RealtimeAllocations, PubSubBestEffortWithLimitedSubscribers)
 
 TEST_P(RealtimeAllocations, AsyncPubSubBestEffortWithLimitedSubscribers)
 {
-    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubReader<FixedSizedPubSubType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -282,9 +282,9 @@ TEST_P(RealtimeAllocations, AsyncPubSubBestEffortWithLimitedSubscribers)
 
 TEST_P(RealtimeAllocations, PubSubReliableWithLimitedPublishers)
 {
-    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -339,9 +339,9 @@ TEST_P(RealtimeAllocations, PubSubReliableWithLimitedPublishers)
 
 TEST_P(RealtimeAllocations, AsyncPubSubReliableWithLimitedPublishers)
 {
-    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -398,9 +398,9 @@ TEST_P(RealtimeAllocations, AsyncPubSubReliableWithLimitedPublishers)
 
 TEST_P(RealtimeAllocations, PubSubBestEffortWithLimitedPublishers)
 {
-    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -456,9 +456,9 @@ TEST_P(RealtimeAllocations, PubSubBestEffortWithLimitedPublishers)
 
 TEST_P(RealtimeAllocations, AsyncPubSubBestEffortWithLimitedPublishers)
 {
-    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedPubSubType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)

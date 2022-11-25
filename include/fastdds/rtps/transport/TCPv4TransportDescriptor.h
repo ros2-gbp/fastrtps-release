@@ -26,9 +26,9 @@ namespace rtps {
 
 /**
  * TCPv4 Transport configuration.
- * The kind value for TCPv4TransportDescriptor is given by \c eprosima::fastrtps::rtps::LOCATOR_KIND_TCPv4.
+ * The kind value for TCPv4TransportDescriptor is given by eprosima::fastrtps::rtps::LOCATOR_KIND_TCPv4.
  *
- * - \c wan_addr: Public IP address. Peers on a different LAN will use this IP for communications with this host.
+ * - wan_addr: Public IP address. Peers on a different LAN will use this IP for communications with this host.
  *
  * @ingroup TRANSPORT_MODULE
  */
@@ -67,17 +67,6 @@ struct TCPv4TransportDescriptor : public TCPTransportDescriptor
         wan_addr[1] = (fastrtps::rtps::octet)b;
         wan_addr[2] = (fastrtps::rtps::octet)c;
         wan_addr[3] = (fastrtps::rtps::octet)d;
-    }
-
-    //! Get the public IP address
-    std::string get_WAN_address()
-    {
-        std::stringstream ss;
-        ss << static_cast<int>(wan_addr[0]) << "."
-           << static_cast<int>(wan_addr[1]) << "."
-           << static_cast<int>(wan_addr[2]) << "."
-           << static_cast<int>(wan_addr[3]);
-        return ss.str();
     }
 
     //! Constructor

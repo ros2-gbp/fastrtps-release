@@ -29,129 +29,105 @@ namespace security {
 
 class SharedSecret
 {
-public:
-
-    class BinaryData
-    {
     public:
 
-        BinaryData()
+        class BinaryData
         {
-        }
+            public:
 
-        BinaryData(
-                const BinaryData& data)
-            : name_(data.name_)
-            , value_(data.value_)
-        {
-        }
+                BinaryData() {}
 
-        BinaryData(
-                BinaryData&& data)
-            : name_(std::move(data.name_))
-            , value_(std::move(data.value_))
-        {
-        }
+                BinaryData(const BinaryData& data) :
+                    name_(data.name_),
+                    value_(data.value_) {}
 
-        BinaryData(
-                const std::string& name,
-                const std::vector<uint8_t>& value)
-            : name_(name)
-            , value_(value)
-        {
-        }
+                BinaryData(BinaryData&& data) :
+                    name_(std::move(data.name_)),
+                    value_(std::move(data.value_)) {}
 
-        BinaryData(
-                std::string&& name,
-                std::vector<uint8_t>&& value)
-            : name_(std::move(name))
-            , value_(std::move(value))
-        {
-        }
+                BinaryData(const std::string& name,
+                        const std::vector<uint8_t>& value) :
+                    name_(name), value_(value) {}
 
-        BinaryData& operator =(
-                const BinaryData& data)
-        {
-            name_ = data.name_;
-            value_ = data.value_;
-            return *this;
-        }
+                BinaryData(std::string&& name,
+                        std::vector<uint8_t>&& value) :
+                    name_(std::move(name)), value_(std::move(value)) {}
 
-        BinaryData& operator =(
-                BinaryData&& data)
-        {
-            name_ = std::move(data.name_);
-            value_ = std::move(data.value_);
-            return *this;
-        }
+                BinaryData& operator=(const BinaryData& data)
+                {
+                    name_ = data.name_;
+                    value_ = data.value_;
+                    return *this;
+                }
 
-        void name(
-                const std::string& name)
-        {
-            name_ = name;
-        }
+                BinaryData& operator=(BinaryData&& data)
+                {
+                    name_ = std::move(data.name_);
+                    value_ = std::move(data.value_);
+                    return *this;
+                }
 
-        void name(
-                std::string&& name)
-        {
-            name_ = std::move(name);
-        }
+                void name(const std::string& name)
+                {
+                    name_ = name;
+                }
 
-        const std::string& name() const
-        {
-            return name_;
-        }
+                void name(std::string&& name)
+                {
+                    name_ = std::move(name);
+                }
 
-        std::string& name()
-        {
-            return name_;
-        }
+                const std::string& name() const
+                {
+                    return name_;
+                }
 
-        void value(
-                const std::vector<uint8_t>& value)
-        {
-            value_ = value;
-        }
+                std::string& name()
+                {
+                    return name_;
+                }
 
-        void value(
-                std::vector<uint8_t>&& value)
-        {
-            value_ = std::move(value);
-        }
+                void value(const std::vector<uint8_t>& value)
+                {
+                    value_ = value;
+                }
 
-        const std::vector<uint8_t>& value() const
-        {
-            return value_;
-        }
+                void value(std::vector<uint8_t>&& value)
+                {
+                    value_ = std::move(value);
+                }
 
-        std::vector<uint8_t>& value()
-        {
-            return value_;
-        }
+                const std::vector<uint8_t>& value() const
+                {
+                    return value_;
+                }
 
-    private:
+                std::vector<uint8_t>& value()
+                {
+                    return value_;
+                }
 
-        std::string name_;
+            private:
 
-        std::vector<uint8_t> value_;
-    };
+                std::string name_;
 
-    static const char* const class_id_;
+                std::vector<uint8_t> value_;
+        };
 
-    std::vector<BinaryData> data_;
+        static const char* const class_id_;
+
+        std::vector<BinaryData> data_;
 };
 
-class PKIDH;
-
-typedef HandleImpl<SharedSecret, PKIDH> SharedSecretHandle;
+typedef HandleImpl<SharedSecret> SharedSecretHandle;
 
 class SharedSecretHelper
 {
-public:
+    public:
 
-    static const std::vector<uint8_t>* find_data_value(
-            const SecretHandle& sharedsecret,
-            const std::string& name);
+        static std::vector<uint8_t>* find_data_value(SharedSecret& sharedsecret, const std::string& name);
+
+        static const std::vector<uint8_t>* find_data_value(const SharedSecret& sharedsecret, const std::string& name);
 };
 
 } //namespace security

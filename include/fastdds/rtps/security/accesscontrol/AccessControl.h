@@ -51,6 +51,7 @@ public:
             const RTPSParticipantAttributes& participant_attr,
             SecurityException& exception) = 0;
 
+
     virtual bool get_permissions_token(
             PermissionsToken** permissions_token,
             const PermissionsHandle& handle,
@@ -67,9 +68,6 @@ public:
 
     virtual bool return_permissions_credential_token(
             PermissionsCredentialToken* token,
-            SecurityException& exception) = 0;
-
-    virtual PermissionsHandle* get_permissions_handle(
             SecurityException& exception) = 0;
 
     virtual bool return_permissions_handle(

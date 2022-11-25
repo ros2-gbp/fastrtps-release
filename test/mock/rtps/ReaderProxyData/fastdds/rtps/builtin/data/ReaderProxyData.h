@@ -51,15 +51,14 @@ public:
         , type_()
         , type_info_()
         , m_userDefinedId(0)
-        , content_filter_({})
+
     {
     }
 
     ReaderProxyData(
             size_t max_unicast_locators,
             size_t max_multicast_locators,
-            const VariableLengthDataLimits& data_limits,
-            const fastdds::rtps::ContentFilterProperty::AllocationConfiguration filter_allocation)
+            const VariableLengthDataLimits& data_limits)
         : remote_locators_(max_unicast_locators, max_multicast_locators)
         , m_expectsInlineQos(false)
         , topic_kind_(NO_KEY)
@@ -68,10 +67,7 @@ public:
         , type_()
         , type_info_()
         , m_userDefinedId(0)
-        , content_filter_(filter_allocation)
     {
-        static_cast<void>(filter_allocation);
-
         m_qos.m_userData.set_max_size(data_limits.max_user_data);
     }
 
@@ -342,28 +338,6 @@ public:
         return m_userDefinedId;
     }
 
-    RTPS_DllAPI void content_filter(
-            const fastdds::rtps::ContentFilterProperty& filter)
-    {
-        content_filter_ = filter;
-    }
-
-    RTPS_DllAPI void content_filter(
-            fastdds::rtps::ContentFilterProperty&& filter)
-    {
-        content_filter_ = std::move(filter);
-    }
-
-    RTPS_DllAPI const fastdds::rtps::ContentFilterProperty& content_filter() const
-    {
-        return content_filter_;
-    }
-
-    RTPS_DllAPI fastdds::rtps::ContentFilterProperty& content_filter()
-    {
-        return content_filter_;
-    }
-
 #if HAVE_SECURITY
     security::EndpointSecurityAttributesMask security_attributes_ = 0UL;
     security::PluginEndpointSecurityAttributesMask plugin_security_attributes_ = 0UL;
@@ -386,7 +360,6 @@ private:
     InstanceHandle_t m_key;
     InstanceHandle_t m_RTPSParticipantKey;
     uint16_t m_userDefinedId;
-    fastdds::rtps::ContentFilterProperty content_filter_;
 
 };
 

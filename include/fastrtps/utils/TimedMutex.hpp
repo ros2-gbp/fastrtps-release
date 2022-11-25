@@ -137,11 +137,6 @@ public:
         _Mtx_unlock(mutex_);
     }
 
-    bool try_lock()
-    {
-        return (_Thrd_success == _Mtx_trylock(mutex_));
-    }
-
     template <class Rep, class Period>
     bool try_lock_for(
             const std::chrono::duration<Rep, Period>& rel_time)
@@ -182,7 +177,7 @@ private:
 
     _Mtx_t mutex_;
 };
-#elif _GTHREAD_USE_MUTEX_TIMEDLOCK || !defined(__unix__)
+#elif _GTHREAD_USE_MUTEX_TIMEDLOCK || !defined(__linux__)
 using TimedMutex = std::timed_mutex;
 using RecursiveTimedMutex = std::recursive_timed_mutex;
 #else
@@ -279,11 +274,6 @@ public:
     void unlock()
     {
         pthread_mutex_unlock(&mutex_);
-    }
-
-    bool try_lock()
-    {
-        return (0 == pthread_mutex_trylock(&mutex_));
     }
 
     template <class Rep, class Period>

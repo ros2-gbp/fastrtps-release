@@ -131,7 +131,7 @@ public:
                 const GUID_t& pguid,
                 int16_t userDefinedId));
 
-    ResourceEvent& get_resource_event() const
+    ResourceEvent& get_resource_event()
     {
         return mp_event_thr;
     }
@@ -153,33 +153,14 @@ public:
                 const TopicAttributes& topicAtt,
                 const ReaderQos& rqos));
 
-    MOCK_METHOD4(registerReader, bool(
-                RTPSReader * Reader,
-                const TopicAttributes& topicAtt,
-                const ReaderQos& rqos,
-                const fastdds::rtps::ContentFilterProperty* content_filter));
-
     MOCK_METHOD3(updateReader, bool(
                 RTPSReader * Reader,
                 const TopicAttributes& topicAtt,
                 const ReaderQos& rqos));
 
-    MOCK_METHOD4(updateReader, bool(
-                RTPSReader * Reader,
-                const TopicAttributes& topicAtt,
-                const ReaderQos& rqos,
-                const fastdds::rtps::ContentFilterProperty* content_filter));
-
     const RTPSParticipantAttributes& getRTPSParticipantAttributes()
     {
         return attributes_;
-    }
-
-    bool update_attributes(
-            const RTPSParticipantAttributes& patt)
-    {
-        static_cast<void>(patt);
-        return true;
     }
 
 #if HAVE_SECURITY
@@ -194,7 +175,7 @@ public:
 
     RTPSParticipantListener* listener_;
     const GUID_t m_guid;
-    mutable ResourceEvent mp_event_thr;
+    ResourceEvent mp_event_thr;
     RTPSParticipantAttributes attributes_;
 };
 

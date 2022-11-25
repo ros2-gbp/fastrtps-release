@@ -17,24 +17,23 @@
  *
  */
 
+#include <fastdds/rtps/builtin/data/WriterProxyData.h>
+
 #include <rtps/reader/WriterProxy.h>
+#include <fastdds/rtps/reader/StatefulReader.h>
+#include <fastrtps/rtps/writer/RTPSWriter.h>
 
 #include <fastdds/dds/log/Log.hpp>
-
-#include <fastdds/rtps/builtin/data/WriterProxyData.h>
-#include <fastdds/rtps/messages/RTPSMessageCreator.h>
-#include <fastdds/rtps/reader/StatefulReader.h>
-#include <fastdds/rtps/resources/TimedEvent.h>
-
 #include <fastrtps/utils/TimeConversion.h>
 
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
+#include <fastdds/rtps/resources/TimedEvent.h>
+#include <fastdds/rtps/messages/RTPSMessageCreator.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include "rtps/RTPSDomainImpl.hpp"
 #include "utils/collections/node_size_helpers.hpp"
 
-#if !defined(NDEBUG) && !defined(ANDROID) && defined(FASTRTPS_SOURCE) && defined(__unix__)
+#if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__linux__)
 #define SHOULD_DEBUG_LINUX
 #endif // SHOULD_DEBUG_LINUX
 
@@ -89,7 +88,6 @@ WriterProxy::WriterProxy(
     , liveliness_kind_(AUTOMATIC_LIVELINESS_QOS)
     , locators_entry_(loc_alloc.max_unicast_locators, loc_alloc.max_multicast_locators)
     , is_datasharing_writer_(false)
-    , received_at_least_one_heartbeat_(false)
 {
     //Create Events
     ResourceEvent& event_manager = reader_->getRTPSParticipant()->getEventResource();
@@ -122,8 +120,6 @@ void WriterProxy::start(
         const SequenceNumber_t& initial_sequence,
         bool is_datasharing)
 {
-    using fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators;
-
 #ifdef SHOULD_DEBUG_LINUX
     assert(get_mutex_owner() == get_thread_id());
 #endif // SHOULD_DEBUG_LINUX
@@ -141,19 +137,14 @@ void WriterProxy::start(
     liveliness_kind_ = attributes.m_qos.m_liveliness.kind;
     locators_entry_.unicast = attributes.remote_locators().unicast;
     locators_entry_.multicast = attributes.remote_locators().multicast;
-    filter_remote_locators(locators_entry_,
-            reader_->getAttributes().external_unicast_locators, reader_->getAttributes().ignore_non_matching_locators);
     is_datasharing_writer_ = is_datasharing;
     initial_acknack_->restart_timer();
     loaded_from_storage(initial_sequence);
-    received_at_least_one_heartbeat_ = false;
 }
 
 void WriterProxy::update(
         const WriterProxyData& attributes)
 {
-    using fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators;
-
 #ifdef SHOULD_DEBUG_LINUX
     assert(get_mutex_owner() == get_thread_id());
 #endif // SHOULD_DEBUG_LINUX
@@ -162,8 +153,6 @@ void WriterProxy::update(
     ownership_strength_ = attributes.m_qos.m_ownershipStrength.value;
     locators_entry_.unicast = attributes.remote_locators().unicast;
     locators_entry_.multicast = attributes.remote_locators().multicast;
-    filter_remote_locators(locators_entry_,
-            reader_->getAttributes().external_unicast_locators, reader_->getAttributes().ignore_non_matching_locators);
 }
 
 void WriterProxy::stop()
@@ -216,7 +205,7 @@ void WriterProxy::missing_changes_update(
     }
 }
 
-int32_t WriterProxy::lost_changes_update(
+void WriterProxy::lost_changes_update(
         const SequenceNumber_t& seq_num)
 {
 #ifdef SHOULD_DEBUG_LINUX
@@ -224,27 +213,12 @@ int32_t WriterProxy::lost_changes_update(
 #endif // SHOULD_DEBUG_LINUX
 
     logInfo(RTPS_READER, guid().entityId << ": up to seq_num: " << seq_num);
-    int32_t current_sample_lost = 0;
 
     // Check was not removed from container.
-    if (seq_num > (changes_from_writer_low_mark_ + 1))
+    if (seq_num > changes_from_writer_low_mark_)
     {
         // Remove all received changes with a sequence lower than seq_num
         ChangeIterator it = std::lower_bound(changes_received_.begin(), changes_received_.end(), seq_num);
-        if (!changes_received_.empty())
-        {
-            uint64_t tmp = (*changes_received_.begin()).to64long() - (changes_from_writer_low_mark_.to64long() + 1);
-            auto distance = std::distance(changes_received_.begin(), it);
-            tmp += seq_num.to64long() - (*changes_received_.begin()).to64long() - distance;
-            current_sample_lost = tmp > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()) ?
-                    std::numeric_limits<int32_t>::max() : static_cast<int32_t>(tmp);
-        }
-        else
-        {
-            uint64_t tmp = seq_num.to64long() - (changes_from_writer_low_mark_.to64long() + 1);
-            current_sample_lost = tmp > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()) ?
-                    std::numeric_limits<int32_t>::max() : static_cast<int32_t>(tmp);
-        }
         changes_received_.erase(changes_received_.begin(), it);
 
         // Update low mark
@@ -257,8 +231,6 @@ int32_t WriterProxy::lost_changes_update(
         // Next could need to be removed.
         cleanup();
     }
-
-    return current_sample_lost;
 }
 
 bool WriterProxy::received_change_set(
@@ -381,6 +353,46 @@ const SequenceNumber_t WriterProxy::available_changes_max() const
     return changes_from_writer_low_mark_;
 }
 
+void WriterProxy::change_removed_from_history(
+        const SequenceNumber_t& seq_num)
+{
+#ifdef SHOULD_DEBUG_LINUX
+    assert(get_mutex_owner() == get_thread_id());
+#endif // SHOULD_DEBUG_LINUX
+
+    // Check sequence number is in the container, because it was not clean up.
+    if (seq_num <= changes_from_writer_low_mark_)
+    {
+        return;
+    }
+
+    ChangeIterator chit = changes_received_.find(seq_num);
+
+    (void)chit;
+
+    // Element must be in the container. In other case, bug.
+    assert(chit != changes_received_.end());
+
+    // Previously, it was asserted that the change couldn't be the first and should have RECEIVED
+    // status. As we only keep received changes now, status is already checked by the previous assert.
+    // It can now be the case that the change being removed is the first if there are missing changes
+    // in the (changes_from_writer_low_mark_, seq_num) range.
+
+    // We are removing a change that will not be notified to the user. This may be due to the following:
+    // a) history became full (either due to KEEP_LAST or RESOURCE_LIMITS)
+    // b) lifespan timer expired for seq_num
+    // Previously, change was marked as irrelevant.
+
+    // As this may imply that all changes with a lower sequence number will also be dropped,
+    // now that history is full, it may be interesting to act as if a heartbeat with an initial
+    // sequence of seq_num has been received, i.e. calling lost_changes_update(seq_num).
+    // If we don't do it, changes_received_ may grow above the limits stablished for it,
+    // thus causing undesired dynamic allocations.
+
+    // For case a) a call to lost_changes_update is done inside StatefulReader::change_received.
+    // For case b) it does not imply a dynamic allocation problem.
+}
+
 void WriterProxy::cleanup()
 {
     ChangeIterator chit = changes_received_.begin();
@@ -417,26 +429,27 @@ size_t WriterProxy::unknown_missing_changes_up_to(
     if (seq_num > changes_from_writer_low_mark_)
     {
         SequenceNumber_t first_missing = changes_from_writer_low_mark_ + 1;
+        SequenceNumber_t max_missing = std::min(seq_num, max_sequence_number_ + 1);
         SequenceNumberSet_t sns(first_missing);
         SequenceNumberDiff d_fun;
 
         for (SequenceNumber_t seq : changes_received_)
         {
-            seq = std::min(seq, seq_num);
+            seq = std::min(seq, max_missing);
             if (first_missing < seq)
             {
                 returnedValue += d_fun(seq, first_missing);
             }
             first_missing = seq + 1;
-            if (first_missing >= seq_num)
+            if (first_missing >= max_missing)
             {
                 break;
             }
         }
 
-        if (first_missing < seq_num)
+        if (first_missing < max_missing)
         {
-            returnedValue += d_fun(seq_num, first_missing);
+            returnedValue += d_fun(max_missing, first_missing);
         }
     }
 
@@ -494,7 +507,7 @@ bool WriterProxy::perform_initial_ack_nack()
         {
             if (0 == last_heartbeat_count_)
             {
-                reader_->send_acknack(this, sns, this, false);
+                reader_->send_acknack(this, sns, *this, false);
                 ret_value = true;
             }
         }
@@ -503,9 +516,9 @@ bool WriterProxy::perform_initial_ack_nack()
     return ret_value;
 }
 
-void WriterProxy::perform_heartbeat_response()
+void WriterProxy::perform_heartbeat_response() const
 {
-    reader_->send_acknack(this, this, heartbeat_final_flag_.load());
+    reader_->send_acknack(this, *this, heartbeat_final_flag_.load());
 }
 
 bool WriterProxy::process_heartbeat(
@@ -515,8 +528,7 @@ bool WriterProxy::process_heartbeat(
         bool final_flag,
         bool liveliness_flag,
         bool disable_positive,
-        bool& assert_liveliness,
-        int32_t& current_sample_lost)
+        bool& assert_liveliness)
 {
 #ifdef SHOULD_DEBUG_LINUX
     assert(get_mutex_owner() == get_thread_id());
@@ -532,7 +544,7 @@ bool WriterProxy::process_heartbeat(
         // initial_acknack_->cancel_timer();
 
         last_heartbeat_count_ = count;
-        current_sample_lost = lost_changes_update(first_seq);
+        lost_changes_update(first_seq);
         missing_changes_update(last_seq);
         heartbeat_final_flag_.store(final_flag);
 
@@ -563,12 +575,6 @@ bool WriterProxy::process_heartbeat(
             assert_liveliness = liveliness_flag;
         }
 
-        if (!received_at_least_one_heartbeat_)
-        {
-            current_sample_lost = 0;
-            received_at_least_one_heartbeat_ = true;
-        }
-
         return true;
     }
 
@@ -583,7 +589,7 @@ void WriterProxy::update_heartbeat_response_interval(
 
 bool WriterProxy::send(
         CDRMessage_t* message,
-        std::chrono::steady_clock::time_point max_blocking_time_point) const
+        std::chrono::steady_clock::time_point& max_blocking_time_point) const
 {
     if (is_on_same_process_)
     {

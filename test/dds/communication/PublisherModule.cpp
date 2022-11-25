@@ -72,11 +72,11 @@ bool PublisherModule::init(
     // Construct a FixedSizedType if fixed type is required, defult HelloWro
     if (fixed_type_)
     {
-        type_.reset(new FixedSizedPubSubType());
+        type_.reset(new FixedSizedType());
     }
     else
     {
-        type_.reset(new HelloWorldPubSubType());
+        type_.reset(new HelloWorldType());
     }
 
     type_.register_type(participant_);
@@ -174,11 +174,6 @@ void PublisherModule::run(
         else
         {
             ++index;
-        }
-
-        if (!zero_copy_)
-        {
-            type_.delete_data(sample);
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(250));

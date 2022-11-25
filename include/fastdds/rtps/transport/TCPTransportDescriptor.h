@@ -26,27 +26,27 @@ namespace rtps {
 /**
  * TCP Transport configuration
  *
- * - \c listening_ports: list of ports to listen as server.
+ * - listening_ports: list of ports to listen as server.
  *
- * - \c keep_alive_frequency_ms: frequency of RTCP keep alive requests (in ms).
+ * - keep_alive_frequency_ms: frequency of RTCP keep alive requests (in ms).
  *
- * - \c keep_alive_timeout_ms: time since sending the last keep alive request to consider a connection as broken (in ms).
+ * - keep_alive_timeout_ms: time since sending the last keep alive request to consider a connection as broken (in ms).
  *
- * - \c max_logical_port: maximum number of logical ports to try during RTCP negotiation.
+ * - max_logical_port: maximum number of logical ports to try during RTCP negotiation.
  *
- * - \c logical_port_range: maximum number of logical ports per request to try during RTCP negotiation.
+ * - logical_port_range: maximum number of logical ports per request to try during RTCP negotiation.
  *
- * - \c logical_port_increment: increment between logical ports to try during RTCP negotiation.
+ * - logical_port_increment: increment between logical ports to try during RTCP negotiation.
  *
- * - \c enable_tcp_nodelay: enables the TCP_NODELAY socket option.
+ * - enable_tcp_nodelay: enables the TCP_NODELAY socket option.
  *
- * - \c calculate_crc: true to calculate and send CRC on message headers.
+ * - calculate_crc: true to calculate and send CRC on message headers.
  *
- * - \c check_crc: true to check the CRC of incoming message headers.
+ * - check_crc: true to check the CRC of incoming message headers.
  *
- * - \c apply_security: true to use TLS (Transport Layer Security).
+ * - apply_security: true to use TLS (Transport Layer Security).
  *
- * - \c tls_config: Configuration for TLS.
+ * - tls_config: Configuration for TLS.
  *
  * @ingroup TRANSPORT_MODULE
  */
@@ -55,29 +55,27 @@ struct TCPTransportDescriptor : public SocketTransportDescriptor
     /**
      * TLS Configuration
      *
-     * - \c password: password of the \c private_key_file or \c rsa_private_key_file.
+     * - password: password of the private_key_file or rsa_private_key_file.
      *
-     * - \c private_key_file: path to the private key certificate file.
+     * - private_key_file: path to the private key certificate file.
      *
-     * - \c rsa_private_key_file: path to the private key RSA certificate file.
+     * - rsa_private_key_file: path to the private key RSA certificate file.
      *
-     * - \c cert_chain_file: path to the public certificate chain file.
+     * - cert_chain_file: path to the public certificate chain file.
      *
-     * - \c tmp_dh_file: path to the Diffie-Hellman parameters file.
+     * - tmp_dh_file: path to the Diffie-Hellman parameters file.
      *
-     * - \c verify_file: path to the CA (Certification-Authority) file.
+     * - verify_file: path to the CA (Certification-Authority) file.
      *
-     * - \c verify_mode: establishes the verification mode mask.
+     * - verify_mode: establishes the verification mode mask.
      *
-     * - \c options: establishes the SSL Context options mask.
+     * - options: establishes the SSL Context options mask.
      *
-     * - \c verify_paths: paths where the system will look for verification files.
+     * - verify_paths: paths where the system will look for verification files.
      *
-     * - \c default_verify_path: look for verification files on the default paths.
+     * - default_verify_path: look for verification files on the default paths.
      *
-     * - \c handshake_role: role that the transport will take on handshaking.
-     *
-     * - \c server_name: server name or host name required in case Server Name Indication (SNI) is used.
+     * - handshake_role: role that the transport will take on handshaking.
      *
      */
     struct TLSConfig
@@ -158,7 +156,7 @@ struct TCPTransportDescriptor : public SocketTransportDescriptor
             SERVER                      = 1 << 1  // 0000 0010
         };
 
-        //! Password of the \c private_key_file or \c rsa_private_key_file
+        //! Password of the private_key_file or rsa_private_key_file
         std::string password;
         //! SSL context options mask
         uint32_t options = TLSOptions::NONE;
@@ -174,7 +172,7 @@ struct TCPTransportDescriptor : public SocketTransportDescriptor
         uint8_t verify_mode = TLSVerifyMode::UNUSED;
         //! Paths where the system will look for verification files
         std::vector<std::string> verify_paths;
-        //! Look for verification files on the default paths.
+        //! Look for verification files on the default paths. Do not invoque
         bool default_verify_path = false;
         //! Maximum allowed depth for verifying intermediate certificates. Do not override
         int32_t verify_depth = -1;
@@ -182,8 +180,6 @@ struct TCPTransportDescriptor : public SocketTransportDescriptor
         std::string rsa_private_key_file;
         //! Role that the transport will take on handshaking
         TLSHandShakeRole handshake_role = TLSHandShakeRole::DEFAULT;
-        //! Server name or host name required in case Server Name Indication (SNI) is used
-        std::string server_name;
 
         //! Add verification modes to the verification mode mask
         void add_verify_mode(

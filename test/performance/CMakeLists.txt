@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-find_package(Threads REQUIRED)
+if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER) AND fastcdr_FOUND)
+    find_package(Threads REQUIRED)
 
-if(WIN32)
+    if(WIN32)
     if("${CMAKE_SYSTEM_NAME}" STREQUAL "WindowsStore")
-        add_definitions(-D_WIN32_WINNT=0x0603)
+    add_definitions(-D_WIN32_WINNT=0x0603)
     else()
-        add_definitions(-D_WIN32_WINNT=0x0601)
+    add_definitions(-D_WIN32_WINNT=0x0601)
     endif()
-endif()
+    endif()
 
-option(VIDEO_TESTS "Activate the building and execution of performance tests" OFF)
-add_subdirectory(latency)
-add_subdirectory(throughput)
-if(VIDEO_TESTS)
-    add_subdirectory(video)
+    option(VIDEO_TESTS "Activate the building and execution of performance tests" OFF)
+    add_subdirectory(latency)
+    add_subdirectory(throughput)
+    if(VIDEO_TESTS)
+        add_subdirectory(video)
+    endif()
 endif()

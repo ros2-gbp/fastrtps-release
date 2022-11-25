@@ -247,7 +247,7 @@ public:
      */
     void change_read_by_user(
             CacheChange_t* change,
-            WriterProxy* writer,
+            const WriterProxy* writer,
             bool mark_as_read = true) override;
 
 private:
@@ -259,7 +259,6 @@ private:
         bool has_manual_topic_liveliness = false;
         CacheChange_t* fragmented_change = nullptr;
         bool is_datasharing = false;
-        uint32_t ownership_strength;
     };
 
     bool acceptMsgFrom(

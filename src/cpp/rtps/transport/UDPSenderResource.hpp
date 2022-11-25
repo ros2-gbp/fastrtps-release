@@ -31,12 +31,10 @@ public:
     UDPSenderResource(
             UDPTransportInterface& transport,
             eProsimaUDPSocket& socket,
-            bool only_multicast_purpose = false,
-            bool whitelisted = false)
+            bool only_multicast_purpose = false)
         : SenderResource(transport.kind())
         , socket_(moveSocket(socket))
         , only_multicast_purpose_(only_multicast_purpose)
-        , whitelisted_(whitelisted)
         , transport_(transport)
     {
         // Implementation functions are bound to the right transport parameters
@@ -53,8 +51,7 @@ public:
             const std::chrono::steady_clock::time_point& max_blocking_time_point) -> bool
                 {
                     return transport.send(data, dataSize, socket_, destination_locators_begin,
-                                   destination_locators_end, only_multicast_purpose_, whitelisted_,
-                                   max_blocking_time_point);
+                                   destination_locators_end, only_multicast_purpose_, max_blocking_time_point);
                 };
     }
 
@@ -73,15 +70,6 @@ public:
         auto local_endpoint = getSocketPtr(socket_)->local_endpoint();
         transport_.endpoint_to_locator(local_endpoint, locator);
         locators.push_back(locator);
-    }
-
-    bool check_ip_address(
-            const Locator& locator) const
-    {
-        Locator sender_resource_locator;
-        auto local_endpoint = getSocketPtr(socket_)->local_endpoint();
-        transport_.endpoint_to_locator(local_endpoint, sender_resource_locator);
-        return memcmp(&sender_resource_locator.address[12], &locator.address[12], 4) == 0;
     }
 
     static UDPSenderResource* cast(
@@ -111,7 +99,6 @@ private:
     eProsimaUDPSocket socket_;
 
     bool only_multicast_purpose_;
-    bool whitelisted_;
 
     UDPTransportInterface& transport_;
 };

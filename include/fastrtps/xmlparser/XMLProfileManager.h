@@ -47,6 +47,7 @@ using replier_map_iterator_t = replier_map_t::iterator;
 using xmlfiles_map_t = std::map<std::string, XMLP_ret>;
 using xmlfile_map_iterator_t = xmlfiles_map_t::iterator;
 
+
 /**
  * Class XMLProfileManager, used to make available profiles from XML file.
  * @ingroup XMLPROFILEMANAGER_MODULE
@@ -68,17 +69,6 @@ public:
      */
     RTPS_DllAPI static XMLP_ret loadXMLFile(
             const std::string& filename);
-
-    /**
-     * Load a profiles XML string.
-     * @param data Buffer containing the data.
-     * @param length Length of data.
-     * @return XMLP_ret::XML_OK if all profiles are correct, XMLP_ret::XML_NOK if some are and some are not,
-     *         XMLP_ret::XML_ERROR in other case.
-     */
-    RTPS_DllAPI static XMLP_ret loadXMLString(
-            const char* data,
-            size_t length);
 
     /**
      * Load a profiles XML node.

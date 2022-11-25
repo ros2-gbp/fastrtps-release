@@ -151,12 +151,15 @@ TEST_F(EntityTests, entity_equal_operator)
     ASSERT_FALSE(entity1 == entity4);
 }
 
-TEST_F(EntityTests, get_statuscondition)
+/* Test unsupported methods behaviour*/
+TEST_F(EntityTests, unsupported_entity_methods)
 {
     Entity entity;
 
-    StatusCondition& cond = entity.get_statuscondition();
-    EXPECT_EQ(&entity, cond.get_entity());
+    // It cannot compare because StatusCondition does not have comparaison methods
+    entity.get_statuscondition();
+
+    HELPER_WaitForEntries(1);
 }
 
 int main(

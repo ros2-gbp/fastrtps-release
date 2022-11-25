@@ -16,11 +16,6 @@
 #include <cstring>
 #include <algorithm>
 
-#ifdef ANDROID
-#include <boostconfig.hpp>
-#include <unistd.h>
-#endif // ifdef ANDROID
-
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/network/ReceiverResource.h>
@@ -239,8 +234,7 @@ bool SharedMemTransport::DoInputLocatorsMatch(
     return left.kind == right.kind && left.port == right.port;
 }
 
-bool SharedMemTransport::init(
-        const fastrtps::rtps::PropertyPolicy*)
+bool SharedMemTransport::init()
 {
     // TODO(Adolfo): Calculate this value from UDP sockets buffers size.
     static constexpr uint32_t shm_default_segment_size = 512 * 1024;
@@ -255,15 +249,6 @@ bool SharedMemTransport::init(
         logError(RTPS_MSG_OUT, "max_message_size cannot be greater than segment_size");
         return false;
     }
-
-#ifdef ANDROID
-    if (access(BOOST_INTERPROCESS_SHARED_DIR_PATH, W_OK) != F_OK)
-    {
-        logWarning(RTPS_MSG_OUT,
-                "Unable to write on " << BOOST_INTERPROCESS_SHARED_DIR_PATH << ". SHM Transport not enabled");
-        return false;
-    }
-#endif // ifdef ANDROID
 
     try
     {

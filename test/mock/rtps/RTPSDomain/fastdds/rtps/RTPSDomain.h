@@ -109,10 +109,9 @@ public:
     static RTPSReader* createRTPSReader(
             RTPSParticipant*,
             ReaderAttributes&,
-            ReaderHistory* history,
+            ReaderHistory*,
             ReaderListener* listen = nullptr)
     {
-        reader_->setHistory(history);
         reader_->setListener(listen);
         return reader_;
     }
@@ -121,23 +120,9 @@ public:
             RTPSParticipant*,
             ReaderAttributes&,
             const std::shared_ptr<IPayloadPool>&,
-            ReaderHistory* history,
+            ReaderHistory*,
             ReaderListener* listen = nullptr)
     {
-        reader_->setHistory(history);
-        reader_->setListener(listen);
-        return reader_;
-    }
-
-    static RTPSReader* createRTPSReader(
-            RTPSParticipant*,
-            const EntityId_t&,
-            ReaderAttributes&,
-            const std::shared_ptr<IPayloadPool>&,
-            ReaderHistory* history,
-            ReaderListener* listen = nullptr)
-    {
-        reader_->setHistory(history);
         reader_->setListener(listen);
         return reader_;
     }

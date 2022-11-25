@@ -15,8 +15,6 @@
 #ifndef _FASTDDS_RTPS_SENDER_RESOURCE_H
 #define _FASTDDS_RTPS_SENDER_RESOURCE_H
 
-#include <fastdds/rtps/common/Types.h>
-
 #include <functional>
 #include <vector>
 #include <chrono>

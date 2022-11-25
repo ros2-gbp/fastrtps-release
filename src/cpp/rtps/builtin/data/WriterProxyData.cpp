@@ -606,8 +606,13 @@ bool WriterProxyData::readFromCDRMessage(
         const NetworkFactory& network,
         bool is_shm_transport_available)
 {
-    auto param_process = [this, &network, &is_shm_transport_available](
-        CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
+    bool are_shm_default_locators_present = false;
+    bool is_shm_transport_possible = false;
+
+    auto param_process = [this, &network,
+                    &is_shm_transport_available,
+                    &is_shm_transport_possible,
+                    &are_shm_default_locators_present](CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
                 switch (pid)
                 {
@@ -799,7 +804,8 @@ bool WriterProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        m_RTPSParticipantKey = p.guid;
+                        memcpy(m_RTPSParticipantKey.value, p.guid.guidPrefix.value, 12);
+                        memcpy(m_RTPSParticipantKey.value + 12, p.guid.entityId.value, 4);
                         break;
                     }
                     case fastdds::dds::PID_ENDPOINT_GUID:
@@ -811,7 +817,8 @@ bool WriterProxyData::readFromCDRMessage(
                         }
 
                         m_guid = p.guid;
-                        m_key = p.guid;
+                        memcpy(m_key.value, p.guid.guidPrefix.value, 12);
+                        memcpy(m_key.value + 12, p.guid.entityId.value, 4);
                         break;
                     }
                     case fastdds::dds::PID_PERSISTENCE_GUID:
@@ -839,7 +846,9 @@ bool WriterProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                remote_locators_,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &remote_locators_,
                                 temp_locator,
                                 true);
                         }
@@ -859,7 +868,9 @@ bool WriterProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                remote_locators_,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &remote_locators_,
                                 temp_locator,
                                 false);
                         }
@@ -998,7 +1009,8 @@ bool WriterProxyData::readFromCDRMessage(
             {
                 GUID_t tmp_guid = m_guid;
                 tmp_guid.entityId = c_EntityId_RTPSParticipant;
-                m_RTPSParticipantKey = tmp_guid;
+                memcpy(m_RTPSParticipantKey.value, tmp_guid.guidPrefix.value, 12);
+                memcpy(m_RTPSParticipantKey.value + 12, tmp_guid.entityId.value, 4);
             }
 
             return true;

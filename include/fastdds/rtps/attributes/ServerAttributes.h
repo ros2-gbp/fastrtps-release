@@ -24,8 +24,6 @@
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/common/Locator.h>
 
-#include <algorithm>
-#include <iterator>
 #include <list>
 
 namespace eprosima {
@@ -70,7 +68,7 @@ public:
     RTPS_DllAPI fastrtps::rtps::GUID_t GetPDPReader() const;
     RTPS_DllAPI fastrtps::rtps::GUID_t GetPDPWriter() const;
 
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
+
     FASTDDS_DEPRECATED_UNTIL(3, "eprosima::fastrtps::rtps:GetEDPPublicationsReader()",
             "Not implemented nor used functions.")
     RTPS_DllAPI fastrtps::rtps::GUID_t GetEDPPublicationsReader() const;
@@ -84,7 +82,6 @@ public:
     FASTDDS_DEPRECATED_UNTIL(3, "eprosima::fastrtps::rtps:GetEDPSubscriptionsReader()",
             "Not implemented nor used functions.")
     RTPS_DllAPI fastrtps::rtps::GUID_t GetEDPSubscriptionsReader() const;
-#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI inline bool ReadguidPrefix(
             const char* pfx)
@@ -102,62 +99,9 @@ public:
 
     // Live participant proxy reference
     const fastrtps::rtps::ParticipantProxyData* proxy{};
-
-    // Check if there are specific transport locators associated
-    // the template parameter is the locator kind (e.g. LOCATOR_KIND_UDPv4)
-    template<int kind> bool requires_transport() const
-    {
-        return metatrafficUnicastLocatorList.has_kind<kind>() ||
-               metatrafficMulticastLocatorList.has_kind<kind>();
-    }
-
 };
 
 typedef std::list<RemoteServerAttributes> RemoteServerList_t;
-
-template<class charT>
-struct server_ostream_separators
-{
-    static const charT* list_separator;
-    static const charT* locator_separator;
-};
-
-#ifndef _MSC_VER
-template<> const char* server_ostream_separators<char>::list_separator;
-template<> const wchar_t* server_ostream_separators<wchar_t>::list_separator;
-
-template<> const char* server_ostream_separators<char>::locator_separator;
-template<> const wchar_t* server_ostream_separators<wchar_t>::locator_separator;
-#endif // _MSC_VER
-
-template<class charT>
-std::basic_ostream<charT>& operator <<(
-        std::basic_ostream<charT>& output,
-        const RemoteServerAttributes& sa)
-{
-    typename std::basic_ostream<charT>::sentry s(output);
-    output << sa.guidPrefix;
-    if (!sa.metatrafficUnicastLocatorList.empty())
-    {
-        output << server_ostream_separators<charT>::locator_separator << sa.metatrafficUnicastLocatorList;
-    }
-    if (!sa.metatrafficMulticastLocatorList.empty())
-    {
-        output << server_ostream_separators<charT>::locator_separator << sa.metatrafficUnicastLocatorList;
-    }
-    return output;
-}
-
-template<class charT>
-std::basic_ostream<charT>& operator <<(
-        std::basic_ostream<charT>& output,
-        const RemoteServerList_t& list)
-{
-    typename std::basic_ostream<charT>::sentry s(output);
-    std::ostream_iterator<RemoteServerAttributes> os_iterator(output, server_ostream_separators<charT>::list_separator);
-    std::copy(list.begin(), list.end(), os_iterator);
-    return output;
-}
 
 // port use if the ros environment variable doesn't specified one
 constexpr uint16_t DEFAULT_ROS2_SERVER_PORT = 11811;
@@ -186,19 +130,12 @@ const char* const DEFAULT_ROS2_MASTER_URI = "ROS_DISCOVERY_SERVER";
  * @return true if parsing succeeds, false otherwise (or if the list is empty)
  */
 RTPS_DllAPI bool load_environment_server_info(
-        const std::string& list,
+        std::string list,
         RemoteServerList_t& attributes);
 
 /**
  * Retrieves a semicolon-separated list of locators from DEFAULT_ROS2_MASTER_URI environment variable, and
  * populates a RemoteServerList_t mapping list position to default guid.
- *
- * The environment variable can be read from an environment file (which allows runtime modification of the remote
- * servers list) or directly from the environment.
- * The value contained in the file takes precedence over the environment value (if both are set).
- * This is to avoid conflicts because only new servers can be added to the list (containing thus all the previously
- * known servers).
- *
  * @param[out] attributes reference to a RemoteServerList_t to populate.
  * @return true if parsing succeeds, false otherwise
  */

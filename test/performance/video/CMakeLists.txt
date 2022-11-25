@@ -111,7 +111,6 @@ if(GST_FOUND)
             fastrtps
             fastcdr
             foonathan_memory
-            fastdds::optionparser
             ${CMAKE_THREAD_LIBS_INIT}
             ${CMAKE_DL_LIBS}
             ${GST_LIBRARIES}
@@ -127,7 +126,6 @@ if(GST_FOUND)
             fastrtps
             fastcdr
             foonathan_memory
-            fastdds::optionparser
             ${CMAKE_THREAD_LIBS_INIT}
             ${CMAKE_DL_LIBS}
             ${GST_LIBRARIES}

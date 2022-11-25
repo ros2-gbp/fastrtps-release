@@ -40,12 +40,12 @@ class UDPTransportInterface : public TransportInterface
 
 public:
 
-    ~UDPTransportInterface() override;
+    virtual ~UDPTransportInterface() override;
 
     void clean();
 
     //! Removes the listening socket for the specified port.
-    bool CloseInputChannel(
+    virtual bool CloseInputChannel(
             const Locator&) override;
 
     //! Removes all outbound sockets on the given port.
@@ -53,25 +53,24 @@ public:
             eProsimaUDPSocket& socket);
 
     //! Reports whether Locators correspond to the same port.
-    bool DoInputLocatorsMatch(
+    virtual bool DoInputLocatorsMatch(
             const Locator&,
             const Locator&) const override;
 
     virtual const UDPTransportDescriptor* configuration() const = 0;
 
-    bool init(
-            const fastrtps::rtps::PropertyPolicy* properties = nullptr) override;
+    bool init() override;
 
     //! Checks whether there are open and bound sockets for the given port.
-    bool IsInputChannelOpen(
+    virtual bool IsInputChannelOpen(
             const Locator&) const override;
 
     //! Checks for TCP kinds.
-    bool IsLocatorSupported(
+    virtual bool IsLocatorSupported(
             const Locator&) const override;
 
     //! Opens a socket on the given address and port (as long as they are white listed).
-    bool OpenOutputChannel(
+    virtual bool OpenOutputChannel(
             SendResourceList& sender_resource_list,
             const Locator&) override;
 
@@ -80,7 +79,7 @@ public:
      * destination) to the main local locator whose channel can write to that
      * destination. In this case it will return a 0.0.0.0 address on that port.
      */
-    Locator RemoteToMainLocal(
+    virtual Locator RemoteToMainLocal(
             const Locator&) const override;
 
     /**
@@ -94,7 +93,7 @@ public:
      *
      * @return false if the input locator is not supported/allowed by this transport, true otherwise.
      */
-    bool transform_remote_locator(
+    virtual bool transform_remote_locator(
             const Locator& remote_locator,
             Locator& result_locator) const override;
 
@@ -109,8 +108,7 @@ public:
      * so should not be reuse.
      * @param destination_locators_end pointer to destination locators iterator end, the iterator can be advanced inside this fuction
      * so should not be reuse.
-     * @param only_multicast_purpose multicast network interface
-     * @param whitelisted network interface included in the user whitelist
+     * @param only_multicast_purpose
      * @param max_blocking_time_point maximum blocking time.
      */
     virtual bool send(
@@ -120,7 +118,6 @@ public:
             fastrtps::rtps::LocatorsIterator* destination_locators_begin,
             fastrtps::rtps::LocatorsIterator* destination_locators_end,
             bool only_multicast_purpose,
-            bool whitelisted,
             const std::chrono::steady_clock::time_point& max_blocking_time_point);
 
     /**
@@ -136,33 +133,31 @@ public:
      *
      * @param [in, out] selector Locator selector.
      */
-    void select_locators(
+    virtual void select_locators(
             fastrtps::rtps::LocatorSelector& selector) const override;
 
-    bool fillMetatrafficMulticastLocator(
+    virtual bool fillMetatrafficMulticastLocator(
             Locator& locator,
             uint32_t metatraffic_multicast_port) const override;
 
-    bool fillMetatrafficUnicastLocator(
+    virtual bool fillMetatrafficUnicastLocator(
             Locator& locator,
             uint32_t metatraffic_unicast_port) const override;
 
-    bool configureInitialPeerLocator(
+    virtual bool configureInitialPeerLocator(
             Locator& locator,
             const fastrtps::rtps::PortParameters& port_params,
             uint32_t domainId,
             LocatorList& list) const override;
 
-    bool fillUnicastLocator(
+    virtual bool fillUnicastLocator(
             Locator& locator,
             uint32_t well_known_port) const override;
 
-    uint32_t max_recv_buffer_size() const override
+    virtual uint32_t max_recv_buffer_size() const override
     {
         return configuration()->maxMessageSize;
     }
-
-    void update_network_interfaces() override;
 
 protected:
 
@@ -178,9 +173,6 @@ protected:
     uint32_t mSendBufferSize;
     uint32_t mReceiveBufferSize;
     eprosima::fastdds::statistics::rtps::OutputTrafficManager statistics_info_;
-
-    //! First time open output channel flag: open the first socket with the ip::multicast::enable_loopback
-    bool first_time_open_output_channel_;
 
     UDPTransportInterface(
             int32_t transport_kind);
@@ -266,22 +258,7 @@ protected:
             eProsimaUDPSocket& socket,
             const Locator& remote_locator,
             bool only_multicast_purpose,
-            bool whitelisted,
             const std::chrono::microseconds& timeout);
-
-    /**
-     * @brief Return list of not yet open network interfaces
-     *
-     * @param [in] sender_resource_list List of SenderResources already registered in the transport
-     * @param [out] locNames Return the list of new available network interfaces
-     * @param [in] return_loopback return the lo network interface
-     */
-    void get_unknown_network_interfaces(
-            const SendResourceList& sender_resource_list,
-            std::vector<fastrtps::rtps::IPFinder::info_IP>& locNames,
-            bool return_loopback = false);
-
-    std::atomic_bool rescan_interfaces_ = {true};
 };
 
 } // namespace rtps

@@ -50,10 +50,9 @@ public:
 
     const SharedMemTransportDescriptor* configuration() const;
 
-    bool init(
-            const fastrtps::rtps::PropertyPolicy* properties = nullptr) override;
+    bool init() override;
 
-    ~SharedMemTransport() override;
+    virtual ~SharedMemTransport() override;
 
     /**
      * Starts listening on the specified port, and if the specified address is in the

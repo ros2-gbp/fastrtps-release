@@ -30,6 +30,7 @@
 
 #include <fastdds/rtps/participant/RTPSParticipantListener.h>
 #include <fastdds/rtps/writer/StatelessWriter.h>
+#include <fastdds/rtps/resources/AsyncWriterThread.h>
 
 #include <fastdds/rtps/reader/StatelessReader.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
@@ -128,8 +129,6 @@ bool PDPSimple::init(
         if (!mp_EDP->initEDP(m_discovery))
         {
             logError(RTPS_PDP, "Endpoint discovery configuration failed");
-            delete mp_EDP;
-            mp_EDP = nullptr;
             return false;
         }
     }
@@ -139,8 +138,6 @@ bool PDPSimple::init(
         if (!mp_EDP->initEDP(m_discovery))
         {
             logError(RTPS_PDP, "Endpoint discovery configuration failed");
-            delete mp_EDP;
-            mp_EDP = nullptr;
             return false;
         }
     }
@@ -193,9 +190,11 @@ ParticipantProxyData* PDPSimple::createParticipantProxyData(
         }
     }
 
-    ParticipantProxyData* pdata = add_participant_proxy_data(participant_data.m_guid, true, &participant_data);
+    ParticipantProxyData* pdata = add_participant_proxy_data(participant_data.m_guid, true);
     if (pdata != nullptr)
     {
+        pdata->copy(participant_data);
+        pdata->isAlive = true;
         pdata->lease_duration_event->update_interval(pdata->m_leaseDuration);
         pdata->lease_duration_event->restart_timer();
     }
@@ -214,22 +213,19 @@ void PDPSimple::announceParticipantState(
         bool dispose,
         WriteParams& wp)
 {
-    if (enabled_)
+    PDP::announceParticipantState(new_change, dispose, wp);
+
+    if (!(dispose || new_change))
     {
-        PDP::announceParticipantState(new_change, dispose, wp);
+        StatelessWriter* pW = dynamic_cast<StatelessWriter*>(mp_PDPWriter);
 
-        if (!(dispose || new_change))
+        if (pW != nullptr)
         {
-            StatelessWriter* pW = dynamic_cast<StatelessWriter*>(mp_PDPWriter);
-
-            if (pW != nullptr)
-            {
-                pW->unsent_changes_reset();
-            }
-            else
-            {
-                logError(RTPS_PDP, "Using PDPSimple protocol with a reliable writer");
-            }
+            pW->unsent_changes_reset();
+        }
+        else
+        {
+            logError(RTPS_PDP, "Using PDPSimple protocol with a reliable writer");
         }
     }
 }
@@ -238,8 +234,8 @@ bool PDPSimple::createPDPEndpoints()
 {
     logInfo(RTPS_PDP, "Beginning");
 
-    const RTPSParticipantAttributes& pattr = mp_RTPSParticipant->getRTPSParticipantAttributes();
-    const RTPSParticipantAllocationAttributes& allocation = pattr.allocation;
+    const RTPSParticipantAllocationAttributes& allocation =
+            mp_RTPSParticipant->getRTPSParticipantAttributes().allocation;
 
     //SPDP BUILTIN RTPSParticipant READER
     HistoryAttributes hatt;
@@ -263,8 +259,6 @@ bool PDPSimple::createPDPEndpoints()
     ReaderAttributes ratt;
     ratt.endpoint.multicastLocatorList = mp_builtin->m_metatrafficMulticastLocatorList;
     ratt.endpoint.unicastLocatorList = mp_builtin->m_metatrafficUnicastLocatorList;
-    ratt.endpoint.external_unicast_locators = mp_builtin->m_att.metatraffic_external_unicast_locators;
-    ratt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     ratt.endpoint.topicKind = WITH_KEY;
     ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
     ratt.endpoint.reliabilityKind = BEST_EFFORT;
@@ -301,8 +295,6 @@ bool PDPSimple::createPDPEndpoints()
 
     mp_PDPWriterHistory = new WriterHistory(hatt);
     WriterAttributes watt;
-    watt.endpoint.external_unicast_locators = mp_builtin->m_att.metatraffic_external_unicast_locators;
-    watt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     watt.endpoint.endpointKind = WRITER;
     watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
     watt.endpoint.reliabilityKind = BEST_EFFORT;
@@ -310,7 +302,8 @@ bool PDPSimple::createPDPEndpoints()
     watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
     watt.matched_readers_allocation = allocation.participants;
 
-    if (pattr.throughputController.bytesPerPeriod != UINT32_MAX && pattr.throughputController.periodMillisecs != 0)
+    if (mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+            mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
     {
         watt.mode = ASYNCHRONOUS_WRITER;
     }
@@ -364,43 +357,30 @@ void PDPSimple::assignRemoteEndpoints(
     auxendp &= DISC_BUILTIN_ENDPOINT_PARTICIPANT_ANNOUNCER;
     if (auxendp != 0)
     {
-        auto temp_writer_data = get_temporary_writer_proxies_pool().get();
-
-        temp_writer_data->clear();
-        temp_writer_data->guid().guidPrefix = pdata->m_guid.guidPrefix;
-        temp_writer_data->guid().entityId = c_EntityId_SPDPWriter;
-        temp_writer_data->persistence_guid(pdata->get_persistence_guid());
-        temp_writer_data->set_persistence_entity_id(c_EntityId_SPDPWriter);
-        temp_writer_data->set_remote_locators(pdata->metatraffic_locators, network, use_multicast_locators);
-        temp_writer_data->m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
-        temp_writer_data->m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
-        mp_PDPReader->matched_writer_add(*temp_writer_data);
+        std::lock_guard<std::mutex> data_guard(temp_data_lock_);
+        temp_writer_data_.clear();
+        temp_writer_data_.guid().guidPrefix = pdata->m_guid.guidPrefix;
+        temp_writer_data_.guid().entityId = c_EntityId_SPDPWriter;
+        temp_writer_data_.persistence_guid(pdata->get_persistence_guid());
+        temp_writer_data_.set_persistence_entity_id(c_EntityId_SPDPWriter);
+        temp_writer_data_.set_remote_locators(pdata->metatraffic_locators, network, use_multicast_locators);
+        temp_writer_data_.m_qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
+        temp_writer_data_.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+        mp_PDPReader->matched_writer_add(temp_writer_data_);
     }
     auxendp = endp;
     auxendp &= DISC_BUILTIN_ENDPOINT_PARTICIPANT_DETECTOR;
     if (auxendp != 0)
     {
-        auto temp_reader_data = get_temporary_reader_proxies_pool().get();
-
-        temp_reader_data->clear();
-        temp_reader_data->m_expectsInlineQos = false;
-        temp_reader_data->guid().guidPrefix = pdata->m_guid.guidPrefix;
-        temp_reader_data->guid().entityId = c_EntityId_SPDPReader;
-        temp_reader_data->set_remote_locators(pdata->metatraffic_locators, network, use_multicast_locators);
-        temp_reader_data->m_qos.m_reliability.kind = BEST_EFFORT_RELIABILITY_QOS;
-        temp_reader_data->m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
-        mp_PDPWriter->matched_reader_add(*temp_reader_data);
-
-        StatelessWriter* pW = dynamic_cast<StatelessWriter*>(mp_PDPWriter);
-
-        if (pW != nullptr)
-        {
-            pW->unsent_changes_reset();
-        }
-        else
-        {
-            logError(RTPS_PDP, "Using PDPSimple protocol with a reliable writer");
-        }
+        std::lock_guard<std::mutex> data_guard(temp_data_lock_);
+        temp_reader_data_.clear();
+        temp_reader_data_.m_expectsInlineQos = false;
+        temp_reader_data_.guid().guidPrefix = pdata->m_guid.guidPrefix;
+        temp_reader_data_.guid().entityId = c_EntityId_SPDPReader;
+        temp_reader_data_.set_remote_locators(pdata->metatraffic_locators, network, use_multicast_locators);
+        temp_reader_data_.m_qos.m_reliability.kind = BEST_EFFORT_RELIABILITY_QOS;
+        temp_reader_data_.m_qos.m_durability.kind = TRANSIENT_LOCAL_DURABILITY_QOS;
+        mp_PDPWriter->matched_reader_add(temp_reader_data_);
     }
 
 #if HAVE_SECURITY

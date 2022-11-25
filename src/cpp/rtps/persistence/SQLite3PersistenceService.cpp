@@ -259,7 +259,7 @@ SQLite3PersistenceService::~SQLite3PersistenceService()
 bool SQLite3PersistenceService::load_writer_from_storage(
         const std::string& persistence_guid,
         const GUID_t& writer_guid,
-        WriterHistory* history,
+        std::vector<CacheChange_t*>& changes,
         const std::shared_ptr<IChangePool>& change_pool,
         const std::shared_ptr<IPayloadPool>& payload_pool,
         SequenceNumber_t& next_sequence)
@@ -270,8 +270,6 @@ bool SQLite3PersistenceService::load_writer_from_storage(
     {
         sqlite3_reset(load_writer_stmt_);
         sqlite3_bind_text(load_writer_stmt_, 1, persistence_guid.c_str(), -1, SQLITE_STATIC);
-
-        std::vector<CacheChange_t*>& changes = get_changes(history);
 
         while (SQLITE_ROW == sqlite3_step(load_writer_stmt_))
         {
@@ -301,9 +299,6 @@ bool SQLite3PersistenceService::load_writer_from_storage(
             change->sequenceNumber = identity.sequence_number();
             change->serializedPayload.length = size;
             memcpy(change->serializedPayload.data, sqlite3_column_blob(load_writer_stmt_, 2), size);
-            change->writer_info.previous = nullptr;
-            change->writer_info.next = nullptr;
-            change->writer_info.num_sent_submessages = 0;
 
             // related sample identity
             {
@@ -319,8 +314,6 @@ bool SQLite3PersistenceService::load_writer_from_storage(
 
             // timestamp
             change->sourceTimestamp.from_ns(sqlite3_column_int64(load_writer_stmt_, 5));
-
-            set_fragments(history, change);
 
             changes.insert(changes.begin(), change);
         }
@@ -372,17 +365,16 @@ bool SQLite3PersistenceService::add_writer_change_to_storage(
                     change.serializedPayload.length, SQLITE_STATIC);
 
             // related sample identity
-            std::ostringstream os;
-            auto& si = change.write_params.related_sample_identity();
-            os << si.writer_guid();
+            {
+                using namespace std;
+                ostringstream os;
+                auto& si = change.write_params.related_sample_identity();
+                os << si.writer_guid();
+                auto guids = os.str();
 
-            // IMPORTANT: this element must survive until the call (sqlite3_step) has been fulfilled.
-            // Another way would be to use SQLITE_TRANSIENT instead of static, forcing an internal copy,
-            // but this way a copy is saved (with cost of taking care that this string should survive)
-            std::string guids = os.str();
-
-            sqlite3_bind_text(add_writer_change_stmt_, 5, guids.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_int64(add_writer_change_stmt_, 6, si.sequence_number().to64long());
+                sqlite3_bind_text(add_writer_change_stmt_, 5, guids.c_str(), -1, SQLITE_STATIC);
+                sqlite3_bind_int64(add_writer_change_stmt_, 6, si.sequence_number().to64long());
+            }
 
             // source time stamp
             sqlite3_bind_int64(add_writer_change_stmt_, 7, change.sourceTimestamp.to_ns());

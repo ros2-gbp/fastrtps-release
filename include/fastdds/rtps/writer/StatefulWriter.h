@@ -22,7 +22,7 @@
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include <fastdds/rtps/writer/RTPSWriter.h>
-#include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
+#include <fastdds/rtps/writer/IReaderDataFilter.hpp>
 #include <fastdds/rtps/history/IChangePool.h>
 #include <fastdds/rtps/history/IPayloadPool.h>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
@@ -57,7 +57,6 @@ protected:
             RTPSParticipantImpl* impl,
             const GUID_t& guid,
             const WriterAttributes& att,
-            fastdds::rtps::FlowController* flow_controller,
             WriterHistory* hist,
             WriterListener* listen = nullptr);
 
@@ -66,7 +65,6 @@ protected:
             const GUID_t& guid,
             const WriterAttributes& att,
             const std::shared_ptr<IPayloadPool>& payload_pool,
-            fastdds::rtps::FlowController* flow_controller,
             WriterHistory* hist,
             WriterListener* listen = nullptr);
 
@@ -76,7 +74,6 @@ protected:
             const WriterAttributes& att,
             const std::shared_ptr<IPayloadPool>& payload_pool,
             const std::shared_ptr<IChangePool>& change_pool,
-            fastdds::rtps::FlowController* flow_controller,
             WriterHistory* hist,
             WriterListener* listen = nullptr);
 
@@ -149,6 +146,11 @@ public:
             CacheChange_t* a_change) override;
 
     /**
+     * Method to indicate that there are changes not sent in some of all ReaderProxy.
+     */
+    void send_any_unsent_changes() override;
+
+    /**
      * Sends a change directly to a intraprocess reader.
      */
     bool intraprocess_delivery(
@@ -157,16 +159,7 @@ public:
 
     bool intraprocess_gap(
             ReaderProxy* reader_proxy,
-            const SequenceNumber_t& seq_num)
-    {
-        SequenceNumber_t last_seq = seq_num + 1;
-        return intraprocess_gap(reader_proxy, seq_num, last_seq);
-    }
-
-    bool intraprocess_gap(
-            ReaderProxy* reader_proxy,
-            const SequenceNumber_t& first_seq,
-            const SequenceNumber_t& last_seq);
+            const SequenceNumber_t& seq_num);
 
     bool intraprocess_heartbeat(
             ReaderProxy* reader_proxy,
@@ -293,7 +286,6 @@ public:
 
     /**
      * @brief Returns true if disable positive ACKs QoS is enabled
-     *
      * @return True if positive acks are disabled, false otherwise
      */
     inline bool get_disable_positive_acks() const
@@ -308,14 +300,15 @@ public:
     void updateTimes(
             const WriterTimes& times);
 
+    void add_flow_controller(
+            std::unique_ptr<FlowController> controller) override;
+
     SequenceNumber_t next_sequence_number() const;
 
     /**
      * @brief Sends a periodic heartbeat
-     *
      * @param final Final flag
      * @param liveliness Liveliness flag
-     *
      * @return True on success
      */
     bool send_periodic_heartbeat(
@@ -324,7 +317,6 @@ public:
 
     /*!
      * @brief Sends a heartbeat to a remote reader.
-     *
      * @remarks This function is non thread-safe.
      */
     void send_heartbeat_to_nts(
@@ -376,51 +368,16 @@ public:
             bool& result) override;
 
     /**
-     * @brief Set a content filter to perform content filtering on this writer.
-     *
-     * This method sets a content filter that will be used to check whether a cache change is relevant
-     * for a reader or not.
-     *
-     * @param filter  The content filter to use on this writer. May be @c nullptr to remove the content filter
-     *                (i.e. treat all samples as relevant).
+     * @brief Set a reader data filter to filter data in ReaderProxies
+     * @param reader_data_filter The reader data filter
      */
     void reader_data_filter(
-            fastdds::rtps::IReaderDataFilter* filter) final;
+            fastdds::rtps::IReaderDataFilter* reader_data_filter);
 
     /**
-     * @brief Get the content filter used to perform content filtering on this writer.
-     *
-     * @return The content filter used on this writer.
+     * @brief Get the reader data filter used to filter data in ReaderProxies
      */
-    const fastdds::rtps::IReaderDataFilter* reader_data_filter() const final;
-
-    /*!
-     * Tells writer the sample can be sent to the network.
-     * This function should be used by a fastdds::rtps::FlowController.
-     *
-     * @param cache_change Pointer to the CacheChange_t that represents the sample which can be sent.
-     * @param group RTPSMessageGroup reference uses for generating the RTPS message.
-     * @param locator_selector RTPSMessageSenderInterface reference uses for selecting locators. The reference has to
-     * be a member of this RTPSWriter object.
-     * @param max_blocking_time Future timepoint where blocking send should end.
-     * @return Return code.
-     * @note Must be non-thread safe.
-     */
-    DeliveryRetCode deliver_sample_nts(
-            CacheChange_t* cache_change,
-            RTPSMessageGroup& group,
-            LocatorSelectorSender& locator_selector,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) override;
-
-    LocatorSelectorSender& get_general_locator_selector() override
-    {
-        return locator_selector_general_;
-    }
-
-    LocatorSelectorSender& get_async_locator_selector() override
-    {
-        return locator_selector_async_;
-    }
+    const fastdds::rtps::IReaderDataFilter* reader_data_filter() const;
 
 private:
 
@@ -428,16 +385,11 @@ private:
             const SequenceNumber_t seq) const;
 
     void update_reader_info(
-            LocatorSelectorSender& locator_selector,
             bool create_sender_resources);
 
-    void select_all_readers_nts(
-            RTPSMessageGroup& group,
-            LocatorSelectorSender& locator_selector);
-
     void send_heartbeat_piggyback_nts_(
+            ReaderProxy* reader,
             RTPSMessageGroup& message_group,
-            LocatorSelectorSender& locator_selector,
             uint32_t& last_bytes_processed);
 
     void send_heartbeat_nts_(
@@ -450,35 +402,47 @@ private:
 
     /**
      * @brief A method called when the ack timer expires
-     *
      * @details Only used if disable positive ACKs QoS is enabled
      */
     bool ack_timer_expired();
 
     void send_heartbeat_to_all_readers();
 
-    void deliver_sample_to_intraprocesses(
-            CacheChange_t* change);
+    void send_changes_separatedly(
+            SequenceNumber_t max_sequence,
+            bool& activateHeartbeatPeriod);
 
-    void deliver_sample_to_datasharing(
-            CacheChange_t* change);
+    void send_all_intraprocess_changes(
+            SequenceNumber_t max_sequence);
 
-    DeliveryRetCode deliver_sample_to_network(
-            CacheChange_t* change,
-            RTPSMessageGroup& group,
-            LocatorSelectorSender& locator_selector,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time);
+    void send_all_datasharing_changes(
+            SequenceNumber_t max_sequence);
+
+    void send_all_unsent_changes(
+            SequenceNumber_t max_sequence,
+            bool& activateHeartbeatPeriod);
+
+    void send_unsent_changes_with_flow_control(
+            SequenceNumber_t max_sequence,
+            bool& activateHeartbeatPeriod);
+
+    bool send_hole_gaps_to_group(
+            RTPSMessageGroup& group);
+
+    void select_all_readers_with_lowmark_below(
+            SequenceNumber_t seq,
+            RTPSMessageGroup& group);
 
     void prepare_datasharing_delivery(
             CacheChange_t* change);
 
-    /**
-     * Check the StatefulWriter's sequence numbers and add the required GAP messages to the provided message group.
-     *
-     * @param group     Reference to the Message Group to which the GAP messages are to be added.
-     */
-    void add_gaps_for_holes_in_history_(
-            RTPSMessageGroup& group);
+    void async_delivery(
+            CacheChange_t* change,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time);
+
+    void sync_delivery(
+            CacheChange_t* change,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time);
 
     //! True to disable piggyback heartbeats
     bool disable_heartbeat_piggyback_;
@@ -495,6 +459,8 @@ private:
 
     int32_t currentUsageSendBufferSize_;
 
+    std::vector<std::unique_ptr<FlowController>> m_controllers;
+
     bool there_are_remote_readers_ = false;
     bool there_are_local_readers_ = false;
 
@@ -508,10 +474,6 @@ private:
     //! Vector containing all the active ReaderProxies for datasharing delivery.
     ResourceLimitedVector<ReaderProxy*> matched_datasharing_readers_;
     bool there_are_datasharing_readers_ = false;
-
-    LocatorSelectorSender locator_selector_general_;
-
-    LocatorSelectorSender locator_selector_async_;
 };
 
 } /* namespace rtps */

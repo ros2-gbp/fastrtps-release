@@ -27,6 +27,7 @@
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/subscriber/SampleInfo.hpp>
 
+#include <fastrtps/subscriber/SubscriberHistory.h>
 #include <fastrtps/types/TypesBase.h>
 
 #include <fastdds/subscriber/DataReaderImpl.hpp>
@@ -34,7 +35,6 @@
 #include <fastdds/subscriber/DataReaderImpl/StateFilter.hpp>
 #include <fastdds/subscriber/DataReaderImpl/SampleInfoPool.hpp>
 #include <fastdds/subscriber/DataReaderImpl/SampleLoanManager.hpp>
-#include <fastdds/subscriber/history/DataReaderHistory.hpp>
 
 #include <fastdds/rtps/common/CacheChange.h>
 #include <fastdds/rtps/reader/RTPSReader.h>
@@ -51,7 +51,7 @@ namespace detail {
 struct ReadTakeCommand
 {
     using ReturnCode_t = eprosima::fastrtps::types::ReturnCode_t;
-    using history_type = eprosima::fastdds::dds::detail::DataReaderHistory;
+    using history_type = eprosima::fastrtps::SubscriberHistory;
     using CacheChange_t = eprosima::fastrtps::rtps::CacheChange_t;
     using RTPSReader = eprosima::fastrtps::rtps::RTPSReader;
     using WriterProxy = eprosima::fastrtps::rtps::WriterProxy;
@@ -64,9 +64,8 @@ struct ReadTakeCommand
             SampleInfoSeq& sample_infos,
             int32_t max_samples,
             const StateFilter& states,
-            const history_type::instance_info& instance,
-            bool single_instance,
-            bool loop_for_data)
+            history_type::instance_info instance,
+            bool single_instance = false)
         : type_(reader.type_)
         , loan_manager_(reader.loan_manager_)
         , history_(reader.history_)
@@ -78,14 +77,13 @@ struct ReadTakeCommand
         , remaining_samples_(max_samples)
         , states_(states)
         , instance_(instance)
-        , handle_(instance->first)
+        , handle_(instance.first)
         , single_instance_(single_instance)
-        , loop_for_data_(loop_for_data)
     {
         assert(0 <= remaining_samples_);
 
         current_slot_ = data_values_.length();
-        finished_ = false;
+        finished_ = nullptr == instance.second;
     }
 
     ~ReadTakeCommand()
@@ -110,8 +108,8 @@ struct ReadTakeCommand
         // Traverse changes on current instance
         bool ret_val = false;
         LoanableCollection::size_type first_slot = current_slot_;
-        auto it = instance_->second->cache_changes.begin();
-        while (!finished_ && it != instance_->second->cache_changes.end())
+        auto it = instance_.second->begin();
+        while (!finished_ && it != instance_.second->end())
         {
             CacheChange_t* change = *it;
             SampleStateKind check;
@@ -124,7 +122,7 @@ struct ReadTakeCommand
                 if (reader_->begin_sample_access_nts(change, wp, is_future_change))
                 {
                     //Check if the payload is dirty
-                    remove_change = !check_datasharing_validity(change, data_values_.has_ownership());
+                    remove_change = !check_datasharing_validity(change, data_values_.has_ownership(), wp);
                 }
                 else
                 {
@@ -144,14 +142,14 @@ struct ReadTakeCommand
                 // in the future also
                 if (!is_future_change)
                 {
+
                     // Add sample and info to collections
                     ReturnCode_t previous_return_value = return_value_;
-                    bool added = add_sample(*it, remove_change);
-                    history_.change_was_processed_nts(change, added);
+                    bool added = add_sample(change, remove_change);
                     reader_->end_sample_access_nts(change, wp, added);
 
                     // Check if the payload is dirty
-                    if (added && !check_datasharing_validity(change, data_values_.has_ownership()))
+                    if (added && !check_datasharing_validity(change, data_values_.has_ownership(), wp))
                     {
                         // Decrement length of collections
                         --current_slot_;
@@ -183,7 +181,6 @@ struct ReadTakeCommand
 
         if (current_slot_ > first_slot)
         {
-            history_.instance_viewed_nts(instance_->second);
             ret_val = true;
 
             // complete sample infos
@@ -197,17 +194,7 @@ struct ReadTakeCommand
             }
         }
 
-        // Check if further iteration is required
-        if (single_instance_ && (!loop_for_data_ || (loop_for_data_ && ret_val)))
-        {
-            finished_ = true;
-            history_.check_and_remove_instance(instance_);
-        }
-        else
-        {
-            next_instance();
-        }
-
+        next_instance();
         return ret_val;
     }
 
@@ -219,41 +206,6 @@ struct ReadTakeCommand
     inline ReturnCode_t return_value() const
     {
         return return_value_;
-    }
-
-    static void generate_info(
-            SampleInfo& info,
-            const DataReaderInstance& instance,
-            const DataReaderCacheChange& item)
-    {
-        info.sample_state = item->isRead ? READ_SAMPLE_STATE : NOT_READ_SAMPLE_STATE;
-        info.instance_state = instance.instance_state;
-        info.view_state = instance.view_state;
-        info.disposed_generation_count = item->reader_info.disposed_generation_count;
-        info.no_writers_generation_count = item->reader_info.no_writers_generation_count;
-        info.sample_rank = 0;
-        info.generation_rank = 0;
-        info.absolute_generation_rank = 0;
-        info.source_timestamp = item->sourceTimestamp;
-        info.reception_timestamp = item->reader_info.receptionTimestamp;
-        info.instance_handle = item->instanceHandle;
-        info.publication_handle = InstanceHandle_t(item->writerGUID);
-        info.sample_identity.writer_guid(item->writerGUID);
-        info.sample_identity.sequence_number(item->sequenceNumber);
-        info.related_sample_identity = item->write_params.sample_identity();
-        info.valid_data = true;
-
-        switch (item->kind)
-        {
-            case eprosima::fastrtps::rtps::NOT_ALIVE_DISPOSED:
-            case eprosima::fastrtps::rtps::NOT_ALIVE_DISPOSED_UNREGISTERED:
-            case eprosima::fastrtps::rtps::NOT_ALIVE_UNREGISTERED:
-                info.valid_data = false;
-                break;
-            case eprosima::fastrtps::rtps::ALIVE:
-            default:
-                break;
-        }
     }
 
 private:
@@ -271,7 +223,6 @@ private:
     history_type::instance_info instance_;
     InstanceHandle_t handle_;
     bool single_instance_;
-    bool loop_for_data_;
 
     bool finished_ = false;
     ReturnCode_t return_value_ = ReturnCode_t::RETCODE_NO_DATA;
@@ -282,29 +233,31 @@ private:
     {
         while (!is_current_instance_valid())
         {
-            if ((single_instance_ && !loop_for_data_) || !next_instance())
+            if (!next_instance())
             {
-                finished_ = true;
                 return false;
             }
         }
-
         return true;
     }
 
     bool is_current_instance_valid()
     {
-        // Check instance_state against states_.instance_states and view_state against states_.view_states
-        auto instance_state = instance_->second->instance_state;
-        auto view_state = instance_->second->view_state;
-        return (0 != (states_.instance_states & instance_state)) && (0 != (states_.view_states & view_state));
+        // We are not implementing instance_state or view_state yet, so all instances will be considered to have
+        // a valid state. In the future this should check instance_state against states_.instance_states and
+        // view_state against states_.view_states
+        return true;
     }
 
     bool next_instance()
     {
-        history_.check_and_remove_instance(instance_);
+        if (single_instance_)
+        {
+            finished_ = true;
+            return false;
+        }
 
-        auto result = history_.next_available_instance_nts(handle_, instance_);
+        auto result = history_.lookup_instance(handle_, false);
         if (!result.first)
         {
             finished_ = true;
@@ -312,12 +265,12 @@ private:
         }
 
         instance_ = result.second;
-        handle_ = instance_->first;
+        handle_ = instance_.first;
         return true;
     }
 
     bool add_sample(
-            const DataReaderCacheChange& item,
+            CacheChange_t* change,
             bool& deserialization_error)
     {
         bool ret_val = false;
@@ -331,10 +284,10 @@ private:
             sample_infos_.length(new_len);
 
             // Add information
-            generate_info(item);
+            generate_info(change);
             if (sample_infos_[current_slot_].valid_data)
             {
-                if (!deserialize_sample(item))
+                if (!deserialize_sample(change))
                 {
                     // Decrement length of collections
                     data_values_.length(current_slot_);
@@ -342,10 +295,11 @@ private:
                     deserialization_error = true;
                     return false;
                 }
+
+                // Mark that some data is available
+                return_value_ = ReturnCode_t::RETCODE_OK;
             }
 
-            // Mark that some data is available
-            return_value_ = ReturnCode_t::RETCODE_OK;
             ++current_slot_;
             --remaining_samples_;
             ret_val = true;
@@ -376,23 +330,54 @@ private:
     }
 
     void generate_info(
-            const DataReaderCacheChange& item)
+            CacheChange_t* change)
     {
         // Loan when necessary
         if (!sample_infos_.has_ownership())
         {
-            SampleInfo* pool_item = info_pool_.get_item();
-            assert(pool_item != nullptr);
-            const_cast<void**>(sample_infos_.buffer())[current_slot_] = pool_item;
+            SampleInfo* item = info_pool_.get_item();
+            assert(item != nullptr);
+            const_cast<void**>(sample_infos_.buffer())[current_slot_] = item;
         }
 
         SampleInfo& info = sample_infos_[current_slot_];
-        generate_info(info, *instance_->second, item);
+        info.sample_state = change->isRead ? READ_SAMPLE_STATE : NOT_READ_SAMPLE_STATE;
+        info.view_state = NOT_NEW_VIEW_STATE;
+        info.disposed_generation_count = 0;
+        info.no_writers_generation_count = 1;
+        info.sample_rank = 0;
+        info.generation_rank = 0;
+        info.absoulte_generation_rank = 0;
+        info.source_timestamp = change->sourceTimestamp;
+        info.reception_timestamp = change->receptionTimestamp;
+        info.instance_handle = handle_;
+        info.publication_handle = InstanceHandle_t(change->writerGUID);
+        info.sample_identity.writer_guid(change->writerGUID);
+        info.sample_identity.sequence_number(change->sequenceNumber);
+        info.related_sample_identity = change->write_params.sample_identity();
+        info.valid_data = true;
+
+        switch (change->kind)
+        {
+            case eprosima::fastrtps::rtps::ALIVE:
+                info.instance_state = ALIVE_INSTANCE_STATE;
+                break;
+            case eprosima::fastrtps::rtps::NOT_ALIVE_DISPOSED:
+            case eprosima::fastrtps::rtps::NOT_ALIVE_DISPOSED_UNREGISTERED:
+                info.instance_state = NOT_ALIVE_DISPOSED_INSTANCE_STATE;
+                info.valid_data = false;
+                break;
+            default:
+                //TODO [ILG] change this if the other kinds ever get implemented
+                info.instance_state = ALIVE_INSTANCE_STATE;
+                break;
+        }
     }
 
     bool check_datasharing_validity(
             CacheChange_t* change,
-            bool has_ownership)
+            bool has_ownership,
+            WriterProxy* wp)
     {
         bool is_valid = true;
         if (has_ownership)  //< On loans the user must check the validity anyways
@@ -408,7 +393,8 @@ private:
         if (!is_valid)
         {
             logWarning(RTPS_READER,
-                    "Change " << change->sequenceNumber << " from " << change->writerGUID << " is overidden");
+                    "Change " << change->sequenceNumber << " from " << wp->guid() <<
+                    " is overidden");
             return false;
         }
 

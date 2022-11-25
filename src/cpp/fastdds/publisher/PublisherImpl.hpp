@@ -151,10 +151,6 @@ public:
 
     ReturnCode_t delete_contained_entities();
 
-    DomainParticipantImpl* get_participant_impl()
-    {
-        return participant_;
-    }
 
     ReturnCode_t set_default_datawriter_qos(
             const DataWriterQos& qos);

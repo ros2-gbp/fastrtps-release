@@ -61,7 +61,6 @@ UDPTransportInterface::UDPTransportInterface(
     : TransportInterface(transport_kind)
     , mSendBufferSize(0)
     , mReceiveBufferSize(0)
-    , first_time_open_output_channel_(true)
 {
 }
 
@@ -116,8 +115,7 @@ bool UDPTransportInterface::DoInputLocatorsMatch(
     return IPLocator::getPhysicalPort(left) == IPLocator::getPhysicalPort(right);
 }
 
-bool UDPTransportInterface::init(
-        const fastrtps::rtps::PropertyPolicy*)
+bool UDPTransportInterface::init()
 {
     if (configuration()->sendBufferSize == 0 || configuration()->receiveBufferSize == 0)
     {
@@ -265,51 +263,51 @@ bool UDPTransportInterface::OpenOutputChannel(
         return false;
     }
 
-    std::vector<IPFinder::info_IP> locNames;
-    get_unknown_network_interfaces(sender_resource_list, locNames);
-
-    if (locNames.empty() && !first_time_open_output_channel_)
+    // We try to find a SenderResource that can be reuse to this locator.
+    // Note: This is done in this level because if we do in NetworkFactory level, we have to mantain what transport
+    // already reuses a SenderResource.
+    for (auto& sender_resource : sender_resource_list)
     {
-        statistics_info_.add_entry(locator);
-        rescan_interfaces_.store(false);
-        return true;
+        UDPSenderResource* udp_sender_resource = UDPSenderResource::cast(*this, sender_resource.get());
+
+        if (udp_sender_resource)
+        {
+            statistics_info_.add_entry(locator);
+            return true;
+        }
     }
 
     try
     {
         uint16_t port = configuration()->m_output_udp_socket;
+        std::vector<IPFinder::info_IP> locNames;
+        get_ips(locNames);
         // If there is no whitelist, we can simply open a generic output socket
         // and gain efficiency.
         if (is_interface_whitelist_empty())
         {
-            if (first_time_open_output_channel_)
-            {
-                first_time_open_output_channel_ = false;
-                // We add localhost output for multicast, so in case the network cable is unplugged, local
-                // participants keep receiving DATA(p) announcements
-                // Also in case that no network interfaces were found
-                try
-                {
-                    eProsimaUDPSocket unicastSocket = OpenAndBindUnicastOutputSocket(GenerateAnyAddressEndpoint(
-                                        port), port);
-                    getSocketPtr(unicastSocket)->set_option(ip::multicast::enable_loopback(true));
-                    SetSocketOutboundInterface(unicastSocket, localhost_name());
-                    sender_resource_list.emplace_back(
-                        static_cast<SenderResource*>(new UDPSenderResource(*this, unicastSocket, false, true)));
-                }
-                catch (asio::system_error const& e)
-                {
-                    (void)e;
-                    logWarning(RTPS_MSG_OUT, "UDPTransport Error binding interface "
-                            << localhost_name() << " (skipping) with msg: " << e.what());
-                }
-            }
+            eProsimaUDPSocket unicastSocket = OpenAndBindUnicastOutputSocket(GenerateAnyAddressEndpoint(port), port);
+            getSocketPtr(unicastSocket)->set_option(ip::multicast::enable_loopback(true));
 
-            // Create sockets for outbounding multicast for the other found network interfaces.
+            // Outbounding first interface with already created socket.
             if (!locNames.empty())
             {
+                SetSocketOutboundInterface(unicastSocket, (*locNames.begin()).name);
+            }
+            else
+            {
+                SetSocketOutboundInterface(unicastSocket, localhost_name());
+            }
+
+            // If more than one interface, then create sockets for outbounding multicast.
+            if (locNames.size() > 1)
+            {
+                auto locIt = locNames.begin();
+                sender_resource_list.emplace_back(
+                    static_cast<SenderResource*>(new UDPSenderResource(*this, unicastSocket)));
+
                 // Create other socket for outbounding rest of interfaces.
-                for (auto locIt = locNames.begin(); locIt != locNames.end(); ++locIt)
+                for (++locIt; locIt != locNames.end(); ++locIt)
                 {
                     uint16_t new_port = 0;
                     try
@@ -329,11 +327,42 @@ bool UDPTransportInterface::OpenOutputChannel(
                     }
                 }
             }
+            else
+            {
+                // Multicast data will be sent for the only one interface.
+                sender_resource_list.emplace_back(
+                    static_cast<SenderResource*>(new UDPSenderResource(*this, unicastSocket)));
+            }
+
+            if (!locNames.empty())
+            {
+                // We add localhost output for multicast, so in case the network cable is unplugged, local
+                // participants keep receiving DATA(p) announcements
+                const std::string& localhost = localhost_name();
+                uint16_t new_port = 0;
+                try
+                {
+                    eProsimaUDPSocket multicastSocket =
+                            OpenAndBindUnicastOutputSocket(generate_endpoint(localhost, new_port), new_port);
+                    SetSocketOutboundInterface(multicastSocket, localhost);
+
+                    sender_resource_list.emplace_back(
+                        static_cast<SenderResource*>(new UDPSenderResource(*this, multicastSocket, true)));
+                }
+                catch (asio::system_error const& e)
+                {
+                    (void)e;
+                    logWarning(RTPS_MSG_OUT, "UDPTransport Error binding interface "
+                            << localhost << " (skipping) with msg: " << e.what());
+                }
+            }
         }
         else
         {
-            get_unknown_network_interfaces(sender_resource_list, locNames, true);
+            locNames.clear();
+            get_ips(locNames, true);
 
+            bool firstInterface = false;
             for (const auto& infoIP : locNames)
             {
                 if (is_interface_allowed(infoIP.name))
@@ -341,13 +370,13 @@ bool UDPTransportInterface::OpenOutputChannel(
                     eProsimaUDPSocket unicastSocket =
                             OpenAndBindUnicastOutputSocket(generate_endpoint(infoIP.name, port), port);
                     SetSocketOutboundInterface(unicastSocket, infoIP.name);
-                    if (first_time_open_output_channel_)
+                    if (!firstInterface)
                     {
                         getSocketPtr(unicastSocket)->set_option(ip::multicast::enable_loopback(true));
-                        first_time_open_output_channel_ = false;
+                        firstInterface = true;
                     }
                     sender_resource_list.emplace_back(
-                        static_cast<SenderResource*>(new UDPSenderResource(*this, unicastSocket, false, true)));
+                        static_cast<SenderResource*>(new UDPSenderResource(*this, unicastSocket)));
                 }
             }
         }
@@ -368,7 +397,6 @@ bool UDPTransportInterface::OpenOutputChannel(
     }
 
     statistics_info_.add_entry(locator);
-    rescan_interfaces_.store(false);
     return true;
 }
 
@@ -427,7 +455,6 @@ bool UDPTransportInterface::send(
         fastrtps::rtps::LocatorsIterator* destination_locators_begin,
         fastrtps::rtps::LocatorsIterator* destination_locators_end,
         bool only_multicast_purpose,
-        bool whitelisted,
         const std::chrono::steady_clock::time_point& max_blocking_time_point)
 {
     fastrtps::rtps::LocatorsIterator& it = *destination_locators_begin;
@@ -446,7 +473,6 @@ bool UDPTransportInterface::send(
                             socket,
                             *it,
                             only_multicast_purpose,
-                            whitelisted,
                             time_out);
         }
 
@@ -462,7 +488,6 @@ bool UDPTransportInterface::send(
         eProsimaUDPSocket& socket,
         const Locator& remote_locator,
         bool only_multicast_purpose,
-        bool whitelisted,
         const std::chrono::microseconds& timeout)
 {
     using namespace eprosima::fastdds::statistics::rtps;
@@ -475,7 +500,7 @@ bool UDPTransportInterface::send(
     bool success = false;
     bool is_multicast_remote_address = IPLocator::isMulticast(remote_locator);
 
-    if (is_multicast_remote_address == only_multicast_purpose || whitelisted)
+    if (is_multicast_remote_address || !only_multicast_purpose)
     {
         auto destinationEndpoint = generate_endpoint(remote_locator, IPLocator::getPhysicalPort(remote_locator));
 
@@ -672,41 +697,6 @@ bool UDPTransportInterface::fillUnicastLocator(
         locator.port = well_known_port;
     }
     return true;
-}
-
-void UDPTransportInterface::get_unknown_network_interfaces(
-        const SendResourceList& sender_resource_list,
-        std::vector<IPFinder::info_IP>& locNames,
-        bool return_loopback)
-{
-    locNames.clear();
-    if (rescan_interfaces_)
-    {
-        get_ips(locNames, return_loopback);
-        for (auto& sender_resource : sender_resource_list)
-        {
-            UDPSenderResource* udp_sender_resource = UDPSenderResource::cast(*this, sender_resource.get());
-            if (nullptr != udp_sender_resource)
-            {
-                for (auto it = locNames.begin(); it != locNames.end();)
-                {
-                    if (udp_sender_resource->check_ip_address(it->locator))
-                    {
-                        it = locNames.erase(it);
-                    }
-                    else
-                    {
-                        ++it;
-                    }
-                }
-            }
-        }
-    }
-}
-
-void UDPTransportInterface::update_network_interfaces()
-{
-    rescan_interfaces_.store(true);
 }
 
 } // namespace rtps

@@ -136,10 +136,29 @@ public:
     void helper_block_for_at_least_entries(
             uint32_t amount)
     {
-        mock_consumer_->wait_for_at_least_entries(amount);
+        std::unique_lock<std::mutex> lck(*mutex_);
+        mock_consumer_->cv().wait(lck, [this, amount]
+                {
+                    return mock_consumer_->ConsumedEntriesSize_nts() >= amount;
+                });
     }
 
     eprosima::fastdds::dds::MockConsumer* mock_consumer_;
+
+    mutable std::mutex* mutex_;
+
+protected:
+
+    void SetUp() override
+    {
+        mutex_ = new std::mutex();
+    }
+
+    void TearDown() override
+    {
+        delete mutex_;
+        mutex_ = nullptr;
+    }
 
 };
 
@@ -695,49 +714,6 @@ TEST_F(StatisticsDomainParticipantTests, EnableStatisticsDataWriterFailureIncomp
     EXPECT_EQ(ReturnCode_t::RETCODE_OK, participant->delete_topic(invalid_topic));
     EXPECT_EQ(eprosima::fastdds::dds::DomainParticipantFactory::get_instance()->
                     delete_participant(statistics_participant), ReturnCode_t::RETCODE_OK);
-#endif // FASTDDS_STATISTICS
-}
-
-/**
-
- * This test checks that a participant is correctly deleted by the factory
- * after calling delete_contained_entities() method
- * 1. Create a statistics participant, register type
- * 2. Create a sample topic
- * 3. Perform a delete_contained_entities() in the statistics participant
- * 4. Delete the participant
- */
-TEST_F(StatisticsDomainParticipantTests, DeleteParticipantAfterDeleteContainedEntitiesFailure)
-{
-#ifdef FASTDDS_STATISTICS
-
-    eprosima::fastdds::dds::TypeSupport count_type(new EntityCountPubSubType);
-
-    // 1. Create DomainParticipant with statistics
-    eprosima::fastdds::dds::DomainParticipant* participant =
-            eprosima::fastdds::dds::DomainParticipantFactory::get_instance()->
-                    create_participant(0, eprosima::fastdds::dds::PARTICIPANT_QOS_DEFAULT);
-    ASSERT_NE(participant, nullptr);
-
-    // Register type
-    participant->register_type(count_type);
-
-    // 2. Create a sample topic
-    participant->create_topic(HEARTBEAT_COUNT_TOPIC,
-            count_type->getName(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-
-    DomainParticipant* statistics_participant = DomainParticipant::narrow(participant);
-    ASSERT_NE(statistics_participant, nullptr);
-
-    EXPECT_EQ(ReturnCode_t::RETCODE_OK, statistics_participant->enable_statistics_datawriter(HEARTBEAT_COUNT_TOPIC,
-            STATISTICS_DATAWRITER_QOS));
-
-    // 3. Perform a delete_contained_entities() in the statistics participant
-    EXPECT_EQ(participant->delete_contained_entities(), ReturnCode_t::RETCODE_OK);
-
-    // 4. Delete the participant
-    EXPECT_EQ(eprosima::fastdds::dds::DomainParticipantFactory::get_instance()->
-                    delete_participant(participant), ReturnCode_t::RETCODE_OK);
 #endif // FASTDDS_STATISTICS
 }
 

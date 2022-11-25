@@ -301,23 +301,22 @@ public:
 
         participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
 
-        if (participant_ != nullptr)
+        ASSERT_NE(participant_, nullptr);
+
+        participant_guid_ = participant_->getGuid();
+
+        // Register type
+        ASSERT_EQ(eprosima::fastrtps::Domain::registerType(participant_, &type_), true);
+
+        //Create subscribe r
+        subscriber_ = eprosima::fastrtps::Domain::createSubscriber(participant_, subscriber_attr, &listener_);
+
+        if (subscriber_ != nullptr)
         {
-            participant_guid_ = participant_->getGuid();
+            std::cout << "Created subscriber " << subscriber_->getGuid() << " for topic " <<
+                subscriber_attr_.topic.topicName << std::endl;
 
-            // Register type
-            ASSERT_EQ(eprosima::fastrtps::Domain::registerType(participant_, &type_), true);
-
-            //Create subscribe r
-            subscriber_ = eprosima::fastrtps::Domain::createSubscriber(participant_, subscriber_attr, &listener_);
-
-            if (subscriber_ != nullptr)
-            {
-                std::cout << "Created subscriber " << subscriber_->getGuid() << " for topic " <<
-                    subscriber_attr_.topic.topicName << std::endl;
-
-                initialized_ = true;
-            }
+            initialized_ = true;
         }
     }
 
@@ -342,7 +341,7 @@ public:
     }
 
     void startReception(
-            const std::list<type>& msgs)
+            std::list<type>& msgs)
     {
         mutex_.lock();
         total_msgs_ = msgs;
@@ -404,13 +403,11 @@ public:
     size_t block_for_at_least(
             size_t at_least)
     {
-        size_t read_count_locked; // solves TSan data race
-        block([this, &read_count_locked, at_least]() -> bool
+        block([this, at_least]() -> bool
                 {
-                    read_count_locked = current_processed_count_;
                     return current_processed_count_ >= at_least;
                 });
-        return read_count_locked;
+        return current_processed_count_;
     }
 
     void block(
@@ -436,8 +433,7 @@ public:
     }
 
     void wait_discovery(
-            std::chrono::seconds timeout = std::chrono::seconds::zero(),
-            unsigned int min_writers = 1)
+            std::chrono::seconds timeout = std::chrono::seconds::zero())
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
@@ -447,57 +443,18 @@ public:
         {
             cvDiscovery_.wait(lock, [&]()
                     {
-                        return matched_ >= min_writers;
+                        return matched_ != 0;
                     });
         }
         else
         {
             cvDiscovery_.wait_for(lock, timeout, [&]()
                     {
-                        return matched_ >= min_writers;
+                        return matched_ != 0;
                     });
         }
 
         std::cout << "Reader discovery finished..." << std::endl;
-    }
-
-    bool wait_participant_discovery(
-            unsigned int min_participants = 1,
-            std::chrono::seconds timeout = std::chrono::seconds::zero())
-    {
-        bool ret_value = true;
-        std::unique_lock<std::mutex> lock(mutexDiscovery_);
-
-        std::cout << "Reader is waiting discovery of at least " << min_participants << " participants..." << std::endl;
-
-        if (timeout == std::chrono::seconds::zero())
-        {
-            cvDiscovery_.wait(lock, [&]()
-                    {
-                        return participant_matched_ >= min_participants;
-                    });
-        }
-        else
-        {
-            if (!cvDiscovery_.wait_for(lock, timeout, [&]()
-                    {
-                        return participant_matched_ >= min_participants;
-                    }))
-            {
-                ret_value = false;
-            }
-        }
-
-        if (ret_value)
-        {
-            std::cout << "Reader participant discovery finished successfully..." << std::endl;
-        }
-        else
-        {
-            std::cout << "Reader participant discovery finished unsuccessfully..." << std::endl;
-        }
-
-        return ret_value;
     }
 
     bool wait_participant_undiscovery(
@@ -538,8 +495,7 @@ public:
         return ret_value;
     }
 
-    void wait_writer_undiscovery(
-            unsigned int matched = 0)
+    void wait_writer_undiscovery()
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
@@ -547,7 +503,7 @@ public:
 
         cvDiscovery_.wait(lock, [&]()
                 {
-                    return matched_ <= matched;
+                    return matched_ == 0;
                 });
 
         std::cout << "Reader removal finished..." << std::endl;
@@ -1049,21 +1005,6 @@ public:
         return *this;
     }
 
-    PubSubReader& initial_announcements(
-            uint32_t count,
-            const eprosima::fastrtps::Duration_t& period)
-    {
-        participant_attr_.rtps.builtin.discovery_config.initial_announcements.count = count;
-        participant_attr_.rtps.builtin.discovery_config.initial_announcements.period = period;
-        return *this;
-    }
-
-    PubSubReader& ownership_exclusive()
-    {
-        subscriber_attr_.qos.m_ownership.kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
-        return *this;
-    }
-
     PubSubReader& load_participant_attr(
             const std::string& xml)
     {
@@ -1263,11 +1204,6 @@ public:
     bool is_matched() const
     {
         return matched_ > 0;
-    }
-
-    unsigned int get_matched() const
-    {
-        return matched_;
     }
 
 private:

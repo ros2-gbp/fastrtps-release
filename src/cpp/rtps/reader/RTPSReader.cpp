@@ -367,29 +367,6 @@ uint64_t RTPSReader::get_unread_count() const
     return total_unread_;
 }
 
-uint64_t RTPSReader::get_unread_count(
-        bool mark_as_read)
-{
-    std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
-    uint64_t ret_val = total_unread_;
-
-    if (mark_as_read)
-    {
-        for (auto it = mp_history->changesBegin(); 0 < total_unread_ && it != mp_history->changesEnd(); ++it)
-        {
-            CacheChange_t* change = *it;
-            if (!change->isRead && get_last_notified(change->writerGUID) >= change->sequenceNumber)
-            {
-                change->isRead = true;
-                assert(0 < total_unread_);
-                --total_unread_;
-            }
-        }
-        assert(0 == total_unread_);
-    }
-    return ret_val;
-}
-
 bool RTPSReader::is_datasharing_compatible_with(
         const WriterProxyData& wdata)
 {
@@ -419,11 +396,8 @@ bool RTPSReader::is_sample_valid(
 {
     if (is_datasharing_compatible_ && datasharing_listener_->writer_is_matched(writer))
     {
-        // Check if the payload is dirty
-        // Note the Payloads used in loans include a mandatory RTPS 2.3 extra header
-        if (!DataSharingPayloadPool::check_sequence_number(
-                    static_cast<const octet*>(data) - SerializedPayload_t::representation_header_size,
-                    sn))
+        //Check if the payload is dirty
+        if (!DataSharingPayloadPool::check_sequence_number(static_cast<const octet*>(data), sn))
         {
             return false;
         }

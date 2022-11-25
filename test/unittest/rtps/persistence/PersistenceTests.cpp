@@ -21,7 +21,6 @@
 
 #include <rtps/common/GuidUtils.hpp>
 #include <fastrtps/utils/TimeConversion.h>
-#include <fastdds/rtps/history/WriterHistory.h>
 
 #include <climits>
 #include <gtest/gtest.h>
@@ -249,15 +248,15 @@ TEST_F(PersistenceTest, Writer)
     SequenceNumber_t max_seq;
     CacheChange_t change;
     GUID_t guid(GuidPrefix_t::unknown(), 1U);
-    WriterHistory history;
+    std::vector<CacheChange_t*> changes;
     change.kind = ALIVE;
     change.writerGUID = guid;
     change.serializedPayload.length = 0;
 
     // Initial load should return empty vector
-    history.m_changes.clear();
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, &history, pool, payload_pool_, max_seq));
-    ASSERT_EQ(history.m_changes.size(), 0u);
+    changes.clear();
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, max_seq));
+    ASSERT_EQ(changes.size(), 0u);
 
     // Add two changes
     change.sequenceNumber.low = 1;
@@ -272,12 +271,12 @@ TEST_F(PersistenceTest, Writer)
     ASSERT_FALSE(service->add_writer_change_to_storage(persist_guid, change));
 
     // Loading should return two changes (seqs = 1, 2)
-    history.m_changes.clear();
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, &history, pool, payload_pool_, max_seq));
-    ASSERT_EQ(history.m_changes.size(), 2u);
+    changes.clear();
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, max_seq));
+    ASSERT_EQ(changes.size(), 2u);
     ASSERT_EQ(max_seq, SequenceNumber_t(0, 2u));
     uint32_t i = 0;
-    for (auto it : history.m_changes)
+    for (auto it : changes)
     {
         ++i;
         ASSERT_EQ(it->sequenceNumber, SequenceNumber_t(0, i));
@@ -289,18 +288,18 @@ TEST_F(PersistenceTest, Writer)
     ASSERT_TRUE(service->remove_writer_change_from_storage(persist_guid, change));
 
     // Loading should return one change (seq = 2)
-    history.m_changes.clear();
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, &history, pool, payload_pool_, max_seq));
-    ASSERT_EQ(history.m_changes.size(), 1u);
-    ASSERT_EQ((*history.m_changes.begin())->sequenceNumber, SequenceNumber_t(0, 2));
+    changes.clear();
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, max_seq));
+    ASSERT_EQ(changes.size(), 1u);
+    ASSERT_EQ((*changes.begin())->sequenceNumber, SequenceNumber_t(0, 2));
     ASSERT_EQ(max_seq, SequenceNumber_t(0, 2u));
 
     // Remove seq = 2, and check that load returns empty vector
-    history.m_changes.clear();
+    changes.clear();
     change.sequenceNumber.low = 2;
     ASSERT_TRUE(service->remove_writer_change_from_storage(persist_guid, change));
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, &history, pool, payload_pool_, max_seq));
-    ASSERT_EQ(history.m_changes.size(), 0u);
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, max_seq));
+    ASSERT_EQ(changes.size(), 0u);
     ASSERT_EQ(max_seq, SequenceNumber_t(0, 2u));
 }
 
@@ -361,19 +360,19 @@ TEST_P(PersistenceTest, SchemaVersionUpdate)
     auto pool = std::make_shared<CacheChangePool>(cfg, init_cache);
     CacheChange_t change;
     GUID_t guid(GuidPrefix_t::unknown(), 1U);
-    WriterHistory history;
+    std::vector<CacheChange_t*> changes;
     SequenceNumber_t last_seq_number;
     change.kind = ALIVE;
     change.writerGUID = guid;
     change.serializedPayload.length = 0;
 
     // Load data
-    history.m_changes.clear();
-    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, &history, pool, payload_pool_, last_seq_number));
-    ASSERT_EQ(history.m_changes.size(), 2u);
+    changes.clear();
+    ASSERT_TRUE(service->load_writer_from_storage(persist_guid, guid, changes, pool, payload_pool_, last_seq_number));
+    ASSERT_EQ(changes.size(), 2u);
     ASSERT_EQ(last_seq_number, SequenceNumber_t(0, 2u));
     uint32_t i = 0;
-    for (auto it : history.m_changes)
+    for (auto it : changes)
     {
         ++i;
         ASSERT_EQ(it->sequenceNumber, SequenceNumber_t(0, i));

@@ -40,7 +40,7 @@
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::rtps::security;
 
-constexpr int initialization_vector_suffix_length = 8;
+CONSTEXPR int initialization_vector_suffix_length = 8;
 
 static KeyMaterial_AES_GCM_GMAC* find_key(
         KeyMaterial_AES_GCM_GMAC_Seq& keys,
@@ -153,7 +153,7 @@ bool AESGCMGMAC_Transform::encode_serialized_payload(
 
     try
     {
-        std::vector<std::shared_ptr<DatareaderCryptoHandle>> receiving_datareader_crypto_list;
+        std::vector<DatareaderCryptoHandle*> receiving_datareader_crypto_list;
         if (!serialize_SecureDataTag(serializer, keyMat.transformation_kind, session->session_id,
                 initialization_vector, receiving_datareader_crypto_list, false, tag, nKeys - 1))
         {
@@ -176,7 +176,7 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
         CDRMessage_t& encoded_rtps_submessage,
         const CDRMessage_t& plain_rtps_submessage,
         DatawriterCryptoHandle& sending_datawriter_crypto,
-        std::vector<std::shared_ptr<DatareaderCryptoHandle>>& receiving_datareader_crypto_list,
+        std::vector<DatareaderCryptoHandle*>& receiving_datareader_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_WriterCryptoHandle& local_writer = AESGCMGMAC_WriterCryptoHandle::narrow(sending_datawriter_crypto);
@@ -318,7 +318,7 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
         CDRMessage_t& encoded_rtps_submessage,
         const CDRMessage_t& plain_rtps_submessage,
         DatareaderCryptoHandle& sending_datareader_crypto,
-        std::vector<std::shared_ptr<DatawriterCryptoHandle>>& receiving_datawriter_crypto_list,
+        std::vector<DatawriterCryptoHandle*>& receiving_datawriter_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_ReaderCryptoHandle& local_reader = AESGCMGMAC_ReaderCryptoHandle::narrow(sending_datareader_crypto);
@@ -460,7 +460,7 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
         CDRMessage_t& encoded_rtps_message,
         const CDRMessage_t& plain_rtps_message,
         ParticipantCryptoHandle& sending_crypto,
-        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
+        std::vector<ParticipantCryptoHandle*>& receiving_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_ParticipantCryptoHandle& local_participant = AESGCMGMAC_ParticipantCryptoHandle::narrow(sending_crypto);
@@ -885,9 +885,10 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
     //TODO(Ricardo) Deserializing header two times, here preprocessing and decoding submessage.
     //KeyId is present in Header->transform_identifier->transformation_key_id and contains the sender_key_id
 
-    for (auto& wt_sp : remote_participant->Writers)
+    for (std::vector<DatawriterCryptoHandle*>::iterator it = remote_participant->Writers.begin();
+            it != remote_participant->Writers.end(); ++it)
     {
-        AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(*wt_sp);
+        AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(**it);
         auto& wKeyMats = writer->Entity2RemoteKeyMaterial;
 
         if (wKeyMats.size() == 0)
@@ -900,7 +901,7 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         {
             // Remote writer found
             secure_submessage_category = DATAWRITER_SUBMESSAGE;
-            *datawriter_crypto = wt_sp.get();
+            *datawriter_crypto = *it;
 
             //We have the remote writer, now lets look for the local datareader
             bool found = lookup_reader(local_participant, datareader_crypto, key_id);
@@ -921,9 +922,10 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         } //Remote writer key found
     } //For each datawriter present in the remote participant
 
-    for (auto& rd_sh : remote_participant->Readers)
+    for (std::vector<DatareaderCryptoHandle*>::iterator it = remote_participant->Readers.begin();
+            it != remote_participant->Readers.end(); ++it)
     {
-        AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(*rd_sh);
+        AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(**it);
 
         auto& rKeyMats = reader->Entity2RemoteKeyMaterial;
 
@@ -937,7 +939,7 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         {
             // Remote reader found
             secure_submessage_category = DATAREADER_SUBMESSAGE;
-            *datareader_crypto = rd_sh.get();
+            *datareader_crypto = *it;
 
             //We have the remote reader, now lets look for the local datawriter
             bool found = lookup_writer(local_participant, datawriter_crypto, key_id);
@@ -1699,7 +1701,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
         const std::array<uint8_t, 4>& transformation_kind,
         const uint32_t session_id,
         const std::array<uint8_t, 12>& initialization_vector,
-        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
+        std::vector<EntityCryptoHandle*>& receiving_crypto_list,
         bool update_specific_keys,
         SecureDataTag& tag,
         size_t sessionIndex)
@@ -1817,7 +1819,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
         eprosima::fastcdr::Cdr& serializer,
         const AESGCMGMAC_ParticipantCryptoHandle& local_participant,
         const std::array<uint8_t, 12>& initialization_vector,
-        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
+        std::vector<ParticipantCryptoHandle*>& receiving_crypto_list,
         bool update_specific_keys,
         SecureDataTag& tag)
 {
@@ -2183,15 +2185,15 @@ bool AESGCMGMAC_Transform::deserialize_SecureDataTag(
     return true;
 }
 
-constexpr uint32_t srtps_prefix_length = 4;
+CONSTEXPR uint32_t srtps_prefix_length = 4;
 // 4 bytes to serialize length of the body.
-constexpr uint32_t srtps_postfix_length = 4;
-constexpr uint32_t sec_prefix_length = 4;
+CONSTEXPR uint32_t srtps_postfix_length = 4;
+CONSTEXPR uint32_t sec_prefix_length = 4;
 // 4 bytes to serialize length of the body.
-constexpr uint32_t sec_postfix_length = 4;
-constexpr uint32_t aesgcmgmac_header_length = 20;
-constexpr uint32_t aesgcmgmac_body_length_attr = 4 + 3 /*possible alignment*/;
-constexpr uint32_t aesgcmgmac_common_tag = 16;
+CONSTEXPR uint32_t sec_postfix_length = 4;
+CONSTEXPR uint32_t aesgcmgmac_header_length = 20;
+CONSTEXPR uint32_t aesgcmgmac_body_length_attr = 4 + 3 /*possible alignment*/;
+CONSTEXPR uint32_t aesgcmgmac_common_tag = 16;
 
 uint32_t AESGCMGMAC_Transform::calculate_extra_size_for_rtps_message(
         uint32_t number_discovered_participants) const
@@ -2244,7 +2246,7 @@ bool AESGCMGMAC_Transform::lookup_reader(
         DatareaderCryptoHandle** datareader_crypto,
         CryptoTransformKeyId key_id)
 {
-    for (auto& readerHandle : participant->Readers)
+    for (DatareaderCryptoHandle* readerHandle : participant->Readers)
     {
         AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(*readerHandle);
 
@@ -2258,7 +2260,7 @@ bool AESGCMGMAC_Transform::lookup_reader(
         {
             if (elem.sender_key_id == key_id)
             {
-                *datareader_crypto = readerHandle.get();
+                *datareader_crypto = readerHandle;
                 return true;
             }
         }   //For each Reader2WriterKeyMaterial in the datareader
@@ -2272,7 +2274,7 @@ bool AESGCMGMAC_Transform::lookup_writer(
         DatawriterCryptoHandle** datawriter_crypto,
         CryptoTransformKeyId key_id)
 {
-    for (auto& writerHandle : participant->Writers)
+    for (DatawriterCryptoHandle* writerHandle : participant->Writers)
     {
         AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(*writerHandle);
 
@@ -2286,7 +2288,7 @@ bool AESGCMGMAC_Transform::lookup_writer(
         {
             if (elem.sender_key_id == key_id)
             {
-                *datawriter_crypto = writerHandle.get();
+                *datawriter_crypto = writerHandle;
                 return true;
             }
         }   //For each Writer2ReaderKeyMaterial in the datawriter

@@ -19,14 +19,14 @@
 #ifndef _RTPS_PARTICIPANT_RTPSPARTICIPANTIMPL_H_
 #define _RTPS_PARTICIPANT_RTPSPARTICIPANTIMPL_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-
-#include <atomic>
-#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <list>
-#include <mutex>
 #include <sys/types.h>
+#include <mutex>
+#include <atomic>
+#include <chrono>
+#include <fastrtps/utils/Semaphore.h>
 
 #if defined(_WIN32)
 #include <process.h>
@@ -41,12 +41,9 @@
 
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 
-#include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDPSimple.h>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
-
-#include <fastdds/rtps/history/IChangePool.h>
-#include <fastdds/rtps/history/IPayloadPool.h>
 
 #include <fastdds/rtps/network/NetworkFactory.h>
 #include <fastdds/rtps/network/ReceiverResource.h>
@@ -55,7 +52,7 @@
 #include <fastdds/rtps/messages/MessageReceiver.h>
 
 #include <fastdds/rtps/resources/ResourceEvent.h>
-#include "../flowcontrol/FlowControllerFactory.hpp"
+#include <fastdds/rtps/resources/AsyncWriterThread.h>
 
 #include <statistics/rtps/StatisticsBase.hpp>
 
@@ -64,9 +61,6 @@
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <rtps/security/SecurityManager.h>
 #endif // if HAVE_SECURITY
-
-#include <fastrtps/utils/Semaphore.h>
-#include <fastrtps/utils/shared_mutex.hpp>
 
 namespace eprosima {
 
@@ -102,6 +96,7 @@ class ReaderHistory;
 class ReaderListener;
 class StatefulReader;
 class PDPSimple;
+class FlowController;
 class IPersistenceService;
 class WLP;
 
@@ -321,7 +316,6 @@ public:
      */
     inline RTPSParticipantListener* getListener()
     {
-        std::lock_guard<std::recursive_mutex> _(*getParticipantMutex());
         return mp_participantListener;
     }
 
@@ -332,7 +326,6 @@ public:
     void set_listener(
             RTPSParticipantListener* listener)
     {
-        std::lock_guard<std::recursive_mutex> _(*getParticipantMutex());
         mp_participantListener = listener;
     }
 
@@ -345,6 +338,11 @@ public:
     inline RTPSParticipant* getUserRTPSParticipant()
     {
         return mp_userParticipant;
+    }
+
+    std::vector<std::unique_ptr<FlowController>>& getFlowControllers()
+    {
+        return m_controllers;
     }
 
     /*!
@@ -375,14 +373,14 @@ public:
         return security_attributes_;
     }
 
-    inline bool is_security_initialized() const
+    bool is_security_initialized() const
     {
-        return m_security_manager.is_security_initialized();
+        return m_security_manager_initialized;
     }
 
-    inline bool is_secure() const
+    bool is_secure() const
     {
-        return m_security_manager.is_security_active();
+        return m_is_security_active;
     }
 
     bool pairing_remote_reader_with_local_writer_after_security(
@@ -443,6 +441,11 @@ public:
     void get_sending_locators(
             rtps::LocatorList_t& locators) const;
 
+    AsyncWriterThread& async_thread()
+    {
+        return async_thread_;
+    }
+
     /***
      * @returns A pointer to a local reader given its endpoint guid, or nullptr if not found.
      */
@@ -488,28 +491,10 @@ public:
             const LocatorList_t& MulticastLocatorList,
             const LocatorList_t& UnicastLocatorList) const;
 
-    //! Getter client_override flag
-    bool client_override()
-    {
-        return client_override_;
-    }
-
-    //! Setter client_override flag
-    void client_override(
-            bool value)
-    {
-        client_override_ = value;
-    }
-
     //! Retrieve persistence guid prefix
     GuidPrefix_t get_persistence_guid_prefix() const
     {
         return m_persistence_guid.guidPrefix;
-    }
-
-    bool is_initialized() const
-    {
-        return initialized_;
     }
 
 private:
@@ -520,8 +505,6 @@ private:
     RTPSParticipantAttributes m_att;
     //!Guid of the RTPSParticipant.
     GUID_t m_guid;
-    //! String containing the RTPSParticipant Guid.
-    std::string guid_str_;
     //!Persistence guid of the RTPSParticipant
     GUID_t m_persistence_guid;
     //! Sending resources. - DEPRECATED -Stays commented for reference purposes
@@ -533,9 +516,7 @@ private:
     //!Semaphore to wait for the listen thread creation.
     Semaphore* mp_ResourceSemaphore;
     //!Id counter to correctly assign the ids to writers and readers.
-    std::atomic<uint32_t> IdCounter;
-    //! Mutex to safely access endpoints collections
-    mutable shared_mutex endpoints_list_mutex;
+    uint32_t IdCounter;
     //!Writer List.
     std::vector<RTPSWriter*> m_allWriterList;
     //!Reader List
@@ -547,25 +528,20 @@ private:
     std::vector<RTPSReader*> m_userReaderList;
     //!Network Factory
     NetworkFactory m_network_Factory;
+    //!Async writer thread
+    AsyncWriterThread async_thread_;
     //! Type cheking function
     std::function<bool(const std::string&)> type_check_fn_;
     //!Pool of send buffers
     std::unique_ptr<SendBuffersManager> send_buffers_;
 
-    /**
-     * Client override flag: SIMPLE participant that has been overriden with the environment variable and transformed
-     * into a client.
-     */
-    bool client_override_;
-
-    //! Autogenerated metatraffic locators flag
-    bool internal_metatraffic_locators_;
-    //! Autogenerated default locators flag
-    bool internal_default_locators_;
-
 #if HAVE_SECURITY
     // Security manager
     security::SecurityManager m_security_manager;
+    // Security manager initialization result
+    bool m_security_manager_initialized = false;
+    // Security activation flag
+    bool m_is_security_active = false;
 #endif // if HAVE_SECURITY
 
     //! Encapsulates all associated resources on a Receiving element.
@@ -581,9 +557,6 @@ private:
     RTPSParticipantListener* mp_participantListener;
     //!Pointer to the user participant
     RTPSParticipant* mp_userParticipant;
-
-    //! Determine if the RTPSParticipantImpl was initialized successfully.
-    bool initialized_ = false;
 
     RTPSParticipantImpl& operator =(
             const RTPSParticipantImpl&) = delete;
@@ -659,9 +632,9 @@ private:
     bool is_intraprocess_only_;
 
     /*
-     * Flow controller factory.
+     * Flow controllers for this participant.
      */
-    fastdds::rtps::FlowControllerFactory flow_controller_factory_;
+    std::vector<std::unique_ptr<FlowController>> m_controllers;
 
 #if HAVE_SECURITY
     security::ParticipantSecurityAttributes security_attributes_;
@@ -701,6 +674,12 @@ private:
             const EndpointAttributes& param,
             IPersistenceService*& service);
 
+    template <EndpointKind_t kind, octet no_key, octet with_key>
+    bool preprocess_endpoint_attributes(
+            const EntityId_t& entity_id,
+            EndpointAttributes& att,
+            EntityId_t& entId);
+
     template<typename Functor>
     bool create_writer(
             RTPSWriter** writer_out,
@@ -717,16 +696,6 @@ private:
             bool is_builtin,
             bool enable,
             const Functor& callback);
-
-    /**
-     * Get default metatraffic locators when not provided by the user.
-     */
-    void get_default_metatraffic_locators();
-
-    /**
-     * Get default unicast locators when not provided by the user.
-     */
-    void get_default_unicast_locators();
 
 public:
 
@@ -768,28 +737,6 @@ public:
             RTPSWriter** Writer,
             WriterAttributes& param,
             const std::shared_ptr<IPayloadPool>& payload_pool,
-            WriterHistory* hist,
-            WriterListener* listen,
-            const EntityId_t& entityId = c_EntityId_Unknown,
-            bool isBuiltin = false);
-
-    /**
-     * Create a Writer in this RTPSParticipant with a custom payload pool.
-     * @param Writer Pointer to pointer of the Writer, used as output. Only valid if return==true.
-     * @param watt WriterAttributes to define the Writer.
-     * @param payload_pool Shared pointer to the IPayloadPool
-     * @param change_pool Shared pointer to the IChangePool
-     * @param hist Pointer to the WriterHistory.
-     * @param listen Pointer to the WriterListener.
-     * @param entityId EntityId assigned to the Writer.
-     * @param isBuiltin Bool value indicating if the Writer is builtin (Discovery or Liveliness protocol) or is created for the end user.
-     * @return True if the Writer was correctly created.
-     */
-    bool create_writer(
-            RTPSWriter** Writer,
-            WriterAttributes& watt,
-            const std::shared_ptr<IPayloadPool>& payload_pool,
-            const std::shared_ptr<IChangePool>& change_pool,
             WriterHistory* hist,
             WriterListener* listen,
             const EntityId_t& entityId = c_EntityId_Unknown,
@@ -857,25 +804,15 @@ public:
 
     /**
      * Register a Reader in the BuiltinProtocols.
-     * @param Reader          Pointer to the RTPSReader.
-     * @param topicAtt        TopicAttributes of the Reader.
-     * @param rqos            ReaderQos.
-     * @param content_filter  Optional content filtering information.
-     * @return True if correctly registered.
+     * @param Reader Pointer to the RTPSReader.
+     * @param topicAtt TopicAttributes of the Reader.
+     * @param rqos ReaderQos.
+     * @return  True if correctly registered.
      */
     bool registerReader(
             RTPSReader* Reader,
             const TopicAttributes& topicAtt,
-            const ReaderQos& rqos,
-            const fastdds::rtps::ContentFilterProperty* content_filter = nullptr);
-
-    /**
-     * Update participant attributes.
-     * @param patt New participant attributes.
-     * @return True on success, false otherwise.
-     */
-    void update_attributes(
-            const RTPSParticipantAttributes& patt);
+            const ReaderQos& rqos);
 
     /**
      * Update local writer QoS
@@ -890,17 +827,14 @@ public:
 
     /**
      * Update local reader QoS
-     * @param Reader          Reader to update
-     * @param topicAtt        TopicAttributes of the Reader.
-     * @param rqos            New QoS for the reader
-     * @param content_filter  Optional content filtering information.
+     * @param Reader Reader to update
+     * @param rqos New QoS for the reader
      * @return True on success
      */
     bool updateLocalReader(
             RTPSReader* Reader,
             const TopicAttributes& topicAtt,
-            const ReaderQos& rqos,
-            const fastdds::rtps::ContentFilterProperty* content_filter = nullptr);
+            const ReaderQos& rqos);
 
     /**
      * Get the participant attributes
@@ -917,54 +851,42 @@ public:
      * @return True on success
      */
     bool deleteUserEndpoint(
-            const GUID_t&);
+            Endpoint*);
 
-    //! Delete all user endpoints, builtin are disposed in its related classes
-    void deleteAllUserEndpoints();
-
-    /** Traverses the user writers collection transforming its elements with a provided functor
-     * @param f - Functor applied to each element. Must accept a reference as parameter. Should return true to keep iterating.
-     * @return Functor provided in order to allow aggregates retrieval
+    /**
+     * Get the begin of the user reader list
+     * @return Iterator pointing to the begin of the user reader list
      */
-    template<class Functor>
-    Functor forEachUserWriter(
-            Functor f)
+    std::vector<RTPSReader*>::iterator userReadersListBegin()
     {
-        // check if we are reentrying
-        shared_lock<shared_mutex> _(endpoints_list_mutex);
-
-        // traverse the list
-        for ( RTPSWriter* pw : m_userWriterList)
-        {
-            if (!f(*pw))
-            {
-                break;
-            }
-        }
-
-        return f;
+        return m_userReaderList.begin();
     }
 
-    /** Traverses the user readers collection transforming its elements with a provided functor
-     * @param f - Functor applied to each element. Must accept a reference as parameter. Should return true to keep iterating.
-     * @return Functor provided in order to allow aggregates retrieval
+    /**
+     * Get the end of the user reader list
+     * @return Iterator pointing to the end of the user reader list
      */
-    template<class Functor>
-    Functor forEachUserReader(
-            Functor f)
+    std::vector<RTPSReader*>::iterator userReadersListEnd()
     {
-        // check if we are reentrying
-        shared_lock<shared_mutex> _(endpoints_list_mutex);
+        return m_userReaderList.end();
+    }
 
-        for ( RTPSReader* pr : m_userReaderList)
-        {
-            if (!f(*pr))
-            {
-                break;
-            }
-        }
+    /**
+     * Get the begin of the user writer list
+     * @return Iterator pointing to the begin of the user writer list
+     */
+    std::vector<RTPSWriter*>::iterator userWritersListBegin()
+    {
+        return m_userWriterList.begin();
+    }
 
-        return f;
+    /**
+     * Get the end of the user writer list
+     * @return Iterator pointing to the end of the user writer list
+     */
+    std::vector<RTPSWriter*>::iterator userWritersListEnd()
+    {
+        return m_userWriterList.end();
     }
 
     /** Helper function that creates ReceiverResources based on a Locator_t List, possibly mutating
@@ -985,18 +907,6 @@ public:
             const Locator_t& locator);
 
     bool networkFactoryHasRegisteredTransports() const;
-
-    /**
-     * Function run when the RTPSDomain is notified that the environment file has changed.
-     */
-    void environment_file_has_changed();
-
-    template <EndpointKind_t kind, octet no_key, octet with_key>
-    static bool preprocess_endpoint_attributes(
-            const EntityId_t& entity_id,
-            std::atomic<uint32_t>& id_count,
-            EndpointAttributes& att,
-            EntityId_t& entId);
 
 #if HAVE_SECURITY
     void set_endpoint_rtps_protection_supports(

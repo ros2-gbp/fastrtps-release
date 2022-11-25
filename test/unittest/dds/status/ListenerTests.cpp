@@ -41,7 +41,6 @@
 using ::testing::StrictMock;
 using ::testing::NiceMock;
 using ::testing::Mock;
-using ::testing::_;
 
 using eprosima::fastrtps::rtps::RTPSDomain;
 
@@ -568,10 +567,6 @@ protected:
         subscriber_ =
                 participant_->create_subscriber(SUBSCRIBER_QOS_DEFAULT, &subscriber_listener_);
         ASSERT_NE(subscriber_, nullptr);
-
-        EXPECT_CALL(participant_mock_,
-                registerReader(&reader_mock_, ::testing::_, ::testing::_, nullptr)).WillRepeatedly(
-            ::testing::Return(true));
 
         datareader_ =
                 subscriber_->create_datareader(topic_, DATAREADER_QOS_DEFAULT, &datareader_listener_);
@@ -1329,18 +1324,10 @@ void verify_expectations_on_data_available (
 {
     fastrtps::rtps::CacheChange_t change;
 
-    auto seq = change.sequenceNumber;
-    bool notify_individual = false;
-
-    EXPECT_CALL(*RTPSDomain::reader_->history_, get_change(_, _, _))
-            .WillRepeatedly(testing::DoAll(testing::SetArgPointee<2>(&change), testing::Return(true)));
-
-    RTPSDomain::reader_->listener_->on_data_available(nullptr, change.writerGUID, seq, seq, notify_individual);
-
+    RTPSDomain::reader_->listener_->onNewCacheChangeAdded(nullptr, &change);
     Mock::VerifyAndClearExpectations(&datareader_listener_);
     Mock::VerifyAndClearExpectations(&subscriber_listener_);
     Mock::VerifyAndClearExpectations(&participant_listener_);
-    Mock::VerifyAndClearExpectations(RTPSDomain::reader_->history_);
 }
 
 TEST_F(UserListeners, data_available)

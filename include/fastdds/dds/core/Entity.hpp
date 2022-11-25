@@ -40,20 +40,18 @@ public:
 
     /**
      * @brief Constructor
-     *
      * @param mask StatusMask (default: all)
      */
     RTPS_DllAPI Entity(
             const StatusMask& mask = StatusMask::all())
         : status_mask_(mask)
-        , status_condition_(this)
+        , status_changes_(StatusMask::none())
         , enable_(false)
     {
     }
 
     /**
      * @brief This operation enables the Entity
-     *
      * @return RETCODE_OK
      */
     virtual fastrtps::types::ReturnCode_t enable()
@@ -72,7 +70,6 @@ public:
 
     /**
      * @brief Retrieves the set of relevant statuses for the Entity
-     *
      * @return Reference to the StatusMask with the relevant statuses set to 1
      */
     RTPS_DllAPI const StatusMask& get_status_mask() const
@@ -94,11 +91,13 @@ public:
      *
      * @return const reference to the StatusMask with the triggered statuses set to 1
      */
-    RTPS_DllAPI const StatusMask& get_status_changes() const;
+    RTPS_DllAPI const StatusMask& get_status_changes() const
+    {
+        return status_changes_;
+    }
 
     /**
      * @brief Retrieves the instance handler that represents the Entity
-     *
      * @return Reference to the InstanceHandle
      */
     const InstanceHandle_t& get_instance_handle() const
@@ -108,7 +107,6 @@ public:
 
     /**
      * @brief Checks if the Entity is enabled
-     *
      * @return true if enabled, false if not
      */
     RTPS_DllAPI bool is_enabled() const
@@ -124,11 +122,11 @@ public:
 
     /**
      * @brief Allows access to the StatusCondition associated with the Entity
-     *
      * @return Reference to StatusCondition object
      */
-    RTPS_DllAPI StatusCondition& get_statuscondition()
+    RTPS_DllAPI const StatusCondition& get_statuscondition() const
     {
+        logWarning(CONDITION, "get_statuscondition method not implemented");
         return status_condition_;
     }
 
@@ -136,7 +134,6 @@ protected:
 
     /**
      * @brief Setter for the Instance Handle
-     *
      * @param handle Instance Handle
      */
     RTPS_DllAPI void set_instance_handle(
@@ -147,6 +144,9 @@ protected:
 
     //! StatusMask with relevant statuses set to 1
     StatusMask status_mask_;
+
+    //! StatusMask with triggered statuses set to 1
+    StatusMask status_changes_;
 
     //! Condition associated to the Entity
     StatusCondition status_condition_;
@@ -168,10 +168,9 @@ public:
 
     /**
      * @brief Constructor
-     *
      * @param mask StatusMask (default: all)
      */
-    DomainEntity(
+    RTPS_DllAPI DomainEntity(
             const StatusMask& mask = StatusMask::all())
         : Entity(mask)
     {

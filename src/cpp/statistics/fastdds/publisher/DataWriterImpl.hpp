@@ -48,7 +48,8 @@ public:
             efd::Topic* topic,
             const efd::DataWriterQos& qos,
             const eprosima::fastrtps::rtps::EntityId_t& entity_id)
-        : BaseType(p, type, topic, qos, entity_id, nullptr)
+        : BaseType(p, type, topic, qos, nullptr)
+        , entity_id_(entity_id)
     {
     }
 
@@ -91,9 +92,27 @@ public:
         BaseType::disable();
     }
 
+protected:
+
+    fastrtps::rtps::RTPSWriter* create_rtps_writer(
+            fastrtps::rtps::RTPSParticipant* p,
+            fastrtps::rtps::WriterAttributes& watt,
+            const std::shared_ptr<IPayloadPool>& payload_pool,
+            fastrtps::rtps::WriterHistory* hist,
+            fastrtps::rtps::WriterListener* listen) override
+    {
+        if (entity_id_.unknown() == entity_id_)
+        {
+            return BaseType::create_rtps_writer(p, watt, payload_pool, hist, listen);
+        }
+
+        return fastrtps::rtps::RTPSDomain::createRTPSWriter(p, entity_id_, watt, payload_pool, hist, listen);
+    }
+
 private:
 
     std::shared_ptr<IListener> statistics_listener_;
+    eprosima::fastrtps::rtps::EntityId_t entity_id_;
 };
 
 } // dds

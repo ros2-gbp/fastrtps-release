@@ -38,9 +38,6 @@ class Cdr;
 namespace fastrtps {
 namespace types {
 
-//! A special value indicating an unlimited quantity
-constexpr uint32_t BOUND_UNLIMITED = 0;
-
 using eprosima::fastrtps::rtps::octet;
 
 using OctetSeq = std::vector<octet>;
@@ -191,7 +188,7 @@ class RTPS_DllAPI ReturnCode_t
 
 public:
 
-    enum ReturnCodeValue
+    enum
     {
         RETCODE_OK = 0,
         RETCODE_ERROR = 1,

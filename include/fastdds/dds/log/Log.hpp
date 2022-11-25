@@ -15,6 +15,7 @@
 #ifndef _FASTDDS_DDS_LOG_LOG_HPP_
 #define _FASTDDS_DDS_LOG_LOG_HPP_
 
+#include <fastrtps/utils/DBQueue.h>
 #include <fastrtps/fastrtps_dll.h>
 #include <thread>
 #include <sstream>
@@ -115,7 +116,7 @@ public:
     //! Returns the logging engine to configuration defaults.
     RTPS_DllAPI static void Reset();
 
-    //! Waits until all info logged up to the call time is consumed
+    //! Waits until no more log info is available
     RTPS_DllAPI static void Flush();
 
     //! Stops the logging thread. It will re-launch on the next call to a successful log macro.
@@ -153,6 +154,36 @@ public:
 
 private:
 
+    struct Resources
+    {
+        fastrtps::DBQueue<Entry> logs;
+        std::vector<std::unique_ptr<LogConsumer>> consumers;
+        std::unique_ptr<std::thread> logging_thread;
+
+        // Condition variable segment.
+        std::condition_variable cv;
+        std::mutex cv_mutex;
+        bool logging;
+        bool work;
+        int current_loop;
+
+        // Context configuration.
+        std::mutex config_mutex;
+        bool filenames;
+        bool functions;
+        std::unique_ptr<std::regex> category_filter;
+        std::unique_ptr<std::regex> filename_filter;
+        std::unique_ptr<std::regex> error_string_filter;
+
+        std::atomic<Log::Kind> verbosity;
+
+        Resources();
+
+        ~Resources();
+    };
+
+    static struct Resources resources_;
+
     // Applies transformations to the entries compliant with the options selected (such as
     // erasure of certain context information, or filtering by category. Returns false
     // if the log entry is blacklisted.
@@ -160,6 +191,9 @@ private:
             Entry&);
 
     static void run();
+
+    static void get_timestamp(
+            std::string&);
 };
 
 /**
@@ -176,27 +210,27 @@ public:
 
 protected:
 
-    RTPS_DllAPI void print_timestamp(
+    void print_timestamp(
             std::ostream& stream,
             const Log::Entry&,
             bool color) const;
 
-    RTPS_DllAPI void print_header(
+    void print_header(
             std::ostream& stream,
             const Log::Entry&,
             bool color) const;
 
-    RTPS_DllAPI void print_context(
+    void print_context(
             std::ostream& stream,
             const Log::Entry&,
             bool color) const;
 
-    RTPS_DllAPI void print_message(
+    void print_message(
             std::ostream& stream,
             const Log::Entry&,
             bool color) const;
 
-    RTPS_DllAPI void print_new_line(
+    void print_new_line(
             std::ostream& stream,
             bool color) const;
 };
@@ -257,8 +291,7 @@ protected:
 // Allow multiconfig platforms like windows to disable info queueing on Release and other non-debug configs
 #if !HAVE_LOG_NO_INFO &&  \
     (defined(FASTDDS_ENFORCE_LOG_INFO) || \
-    ((defined(__INTERNALDEBUG) || defined(_INTERNALDEBUG)) && (defined(_DEBUG) || defined(__DEBUG) || \
-    !defined(NDEBUG))))
+    ((defined(__INTERNALDEBUG) || defined(_INTERNALDEBUG)) && (defined(_DEBUG) || defined(__DEBUG))))
 #define logInfo_(cat, msg)                                                                              \
     {                                                                                                   \
         using namespace eprosima::fastdds::dds;                                                         \

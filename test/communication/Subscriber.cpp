@@ -26,7 +26,6 @@
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/Domain.h>
 #include <fastrtps/subscriber/SampleInfo.h>
-#include <fastrtps/TopicDataType.h>
 
 #include <fstream>
 #include <string>
@@ -62,11 +61,11 @@ bool Subscriber::init(
     // Construct a FixedSizedType if fixed type is required, defult HelloWorldType
     if (fixed_type)
     {
-        type_ = new FixedSizedPubSubType();
+        type_ = new FixedSizedType();
     }
     else
     {
-        type_ = new HelloWorldPubSubType();
+        type_ = new HelloWorldType();
     }
 
     //Register the type

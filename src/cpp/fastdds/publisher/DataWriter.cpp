@@ -101,14 +101,6 @@ ReturnCode_t DataWriter::write(
 ReturnCode_t DataWriter::write_w_timestamp(
         void* data,
         const InstanceHandle_t& handle,
-        const fastrtps::Time_t& timestamp)
-{
-    return impl_->write_w_timestamp(data, handle, timestamp);
-}
-
-ReturnCode_t DataWriter::write_w_timestamp(
-        void* data,
-        const InstanceHandle_t& handle,
         const fastrtps::rtps::Time_t& timestamp)
 {
     static_cast<void> (data);
@@ -121,13 +113,6 @@ InstanceHandle_t DataWriter::register_instance(
         void* instance)
 {
     return impl_->register_instance(instance);
-}
-
-InstanceHandle_t DataWriter::register_instance_w_timestamp(
-        void* instance,
-        const fastrtps::Time_t& timestamp)
-{
-    return impl_->register_instance_w_timestamp(instance, timestamp);
 }
 
 InstanceHandle_t DataWriter::register_instance_w_timestamp(
@@ -150,14 +135,6 @@ ReturnCode_t DataWriter::unregister_instance(
 ReturnCode_t DataWriter::unregister_instance_w_timestamp(
         void* instance,
         const InstanceHandle_t& handle,
-        const fastrtps::Time_t& timestamp)
-{
-    return impl_->unregister_instance_w_timestamp(instance, handle, timestamp);
-}
-
-ReturnCode_t DataWriter::unregister_instance_w_timestamp(
-        void* instance,
-        const InstanceHandle_t& handle,
         const fastrtps::rtps::Time_t& timestamp)
 {
     static_cast<void> (instance);
@@ -170,7 +147,9 @@ ReturnCode_t DataWriter::get_key_value(
         void* key_holder,
         const InstanceHandle_t& handle)
 {
-    return impl_->get_key_value(key_holder, handle);
+    static_cast<void> (key_holder);
+    static_cast<void> (handle);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 InstanceHandle_t DataWriter::lookup_instance(
@@ -188,14 +167,6 @@ ReturnCode_t DataWriter::dispose(
     return impl_->unregister_instance(data, handle, true);
 }
 
-ReturnCode_t DataWriter::dispose_w_timestamp(
-        void* instance,
-        const InstanceHandle_t& handle,
-        const fastrtps::Time_t& timestamp)
-{
-    return impl_->unregister_instance_w_timestamp(instance, handle, timestamp, true);
-}
-
 const fastrtps::rtps::GUID_t& DataWriter::guid() const
 {
     return impl_->guid();
@@ -204,11 +175,6 @@ const fastrtps::rtps::GUID_t& DataWriter::guid() const
 InstanceHandle_t DataWriter::get_instance_handle() const
 {
     return impl_->get_instance_handle();
-}
-
-TypeSupport DataWriter::get_type() const
-{
-    return impl_->get_type();
 }
 
 ReturnCode_t DataWriter::set_qos(
@@ -284,7 +250,11 @@ ReturnCode_t DataWriter::get_offered_incompatible_qos_status(
 ReturnCode_t DataWriter::get_publication_matched_status(
         PublicationMatchedStatus& status) const
 {
-    return impl_->get_publication_matched_status(status);
+    static_cast<void> (status);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->get_publication_matched_status(status);
+     */
 }
 
 ReturnCode_t DataWriter::get_liveliness_lost_status(
@@ -300,7 +270,7 @@ ReturnCode_t DataWriter::assert_liveliness()
 
 ReturnCode_t DataWriter::get_matched_subscription_data(
         builtin::SubscriptionBuiltinTopicData& subscription_data,
-        const InstanceHandle_t& subscription_handle) const
+        const fastrtps::rtps::InstanceHandle_t& subscription_handle) const
 {
     static_cast<void> (subscription_data);
     static_cast<void> (subscription_handle);
@@ -311,17 +281,7 @@ ReturnCode_t DataWriter::get_matched_subscription_data(
 }
 
 ReturnCode_t DataWriter::get_matched_subscriptions(
-        std::vector<InstanceHandle_t>& subscription_handles) const
-{
-    static_cast<void> (subscription_handles);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-    /*
-       return impl_->get_matched_subscription_data(subscription_handles);
-     */
-}
-
-ReturnCode_t DataWriter::get_matched_subscriptions(
-        std::vector<InstanceHandle_t*>& subscription_handles) const
+        std::vector<fastrtps::rtps::InstanceHandle_t*>& subscription_handles) const
 {
     static_cast<void> (subscription_handles);
     return ReturnCode_t::RETCODE_UNSUPPORTED;
@@ -340,14 +300,6 @@ ReturnCode_t DataWriter::get_sending_locators(
         rtps::LocatorList& locators) const
 {
     return impl_->get_sending_locators(locators);
-}
-
-ReturnCode_t DataWriter::wait_for_acknowledgments(
-        void* instance,
-        const InstanceHandle_t& handle,
-        const fastrtps::Duration_t& max_wait)
-{
-    return impl_->wait_for_acknowledgments(instance, handle, max_wait);
 }
 
 } // namespace dds

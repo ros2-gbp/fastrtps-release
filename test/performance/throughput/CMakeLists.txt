@@ -37,7 +37,6 @@ target_link_libraries(
     fastrtps
     fastcdr
     foonathan_memory
-    fastdds::optionparser
     ${CMAKE_THREAD_LIBS_INIT}
     ${CMAKE_DL_LIBS}
 )

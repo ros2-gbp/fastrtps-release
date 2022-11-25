@@ -45,20 +45,10 @@
 #include <statistics/types/typesPubSubTypes.h>
 #include <utils/SystemInfo.hpp>
 
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastrtps/xmlparser/XMLParserCommon.h>
-#include <fastdds/utils/QosConverters.hpp>
-
 namespace eprosima {
 namespace fastdds {
 namespace statistics {
 namespace dds {
-
-using fastrtps::xmlparser::XMLProfileManager;
-using fastrtps::xmlparser::XMLP_ret;
-using fastrtps::xmlparser::DEFAULT_STATISTICS_DATAWRITER_PROFILE;
-using fastrtps::PublisherAttributes;
 
 constexpr const char* HISTORY_LATENCY_TOPIC_ALIAS = "HISTORY_LATENCY_TOPIC";
 constexpr const char* NETWORK_LATENCY_TOPIC_ALIAS = "NETWORK_LATENCY_TOPIC";
@@ -141,8 +131,6 @@ ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter(
             auto data_writer = builtin_publisher_impl_->create_datawriter(topic, writer_impl, efd::StatusMask::all());
             if (nullptr == data_writer)
             {
-                // Remove already created Impl
-                delete writer_impl;
                 // Remove topic and type
                 delete_topic_and_type(use_topic_name);
                 logError(STATISTICS_DOMAIN_PARTICIPANT, topic_name << " DataWriter creation has failed");
@@ -173,39 +161,6 @@ ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter(
         }
         return ReturnCode_t::RETCODE_OK;
     }
-    return ReturnCode_t::RETCODE_ERROR;
-}
-
-ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter_with_profile(
-        const std::string& profile_name,
-        const std::string& topic_name)
-{
-    DataWriterQos datawriter_qos;
-    PublisherAttributes attr;
-    if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(profile_name, attr, false))
-    {
-        efd::utils::set_qos_from_attributes(datawriter_qos, attr);
-
-        ReturnCode_t ret = enable_statistics_datawriter(topic_name, datawriter_qos);
-        // case RETCODE_ERROR is checked and logged in enable_statistics_datawriter.
-        // case RETCODE_INCONSISTENT_POLICY could happen if profile defined in XML is inconsistent.
-        // case RETCODE_UNSUPPORTED cannot happen because this method is only called if FASTDDS_STATISTICS
-        // CMake option is enabled
-        if (ret == ReturnCode_t::RETCODE_INCONSISTENT_POLICY)
-        {
-            logError(STATISTICS_DOMAIN_PARTICIPANT,
-                    "Statistics DataWriter QoS from profile name " << profile_name << " are not consistent/compatible");
-        }
-        assert(ret != ReturnCode_t::RETCODE_UNSUPPORTED);
-        if (ret == ReturnCode_t::RETCODE_BAD_PARAMETER)
-        {
-            logError(STATISTICS_DOMAIN_PARTICIPANT,
-                    "Profile name " << profile_name << " is not a valid statistics topic name/alias");
-        }
-        return ret;
-    }
-    logError(STATISTICS_DOMAIN_PARTICIPANT,
-            "Profile name " << profile_name << " has not been found");
     return ReturnCode_t::RETCODE_ERROR;
 }
 
@@ -267,24 +222,16 @@ void DomainParticipantImpl::disable()
     efd::DomainParticipantImpl::disable();
 }
 
-ReturnCode_t DomainParticipantImpl::delete_contained_entities()
-{
-    ReturnCode_t ret = efd::DomainParticipantImpl::delete_contained_entities();
-
-    if (ret == ReturnCode_t::RETCODE_OK)
-    {
-        builtin_publisher_impl_ = nullptr;
-        builtin_publisher_ = nullptr;
-    }
-
-    return ret;
-}
-
 efd::PublisherImpl* DomainParticipantImpl::create_publisher_impl(
         const efd::PublisherQos& qos,
         efd::PublisherListener* listener)
 {
-    return new PublisherImpl(this, qos, listener, statistics_listener_);
+    auto impl = new PublisherImpl(this, qos, listener, statistics_listener_);
+    if (nullptr == builtin_publisher_impl_)
+    {
+        builtin_publisher_impl_ = impl;
+    }
+    return impl;
 }
 
 efd::SubscriberImpl* DomainParticipantImpl::create_subscriber_impl(
@@ -296,13 +243,8 @@ efd::SubscriberImpl* DomainParticipantImpl::create_subscriber_impl(
 
 void DomainParticipantImpl::create_statistics_builtin_entities()
 {
-    efd::PublisherImpl* builtin_publisher_impl = nullptr;
-
     // Builtin publisher
-    builtin_publisher_ = create_publisher(efd::PUBLISHER_QOS_DEFAULT, &builtin_publisher_impl);
-
-    builtin_publisher_impl_ = dynamic_cast<PublisherImpl*>(builtin_publisher_impl);
-    assert(nullptr != builtin_publisher_impl_);
+    builtin_publisher_ = create_publisher(efd::PUBLISHER_QOS_DEFAULT);
 
     // Enable statistics datawriters
     // 1. Find fastdds_statistics PropertyPolicyQos
@@ -316,7 +258,11 @@ void DomainParticipantImpl::create_statistics_builtin_entities()
 
     // 2. FASTDDS_STATISTICS environment variable
     std::string env_topic_list;
-    SystemInfo::get_env(FASTDDS_STATISTICS_ENVIRONMENT_VARIABLE, env_topic_list);
+    const char* data;
+    if (ReturnCode_t::RETCODE_OK == SystemInfo::get_env(FASTDDS_STATISTICS_ENVIRONMENT_VARIABLE, &data))
+    {
+        env_topic_list = data;
+    }
 
     if (!env_topic_list.empty())
     {
@@ -332,28 +278,12 @@ void DomainParticipantImpl::enable_statistics_builtin_datawriters(
     std::string topic;
     while (std::getline(topics, topic, ';'))
     {
-        DataWriterQos datawriter_qos;
-        PublisherAttributes attr;
-        if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(topic, attr, false))
-        {
-            efd::utils::set_qos_from_attributes(datawriter_qos, attr);
-        }
-        else if (XMLP_ret::XML_OK ==
-                XMLProfileManager::fillPublisherAttributes(DEFAULT_STATISTICS_DATAWRITER_PROFILE, attr, false))
-        {
-            efd::utils::set_qos_from_attributes(datawriter_qos, attr);
-        }
-
-        ReturnCode_t ret = enable_statistics_datawriter(topic, datawriter_qos);
+        ReturnCode_t ret = enable_statistics_datawriter(topic, STATISTICS_DATAWRITER_QOS);
         // case RETCODE_ERROR is checked and logged in enable_statistics_datawriter.
-        // case RETCODE_INCONSISTENT_POLICY could happen if profile defined in XML is inconsistent.
+        // case RETCODE_INCONSISTENT_POLICY cannot happen. STATISTICS_DATAWRITER_QOS is consistent.
         // case RETCODE_UNSUPPORTED cannot happen because this method is only called if FASTDDS_STATISTICS
         // CMake option is enabled
-        if (ret == ReturnCode_t::RETCODE_INCONSISTENT_POLICY)
-        {
-            logError(STATISTICS_DOMAIN_PARTICIPANT,
-                    "Statistics DataWriter QoS from topic " << topic << " are not consistent/compatible");
-        }
+        assert(ret != ReturnCode_t::RETCODE_INCONSISTENT_POLICY);
         assert(ret != ReturnCode_t::RETCODE_UNSUPPORTED);
         if (ret == ReturnCode_t::RETCODE_BAD_PARAMETER)
         {

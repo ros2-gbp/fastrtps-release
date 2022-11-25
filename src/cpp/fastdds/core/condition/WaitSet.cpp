@@ -20,46 +20,40 @@
 #include <fastdds/dds/core/condition/WaitSet.hpp>
 #include <fastrtps/types/TypesBase.h>
 
-#include <fastdds/core/condition/WaitSetImpl.hpp>
-
 namespace eprosima {
 namespace fastdds {
 namespace dds {
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
-WaitSet::WaitSet()
-    : impl_(new detail::WaitSetImpl())
-{
-}
-
-WaitSet::~WaitSet()
-{
-}
-
 ReturnCode_t WaitSet::attach_condition(
         const Condition& cond)
 {
-    return impl_->attach_condition(cond);
+    static_cast<void>(cond);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 ReturnCode_t WaitSet::detach_condition(
         const Condition& cond)
 {
-    return impl_->detach_condition(cond);
+    static_cast<void>(cond);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 ReturnCode_t WaitSet::wait(
         ConditionSeq& active_conditions,
         const fastrtps::Duration_t timeout) const
 {
-    return impl_->wait(active_conditions, timeout);
+    static_cast<void>(active_conditions);
+    static_cast<void>(timeout);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 ReturnCode_t WaitSet::get_conditions(
         ConditionSeq& attached_conditions) const
 {
-    return impl_->get_conditions(attached_conditions);
+    static_cast<void>(attached_conditions);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 }  // namespace dds

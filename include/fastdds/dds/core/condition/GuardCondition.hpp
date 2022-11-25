@@ -20,8 +20,6 @@
 #ifndef _FASTDDS_GUARD_CONDITION_HPP_
 #define _FASTDDS_GUARD_CONDITION_HPP_
 
-#include <atomic>
-
 #include <fastdds/dds/core/condition/Condition.hpp>
 #include <fastrtps/fastrtps_dll.h>
 #include <fastrtps/types/TypesBase.h>
@@ -45,11 +43,7 @@ class GuardCondition : public Condition
 {
 public:
 
-    RTPS_DllAPI GuardCondition();
-
-    RTPS_DllAPI ~GuardCondition();
-
-    RTPS_DllAPI bool get_trigger_value() const override;
+    // GuardCondition not implemented.
 
     /**
      * @brief Set the trigger_value
@@ -57,13 +51,15 @@ public:
      * @return RETURN_OK
      */
     RTPS_DllAPI ReturnCode_t set_trigger_value(
-            bool value);
-
-private:
-
-    std::atomic<bool> trigger_value_;
+            bool value)
+    {
+        static_cast<void>(value);
+        return ReturnCode_t::RETCODE_UNSUPPORTED;
+    }
 
 };
+
+typedef std::vector<Condition> ConditionSeq;
 
 } // namespace dds
 } // namespace fastdds
