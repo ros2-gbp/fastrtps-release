@@ -341,9 +341,17 @@ XMLP_ret XMLParser::parseXMLAliasDynamicType(
         if (valueBuilder != nullptr)
         {
             const char* name = p_root->Attribute(NAME);
-            p_dynamictypebuilder_t typeBuilder =
-                    types::DynamicTypeBuilderFactory::get_instance()->create_alias_builder(valueBuilder, name);
-            XMLProfileManager::insertDynamicTypeByName(name, typeBuilder);
+            if (name != nullptr)
+            {
+                p_dynamictypebuilder_t typeBuilder =
+                        types::DynamicTypeBuilderFactory::get_instance()->create_alias_builder(valueBuilder, name);
+                XMLProfileManager::insertDynamicTypeByName(name, typeBuilder);
+            }
+            else
+            {
+                logError(XMLPARSER, "Error parsing alias type: No name attribute given.");
+                ret = XMLP_ret::XML_ERROR;
+            }
         }
         else
         {
@@ -386,6 +394,11 @@ XMLP_ret XMLParser::parseXMLBitsetDynamicType(
     uint32_t mId = 0;
 
     const char* name = p_root->Attribute(NAME);
+    if (nullptr == name)
+    {
+        logError(XMLPARSER, "Error parsing 'bitsetDcl' type. No name attribute given.");
+        return XMLP_ret::XML_ERROR;
+    }
 
     const char* baseType = p_root->Attribute(BASE_TYPE);
     if (baseType != nullptr)
@@ -658,6 +671,13 @@ XMLP_ret XMLParser::parseXMLEnumDynamicType(
      */
     XMLP_ret ret = XMLP_ret::XML_OK;
     const char* enumName = p_root->Attribute(NAME);
+
+    if (enumName == nullptr)
+    {
+        logError(XMLPARSER, "Error parsing 'enum' type. No name attribute given.");
+        return XMLP_ret::XML_ERROR;
+    }
+
     p_dynamictypebuilder_t typeBuilder = types::DynamicTypeBuilderFactory::get_instance()->create_enum_builder();
     uint32_t currValue = 0;
     for (tinyxml2::XMLElement* literal = p_root->FirstChildElement(ENUMERATOR);
@@ -981,7 +1001,15 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
         uint32_t length = types::MAX_ELEMENTS_COUNT;
         if (lengthStr != nullptr)
         {
-            length = static_cast<uint32_t>(std::stoi(lengthStr));
+            try
+            {
+                length = static_cast<uint32_t>(std::stoi(lengthStr));
+            }
+            catch (const std::exception&)
+            {
+                logError(XMLPARSER, "Error parsing member sequence length in line " << p_root->GetLineNum());
+                return nullptr;
+            }
         }
 
         if (!isArray)
@@ -1057,7 +1085,15 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
         uint32_t length = types::MAX_ELEMENTS_COUNT;
         if (lengthStr != nullptr)
         {
-            length = static_cast<uint32_t>(std::stoi(lengthStr));
+            try
+            {
+                length = static_cast<uint32_t>(std::stoi(lengthStr));
+            }
+            catch (const std::exception&)
+            {
+                logError(XMLPARSER, "Error parsing map member sequence length in line " << p_root->GetLineNum())
+                return nullptr;
+            }
         }
 
         if (!isArray)
@@ -1336,12 +1372,13 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
     {
         if (!isArray)
         {
-            logError(XMLPARSER, "Failed creating " << memberType << ": " << memberName);
+            logError(XMLPARSER, "Failed creating " << memberType << ": " << (memberName ? memberName : ""));
         }
         else
         {
-            logError(XMLPARSER, "Failed creating " << memberType << " array: " << memberName);
+            logError(XMLPARSER, "Failed creating " << memberType << " array: " << (memberName ? memberName : ""));
         }
+        return nullptr;
     }
 
     const char* memberTopicKey = p_root->Attribute(KEY);
