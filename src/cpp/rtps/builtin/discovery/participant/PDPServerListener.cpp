@@ -17,18 +17,20 @@
  *
  */
 
-#include <fastdds/dds/log/Log.hpp>
-
-#include <fastdds/rtps/history/ReaderHistory.h>
-#include <fastdds/rtps/reader/RTPSReader.h>
-#include <rtps/participant/RTPSParticipantImpl.h>
-#include <fastdds/rtps/participant/RTPSParticipantListener.h>
+#include <memory>
 
 #include <rtps/builtin/discovery/participant/PDPServerListener.hpp>
-#include <rtps/builtin/discovery/participant/PDPServer.hpp>
-#include <rtps/builtin/discovery/database/DiscoveryParticipantChangeData.hpp>
 
-#include <memory>
+#include <fastdds/dds/log/Log.hpp>
+
+#include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/participant/RTPSParticipantListener.h>
+#include <fastdds/rtps/reader/RTPSReader.h>
+
+#include <rtps/builtin/discovery/database/DiscoveryParticipantChangeData.hpp>
+#include <rtps/builtin/discovery/participant/PDPServer.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
 
 namespace eprosima {
 namespace fastdds {
@@ -108,6 +110,10 @@ void PDPServerListener::onNewCacheChangeAdded(
         change->write_params.related_sample_identity(change->write_params.sample_identity());
     }
 
+    // Reset the internal CacheChange_t union.
+    change->writer_info.next = nullptr;
+    change->writer_info.previous = nullptr;
+    change->writer_info.num_sent_submessages = 0;
 
     // DATA(p) case
     if (change->kind == ALIVE)

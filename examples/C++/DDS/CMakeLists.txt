@@ -14,9 +14,11 @@
 
 set(fastrtps_FOUND TRUE)
 
+add_subdirectory(BasicConfigurationExample)
 add_subdirectory(Benchmark)
 add_subdirectory(ClientServerTest)
 add_subdirectory(Configurability)
+add_subdirectory(ContentFilteredTopicExample)
 add_subdirectory(CustomListenerExample)
 add_subdirectory(DeadlineQoSExample)
 add_subdirectory(DisablePositiveACKs)

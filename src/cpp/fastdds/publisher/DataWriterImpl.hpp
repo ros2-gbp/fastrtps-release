@@ -19,6 +19,8 @@
 #ifndef _FASTRTPS_DATAWRITERIMPL_HPP_
 #define _FASTRTPS_DATAWRITERIMPL_HPP_
 
+#include <memory>
+
 #include <fastdds/dds/core/status/BaseStatus.hpp>
 #include <fastdds/dds/core/status/IncompatibleQosStatus.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
@@ -31,14 +33,18 @@
 #include <fastdds/rtps/common/LocatorList.hpp>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/common/WriteParams.h>
+#include <fastdds/rtps/history/IChangePool.h>
 #include <fastdds/rtps/history/IPayloadPool.h>
+#include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
 #include <fastdds/rtps/writer/WriterListener.h>
 
-#include <fastrtps/publisher/PublisherHistory.h>
 #include <fastrtps/qos/DeadlineMissedStatus.h>
 #include <fastrtps/qos/LivelinessLostStatus.h>
 
 #include <fastrtps/types/TypesBase.h>
+
+#include <fastdds/publisher/DataWriterHistory.hpp>
+#include <fastdds/publisher/filtering/ReaderFilterCollection.hpp>
 
 #include <rtps/common/PayloadInfo_t.hpp>
 #include <rtps/history/ITopicPayloadPool.h>
@@ -78,7 +84,7 @@ class Publisher;
  * Class DataWriterImpl, contains the actual implementation of the behaviour of the DataWriter.
  * @ingroup FASTDDS_MODULE
  */
-class DataWriterImpl
+class DataWriterImpl : protected rtps::IReaderDataFilter
 {
     using LoanInitializationKind = DataWriter::LoanInitializationKind;
     using PayloadInfo_t = eprosima::fastrtps::rtps::detail::PayloadInfo_t;
@@ -102,6 +108,14 @@ protected:
             TypeSupport type,
             Topic* topic,
             const DataWriterQos& qos,
+            DataWriterListener* listener = nullptr);
+
+    DataWriterImpl(
+            PublisherImpl* p,
+            TypeSupport type,
+            Topic* topic,
+            const DataWriterQos& qos,
+            const fastrtps::rtps::EntityId_t& entity_id,
             DataWriterListener* listener = nullptr);
 
 public:
@@ -174,7 +188,7 @@ public:
 
     /*!
      * @brief Implementation of the DDS `register_instance` operation.
-     * It deduces the instance's key and tries to get resources in the PublisherHistory.
+     * It deduces the instance's key and tries to get resources in the DataWriterHistory.
      * @param[in] instance Sample used to get the instance's key.
      * @return Handle containing the instance's key.
      * This handle could be used in successive `write` or `dispose` operations.
@@ -221,6 +235,14 @@ public:
     ReturnCode_t wait_for_acknowledgments(
             const fastrtps::Duration_t& max_wait);
 
+    ReturnCode_t wait_for_acknowledgments(
+            void* instance,
+            const InstanceHandle_t& handle,
+            const fastrtps::Duration_t& max_wait);
+
+    ReturnCode_t get_publication_matched_status(
+            PublicationMatchedStatus& status);
+
     ReturnCode_t get_offered_deadline_missed_status(
             fastrtps::OfferedDeadlineMissedStatus& status);
 
@@ -239,11 +261,23 @@ public:
     ReturnCode_t set_listener(
             DataWriterListener* listener);
 
-    /* TODO
-       bool get_key_value(
+    /**
+     * This operation can be used to retrieve the instance key that corresponds to an
+     * @ref eprosima::fastdds::dds::Entity::instance_handle_ "instance_handle".
+     * The operation will only fill the fields that form the key inside the key_holder instance.
+     *
+     * This operation may return BAD_PARAMETER if the InstanceHandle_t handle does not correspond to an existing
+     * data-object known to the DataWriter. If the implementation is not able to check invalid handles then the result
+     * in this situation is unspecified.
+     *
+     * @param[in,out] key_holder  Sample where the key fields will be returned.
+     * @param[in] handle          Handle to the instance to retrieve the key values from.
+     *
+     * @return Any of the standard return codes.
+     */
+    ReturnCode_t get_key_value(
             void* key_holder,
             const InstanceHandle_t& handle);
-     */
 
     ReturnCode_t get_liveliness_lost_status(
             LivelinessLostStatus& status);
@@ -274,8 +308,17 @@ public:
     ReturnCode_t get_sending_locators(
             rtps::LocatorList& locators) const;
 
+    /**
+     * Called from the DomainParticipant when a filter factory is being unregistered.
+     *
+     * @param filter_class_name  The class name under which the factory was registered.
+     */
+    void filter_is_being_removed(
+            const char* filter_class_name);
+
 protected:
 
+    using IChangePool = eprosima::fastrtps::rtps::IChangePool;
     using IPayloadPool = eprosima::fastrtps::rtps::IPayloadPool;
     using ITopicPayloadPool = eprosima::fastrtps::rtps::ITopicPayloadPool;
 
@@ -291,8 +334,8 @@ protected:
 
     DataWriterQos qos_;
 
-    //!Publisher History
-    fastrtps::PublisherHistory history_;
+    //!History
+    DataWriterHistory history_;
 
     //! DataWriterListener
     DataWriterListener* listener_ = nullptr;
@@ -328,11 +371,15 @@ protected:
                 fastrtps::rtps::RTPSWriter* writer,
                 const fastrtps::LivelinessLostStatus& status) override;
 
+        void on_reader_discovery(
+                fastrtps::rtps::RTPSWriter* writer,
+                fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS reason,
+                const fastrtps::rtps::GUID_t& reader_guid,
+                const fastrtps::rtps::ReaderProxyData* reader_info) override;
+
         DataWriterImpl* data_writer_;
     }
     writer_listener_;
-
-    uint32_t high_mark_for_frag_;
 
     //! A timer used to check for deadlines
     fastrtps::rtps::TimedEvent* deadline_timer_ = nullptr;
@@ -342,6 +389,9 @@ protected:
 
     //! The current timer owner, i.e. the instance which started the deadline timer
     InstanceHandle_t timer_owner_;
+
+    //! The publication matched status
+    PublicationMatchedStatus publication_matched_status_;
 
     //! The offered deadline missed status
     OfferedDeadlineMissedStatus deadline_missed_status_;
@@ -368,12 +418,9 @@ protected:
 
     std::unique_ptr<LoanCollection> loans_;
 
-    virtual fastrtps::rtps::RTPSWriter* create_rtps_writer(
-            fastrtps::rtps::RTPSParticipant* p,
-            fastrtps::rtps::WriterAttributes& watt,
-            const std::shared_ptr<IPayloadPool>& payload_pool,
-            fastrtps::rtps::WriterHistory* hist,
-            fastrtps::rtps::WriterListener* listen);
+    fastrtps::rtps::GUID_t guid_;
+
+    std::unique_ptr<ReaderFilterCollection> reader_filters_;
 
     /**
      *
@@ -416,6 +463,9 @@ protected:
      * @return True if correct.
      */
     bool remove_min_seq_change();
+
+    void update_publication_matched_status(
+            const PublicationMatchedStatus& status);
 
     /**
      * @brief A method called when an instance misses the deadline
@@ -485,6 +535,8 @@ protected:
             fastrtps::rtps::CacheChange_t* ch,
             const uint32_t& high_mark_for_frag);
 
+    std::shared_ptr<IChangePool> get_change_pool() const;
+
     std::shared_ptr<IPayloadPool> get_payload_pool();
 
     bool release_payload_pool();
@@ -529,6 +581,30 @@ protected:
     bool check_and_remove_loan(
             void* data,
             PayloadInfo_t& payload);
+
+    /**
+     * Remove internal filtering information about a reader.
+     * Called whenever a non-intra-process reader is unmatched.
+     *
+     * @param reader_guid  GUID of the reader that has been unmatched.
+     */
+    void remove_reader_filter(
+            const fastrtps::rtps::GUID_t& reader_guid);
+
+    /**
+     * Process filtering information for a reader.
+     * Called when a new reader is matched, and whenever the discovery information of a matched reader changes.
+     *
+     * @param reader_guid  The GUID of the reader for which the discovery information changed.
+     * @param reader_info  The reader's discovery information.
+     */
+    void process_reader_filter_info(
+            const fastrtps::rtps::GUID_t& reader_guid,
+            const fastrtps::rtps::ReaderProxyData& reader_info);
+
+    bool is_relevant(
+            const fastrtps::rtps::CacheChange_t& change,
+            const fastrtps::rtps::GUID_t& reader_guid) const override;
 
 };
 

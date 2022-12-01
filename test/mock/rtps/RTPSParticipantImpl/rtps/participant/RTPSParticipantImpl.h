@@ -20,25 +20,21 @@
 #define _RTPS_PARTICIPANT_RTPSPARTICIPANTIMPL_H_
 
 // Include first possible mocks (depending on include on CMakeLists.txt)
-#include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
-#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
-#include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
-
 #include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastrtps/rtps/attributes/ReaderAttributes.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
-#include <fastrtps/rtps/reader/RTPSReader.h>
-#include <fastrtps/rtps/participant/RTPSParticipantListener.h>
-#include <fastrtps/rtps/resources/ResourceEvent.h>
 #include <fastrtps/rtps/network/NetworkFactory.h>
-#include <fastrtps/rtps/resources/AsyncWriterThread.h>
+#include <fastrtps/rtps/participant/RTPSParticipantListener.h>
+#include <fastrtps/rtps/reader/RTPSReader.h>
+#include <fastrtps/rtps/resources/ResourceEvent.h>
+#include <fastrtps/rtps/writer/RTPSWriter.h>
 
 #if HAVE_SECURITY
-#include <fastrtps/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <rtps/security/SecurityManager.h>
 #endif // if HAVE_SECURITY
 
 #include <gmock/gmock.h>
+
+#include <map>
+#include <sstream>
 
 namespace eprosima {
 namespace fastrtps {
@@ -52,6 +48,17 @@ class WriterListener;
 class ReaderListener;
 class PDPSimple;
 struct EntityId_t;
+class ReaderProxyData;
+class WriterProxyData;
+class ReaderAttributes;
+class NetworkFactory;
+
+#if HAVE_SECURITY
+namespace security {
+class SecurityManager;
+struct ParticipantSecurityAttributes;
+} // namespace security
+#endif // if HAVE_SECURITY
 
 class MockParticipantListener : public RTPSParticipantListener
 {
@@ -121,14 +128,6 @@ public:
             const EntityId_t& entityId, bool isBuiltin, bool enable));
     // *INDENT-ON*
 
-    MOCK_METHOD0(userWritersListBegin, std::vector<RTPSWriter*>::iterator ());
-    MOCK_METHOD0(userWritersListEnd, std::vector<RTPSWriter*>::iterator ());
-
-    MOCK_METHOD0(userReadersListBegin, std::vector<RTPSReader*>::iterator ());
-    MOCK_METHOD0(userReadersListEnd, std::vector<RTPSReader*>::iterator ());
-
-    MOCK_METHOD0(async_thread, AsyncWriterThread & ());
-
     MOCK_CONST_METHOD0(getParticipantMutex, std::recursive_mutex* ());
 
     bool createWriter(
@@ -143,6 +142,10 @@ public:
         if (*writer != nullptr)
         {
             (*writer)->history_ = hist;
+
+            auto guid = generate_endpoint_guid();
+            (*writer)->m_guid = guid;
+            endpoints_.emplace(guid, *writer);
         }
         return ret;
     }
@@ -160,6 +163,10 @@ public:
         if (*writer != nullptr)
         {
             (*writer)->history_ = hist;
+
+            auto guid = generate_endpoint_guid();
+            (*writer)->m_guid = guid;
+            endpoints_.emplace(guid, *writer);
         }
         return ret;
     }
@@ -178,6 +185,10 @@ public:
         {
             (*reader)->history_ = hist;
             (*reader)->listener_ = listen;
+
+            auto guid = generate_endpoint_guid();
+            (*reader)->m_guid = guid;
+            endpoints_.emplace(guid, *reader);
         }
         return ret;
     }
@@ -197,14 +208,26 @@ public:
         {
             (*reader)->history_ = hist;
             (*reader)->listener_ = listen;
+
+            auto guid = generate_endpoint_guid();
+            (*reader)->m_guid = guid;
+            endpoints_.emplace(guid, *reader);
         }
         return ret;
     }
 
-    void deleteUserEndpoint(
-            Endpoint* endpoint)
+    bool deleteUserEndpoint(
+            const GUID_t& e)
     {
-        delete endpoint;
+        // Check the map
+        auto it = endpoints_.find(e);
+        if ( it != endpoints_.end())
+        {
+            delete it->second;
+            endpoints_.erase(it);
+        }
+
+        return true;
     }
 
     MOCK_METHOD0(pdpsimple, PDPSimple * ());
@@ -258,6 +281,30 @@ public:
     {
     }
 
+    template <EndpointKind_t kind, octet no_key, octet with_key>
+    static bool preprocess_endpoint_attributes(
+            const EntityId_t&,
+            uint32_t&,
+            EndpointAttributes&,
+            EntityId_t&)
+    {
+        return true;
+    }
+
+    template<class Functor>
+    Functor forEachUserWriter(
+            Functor f)
+    {
+        return f;
+    }
+
+    template<class Functor>
+    Functor forEachUserReader(
+            Functor f)
+    {
+        return f;
+    }
+
 private:
 
     MockParticipantListener listener_;
@@ -265,6 +312,21 @@ private:
     ResourceEvent events_;
 
     RTPSParticipantAttributes attr_;
+
+    std::map<GUID_t, Endpoint*> endpoints_;
+
+    GUID_t generate_endpoint_guid() const
+    {
+        static uint32_t counter = 0;
+        const char* prefix = "49.20.48.61.74.65.20.47.4D.6F.63.6B";
+
+        GUID_t res;
+        std::istringstream is(prefix);
+        is >> res.guidPrefix;
+        res.entityId = ++counter;
+        return res;
+    }
+
 };
 
 } // namespace rtps

@@ -36,7 +36,6 @@
 #include <fastdds/rtps/reader/ReaderListener.h>
 
 #include <fastrtps/attributes/TopicAttributes.h>
-#include <fastrtps/subscriber/SubscriberHistory.h>
 #include <fastrtps/qos/LivelinessChangedStatus.h>
 #include <fastrtps/types/TypesBase.h>
 
@@ -45,6 +44,8 @@
 #include <fastdds/subscriber/DataReaderImpl/SampleLoanManager.hpp>
 #include <fastdds/subscriber/SubscriberImpl.hpp>
 #include <rtps/history/ITopicPayloadPool.h>
+
+#include <fastdds/subscriber/history/DataReaderHistory.hpp>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -61,6 +62,7 @@ class TimedEvent;
 namespace fastdds {
 namespace dds {
 
+class ContentFilteredTopicImpl;
 class Subscriber;
 class SubscriberImpl;
 class TopicDescription;
@@ -194,9 +196,14 @@ public:
             SampleInfo* info);
 
     /**
-     * @return the number of samples pending to be read.
+     * Get the number of samples pending to be read.
+     *
+     * @param mark_as_read  Whether the unread samples should be marked as read or not.
+     *
+     * @return the number of samples on the reader history that have never been read.
      */
-    uint64_t get_unread_count() const;
+    uint64_t get_unread_count(
+            bool mark_as_read);
 
     /**
      * Get associated GUID
@@ -217,6 +224,9 @@ public:
      * @return TopicDescription
      */
     const TopicDescription* get_topicdescription() const;
+
+    ReturnCode_t get_subscription_matched_status(
+            SubscriptionMatchedStatus& status);
 
     ReturnCode_t get_requested_deadline_missed_status(
             fastrtps::RequestedDeadlineMissedStatus& status);
@@ -243,21 +253,26 @@ public:
     ReturnCode_t get_requested_incompatible_qos_status(
             RequestedIncompatibleQosStatus& status);
 
-    /* TODO
-       bool get_sample_lost_status(
-            fastrtps::SampleLostStatus& status) const;
+    /*!
+     * @brief Get the SAMPLE_LOST communication status
+     *
+     * @param[out] status SampleLostStatus object where the status is returned.
+     *
+     * @return RETCODE_OK
      */
+    ReturnCode_t get_sample_lost_status(
+            fastdds::dds::SampleLostStatus& status);
 
     /* TODO
        bool get_sample_rejected_status(
-            fastrtps::SampleRejectedStatus& status) const;
+       fastrtps::SampleRejectedStatus& status) const;
      */
 
     const Subscriber* get_subscriber() const;
 
     /* TODO
        bool wait_for_historical_data(
-            const fastrtps::Duration_t& max_wait) const;
+       const fastrtps::Duration_t& max_wait) const;
      */
 
     //! Remove all listeners in the hierarchy to allow a quiet destruction
@@ -309,8 +324,12 @@ public:
     ReturnCode_t get_listening_locators(
             rtps::LocatorList& locators) const;
 
-
     ReturnCode_t delete_contained_entities();
+
+    void filter_has_been_updated();
+
+    InstanceHandle_t lookup_instance(
+            const void* instance) const;
 
 protected:
 
@@ -328,10 +347,12 @@ protected:
     DataReaderQos qos_;
 
     //!History
-    fastrtps::SubscriberHistory history_;
+    detail::DataReaderHistory history_;
 
     //!Listener
     DataReaderListener* listener_ = nullptr;
+
+    fastrtps::rtps::GUID_t guid_;
 
     class InnerDataReaderListener : public fastrtps::rtps::ReaderListener
     {
@@ -363,6 +384,10 @@ protected:
                 fastrtps::rtps::RTPSReader* reader,
                 fastdds::dds::PolicyMask qos) override;
 
+        void on_sample_lost(
+                fastrtps::rtps::RTPSReader* reader,
+                int32_t sample_lost_since_last_update) override;
+
         DataReaderImpl* data_reader_;
     }
     reader_listener_;
@@ -376,6 +401,9 @@ protected:
     //! The current timer owner, i.e. the instance which started the deadline timer
     fastrtps::rtps::InstanceHandle_t timer_owner_;
 
+    //! Subscription matched status
+    SubscriptionMatchedStatus subscription_matched_status_;
+
     //! Liveliness changed status
     LivelinessChangedStatus liveliness_changed_status_;
 
@@ -384,6 +412,9 @@ protected:
 
     //! Requested incompatible QoS status
     RequestedIncompatibleQosStatus requested_incompatible_qos_status_;
+
+    //! Sample lost status
+    SampleLostStatus sample_lost_status_;
 
     //! A timed callback to remove expired samples
     fastrtps::rtps::TimedEvent* lifespan_timer_ = nullptr;
@@ -426,6 +457,12 @@ protected:
             SampleInfo* info,
             bool should_take);
 
+    void set_read_communication_status(
+            bool trigger_value);
+
+    void update_subscription_matched_status(
+            const SubscriptionMatchedStatus& status);
+
     /**
      * @brief A method called when a new cache change is added
      * @param change The cache change that has been added
@@ -459,6 +496,9 @@ protected:
     LivelinessChangedStatus& update_liveliness_status(
             const fastrtps::LivelinessChangedStatus& status);
 
+    SampleLostStatus& update_sample_lost_status(
+            int32_t sample_lost_since_last_update);
+
     /**
      * Returns the most appropriate listener to handle the callback for the given status,
      * or nullptr if there is no appropriate listener.
@@ -470,10 +510,15 @@ protected:
 
     void release_payload_pool();
 
+    void stop();
+
     ReturnCode_t check_datasharing_compatible(
             const fastrtps::rtps::ReaderAttributes& reader_attributes,
             bool& is_datasharing_compatible) const;
 
+private:
+
+    void update_rtps_reader_qos();
 
 };
 

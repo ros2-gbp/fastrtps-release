@@ -13,13 +13,17 @@
 // limitations under the License.
 
 #include <fastdds/rtps/network/NetworkFactory.h>
-#include <fastdds/rtps/transport/TransportDescriptorInterface.h>
-#include <fastdds/rtps/participant/RTPSParticipant.h>
+
+#include <limits>
+#include <utility>
+
 #include <fastdds/rtps/common/Guid.h>
+#include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <fastdds/rtps/transport/TransportDescriptorInterface.h>
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/IPLocator.h>
-#include <utility>
-#include <limits>
+
+#include <rtps/transport/UDPv4Transport.h>
 
 using namespace std;
 using namespace eprosima::fastdds::rtps;
@@ -85,16 +89,18 @@ bool NetworkFactory::BuildReceiverResources(
 }
 
 bool NetworkFactory::RegisterTransport(
-        const TransportDescriptorInterface* descriptor)
+        const TransportDescriptorInterface* descriptor,
+        const fastrtps::rtps::PropertyPolicy* properties)
 {
     bool wasRegistered = false;
+
     uint32_t minSendBufferSize = std::numeric_limits<uint32_t>::max();
 
     std::unique_ptr<TransportInterface> transport(descriptor->create_transport());
 
     if (transport)
     {
-        if (transport->init())
+        if (transport->init(properties))
         {
             minSendBufferSize = transport->get_configuration()->min_send_buffer_size();
             mRegisteredTransports.emplace_back(std::move(transport));
@@ -380,6 +386,14 @@ uint16_t NetworkFactory::calculate_well_known_port(
     }
 
     return static_cast<uint16_t>(port);
+}
+
+void NetworkFactory::update_network_interfaces()
+{
+    for (auto& transport : mRegisteredTransports)
+    {
+        transport->update_network_interfaces();
+    }
 }
 
 } // namespace rtps

@@ -97,14 +97,17 @@ public:
     /**
      * Called when a change is added to the writer's history.
      * @param change Information regarding the change added.
+     * @param is_relevant Specify if change is relevant for this remote reader.
      * @param restart_nack_supression Whether nack-supression event should be restarted.
      */
     void add_change(
             const ChangeForReader_t& change,
+            bool is_relevant,
             bool restart_nack_supression);
 
     void add_change(
             const ChangeForReader_t& change,
+            bool is_relevant,
             bool restart_nack_supression,
             const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time);
 
@@ -124,13 +127,23 @@ public:
 
     /**
      * Check if a specific change is marked to be sent to this reader.
+     *
      * @param[in]  seq_num Sequence number of the change to be checked.
-     * @param[out] is_irrelevant Will be forced to true if change is irrelevant for this reader.
-     * @return true when the change is marked to be sent, false otherwise.
+     * @param[out] next_unsent_frag Return next fragment to be sent.
+     * @param[out] gap_seq Return, when it is its first delivery (should be relevant seq_num), the sequence number of
+     * the first sequence of the gap [first, seq_num). Otherwise return SequenceNumber_t::unknown().
+     * @param[in]  min_seq Minimum sequence number managed by the History. It could be SequenceNumber_t::unknown() if
+     * history is empty.
+     * @param[out] need_reactivate_periodic_heartbeat Indicates if the heartbeat period event has to be restarted.
+     *
+     * @return true if the change is marked to be sent. False otherwise.
      */
     bool change_is_unsent(
             const SequenceNumber_t& seq_num,
-            bool& is_irrelevant) const;
+            FragmentNumber_t& next_unsent_frag,
+            SequenceNumber_t& gap_seq,
+            const SequenceNumber_t& min_seq,
+            bool& need_reactivate_periodic_heartbeat) const;
 
     /**
      * Mark all changes up to the one indicated by seq_num as Acknowledged.
@@ -145,79 +158,35 @@ public:
      * @param seq_num_set Bitmap of sequence numbers.
      * @param gap_builder RTPSGapBuilder reference uses for adding  each requested change that is irrelevant for the
      * requester.
+     * @param[in] min_seq_in_history Minimum SequenceNumber_t in the writer's history. If writer's history is empty,
+     * SequenceNumber_t::unknown() is expected.
      * @return true if at least one change has been marked as REQUESTED, false otherwise.
      */
     bool requested_changes_set(
             const SequenceNumberSet_t& seq_num_set,
-            RTPSGapBuilder& gap_builder);
+            RTPSGapBuilder& gap_builder,
+            const SequenceNumber_t& min_seq_in_history);
 
     /**
      * Performs processing of preemptive acknack
+     * @param func functor called, if the requester is a local reader, for each changes moved to UNSENT status.
      * @return true if a heartbeat should be sent, false otherwise.
      */
-    bool process_initial_acknack();
-
-    /**
-     * Applies the given function object to every unsent change.
-     * @param max_seq Maximum sequence number to be considered without including it.
-     * @param f Function to apply.
-     *          Will receive a SequenceNumber_t and a ChangeForReader_t*.
-     *          The second argument may be nullptr for irrelevant changes.
-     */
-    template <class BinaryFunction>
-    void for_each_unsent_change(
-            const SequenceNumber_t& max_seq,
-            BinaryFunction f) const
-    {
-        if (!changes_for_reader_.empty())
-        {
-            SequenceNumber_t current_seq = changes_low_mark_ + 1;
-            ChangeConstIterator it = changes_for_reader_.begin();
-            while (it != changes_for_reader_.end())
-            {
-                // Holes before this change are informed as irrelevant.
-                SequenceNumber_t change_seq = it->getSequenceNumber();
-                for (; current_seq < change_seq; ++current_seq)
-                {
-                    f(current_seq, nullptr);
-                }
-
-                // We then inform of this change if it is unsent, and go to the next one.
-                if (it->getStatus() == UNSENT)
-                {
-                    f(current_seq, &(*it));
-                }
-                ++current_seq;
-                ++it;
-            }
-
-            // After the last change has been checked, there may be a hole at the end.
-            for (; current_seq < max_seq; ++current_seq)
-            {
-                f(current_seq, nullptr);
-            }
-        }
-        else
-        {
-            // This may be entered if all changes where removed before being acknowledged.
-            for (SequenceNumber_t seq = changes_low_mark_ + 1; seq < max_seq; ++seq)
-            {
-                f(seq, nullptr);
-            }
-        }
-    }
+    bool process_initial_acknack(
+            const std::function<void(ChangeForReader_t& change)>& func);
 
     /*!
      * @brief Sets a change to a particular status (if present in the ReaderProxy)
      * @param seq_num Sequence number of the change to update.
      * @param status Status to apply.
      * @param restart_nack_supression Whether nack supression event should be restarted or not.
-     * @return true when a status has changed, false otherwise.
+     * @param delivered true if change was able to be delivered to its addressees. false otherwise.
      */
-    bool set_change_to_status(
+    void from_unsent_to_status(
             const SequenceNumber_t& seq_num,
             ChangeForReaderStatus_t status,
-            bool restart_nack_supression);
+            bool restart_nack_supression,
+            bool delivered = true);
 
     /**
      * @brief Mark a particular fragment as sent.
@@ -233,15 +202,19 @@ public:
 
     /**
      * Turns all UNDERWAY changes into UNACKNOWLEDGED.
+     *
      * @return true if at least one change changed its status, false otherwise.
      */
     bool perform_nack_supression();
 
     /**
      * Turns all REQUESTED changes into UNSENT.
+     *
+     * @param func Function executed for each change which changes its status.
      * @return the number of changes that changed its status.
      */
-    uint32_t perform_acknack_response();
+    uint32_t perform_acknack_response(
+            const std::function<void(ChangeForReader_t& change)>& func);
 
     /**
      * Call this to inform a change was removed from history.
@@ -252,9 +225,11 @@ public:
 
     /*!
      * @brief Returns there is some UNACKNOWLEDGED change.
+     * @param first_seq_in_history Minimum sequence number in the writer history.
      * @return There is some UNACKNOWLEDGED change.
      */
-    bool has_unacknowledged() const;
+    bool has_unacknowledged(
+            const SequenceNumber_t& first_seq_in_history) const;
 
     /**
      * Get the GUID of the reader represented by this proxy.
@@ -373,42 +348,20 @@ public:
     }
 
     /**
-     * Get the first relevant sequence number of the changes for this reader.
-     * @return the first relevant sequence number of the changes for this reader.
-     */
-    SequenceNumber_t first_relevant_sequence_number() const;
-
-    /**
      * Change the interval of nack-supression event.
      * @param interval Time from data sending to acknack processing.
      */
     void update_nack_supression_interval(
             const Duration_t& interval);
 
-    /**
-     * Check if there are gaps in the list of ChangeForReader_t.
-     * @return True if there are gaps, else false.
-     */
-    bool are_there_gaps();
-
-    /**
-     * Adds gaps to message group if there are holes / irrelevant changes on this proxy.
-
-     * @param group Message group where gaps will be added.
-     * @param next_seq Sequence number of next sample to be added to history.
-     */
-    void send_gaps(
-            RTPSMessageGroup& group,
-            SequenceNumber_t next_seq);
-
     LocatorSelectorEntry* locator_selector_entry()
     {
         return locator_info_.locator_selector_entry();
     }
 
-    const RTPSMessageSenderInterface& message_sender() const
+    RTPSMessageSenderInterface* message_sender()
     {
-        return locator_info_;
+        return &locator_info_;
     }
 
     bool is_datasharing_reader() const
@@ -434,6 +387,17 @@ public:
     size_t locators_size() const
     {
         return locator_info_.locators_size();
+    }
+
+    bool active() const
+    {
+        return active_;
+    }
+
+    void active(
+            bool active)
+    {
+        active_ = active;
     }
 
 private:
@@ -466,6 +430,8 @@ private:
 
     SequenceNumber_t changes_low_mark_;
 
+    bool active_ = false;
+
     using ChangeIterator = ResourceLimitedVector<ChangeForReader_t, std::true_type>::iterator;
     using ChangeConstIterator = ResourceLimitedVector<ChangeForReader_t, std::true_type>::const_iterator;
 
@@ -475,11 +441,13 @@ private:
      * Converts all changes with a given status to a different status.
      * @param previous Status to change.
      * @param next Status to adopt.
+     * @param func Function executed for each change which changes its status.
      * @return the number of changes that have been modified.
      */
     uint32_t convert_status_on_all_changes(
             ChangeForReaderStatus_t previous,
-            ChangeForReaderStatus_t next);
+            ChangeForReaderStatus_t next,
+            const std::function<void(ChangeForReader_t& change)>& func = {});
 
     /*!
      * @brief Adds requested fragments. These fragments will be sent in next NackResponseDelay.
@@ -492,7 +460,8 @@ private:
             const FragmentNumberSet_t& frag_set);
 
     void add_change(
-            const ChangeForReader_t& change);
+            const ChangeForReader_t& change,
+            bool is_relevant);
 
     /**
      * @brief Find a change with the specified sequence number.

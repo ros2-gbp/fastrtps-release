@@ -27,6 +27,7 @@
 #include <fastdds/rtps/common/SequenceNumber.h>
 #include <fastdds/rtps/common/Time_t.h>
 #include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
 #include <fastrtps/qos/LivelinessChangedStatus.h>
 #include <fastrtps/utils/TimedConditionVariable.hpp>
 
@@ -237,6 +238,9 @@ public:
 
     RTPS_DllAPI uint64_t get_unread_count() const;
 
+    RTPS_DllAPI uint64_t get_unread_count(
+            bool mark_as_read);
+
     /**
      * @return True if the reader expects Inline QOS.
      */
@@ -249,6 +253,22 @@ public:
     RTPS_DllAPI inline ReaderHistory* getHistory()
     {
         return mp_history;
+    }
+
+    //! @return The content filter associated to this reader.
+    RTPS_DllAPI eprosima::fastdds::rtps::IReaderDataFilter* get_content_filter() const
+    {
+        std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+        return data_filter_;
+    }
+
+    //! Set the content filter associated to this reader.
+    //! @param filter Pointer to the content filter to associate to this reader.
+    RTPS_DllAPI void set_content_filter(
+            eprosima::fastdds::rtps::IReaderDataFilter* filter)
+    {
+        std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+        data_filter_ = filter;
     }
 
     /*!
@@ -315,14 +335,18 @@ public:
      */
     virtual void change_read_by_user(
             CacheChange_t* change,
-            const WriterProxy* writer,
+            WriterProxy* writer,
             bool mark_as_read = true) = 0;
 
     /**
-     * Checks whether the sample is still valid or is corrupted
-     * @param data Pointer to the sample data to check
-     * @param writer GUID of the writer that sent \c data
-     * @param sn Sequence number related to \c data
+     * Checks whether the sample is still valid or is corrupted.
+     *
+     * @param data    Pointer to the sample data to check.
+     *                If it does not belong to the payload pool passed to the
+     *                reader on construction, it yields undefined behavior.
+     * @param writer  GUID of the writer that sent \c data.
+     * @param sn      Sequence number related to \c data.
+     *
      * @return true if the sample is valid
      */
     RTPS_DllAPI bool is_sample_valid(
@@ -439,7 +463,6 @@ protected:
     bool is_datasharing_compatible_with(
             const WriterProxyData& wdata);
 
-
     //!ReaderHistory
     ReaderHistory* mp_history;
     //!Listener
@@ -469,6 +492,8 @@ protected:
     bool is_datasharing_compatible_ = false;
     //! The listener for the datasharing notifications
     std::unique_ptr<IDataSharingListener> datasharing_listener_;
+
+    eprosima::fastdds::rtps::IReaderDataFilter* data_filter_ = nullptr;
 
 private:
 

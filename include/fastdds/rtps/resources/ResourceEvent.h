@@ -52,6 +52,8 @@ public:
      */
     void init_thread();
 
+    void stop_thread();
+
     /*!
      * @brief This method informs that a TimedEventImpl has been created.
      *
@@ -119,6 +121,9 @@ private:
 
     //! Collection of registered events waiting completion.
     std::vector<TimedEventImpl*> active_timers_;
+
+    //! Prevents iterator invalidation when active_timers are manipulated inside loops
+    std::atomic<bool> skip_checking_active_timers_;
 
     //! Current time as seen by the execution thread.
     std::chrono::steady_clock::time_point current_time_;

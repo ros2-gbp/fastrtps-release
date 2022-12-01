@@ -107,14 +107,16 @@ WLP::WLP(
     , temp_reader_proxy_data_(
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
-        p->mp_participantImpl->getRTPSParticipantAttributes().allocation.data_limits)
+        p->mp_participantImpl->getRTPSParticipantAttributes().allocation.data_limits,
+        p->mp_participantImpl->getRTPSParticipantAttributes().allocation.content_filter)
     , temp_writer_proxy_data_(
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.locators.max_unicast_locators,
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.locators.max_multicast_locators,
         p->mp_participantImpl->getRTPSParticipantAttributes().allocation.data_limits)
 {
-    automatic_instance_handle_ = p->mp_participantImpl->getGuid();
-    memset(&automatic_instance_handle_.value[12], 0, 3);
+    GUID_t tmp_guid = p->mp_participantImpl->getGuid();
+    tmp_guid.entityId = 0;
+    automatic_instance_handle_ = tmp_guid;
     manual_by_participant_instance_handle_ = automatic_instance_handle_;
 
     automatic_instance_handle_.value[15] = AUTOMATIC_LIVELINESS_QOS + 0x01;
@@ -137,8 +139,8 @@ WLP::~WLP()
 #if HAVE_SECURITY
     if (mp_participant->is_secure())
     {
-        mp_participant->deleteUserEndpoint(mp_builtinReaderSecure);
-        mp_participant->deleteUserEndpoint(mp_builtinWriterSecure);
+        mp_participant->deleteUserEndpoint(mp_builtinReaderSecure->getGuid());
+        mp_participant->deleteUserEndpoint(mp_builtinWriterSecure->getGuid());
 
         if (mp_builtinReaderSecureHistory)
         {
@@ -156,8 +158,8 @@ WLP::~WLP()
     }
 #endif // if HAVE_SECURITY
 
-    mp_participant->deleteUserEndpoint(mp_builtinReader);
-    mp_participant->deleteUserEndpoint(mp_builtinWriter);
+    mp_participant->deleteUserEndpoint(mp_builtinReader->getGuid());
+    mp_participant->deleteUserEndpoint(mp_builtinWriter->getGuid());
 
     if (mp_builtinReaderHistory)
     {
@@ -252,11 +254,6 @@ bool WLP::createEndpoints()
     watt.endpoint.topicKind = WITH_KEY;
     watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
     watt.endpoint.reliabilityKind = RELIABLE;
-    if (mp_participant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            mp_participant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-    {
-        watt.mode = ASYNCHRONOUS_WRITER;
-    }
     RTPSWriter* wout;
     if (mp_participant->createWriter(
                 &wout,
@@ -354,11 +351,6 @@ bool WLP::createSecureEndpoints()
     watt.endpoint.topicKind = WITH_KEY;
     watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
     watt.endpoint.reliabilityKind = RELIABLE;
-    if (mp_participant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            mp_participant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-    {
-        watt.mode = ASYNCHRONOUS_WRITER;
-    }
 
     const security::ParticipantSecurityAttributes& part_attrs = mp_participant->security_attributes();
     security::PluginParticipantSecurityAttributes plugin_attrs(part_attrs.plugin_participant_attributes);

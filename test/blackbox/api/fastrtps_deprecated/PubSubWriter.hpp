@@ -45,6 +45,7 @@
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
+#include <fastdds/rtps/flowcontrol/FlowControllerSchedulerPolicy.hpp>
 
 using eprosima::fastrtps::rtps::IPLocator;
 using eprosima::fastrtps::rtps::UDPTransportDescriptor;
@@ -575,7 +576,12 @@ public:
     bool waitForAllAcked(
             const std::chrono::duration<_Rep, _Period>& max_wait)
     {
-        return publisher_->wait_for_all_acked(eprosima::fastrtps::Time_t((int32_t)max_wait.count(), 0));
+        auto nsecs = std::chrono::duration_cast<std::chrono::nanoseconds>(max_wait);
+        auto secs = std::chrono::duration_cast<std::chrono::seconds>(nsecs);
+        nsecs -= secs;
+        eprosima::fastrtps::Duration_t timeout {static_cast<int32_t>(secs.count()),
+                                                static_cast<uint32_t>(nsecs.count())};
+        return publisher_->wait_for_all_acked(timeout);
     }
 
     void block_until_discover_topic(
@@ -674,6 +680,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& disable_heartbeat_piggyback(
+            bool value)
+    {
+        publisher_attr_.qos.disable_heartbeat_piggyback = value;
+        return *this;
+    }
+
     PubSubWriter& max_blocking_time(
             const eprosima::fastrtps::Duration_t time)
     {
@@ -682,6 +695,7 @@ public:
     }
 
     PubSubWriter& add_throughput_controller_descriptor_to_pparams(
+            eprosima::fastdds::rtps::FlowControllerSchedulerPolicy,
             uint32_t bytesPerPeriod,
             uint32_t periodInMs)
     {
@@ -1059,6 +1073,15 @@ public:
         return *this;
     }
 
+    PubSubWriter& initial_announcements(
+            uint32_t count,
+            const eprosima::fastrtps::Duration_t& period)
+    {
+        participant_attr_.rtps.builtin.discovery_config.initial_announcements.count = count;
+        participant_attr_.rtps.builtin.discovery_config.initial_announcements.period = period;
+        return *this;
+    }
+
     PubSubWriter& load_publisher_attr(
             const std::string& xml)
     {
@@ -1144,6 +1167,11 @@ public:
     bool is_matched() const
     {
         return matched_ > 0;
+    }
+
+    unsigned int get_matched() const
+    {
+        return matched_;
     }
 
     unsigned int missed_deadlines() const

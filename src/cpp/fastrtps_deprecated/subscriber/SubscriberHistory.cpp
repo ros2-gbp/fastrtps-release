@@ -47,7 +47,7 @@ static void get_sample_info(
     info->sample_identity.writer_guid(change->writerGUID);
     info->sample_identity.sequence_number(change->sequenceNumber);
     info->sourceTimestamp = change->sourceTimestamp;
-    info->receptionTimestamp = change->receptionTimestamp;
+    info->receptionTimestamp = change->reader_info.receptionTimestamp;
     info->ownershipStrength = ownership_strength;
     info->iHandle = change->instanceHandle;
     info->related_sample_identity = change->write_params.sample_identity();
@@ -135,6 +135,23 @@ SubscriberHistory::~SubscriberHistory()
     {
         type_->deleteData(get_key_object_);
     }
+}
+
+bool SubscriberHistory::can_change_be_added_nts(
+        const rtps::GUID_t& writer_guid,
+        uint32_t total_payload_size,
+        size_t unknown_missing_changes_up_to,
+        bool& will_never_be_accepted) const
+{
+    if (!ReaderHistory::can_change_be_added_nts(writer_guid, total_payload_size, unknown_missing_changes_up_to,
+            will_never_be_accepted))
+    {
+        return false;
+    }
+
+    will_never_be_accepted = false;
+    return (KEEP_ALL_HISTORY_QOS != history_qos_.kind) ||
+           (m_changes.size() + unknown_missing_changes_up_to < static_cast<size_t>(resource_limited_qos_.max_samples));
 }
 
 bool SubscriberHistory::received_change(
@@ -674,58 +691,6 @@ bool SubscriberHistory::get_next_deadline(
     }
 
     return false;
-}
-
-std::pair<bool, SubscriberHistory::instance_info> SubscriberHistory::lookup_instance(
-        const InstanceHandle_t& handle,
-        bool exact)
-{
-    if (topic_att_.getTopicKind() == NO_KEY)
-    {
-        if (handle.isDefined())
-        {
-            // NO_KEY topics can only return the ficticious instance.
-            // Execution can only get here for two reasons:
-            // - Looking for a specific instance (exact = true)
-            // - Looking for the next instance to the ficticious one (exact = false)
-            // In both cases, no instance should be returned
-            return { false, {InstanceHandle_t(), nullptr} };
-        }
-        else
-        {
-            if (exact)
-            {
-                // Looking for HANDLE_NIL, nothing to return
-                return { false, {InstanceHandle_t(), nullptr} };
-            }
-
-            // Looking for the first instance, return the ficticious one containing all changes
-            InstanceHandle_t tmp;
-            tmp.value[0] = 1;
-            return { true, {tmp, &m_changes} };
-        }
-    }
-
-    t_m_Inst_Caches::iterator it;
-
-    if (exact)
-    {
-        it = keyed_changes_.find(handle);
-    }
-    else
-    {
-        auto comp = [](const InstanceHandle_t& h, const std::pair<InstanceHandle_t, KeyedChanges>& it)
-                {
-                    return h < it.first;
-                };
-        it = std::upper_bound(keyed_changes_.begin(), keyed_changes_.end(), handle, comp);
-    }
-
-    if (it != keyed_changes_.end())
-    {
-        return { true, {it->first, &(it->second.cache_changes)} };
-    }
-    return { false, {InstanceHandle_t(), nullptr} };
 }
 
 ReaderHistory::iterator SubscriberHistory::remove_change_nts(

@@ -58,8 +58,6 @@ public:
 
     MOCK_METHOD1 (matched_reader_is_matched, bool(const GUID_t& reader_guid));
 
-    MOCK_METHOD0(getGuid, const GUID_t& ());
-
     MOCK_METHOD1(unsent_change_added_to_history_mock, void(CacheChange_t*));
 
     MOCK_METHOD1(perform_nack_supression, void(const GUID_t&));
@@ -85,7 +83,7 @@ public:
 
     SequenceNumber_t get_seq_num_min()
     {
-        return SequenceNumber_t(0, 0);
+        return SequenceNumber_t::unknown();
     }
 
     SequenceNumber_t next_sequence_number() const
@@ -94,9 +92,9 @@ public:
     }
 
     void reader_data_filter(
-            fastdds::rtps::IReaderDataFilter* reader_data_filter)
+            fastdds::rtps::IReaderDataFilter* filter)
     {
-        reader_data_filter_ = reader_data_filter;
+        reader_data_filter_ = filter;
     }
 
     const fastdds::rtps::IReaderDataFilter* reader_data_filter() const

@@ -15,7 +15,6 @@
 #ifndef _FASTDDS_DDS_LOG_LOG_HPP_
 #define _FASTDDS_DDS_LOG_LOG_HPP_
 
-#include <fastrtps/utils/DBQueue.h>
 #include <fastrtps/fastrtps_dll.h>
 #include <thread>
 #include <sstream>
@@ -154,36 +153,6 @@ public:
 
 private:
 
-    struct Resources
-    {
-        fastrtps::DBQueue<Entry> logs;
-        std::vector<std::unique_ptr<LogConsumer>> consumers;
-        std::unique_ptr<std::thread> logging_thread;
-
-        // Condition variable segment.
-        std::condition_variable cv;
-        std::mutex cv_mutex;
-        bool logging;
-        bool work;
-        int current_loop;
-
-        // Context configuration.
-        std::mutex config_mutex;
-        bool filenames;
-        bool functions;
-        std::unique_ptr<std::regex> category_filter;
-        std::unique_ptr<std::regex> filename_filter;
-        std::unique_ptr<std::regex> error_string_filter;
-
-        std::atomic<Log::Kind> verbosity;
-
-        Resources();
-
-        ~Resources();
-    };
-
-    static struct Resources resources_;
-
     // Applies transformations to the entries compliant with the options selected (such as
     // erasure of certain context information, or filtering by category. Returns false
     // if the log entry is blacklisted.
@@ -291,7 +260,8 @@ protected:
 // Allow multiconfig platforms like windows to disable info queueing on Release and other non-debug configs
 #if !HAVE_LOG_NO_INFO &&  \
     (defined(FASTDDS_ENFORCE_LOG_INFO) || \
-    ((defined(__INTERNALDEBUG) || defined(_INTERNALDEBUG)) && (defined(_DEBUG) || defined(__DEBUG))))
+    ((defined(__INTERNALDEBUG) || defined(_INTERNALDEBUG)) && (defined(_DEBUG) || defined(__DEBUG) || \
+    !defined(NDEBUG))))
 #define logInfo_(cat, msg)                                                                              \
     {                                                                                                   \
         using namespace eprosima::fastdds::dds;                                                         \

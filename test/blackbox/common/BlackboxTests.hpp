@@ -28,13 +28,13 @@
 #include <unistd.h>
 #endif // if defined(_WIN32)
 
-#include "../types/HelloWorldType.h"
-#include "../types/FixedSizedType.h"
-#include "../types/KeyedHelloWorldType.h"
-#include "../types/StringType.h"
-#include "../types/Data64kbType.h"
-#include "../types/Data1mbType.h"
-#include "../types/KeyedData1mbType.h"
+#include "../types/HelloWorldPubSubTypes.h"
+#include "../types/FixedSizedPubSubTypes.h"
+#include "../types/KeyedHelloWorldPubSubTypes.h"
+#include "../types/StringTestPubSubTypes.h"
+#include "../types/Data64kbPubSubTypes.h"
+#include "../types/Data1mbPubSubTypes.h"
+#include "../types/KeyedData1mbPubSubTypes.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -53,6 +53,7 @@ extern uint16_t global_port;
 extern bool enable_datasharing;
 extern bool use_pull_mode;
 extern bool use_udpv4;
+extern bool use_ipv6;
 
 /****** Auxiliary print functions  ******/
 template<class Type>
@@ -76,7 +77,7 @@ void default_receive_print(
 
 template<>
 void default_receive_print(
-        const String& str);
+        const StringTest& str);
 
 template<>
 void default_receive_print(
@@ -99,7 +100,7 @@ void default_send_print(
 
 template<>
 void default_send_print(
-        const StringType&);
+        const StringTest&);
 
 template<>
 void default_send_print(
@@ -115,7 +116,7 @@ void default_send_print(
 
 template<>
 void default_send_print(
-        const String& str);
+        const StringTest& str);
 
 template<>
 void default_send_print(
@@ -137,9 +138,10 @@ std::list<FixedSized> default_fixed_sized_data_generator(
         size_t max = 0);
 
 std::list<KeyedHelloWorld> default_keyedhelloworld_data_generator(
-        size_t max = 0);
+        size_t max = 0,
+        bool unique_key = false);
 
-std::list<String> default_large_string_data_generator(
+std::list<StringTest> default_large_string_data_generator(
         size_t max = 0);
 
 std::list<Data64kb> default_data64kb_data_generator(
@@ -167,7 +169,7 @@ extern const std::function<void(const FixedSized&)>  default_fixed_sized_print;
 
 extern const std::function<void(const KeyedHelloWorld&)>  default_keyedhelloworld_print;
 
-extern const std::function<void(const String&)>  default_string_print;
+extern const std::function<void(const StringTest&)>  default_string_print;
 
 extern const std::function<void(const Data64kb&)>  default_data64kb_print;
 

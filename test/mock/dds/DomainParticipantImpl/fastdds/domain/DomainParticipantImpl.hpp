@@ -139,6 +139,15 @@ public:
 
     Publisher* create_publisher(
             const PublisherQos& qos,
+            PublisherListener* listener,
+            const StatusMask& mask)
+    {
+        return create_publisher(qos, nullptr, listener, mask);
+    }
+
+    Publisher* create_publisher(
+            const PublisherQos& qos,
+            PublisherImpl** impl,
             PublisherListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all())
     {
@@ -149,6 +158,12 @@ public:
         std::lock_guard<std::mutex> lock(mtx_pubs_);
         publishers_[pub] = pubimpl;
         pub->enable();
+
+        if (impl)
+        {
+            *impl = pubimpl;
+        }
+
         return pub;
     }
 
@@ -295,6 +310,29 @@ public:
         }
         return ReturnCode_t::RETCODE_ERROR;
     }
+
+    MOCK_METHOD5(create_contentfilteredtopic, ContentFilteredTopic * (
+                const std::string& name,
+                Topic * related_topic,
+                const std::string& filter_expression,
+                const std::vector<std::string>& expression_parameters,
+                const char* filter_class_name));
+
+    MOCK_METHOD1(delete_contentfilteredtopic, ReturnCode_t(
+                const ContentFilteredTopic * topic));
+
+    MOCK_METHOD2(register_content_filter_factory, ReturnCode_t(
+                const char* filter_class_name,
+                IContentFilterFactory* const filter_factory));
+
+    MOCK_METHOD1(lookup_content_filter_factory, IContentFilterFactory * (
+                const char* filter_class_name));
+
+    MOCK_METHOD1(unregister_content_filter_factory, ReturnCode_t (
+                const char* filter_class_name));
+
+    MOCK_METHOD1(find_content_filter_factory, IContentFilterFactory * (
+                const char* filter_class_name));
 
     TopicDescription* lookup_topicdescription(
             const std::string& topic_name) const
@@ -619,6 +657,11 @@ public:
         return nullptr;
     }
 
+    uint32_t& id_counter()
+    {
+        return id_counter_;
+    }
+
 protected:
 
     DomainId_t domain_id_;
@@ -638,6 +681,7 @@ protected:
     std::map<std::string, TypeSupport> types_;
     mutable std::mutex mtx_types_;
     TopicQos default_topic_qos_;
+    uint32_t id_counter_ = 0;
 
     class MyRTPSParticipantListener : public fastrtps::rtps::RTPSParticipantListener
     {
@@ -670,11 +714,12 @@ protected:
         return new SubscriberImpl(this, qos, listener);
     }
 
-    static void set_qos(
+    static bool set_qos(
             DomainParticipantQos& /*to*/,
             const DomainParticipantQos& /*from*/,
             bool /*first_time*/)
     {
+        return false;
     }
 
     static ReturnCode_t check_qos(

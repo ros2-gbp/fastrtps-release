@@ -23,6 +23,8 @@
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/utils/TimedMutex.hpp>
 
+#include <mutex>
+
 #include <gmock/gmock.h>
 
 namespace eprosima {
@@ -70,6 +72,15 @@ public:
         change->sequenceNumber = ++last_sequence_number_;
         samples_number_mutex_.unlock();
         return ret;
+    }
+
+    virtual bool can_change_be_added_nts(
+            const GUID_t&,
+            uint32_t,
+            size_t,
+            bool&) const
+    {
+        return true;
     }
 
     virtual bool received_change(
@@ -122,9 +133,21 @@ public:
         return m_changes.erase(removal);
     }
 
+    virtual void writer_unmatched(
+            const GUID_t& /*writer_guid*/,
+            const SequenceNumber_t& /*last_notified_seq*/)
+    {
+    }
+
     HistoryAttributes m_att;
 
 protected:
+
+    template<typename Pred>
+    inline void remove_changes_with_pred(
+            Pred)
+    {
+    }
 
     RTPSReader* mp_reader;
     RecursiveTimedMutex* mp_mutex;
