@@ -1,6 +1,15 @@
 Forthcoming
 -----------
 
+* Default memory management policy set to `PREALLOCATED_WITH_REALLOC_MEMORY_MODE` (behaviour change)
+* Statistics metrics are only calculated/accumulated when their corresponding DataWriter is enabled (behaviour change)
+* Added new log macros `EPROSIMA_LOG_INFO`, `EPROSIMA_LOG_WARNING` and `EPROSIMA_LOG_ERROR`, and change all old macros `logInfo`, `logWarning`, and `logError` in the project.
+* Added `ENABLE_OLD_LOG_MACROS` CMake option to support disabling the compilation of old log macros `logInfo`, `logWarning`, and `logError`.
+* FASTDDS_STATISTICS build option set to ON by default
+
+Version 2.8.0
+-------------
+
 * Added API get the WAN address of TCPv4 transport descriptors (API extension)
 * Support `propagate` attribute for Properties in PropertyQoSPolicies so they could be
   set by user and sent in PDP

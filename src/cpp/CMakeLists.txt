@@ -396,8 +396,8 @@ if(NOT CMAKE_ATOMIC_LIB)
 endif()
 
 try_run(SM_RUN_RESULT SM_COMPILE_RESULT
-        "${CMAKE_CURRENT_BINARY_DIR}/shmtest"
-        "${CMAKE_SOURCE_DIR}/cmake/modules/check_shared_mutex_priority.cpp"
+        "${PROJECT_BINARY_DIR}/shmtest"
+        "${PROJECT_SOURCE_DIR}/cmake/modules/check_shared_mutex_priority.cpp"
         LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_ATOMIC_LIB}
         RUN_OUTPUT_VARIABLE SM_RUN_OUTPUT)
 
@@ -520,12 +520,12 @@ if(MSVC OR MSVC_IDE)
 
         # replace the values in the manifest template
         configure_file(
-            "${CMAKE_SOURCE_DIR}/cmake/packaging/windows/fastrtps.manifest.in"
-            "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest"
+            "${PROJECT_SOURCE_DIR}/cmake/packaging/windows/fastrtps.manifest.in"
+            "${PROJECT_BINARY_DIR}/fastrtps.manifest"
             @ONLY
             )
 
-        file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest" MANIFEST_FILE_PATH)
+        file(TO_NATIVE_PATH "${PROJECT_BINARY_DIR}/fastrtps.manifest" MANIFEST_FILE_PATH)
         target_link_options(${PROJECT_NAME} PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${MANIFEST_FILE_PATH}")
 
         unset(WINDOWS_SOURCE_DIR)
