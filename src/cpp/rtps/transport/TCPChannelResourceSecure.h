@@ -15,6 +15,8 @@
 #ifndef _FASTDDS_TCP_CHANNEL_RESOURCE_SECURE_
 #define _FASTDDS_TCP_CHANNEL_RESOURCE_SECURE_
 
+#define OPENSSL_API_COMPAT 10101
+
 #include <asio.hpp>
 #include <asio/ssl.hpp>
 #include <asio/strand.hpp>
@@ -70,6 +72,9 @@ public:
             const TCPTransportDescriptor* options) override;
 
     void set_tls_verify_mode(
+            const TCPTransportDescriptor* options);
+
+    void set_tls_sni(
             const TCPTransportDescriptor* options);
 
     void cancel() override;

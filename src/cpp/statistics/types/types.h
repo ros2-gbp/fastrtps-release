@@ -23,6 +23,8 @@
 #define _FAST_DDS_GENERATED_EPROSIMA_FASTDDS_STATISTICS_TYPES_H_
 
 
+#include <fastrtps/utils/fixed_size_string.hpp>
+
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -95,7 +97,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::EntityId_s that will be copied.
                      */
                     eProsima_user_DllExport EntityId_s(
-                            EntityId_s&& x);
+                            EntityId_s&& x) noexcept;
 
                     /*!
                      * @brief Copy assignment.
@@ -109,7 +111,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::EntityId_s that will be copied.
                      */
                     eProsima_user_DllExport EntityId_s& operator =(
-                            EntityId_s&& x);
+                            EntityId_s&& x) noexcept;
 
                     /*!
                      * @brief Comparison operator.
@@ -242,7 +244,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::GuidPrefix_s that will be copied.
                      */
                     eProsima_user_DllExport GuidPrefix_s(
-                            GuidPrefix_s&& x);
+                            GuidPrefix_s&& x) noexcept;
 
                     /*!
                      * @brief Copy assignment.
@@ -256,7 +258,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::GuidPrefix_s that will be copied.
                      */
                     eProsima_user_DllExport GuidPrefix_s& operator =(
-                            GuidPrefix_s&& x);
+                            GuidPrefix_s&& x) noexcept;
 
                     /*!
                      * @brief Comparison operator.
@@ -389,7 +391,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::GUID_s that will be copied.
                      */
                     eProsima_user_DllExport GUID_s(
-                            GUID_s&& x);
+                            GUID_s&& x) noexcept;
 
                     /*!
                      * @brief Copy assignment.
@@ -403,7 +405,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::GUID_s that will be copied.
                      */
                     eProsima_user_DllExport GUID_s& operator =(
-                            GUID_s&& x);
+                            GUID_s&& x) noexcept;
 
                     /*!
                      * @brief Comparison operator.
@@ -562,7 +564,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::SequenceNumber_s that will be copied.
                      */
                     eProsima_user_DllExport SequenceNumber_s(
-                            SequenceNumber_s&& x);
+                            SequenceNumber_s&& x) noexcept;
 
                     /*!
                      * @brief Copy assignment.
@@ -576,7 +578,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::SequenceNumber_s that will be copied.
                      */
                     eProsima_user_DllExport SequenceNumber_s& operator =(
-                            SequenceNumber_s&& x);
+                            SequenceNumber_s&& x) noexcept;
 
                     /*!
                      * @brief Comparison operator.
@@ -723,7 +725,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::SampleIdentity_s that will be copied.
                      */
                     eProsima_user_DllExport SampleIdentity_s(
-                            SampleIdentity_s&& x);
+                            SampleIdentity_s&& x) noexcept;
 
                     /*!
                      * @brief Copy assignment.
@@ -737,7 +739,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::SampleIdentity_s that will be copied.
                      */
                     eProsima_user_DllExport SampleIdentity_s& operator =(
-                            SampleIdentity_s&& x);
+                            SampleIdentity_s&& x) noexcept;
 
                     /*!
                      * @brief Comparison operator.
@@ -896,7 +898,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::Locator_s that will be copied.
                      */
                     eProsima_user_DllExport Locator_s(
-                            Locator_s&& x);
+                            Locator_s&& x) noexcept;
 
                     /*!
                      * @brief Copy assignment.
@@ -910,7 +912,7 @@ namespace eprosima {
                      * @param x Reference to the object eprosima::fastdds::statistics::detail::Locator_s that will be copied.
                      */
                     eProsima_user_DllExport Locator_s& operator =(
-                            Locator_s&& x);
+                            Locator_s&& x) noexcept;
 
                     /*!
                      * @brief Comparison operator.
@@ -1084,7 +1086,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::DiscoveryTime that will be copied.
                  */
                 eProsima_user_DllExport DiscoveryTime(
-                        DiscoveryTime&& x);
+                        DiscoveryTime&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -1098,7 +1100,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::DiscoveryTime that will be copied.
                  */
                 eProsima_user_DllExport DiscoveryTime& operator =(
-                        DiscoveryTime&& x);
+                        DiscoveryTime&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -1355,7 +1357,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::EntityCount that will be copied.
                  */
                 eProsima_user_DllExport EntityCount(
-                        EntityCount&& x);
+                        EntityCount&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -1369,7 +1371,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::EntityCount that will be copied.
                  */
                 eProsima_user_DllExport EntityCount& operator =(
-                        EntityCount&& x);
+                        EntityCount&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -1522,7 +1524,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::SampleIdentityCount that will be copied.
                  */
                 eProsima_user_DllExport SampleIdentityCount(
-                        SampleIdentityCount&& x);
+                        SampleIdentityCount&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -1536,7 +1538,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::SampleIdentityCount that will be copied.
                  */
                 eProsima_user_DllExport SampleIdentityCount& operator =(
-                        SampleIdentityCount&& x);
+                        SampleIdentityCount&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -1689,7 +1691,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::Entity2LocatorTraffic that will be copied.
                  */
                 eProsima_user_DllExport Entity2LocatorTraffic(
-                        Entity2LocatorTraffic&& x);
+                        Entity2LocatorTraffic&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -1703,7 +1705,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::Entity2LocatorTraffic that will be copied.
                  */
                 eProsima_user_DllExport Entity2LocatorTraffic& operator =(
-                        Entity2LocatorTraffic&& x);
+                        Entity2LocatorTraffic&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -1922,7 +1924,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::WriterReaderData that will be copied.
                  */
                 eProsima_user_DllExport WriterReaderData(
-                        WriterReaderData&& x);
+                        WriterReaderData&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -1936,7 +1938,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::WriterReaderData that will be copied.
                  */
                 eProsima_user_DllExport WriterReaderData& operator =(
-                        WriterReaderData&& x);
+                        WriterReaderData&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -2115,7 +2117,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::Locator2LocatorData that will be copied.
                  */
                 eProsima_user_DllExport Locator2LocatorData(
-                        Locator2LocatorData&& x);
+                        Locator2LocatorData&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -2129,7 +2131,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::Locator2LocatorData that will be copied.
                  */
                 eProsima_user_DllExport Locator2LocatorData& operator =(
-                        Locator2LocatorData&& x);
+                        Locator2LocatorData&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -2308,7 +2310,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::EntityData that will be copied.
                  */
                 eProsima_user_DllExport EntityData(
-                        EntityData&& x);
+                        EntityData&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -2322,7 +2324,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::EntityData that will be copied.
                  */
                 eProsima_user_DllExport EntityData& operator =(
-                        EntityData&& x);
+                        EntityData&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -2475,7 +2477,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::PhysicalData that will be copied.
                  */
                 eProsima_user_DllExport PhysicalData(
-                        PhysicalData&& x);
+                        PhysicalData&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -2489,7 +2491,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::PhysicalData that will be copied.
                  */
                 eProsima_user_DllExport PhysicalData& operator =(
-                        PhysicalData&& x);
+                        PhysicalData&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -2724,7 +2726,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::Data that will be copied.
                  */
                 eProsima_user_DllExport Data(
-                        Data&& x);
+                        Data&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -2738,7 +2740,7 @@ namespace eprosima {
                  * @param x Reference to the object eprosima::fastdds::statistics::Data that will be copied.
                  */
                 eProsima_user_DllExport Data& operator =(
-                        Data&& x);
+                        Data&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.

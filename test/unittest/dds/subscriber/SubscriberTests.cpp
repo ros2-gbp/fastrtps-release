@@ -186,7 +186,10 @@ public:
     std::function<uint32_t()> getSerializedSizeProvider(
             void* /*data*/) override
     {
-        return std::function<uint32_t()>();
+        return []()->uint32_t
+               {
+                   return 0;
+               };
     }
 
     void* createData() override
@@ -952,9 +955,9 @@ TEST(SubscriberTests, DeleteContainedEntities)
 
     ASSERT_EQ(data_reader_foo->return_loan(mock_coll, mock_seq), ReturnCode_t::RETCODE_OK);
 
-    const std::vector<SampleStateKind> mock_sample_state_kind;
-    const std::vector<ViewStateKind> mock_view_state_kind;
-    const std::vector<InstanceStateKind> mock_instance_states;
+    SampleStateMask mock_sample_state_kind = ANY_SAMPLE_STATE;
+    ViewStateMask mock_view_state_kind = ANY_VIEW_STATE;
+    InstanceStateMask mock_instance_states = ANY_INSTANCE_STATE;
     const std::string mock_query_expression;
     const std::vector<std::string> mock_query_parameters;
 

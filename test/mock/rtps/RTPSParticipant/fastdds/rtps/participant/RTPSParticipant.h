@@ -104,6 +104,11 @@ public:
         return true;
     }
 
+    void set_enabled_statistics_writers_mask(
+            uint32_t /*enabled_writers*/)
+    {
+    }
+
 #endif // FASTDDS_STATISTICS
 
 
@@ -131,7 +136,7 @@ public:
                 const GUID_t& pguid,
                 int16_t userDefinedId));
 
-    ResourceEvent& get_resource_event()
+    ResourceEvent& get_resource_event() const
     {
         return mp_event_thr;
     }
@@ -194,7 +199,7 @@ public:
 
     RTPSParticipantListener* listener_;
     const GUID_t m_guid;
-    ResourceEvent mp_event_thr;
+    mutable ResourceEvent mp_event_thr;
     RTPSParticipantAttributes attributes_;
 };
 

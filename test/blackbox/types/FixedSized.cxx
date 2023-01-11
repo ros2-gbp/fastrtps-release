@@ -36,7 +36,7 @@ using namespace eprosima::fastcdr::exception;
 
 FixedSized::FixedSized()
 {
-    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5db45159
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7fac631b
     m_index = 0;
 
 }
@@ -52,7 +52,7 @@ FixedSized::FixedSized(
 }
 
 FixedSized::FixedSized(
-        FixedSized&& x)
+        FixedSized&& x) noexcept 
 {
     m_index = x.m_index;
 }
@@ -67,7 +67,7 @@ FixedSized& FixedSized::operator =(
 }
 
 FixedSized& FixedSized::operator =(
-        FixedSized&& x)
+        FixedSized&& x) noexcept
 {
 
     m_index = x.m_index;

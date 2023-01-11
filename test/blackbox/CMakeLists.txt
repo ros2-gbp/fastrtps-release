@@ -64,7 +64,7 @@ macro(add_blackbox_gtest)
                 # decide if disable
                 unset(GTEST_USER_DISABLED)
                 foreach(GTEST_USER_FILTER ${GTEST_IGNORE})
-                    string(REGEX MATCH ${GTEST_USER_FILTER} GTEST_USER_DISABLED ${GTEST_TEST_NAME})
+                    string(REGEX MATCH ${GTEST_USER_FILTER} GTEST_USER_DISABLED ${GTEST_GROUP_NAME}.${GTEST_TEST_NAME})
                     if(GTEST_USER_DISABLED)
                         break()
                     endif()
@@ -97,7 +97,7 @@ macro(add_blackbox_gtest)
                 # decide if disable
                 unset(GTEST_USER_DISABLED)
                 foreach(GTEST_USER_FILTER ${GTEST_IGNORE})
-                    string(REGEX MATCH ${GTEST_USER_FILTER} GTEST_USER_DISABLED ${GTEST_TEST_NAME})
+                    string(REGEX MATCH ${GTEST_USER_FILTER} GTEST_USER_DISABLED ${GTEST_GROUP_NAME}.${GTEST_TEST_NAME})
                     if(GTEST_USER_DISABLED)
                         break()
                     endif()
@@ -160,15 +160,15 @@ macro(add_blackbox_gtest)
 
         # add filtering statement if required
         if(GTEST_IGNORE)
-            set(command "${command} --gtest_filter=${GTEST_IGNORE}")
+            set(gtest_filter "--gtest_filter=${GTEST_IGNORE}")
         endif()
 
-        add_test(NAME ${test} COMMAND ${command})
+        add_test(NAME ${test} COMMAND ${command} ${gtest_filter})
 
         # Add environment
         if(WIN32)
             set(WIN_PATH "$ENV{PATH}")
-            get_target_property(LINK_LIBRARIES_ ${command} LINK_LIBRARIES)
+            get_target_property(LINK_LIBRARIES_ ${test} LINK_LIBRARIES)
             if(NOT "${LINK_LIBRARIES_}" STREQUAL "LINK_LIBRARIES_-NOTFOUND")
                 foreach(LIBRARY_LINKED ${LINK_LIBRARIES_})
                     if(TARGET ${LIBRARY_LINKED})
@@ -189,12 +189,14 @@ macro(add_blackbox_gtest)
 
         # Add labels
         set_property(TEST ${test} PROPERTY LABELS "${GTEST_LABELS}")
+
+        unset(gtest_filter)
     endif()
 endmacro()
 
 option(RTPS_API_TESTS "Enable tests using RTPS API" ON)
-option(FASTRTPS_API_TESTS "Enable tests using FastRTPS API" ON)
-option(FASTDDS_PIM_API_TESTS "Enable tests using FastDDS API" OFF)
+option(FASTRTPS_API_TESTS "Enable tests using FastRTPS API" OFF)
+option(FASTDDS_PIM_API_TESTS "Enable tests using FastDDS API" ON)
 
 if(WIN32)
     add_definitions(
@@ -234,6 +236,10 @@ if(NOT LibP11_FOUND)
     endif() # GTEST_INDIVIDUAL
 endif() # LibP11_FOUND
 
+if(EPROSIMA_TEST_DNS_NOT_SET_UP)
+    set(dns_filter "Discovery.ServerClientEnvironmentSetUpDNS")
+endif()
+
 file(GLOB RTPS_BLACKBOXTESTS_TEST_SOURCE "common/RTPSBlackboxTests*.cpp")
 set(RTPS_BLACKBOXTESTS_SOURCE ${RTPS_BLACKBOXTESTS_TEST_SOURCE}
     types/HelloWorld.cxx
@@ -262,6 +268,7 @@ target_compile_definitions(BlackboxTests_RTPS PRIVATE
     $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+    $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
     )
 target_include_directories(BlackboxTests_RTPS PRIVATE
     ${Asio_INCLUDE_DIR})
@@ -299,6 +306,7 @@ set(DDS_BLACKBOXTESTS_SOURCE
     ${DDS_BLACKBOXTESTS_TEST_SOURCE}
     ${BLACKBOXTESTS_SOURCE}
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/ServerAttributes.cpp
     )
 
 # Prepare static discovery xml file for blackbox tests.
@@ -335,6 +343,7 @@ if(FASTRTPS_API_TESTS)
         ${BLACKBOXTESTS_SOURCE}
         api/fastrtps_deprecated/ReqRepHelloWorldRequester.cpp
         api/fastrtps_deprecated/ReqRepHelloWorldReplier.cpp
+        ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/ServerAttributes.cpp
         )
 
     add_executable(BlackboxTests_FastRTPS ${BLACKBOXTESTS_FASTRTPS_SOURCE})
@@ -344,6 +353,7 @@ if(FASTRTPS_API_TESTS)
         $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
         $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+        $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
         )
     target_include_directories(BlackboxTests_FastRTPS PRIVATE
         ${Asio_INCLUDE_DIR}
@@ -355,7 +365,7 @@ if(FASTRTPS_API_TESTS)
         GTest::gtest
         $<$<BOOL:${LibP11_FOUND}>:eProsima_p11>  # $<TARGET_NAME_IF_EXISTS:eProsima_p11>
         )
-       
+
     add_blackbox_gtest(BlackboxTests_FastRTPS SOURCES ${BLACKBOXTESTS_TEST_SOURCE}
         ENVIRONMENTS "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs"
         "TOPIC_RANDOM_NUMBER=${TOPIC_RANDOM_NUMBER}"
@@ -363,7 +373,7 @@ if(FASTRTPS_API_TESTS)
         "R_UNICAST_PORT_RANDOM_NUMBER=${R_UNICAST_PORT_RANDOM_NUMBER}"
         "MULTICAST_PORT_RANDOM_NUMBER=${MULTICAST_PORT_RANDOM_NUMBER}"
         $<$<BOOL:${OPENSSL_CONF}>:OPENSSL_CONF=${OPENSSL_CONF}>
-        IGNORE ${pkcs_filter}
+        IGNORE ${pkcs_filter} ${dns_filter}
         )
 endif(FASTRTPS_API_TESTS)
 
@@ -392,6 +402,7 @@ if(FASTDDS_PIM_API_TESTS)
         $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
         $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+        $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
         )
     target_include_directories(BlackboxTests_DDS_PIM PRIVATE
         ${Asio_INCLUDE_DIR}
@@ -410,7 +421,7 @@ if(FASTDDS_PIM_API_TESTS)
         "R_UNICAST_PORT_RANDOM_NUMBER=${R_UNICAST_PORT_RANDOM_NUMBER}"
         "MULTICAST_PORT_RANDOM_NUMBER=${MULTICAST_PORT_RANDOM_NUMBER}"
         $<$<BOOL:${OPENSSL_CONF}>:OPENSSL_CONF=${OPENSSL_CONF}>
-        IGNORE ${pkcs_filter}
+        IGNORE ${pkcs_filter} ${dns_filter}
         )
 endif(FASTDDS_PIM_API_TESTS)
 
@@ -433,3 +444,11 @@ endforeach()
 # Necessary files
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/environment_file.json
     ${CMAKE_CURRENT_BINARY_DIR}/environment_file.json COPYONLY)
+
+unset(dns_filter)
+unset(pkcs_filter)
+if(ANDROID)
+    set_property(TARGET BlackboxTests_RTPS PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET BlackboxTests_FastRTPS PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET BlackboxTests_DDS_PIM PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

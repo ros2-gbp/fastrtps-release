@@ -28,10 +28,6 @@
 #include <mutex>
 #include <sys/types.h>
 
-#include <fastrtps/fastrtps_dll.h>
-#include <fastrtps/utils/Semaphore.h>
-#include <fastrtps/utils/shared_mutex.hpp>
-
 #if defined(_WIN32)
 #include <process.h>
 #else
@@ -68,6 +64,9 @@
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <rtps/security/SecurityManager.h>
 #endif // if HAVE_SECURITY
+
+#include <fastrtps/utils/Semaphore.h>
+#include <fastrtps/utils/shared_mutex.hpp>
 
 namespace eprosima {
 
@@ -322,6 +321,7 @@ public:
      */
     inline RTPSParticipantListener* getListener()
     {
+        std::lock_guard<std::recursive_mutex> _(*getParticipantMutex());
         return mp_participantListener;
     }
 
@@ -332,6 +332,7 @@ public:
     void set_listener(
             RTPSParticipantListener* listener)
     {
+        std::lock_guard<std::recursive_mutex> _(*getParticipantMutex());
         mp_participantListener = listener;
     }
 
@@ -532,7 +533,7 @@ private:
     //!Semaphore to wait for the listen thread creation.
     Semaphore* mp_ResourceSemaphore;
     //!Id counter to correctly assign the ids to writers and readers.
-    uint32_t IdCounter;
+    std::atomic<uint32_t> IdCounter;
     //! Mutex to safely access endpoints collections
     mutable shared_mutex endpoints_list_mutex;
     //!Writer List.
@@ -993,7 +994,7 @@ public:
     template <EndpointKind_t kind, octet no_key, octet with_key>
     static bool preprocess_endpoint_attributes(
             const EntityId_t& entity_id,
-            uint32_t& id_count,
+            std::atomic<uint32_t>& id_count,
             EndpointAttributes& att,
             EntityId_t& entId);
 
@@ -1040,6 +1041,14 @@ public:
      */
     bool unregister_in_reader(
             std::shared_ptr<fastdds::statistics::IListener> listener) override;
+
+    /**
+     * @brief Set the enabled statistics writers mask
+     *
+     * @param enabled_writers The new mask to set
+     */
+    void set_enabled_statistics_writers_mask(
+            uint32_t enabled_writers) override;
 
 #endif // FASTDDS_STATISTICS
 

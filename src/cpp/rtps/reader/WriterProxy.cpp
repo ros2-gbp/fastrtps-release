@@ -17,23 +17,24 @@
  *
  */
 
-#include <fastdds/rtps/builtin/data/WriterProxyData.h>
-
 #include <rtps/reader/WriterProxy.h>
-#include <fastdds/rtps/reader/StatefulReader.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
 
 #include <fastdds/dds/log/Log.hpp>
+
+#include <fastdds/rtps/builtin/data/WriterProxyData.h>
+#include <fastdds/rtps/messages/RTPSMessageCreator.h>
+#include <fastdds/rtps/reader/StatefulReader.h>
+#include <fastdds/rtps/resources/TimedEvent.h>
+
 #include <fastrtps/utils/TimeConversion.h>
 
-#include <fastdds/rtps/resources/TimedEvent.h>
-#include <fastdds/rtps/messages/RTPSMessageCreator.h>
+#include <rtps/network/ExternalLocatorsProcessor.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include "rtps/RTPSDomainImpl.hpp"
 #include "utils/collections/node_size_helpers.hpp"
 
-#if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__unix__)
+#if !defined(NDEBUG) && !defined(ANDROID) && defined(FASTRTPS_SOURCE) && defined(__unix__)
 #define SHOULD_DEBUG_LINUX
 #endif // SHOULD_DEBUG_LINUX
 
@@ -53,7 +54,7 @@ WriterProxy::~WriterProxy()
 {
     if (is_alive_ && is_on_same_process_)
     {
-        logWarning(RTPS_READER, "Automatically unmatching on ~WriterProxy");
+        EPROSIMA_LOG_WARNING(RTPS_READER, "Automatically unmatching on ~WriterProxy");
         RTPSWriter* writer = RTPSDomainImpl::find_local_writer(guid());
         if (writer)
         {
@@ -89,9 +90,10 @@ WriterProxy::WriterProxy(
     , locators_entry_(loc_alloc.max_unicast_locators, loc_alloc.max_multicast_locators)
     , is_datasharing_writer_(false)
     , received_at_least_one_heartbeat_(false)
+    , state_(StateCode::STOPPED)
 {
     //Create Events
-    ResourceEvent& event_manager = reader_->getRTPSParticipant()->getEventResource();
+    ResourceEvent& event_manager = reader_->getEventResource();
     auto heartbeat_lambda = [this]() -> bool
             {
                 perform_heartbeat_response();
@@ -106,7 +108,7 @@ WriterProxy::WriterProxy(
     initial_acknack_ = new TimedEvent(event_manager, acknack_lambda, 0);
 
     clear();
-    logInfo(RTPS_READER, "Writer Proxy created in reader: " << reader_->getGuid().entityId);
+    EPROSIMA_LOG_INFO(RTPS_READER, "Writer Proxy created in reader: " << reader_->getGuid().entityId);
 }
 
 void WriterProxy::start(
@@ -121,6 +123,8 @@ void WriterProxy::start(
         const SequenceNumber_t& initial_sequence,
         bool is_datasharing)
 {
+    using fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators;
+
 #ifdef SHOULD_DEBUG_LINUX
     assert(get_mutex_owner() == get_thread_id());
 #endif // SHOULD_DEBUG_LINUX
@@ -138,7 +142,10 @@ void WriterProxy::start(
     liveliness_kind_ = attributes.m_qos.m_liveliness.kind;
     locators_entry_.unicast = attributes.remote_locators().unicast;
     locators_entry_.multicast = attributes.remote_locators().multicast;
+    filter_remote_locators(locators_entry_,
+            reader_->getAttributes().external_unicast_locators, reader_->getAttributes().ignore_non_matching_locators);
     is_datasharing_writer_ = is_datasharing;
+    state_.store(StateCode::IDLE);
     initial_acknack_->restart_timer();
     loaded_from_storage(initial_sequence);
     received_at_least_one_heartbeat_ = false;
@@ -147,6 +154,8 @@ void WriterProxy::start(
 void WriterProxy::update(
         const WriterProxyData& attributes)
 {
+    using fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators;
+
 #ifdef SHOULD_DEBUG_LINUX
     assert(get_mutex_owner() == get_thread_id());
 #endif // SHOULD_DEBUG_LINUX
@@ -155,11 +164,24 @@ void WriterProxy::update(
     ownership_strength_ = attributes.m_qos.m_ownershipStrength.value;
     locators_entry_.unicast = attributes.remote_locators().unicast;
     locators_entry_.multicast = attributes.remote_locators().multicast;
+    filter_remote_locators(locators_entry_,
+            reader_->getAttributes().external_unicast_locators, reader_->getAttributes().ignore_non_matching_locators);
 }
 
 void WriterProxy::stop()
 {
-    initial_acknack_->cancel_timer();
+    StateCode prev_code;
+    if ((prev_code = state_.exchange(StateCode::STOPPED)) == StateCode::BUSY)
+    {
+        // TimedEvent being performed, wait for it to finish.
+        // It does not matter which of the two events is the one on execution, but we must wait on initial_acknack_ as
+        // it could be restarted if only cancelled while its callback is being triggered.
+        initial_acknack_->recreate_timer();
+    }
+    else
+    {
+        initial_acknack_->cancel_timer();
+    }
     heartbeat_response_->cancel_timer();
 
     clear();
@@ -195,7 +217,7 @@ void WriterProxy::missing_changes_update(
     assert(get_mutex_owner() == get_thread_id());
 #endif // SHOULD_DEBUG_LINUX
 
-    logInfo(RTPS_READER, guid().entityId << ": changes up to seq_num: " << seq_num << " missing.");
+    EPROSIMA_LOG_INFO(RTPS_READER, guid().entityId << ": changes up to seq_num: " << seq_num << " missing.");
 
     // Check was not removed from container.
     if (seq_num > changes_from_writer_low_mark_)
@@ -214,7 +236,7 @@ int32_t WriterProxy::lost_changes_update(
     assert(get_mutex_owner() == get_thread_id());
 #endif // SHOULD_DEBUG_LINUX
 
-    logInfo(RTPS_READER, guid().entityId << ": up to seq_num: " << seq_num);
+    EPROSIMA_LOG_INFO(RTPS_READER, guid().entityId << ": up to seq_num: " << seq_num);
     int32_t current_sample_lost = 0;
 
     // Check was not removed from container.
@@ -255,7 +277,7 @@ int32_t WriterProxy::lost_changes_update(
 bool WriterProxy::received_change_set(
         const SequenceNumber_t& seq_num)
 {
-    logInfo(RTPS_READER, guid().entityId << ": seq_num: " << seq_num);
+    EPROSIMA_LOG_INFO(RTPS_READER, guid().entityId << ": seq_num: " << seq_num);
     return received_change_set(seq_num, true);
 }
 
@@ -276,8 +298,8 @@ bool WriterProxy::received_change_set(
     // Check if CacheChange_t was already and it was already removed from changesFromW container.
     if (seq_num <= changes_from_writer_low_mark_)
     {
-        logInfo(RTPS_READER, "Change " << seq_num << " <= than max available sequence number "
-                                       << changes_from_writer_low_mark_);
+        EPROSIMA_LOG_INFO(RTPS_READER, "Change " << seq_num << " <= than max available sequence number "
+                                                 << changes_from_writer_low_mark_);
         return false;
     }
 
@@ -372,46 +394,6 @@ const SequenceNumber_t WriterProxy::available_changes_max() const
     return changes_from_writer_low_mark_;
 }
 
-void WriterProxy::change_removed_from_history(
-        const SequenceNumber_t& seq_num)
-{
-#ifdef SHOULD_DEBUG_LINUX
-    assert(get_mutex_owner() == get_thread_id());
-#endif // SHOULD_DEBUG_LINUX
-
-    // Check sequence number is in the container, because it was not clean up.
-    if (seq_num <= changes_from_writer_low_mark_)
-    {
-        return;
-    }
-
-    ChangeIterator chit = changes_received_.find(seq_num);
-
-    (void)chit;
-
-    // Element must be in the container. In other case, bug.
-    assert(chit != changes_received_.end());
-
-    // Previously, it was asserted that the change couldn't be the first and should have RECEIVED
-    // status. As we only keep received changes now, status is already checked by the previous assert.
-    // It can now be the case that the change being removed is the first if there are missing changes
-    // in the (changes_from_writer_low_mark_, seq_num) range.
-
-    // We are removing a change that will not be notified to the user. This may be due to the following:
-    // a) history became full (either due to KEEP_LAST or RESOURCE_LIMITS)
-    // b) lifespan timer expired for seq_num
-    // Previously, change was marked as irrelevant.
-
-    // As this may imply that all changes with a lower sequence number will also be dropped,
-    // now that history is full, it may be interesting to act as if a heartbeat with an initial
-    // sequence of seq_num has been received, i.e. calling lost_changes_update(seq_num).
-    // If we don't do it, changes_received_ may grow above the limits stablished for it,
-    // thus causing undesired dynamic allocations.
-
-    // For case a) a call to lost_changes_update is done inside StatefulReader::change_received.
-    // For case b) it does not imply a dynamic allocation problem.
-}
-
 void WriterProxy::cleanup()
 {
     ChangeIterator chit = changes_received_.begin();
@@ -448,27 +430,26 @@ size_t WriterProxy::unknown_missing_changes_up_to(
     if (seq_num > changes_from_writer_low_mark_)
     {
         SequenceNumber_t first_missing = changes_from_writer_low_mark_ + 1;
-        SequenceNumber_t max_missing = std::min(seq_num, max_sequence_number_ + 1);
         SequenceNumberSet_t sns(first_missing);
         SequenceNumberDiff d_fun;
 
         for (SequenceNumber_t seq : changes_received_)
         {
-            seq = std::min(seq, max_missing);
+            seq = std::min(seq, seq_num);
             if (first_missing < seq)
             {
                 returnedValue += d_fun(seq, first_missing);
             }
             first_missing = seq + 1;
-            if (first_missing >= max_missing)
+            if (first_missing >= seq_num)
             {
                 break;
             }
         }
 
-        if (first_missing < max_missing)
+        if (first_missing < seq_num)
         {
-            returnedValue += d_fun(max_missing, first_missing);
+            returnedValue += d_fun(seq_num, first_missing);
         }
     }
 
@@ -509,6 +490,13 @@ bool WriterProxy::perform_initial_ack_nack()
 {
     bool ret_value = false;
 
+    StateCode expected = StateCode::IDLE;
+    if (!state_.compare_exchange_strong(expected, StateCode::BUSY))
+    {
+        // Stopped from another thread -> abort
+        return ret_value;
+    }
+
     if (!is_datasharing_writer_)
     {
         // Send initial NACK.
@@ -532,12 +520,25 @@ bool WriterProxy::perform_initial_ack_nack()
         }
     }
 
+    expected = StateCode::BUSY;
+    state_.compare_exchange_strong(expected, StateCode::IDLE);
+
     return ret_value;
 }
 
 void WriterProxy::perform_heartbeat_response()
 {
+    StateCode expected = StateCode::IDLE;
+    if (!state_.compare_exchange_strong(expected, StateCode::BUSY))
+    {
+        // Stopped from another thread -> abort
+        return;
+    }
+
     reader_->send_acknack(this, this, heartbeat_final_flag_.load());
+
+    expected = StateCode::BUSY;
+    state_.compare_exchange_strong(expected, StateCode::IDLE);
 }
 
 bool WriterProxy::process_heartbeat(
@@ -555,7 +556,7 @@ bool WriterProxy::process_heartbeat(
 #endif // SHOULD_DEBUG_LINUX
 
     assert_liveliness = false;
-    if (last_heartbeat_count_ < count)
+    if (state_ != StateCode::STOPPED && last_heartbeat_count_ < count)
     {
         // If it is the first heartbeat message, we can try to cancel initial ack.
         // TODO: This timer cancelling should be checked if needed with the liveliness implementation.

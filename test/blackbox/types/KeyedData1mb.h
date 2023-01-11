@@ -23,6 +23,8 @@
 #define _FAST_DDS_GENERATED_KEYEDDATA1MB_H_
 
 
+#include <fastrtps/utils/fixed_size_string.hpp>
+
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -91,7 +93,7 @@ public:
      * @param x Reference to the object KeyedData1mb that will be copied.
      */
     eProsima_user_DllExport KeyedData1mb(
-            KeyedData1mb&& x);
+            KeyedData1mb&& x) noexcept;
 
     /*!
      * @brief Copy assignment.
@@ -105,7 +107,7 @@ public:
      * @param x Reference to the object KeyedData1mb that will be copied.
      */
     eProsima_user_DllExport KeyedData1mb& operator =(
-            KeyedData1mb&& x);
+            KeyedData1mb&& x) noexcept;
 
     /*!
      * @brief Comparison operator.

@@ -52,7 +52,7 @@ eprosima::fastdds::statistics::detail::EntityId_s::EntityId_s(
 }
 
 eprosima::fastdds::statistics::detail::EntityId_s::EntityId_s(
-        EntityId_s&& x)
+        EntityId_s&& x) noexcept
 {
     m_value = std::move(x.m_value);
 }
@@ -67,7 +67,7 @@ eprosima::fastdds::statistics::detail::EntityId_s& eprosima::fastdds::statistics
 }
 
 eprosima::fastdds::statistics::detail::EntityId_s& eprosima::fastdds::statistics::detail::EntityId_s::operator =(
-        EntityId_s&& x)
+        EntityId_s&& x) noexcept
 {
 
     m_value = std::move(x.m_value);
@@ -208,7 +208,7 @@ eprosima::fastdds::statistics::detail::GuidPrefix_s::GuidPrefix_s(
 }
 
 eprosima::fastdds::statistics::detail::GuidPrefix_s::GuidPrefix_s(
-        GuidPrefix_s&& x)
+        GuidPrefix_s&& x) noexcept
 {
     m_value = std::move(x.m_value);
 }
@@ -223,7 +223,7 @@ eprosima::fastdds::statistics::detail::GuidPrefix_s& eprosima::fastdds::statisti
 }
 
 eprosima::fastdds::statistics::detail::GuidPrefix_s& eprosima::fastdds::statistics::detail::GuidPrefix_s::operator =(
-        GuidPrefix_s&& x)
+        GuidPrefix_s&& x) noexcept
 {
 
     m_value = std::move(x.m_value);
@@ -369,7 +369,7 @@ eprosima::fastdds::statistics::detail::GUID_s::GUID_s(
 }
 
 eprosima::fastdds::statistics::detail::GUID_s::GUID_s(
-        GUID_s&& x)
+        GUID_s&& x) noexcept
 {
     m_guidPrefix = std::move(x.m_guidPrefix);
     m_entityId = std::move(x.m_entityId);
@@ -386,7 +386,7 @@ eprosima::fastdds::statistics::detail::GUID_s& eprosima::fastdds::statistics::de
 }
 
 eprosima::fastdds::statistics::detail::GUID_s& eprosima::fastdds::statistics::detail::GUID_s::operator =(
-        GUID_s&& x)
+        GUID_s&& x) noexcept
 {
 
     m_guidPrefix = std::move(x.m_guidPrefix);
@@ -573,7 +573,7 @@ eprosima::fastdds::statistics::detail::SequenceNumber_s::SequenceNumber_s(
 }
 
 eprosima::fastdds::statistics::detail::SequenceNumber_s::SequenceNumber_s(
-        SequenceNumber_s&& x)
+        SequenceNumber_s&& x) noexcept
 {
     m_high = x.m_high;
     m_low = x.m_low;
@@ -590,7 +590,7 @@ eprosima::fastdds::statistics::detail::SequenceNumber_s& eprosima::fastdds::stat
 }
 
 eprosima::fastdds::statistics::detail::SequenceNumber_s& eprosima::fastdds::statistics::detail::SequenceNumber_s::operator =(
-        SequenceNumber_s&& x)
+        SequenceNumber_s&& x) noexcept
 {
 
     m_high = x.m_high;
@@ -746,9 +746,9 @@ void eprosima::fastdds::statistics::detail::SequenceNumber_s::serializeKey(
 
 eprosima::fastdds::statistics::detail::SampleIdentity_s::SampleIdentity_s()
 {
-    // m_writer_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_writer_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
-    // m_sequence_number com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
+    // m_sequence_number com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612679d6
 
 
 }
@@ -767,7 +767,7 @@ eprosima::fastdds::statistics::detail::SampleIdentity_s::SampleIdentity_s(
 }
 
 eprosima::fastdds::statistics::detail::SampleIdentity_s::SampleIdentity_s(
-        SampleIdentity_s&& x)
+        SampleIdentity_s&& x) noexcept
 {
     m_writer_guid = std::move(x.m_writer_guid);
     m_sequence_number = std::move(x.m_sequence_number);
@@ -784,7 +784,7 @@ eprosima::fastdds::statistics::detail::SampleIdentity_s& eprosima::fastdds::stat
 }
 
 eprosima::fastdds::statistics::detail::SampleIdentity_s& eprosima::fastdds::statistics::detail::SampleIdentity_s::operator =(
-        SampleIdentity_s&& x)
+        SampleIdentity_s&& x) noexcept
 {
 
     m_writer_guid = std::move(x.m_writer_guid);
@@ -950,11 +950,11 @@ void eprosima::fastdds::statistics::detail::SampleIdentity_s::serializeKey(
 
 eprosima::fastdds::statistics::detail::Locator_s::Locator_s()
 {
-    // m_kind com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6a1aab78
+    // m_kind com.eprosima.idl.parser.typecode.PrimitiveTypeCode@462d5aee
     m_kind = 0;
-    // m_port com.eprosima.idl.parser.typecode.PrimitiveTypeCode@462d5aee
+    // m_port com.eprosima.idl.parser.typecode.PrimitiveTypeCode@69b0fd6f
     m_port = 0;
-    // m_address com.eprosima.idl.parser.typecode.ArrayTypeCode@69b0fd6f
+    // m_address com.eprosima.idl.parser.typecode.ArrayTypeCode@757942a1
     memset(&m_address, 0, (16) * 1);
 
 }
@@ -975,7 +975,7 @@ eprosima::fastdds::statistics::detail::Locator_s::Locator_s(
 }
 
 eprosima::fastdds::statistics::detail::Locator_s::Locator_s(
-        Locator_s&& x)
+        Locator_s&& x) noexcept
 {
     m_kind = x.m_kind;
     m_port = x.m_port;
@@ -994,7 +994,7 @@ eprosima::fastdds::statistics::detail::Locator_s& eprosima::fastdds::statistics:
 }
 
 eprosima::fastdds::statistics::detail::Locator_s& eprosima::fastdds::statistics::detail::Locator_s::operator =(
-        Locator_s&& x)
+        Locator_s&& x) noexcept
 {
 
     m_kind = x.m_kind;
@@ -1199,17 +1199,17 @@ void eprosima::fastdds::statistics::detail::Locator_s::serializeKey(
 
 eprosima::fastdds::statistics::DiscoveryTime::DiscoveryTime()
 {
-    // m_local_participant_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_local_participant_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
-    // m_remote_entity_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_remote_entity_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
-    // m_time com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7f010382
+    // m_time com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1e802ef9
     m_time = 0;
-    // m_host com.eprosima.idl.parser.typecode.StringTypeCode@1e802ef9
+    // m_host com.eprosima.idl.parser.typecode.StringTypeCode@2b6faea6
     m_host ="";
-    // m_user com.eprosima.idl.parser.typecode.StringTypeCode@2b6faea6
+    // m_user com.eprosima.idl.parser.typecode.StringTypeCode@778d1062
     m_user ="";
-    // m_process com.eprosima.idl.parser.typecode.StringTypeCode@778d1062
+    // m_process com.eprosima.idl.parser.typecode.StringTypeCode@670002
     m_process ="";
 
 }
@@ -1236,7 +1236,7 @@ eprosima::fastdds::statistics::DiscoveryTime::DiscoveryTime(
 }
 
 eprosima::fastdds::statistics::DiscoveryTime::DiscoveryTime(
-        DiscoveryTime&& x)
+        DiscoveryTime&& x) noexcept
 {
     m_local_participant_guid = std::move(x.m_local_participant_guid);
     m_remote_entity_guid = std::move(x.m_remote_entity_guid);
@@ -1261,7 +1261,7 @@ eprosima::fastdds::statistics::DiscoveryTime& eprosima::fastdds::statistics::Dis
 }
 
 eprosima::fastdds::statistics::DiscoveryTime& eprosima::fastdds::statistics::DiscoveryTime::operator =(
-        DiscoveryTime&& x)
+        DiscoveryTime&& x) noexcept
 {
 
     m_local_participant_guid = std::move(x.m_local_participant_guid);
@@ -1338,9 +1338,9 @@ void eprosima::fastdds::statistics::DiscoveryTime::serialize(
     scdr << m_local_participant_guid;
     scdr << m_remote_entity_guid;
     scdr << m_time;
-    scdr << m_host;
-    scdr << m_user;
-    scdr << m_process;
+    scdr << m_host.c_str();
+    scdr << m_user.c_str();
+    scdr << m_process.c_str();
 
 }
 
@@ -1602,7 +1602,7 @@ void eprosima::fastdds::statistics::DiscoveryTime::serializeKey(
 
 eprosima::fastdds::statistics::EntityCount::EntityCount()
 {
-    // m_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
     // m_count com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1ed1993a
     m_count = 0;
@@ -1623,7 +1623,7 @@ eprosima::fastdds::statistics::EntityCount::EntityCount(
 }
 
 eprosima::fastdds::statistics::EntityCount::EntityCount(
-        EntityCount&& x)
+        EntityCount&& x) noexcept
 {
     m_guid = std::move(x.m_guid);
     m_count = x.m_count;
@@ -1640,7 +1640,7 @@ eprosima::fastdds::statistics::EntityCount& eprosima::fastdds::statistics::Entit
 }
 
 eprosima::fastdds::statistics::EntityCount& eprosima::fastdds::statistics::EntityCount::operator =(
-        EntityCount&& x)
+        EntityCount&& x) noexcept
 {
 
     m_guid = std::move(x.m_guid);
@@ -1802,9 +1802,9 @@ void eprosima::fastdds::statistics::EntityCount::serializeKey(
 
 eprosima::fastdds::statistics::SampleIdentityCount::SampleIdentityCount()
 {
-    // m_sample_id com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3cc2931c
+    // m_sample_id com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@4b5a5ed1
 
-    // m_count com.eprosima.idl.parser.typecode.PrimitiveTypeCode@20d28811
+    // m_count com.eprosima.idl.parser.typecode.PrimitiveTypeCode@59d016c9
     m_count = 0;
 
 }
@@ -1823,7 +1823,7 @@ eprosima::fastdds::statistics::SampleIdentityCount::SampleIdentityCount(
 }
 
 eprosima::fastdds::statistics::SampleIdentityCount::SampleIdentityCount(
-        SampleIdentityCount&& x)
+        SampleIdentityCount&& x) noexcept
 {
     m_sample_id = std::move(x.m_sample_id);
     m_count = x.m_count;
@@ -1840,7 +1840,7 @@ eprosima::fastdds::statistics::SampleIdentityCount& eprosima::fastdds::statistic
 }
 
 eprosima::fastdds::statistics::SampleIdentityCount& eprosima::fastdds::statistics::SampleIdentityCount::operator =(
-        SampleIdentityCount&& x)
+        SampleIdentityCount&& x) noexcept
 {
 
     m_sample_id = std::move(x.m_sample_id);
@@ -2002,7 +2002,7 @@ void eprosima::fastdds::statistics::SampleIdentityCount::serializeKey(
 
 eprosima::fastdds::statistics::Entity2LocatorTraffic::Entity2LocatorTraffic()
 {
-    // m_src_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_src_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
     // m_dst_locator com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@5c909414
 
@@ -2035,7 +2035,7 @@ eprosima::fastdds::statistics::Entity2LocatorTraffic::Entity2LocatorTraffic(
 }
 
 eprosima::fastdds::statistics::Entity2LocatorTraffic::Entity2LocatorTraffic(
-        Entity2LocatorTraffic&& x)
+        Entity2LocatorTraffic&& x) noexcept
 {
     m_src_guid = std::move(x.m_src_guid);
     m_dst_locator = std::move(x.m_dst_locator);
@@ -2058,7 +2058,7 @@ eprosima::fastdds::statistics::Entity2LocatorTraffic& eprosima::fastdds::statist
 }
 
 eprosima::fastdds::statistics::Entity2LocatorTraffic& eprosima::fastdds::statistics::Entity2LocatorTraffic::operator =(
-        Entity2LocatorTraffic&& x)
+        Entity2LocatorTraffic&& x) noexcept
 {
 
     m_src_guid = std::move(x.m_src_guid);
@@ -2340,9 +2340,9 @@ void eprosima::fastdds::statistics::Entity2LocatorTraffic::serializeKey(
 
 eprosima::fastdds::statistics::WriterReaderData::WriterReaderData()
 {
-    // m_writer_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_writer_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
-    // m_reader_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_reader_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
     // m_data com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2ea227af
     m_data = 0.0;
@@ -2365,7 +2365,7 @@ eprosima::fastdds::statistics::WriterReaderData::WriterReaderData(
 }
 
 eprosima::fastdds::statistics::WriterReaderData::WriterReaderData(
-        WriterReaderData&& x)
+        WriterReaderData&& x) noexcept
 {
     m_writer_guid = std::move(x.m_writer_guid);
     m_reader_guid = std::move(x.m_reader_guid);
@@ -2384,7 +2384,7 @@ eprosima::fastdds::statistics::WriterReaderData& eprosima::fastdds::statistics::
 }
 
 eprosima::fastdds::statistics::WriterReaderData& eprosima::fastdds::statistics::WriterReaderData::operator =(
-        WriterReaderData&& x)
+        WriterReaderData&& x) noexcept
 {
 
     m_writer_guid = std::move(x.m_writer_guid);
@@ -2615,7 +2615,7 @@ eprosima::fastdds::statistics::Locator2LocatorData::Locator2LocatorData(
 }
 
 eprosima::fastdds::statistics::Locator2LocatorData::Locator2LocatorData(
-        Locator2LocatorData&& x)
+        Locator2LocatorData&& x) noexcept
 {
     m_src_locator = std::move(x.m_src_locator);
     m_dst_locator = std::move(x.m_dst_locator);
@@ -2634,7 +2634,7 @@ eprosima::fastdds::statistics::Locator2LocatorData& eprosima::fastdds::statistic
 }
 
 eprosima::fastdds::statistics::Locator2LocatorData& eprosima::fastdds::statistics::Locator2LocatorData::operator =(
-        Locator2LocatorData&& x)
+        Locator2LocatorData&& x) noexcept
 {
 
     m_src_locator = std::move(x.m_src_locator);
@@ -2840,7 +2840,7 @@ void eprosima::fastdds::statistics::Locator2LocatorData::serializeKey(
 
 eprosima::fastdds::statistics::EntityData::EntityData()
 {
-    // m_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
     // m_data com.eprosima.idl.parser.typecode.PrimitiveTypeCode@363ee3a2
     m_data = 0.0;
@@ -2861,7 +2861,7 @@ eprosima::fastdds::statistics::EntityData::EntityData(
 }
 
 eprosima::fastdds::statistics::EntityData::EntityData(
-        EntityData&& x)
+        EntityData&& x) noexcept
 {
     m_guid = std::move(x.m_guid);
     m_data = x.m_data;
@@ -2878,7 +2878,7 @@ eprosima::fastdds::statistics::EntityData& eprosima::fastdds::statistics::Entity
 }
 
 eprosima::fastdds::statistics::EntityData& eprosima::fastdds::statistics::EntityData::operator =(
-        EntityData&& x)
+        EntityData&& x) noexcept
 {
 
     m_guid = std::move(x.m_guid);
@@ -3040,7 +3040,7 @@ void eprosima::fastdds::statistics::EntityData::serializeKey(
 
 eprosima::fastdds::statistics::PhysicalData::PhysicalData()
 {
-    // m_participant_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
+    // m_participant_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
     // m_host com.eprosima.idl.parser.typecode.StringTypeCode@3c22fc4c
     m_host ="";
@@ -3069,7 +3069,7 @@ eprosima::fastdds::statistics::PhysicalData::PhysicalData(
 }
 
 eprosima::fastdds::statistics::PhysicalData::PhysicalData(
-        PhysicalData&& x)
+        PhysicalData&& x) noexcept
 {
     m_participant_guid = std::move(x.m_participant_guid);
     m_host = std::move(x.m_host);
@@ -3090,7 +3090,7 @@ eprosima::fastdds::statistics::PhysicalData& eprosima::fastdds::statistics::Phys
 }
 
 eprosima::fastdds::statistics::PhysicalData& eprosima::fastdds::statistics::PhysicalData::operator =(
-        PhysicalData&& x)
+        PhysicalData&& x) noexcept
 {
 
     m_participant_guid = std::move(x.m_participant_guid);
@@ -3155,9 +3155,9 @@ void eprosima::fastdds::statistics::PhysicalData::serialize(
 {
 
     scdr << m_participant_guid;
-    scdr << m_host;
-    scdr << m_user;
-    scdr << m_process;
+    scdr << m_host.c_str();
+    scdr << m_user.c_str();
+    scdr << m_process.c_str();
 
 }
 
@@ -3351,21 +3351,21 @@ void eprosima::fastdds::statistics::PhysicalData::serializeKey(
 eprosima::fastdds::statistics::Data::Data()
 {
     m__d = HISTORY2HISTORY_LATENCY;
-    // m_writer_reader_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@49d904ec
+    // m_writer_reader_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@48e4374
 
-    // m_locator2locator_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@48e4374
+    // m_locator2locator_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3d680b5a
 
-    // m_entity_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3d680b5a
+    // m_entity_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@4b5d6a01
 
-    // m_entity2locator_traffic com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@4b5d6a01
+    // m_entity2locator_traffic com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@4a22f9e2
 
-    // m_entity_count com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@4a22f9e2
+    // m_entity_count com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3c419631
 
-    // m_discovery_time com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3c419631
+    // m_discovery_time com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@418e7838
 
-    // m_sample_identity_count com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@418e7838
+    // m_sample_identity_count com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@61230f6a
 
-    // m_physical_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@61230f6a
+    // m_physical_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3c130745
 
 }
 
@@ -3419,7 +3419,7 @@ eprosima::fastdds::statistics::Data::Data(
 }
 
 eprosima::fastdds::statistics::Data::Data(
-        Data&& x)
+        Data&& x) noexcept
 {
     m__d = x.m__d;
 
@@ -3511,7 +3511,7 @@ eprosima::fastdds::statistics::Data& eprosima::fastdds::statistics::Data::operat
 }
 
 eprosima::fastdds::statistics::Data& eprosima::fastdds::statistics::Data::operator =(
-        Data&& x)
+        Data&& x) noexcept
 {
     m__d = x.m__d;
 

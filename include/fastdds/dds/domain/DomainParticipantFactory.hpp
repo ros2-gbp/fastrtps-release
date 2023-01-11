@@ -26,12 +26,22 @@
 #include <fastdds/dds/domain/qos/DomainParticipantFactoryQos.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 
-#include <mutex>
 #include <map>
+#include <memory>
+#include <mutex>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
 namespace eprosima {
+
+namespace fastrtps {
+namespace rtps {
+namespace detail {
+class TopicPayloadPoolRegistry;
+}  // namespace detail
+}  // namespace rtps
+}  // namespace fastrtps
+
 namespace fastdds {
 namespace dds {
 
@@ -50,11 +60,18 @@ class DomainParticipantFactory
 public:
 
     /**
-     * Returns the DomainParticipantFactory singleton.
+     * Returns the DomainParticipantFactory singleton instance.
      *
-     * @return The DomainParticipantFactory singleton.
+     * @return A raw pointer to the DomainParticipantFactory singleton instance.
      */
     RTPS_DllAPI static DomainParticipantFactory* get_instance();
+
+    /**
+     * Returns the DomainParticipantFactory singleton instance.
+     *
+     * @return A shared pointer to the DomainParticipantFactory singleton instance.
+     */
+    RTPS_DllAPI static std::shared_ptr<DomainParticipantFactory> get_shared_instance();
 
     /**
      * Create a Participant.
@@ -211,6 +228,15 @@ public:
             size_t length);
 
     /**
+     * Check the validity of the provided static discovery XML file
+     *
+     * @param xml_file xml file path
+     * @return RETCODE_OK if the validation is successful, RETCODE_ERROR otherwise.
+     */
+    RTPS_DllAPI ReturnCode_t check_xml_static_discovery(
+            std::string& xml_file);
+
+    /**
      * This operation returns the value of the DomainParticipantFactory QoS policies.
      *
      * @param qos DomaParticipantFactoryQos reference where the qos is returned
@@ -275,10 +301,12 @@ protected:
     DomainParticipantFactoryQos factory_qos_;
 
     DomainParticipantQos default_participant_qos_;
+
+    std::shared_ptr<fastrtps::rtps::detail::TopicPayloadPoolRegistry> topic_pool_;
 };
 
-} /* namespace dds */
-} /* namespace fastdds */
-} /* namespace eprosima */
+}  // namespace dds
+}  // namespace fastdds
+}  // namespace eprosima
 
 #endif /* _FASTDDS_DOMAINPARTICIPANT_HPP_*/
