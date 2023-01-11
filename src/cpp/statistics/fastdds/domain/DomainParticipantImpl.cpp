@@ -145,7 +145,7 @@ ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter(
                 delete writer_impl;
                 // Remove topic and type
                 delete_topic_and_type(use_topic_name);
-                logError(STATISTICS_DOMAIN_PARTICIPANT, topic_name << " DataWriter creation has failed");
+                EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT, topic_name << " DataWriter creation has failed");
                 return ReturnCode_t::RETCODE_ERROR;
             }
 
@@ -169,6 +169,7 @@ ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter(
             else
             {
                 statistics_listener_->set_datawriter(event_kind, data_writer);
+                rtps_participant_->set_enabled_statistics_writers_mask(statistics_listener_->enabled_writers_mask());
             }
         }
         return ReturnCode_t::RETCODE_OK;
@@ -193,18 +194,18 @@ ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter_with_profile(
         // CMake option is enabled
         if (ret == ReturnCode_t::RETCODE_INCONSISTENT_POLICY)
         {
-            logError(STATISTICS_DOMAIN_PARTICIPANT,
+            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
                     "Statistics DataWriter QoS from profile name " << profile_name << " are not consistent/compatible");
         }
         assert(ret != ReturnCode_t::RETCODE_UNSUPPORTED);
         if (ret == ReturnCode_t::RETCODE_BAD_PARAMETER)
         {
-            logError(STATISTICS_DOMAIN_PARTICIPANT,
+            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
                     "Profile name " << profile_name << " is not a valid statistics topic name/alias");
         }
         return ret;
     }
-    logError(STATISTICS_DOMAIN_PARTICIPANT,
+    EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
             "Profile name " << profile_name << " has not been found");
     return ReturnCode_t::RETCODE_ERROR;
 }
@@ -227,12 +228,14 @@ ReturnCode_t DomainParticipantImpl::disable_statistics_datawriter(
     {
         // Avoid calling DataWriter from listener callback
         statistics_listener_->set_datawriter(event_kind, nullptr);
+        rtps_participant_->set_enabled_statistics_writers_mask(statistics_listener_->enabled_writers_mask());
 
         // Delete the DataWriter
         if (ReturnCode_t::RETCODE_OK != builtin_publisher_->delete_datawriter(writer))
         {
             // Restore writer on listener before returning the error
             statistics_listener_->set_datawriter(event_kind, writer);
+            rtps_participant_->set_enabled_statistics_writers_mask(statistics_listener_->enabled_writers_mask());
             ret = ReturnCode_t::RETCODE_ERROR;
         }
 
@@ -351,13 +354,14 @@ void DomainParticipantImpl::enable_statistics_builtin_datawriters(
         // CMake option is enabled
         if (ret == ReturnCode_t::RETCODE_INCONSISTENT_POLICY)
         {
-            logError(STATISTICS_DOMAIN_PARTICIPANT,
+            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
                     "Statistics DataWriter QoS from topic " << topic << " are not consistent/compatible");
         }
         assert(ret != ReturnCode_t::RETCODE_UNSUPPORTED);
         if (ret == ReturnCode_t::RETCODE_BAD_PARAMETER)
         {
-            logError(STATISTICS_DOMAIN_PARTICIPANT, "Topic " << topic << " is not a valid statistics topic name/alias");
+            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
+                    "Topic " << topic << " is not a valid statistics topic name/alias");
         }
     }
 }
@@ -474,7 +478,8 @@ bool DomainParticipantImpl::find_or_create_topic_and_type(
     {
         if (topic_desc->get_type_name() != type->getName())
         {
-            logError(STATISTICS_DOMAIN_PARTICIPANT, topic_name << " is not using expected type " << type->getName() <<
+            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
+                    topic_name << " is not using expected type " << type->getName() <<
                     " and is using instead type " << topic_desc->get_type_name());
             return false;
         }
