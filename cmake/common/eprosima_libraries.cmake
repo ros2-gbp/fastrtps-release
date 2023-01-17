@@ -97,7 +97,7 @@ macro(eprosima_find_package package)
             # Update submodule
             message(STATUS "Updating submodule thirdparty/${package}")
             execute_process(
-                COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
+                COMMAND git submodule update --recursive --init "thirdparty/${package}"
                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                 RESULT_VARIABLE EXECUTE_RESULT
                 )
@@ -219,7 +219,7 @@ macro(eprosima_find_thirdparty package thirdparty_name)
             # Update submodule
             message(STATUS "Updating submodule thirdparty/${thirdparty_name}")
             execute_process(
-                COMMAND echo "Submodules were already updated by Bloom - see ros2-gbp/fastrtps-release#15"
+                COMMAND git submodule update --recursive --init "thirdparty/${thirdparty_name}"
                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                 RESULT_VARIABLE EXECUTE_RESULT
                 )
