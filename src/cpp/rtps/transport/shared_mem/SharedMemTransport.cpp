@@ -16,11 +16,6 @@
 #include <cstring>
 #include <algorithm>
 
-#ifdef ANDROID
-#include <boostconfig.hpp>
-#include <unistd.h>
-#endif // ifdef ANDROID
-
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/network/ReceiverResource.h>
@@ -143,7 +138,7 @@ bool SharedMemTransport::OpenInputChannel(
         {
             (void)e;
 
-            EPROSIMA_LOG_INFO(RTPS_MSG_OUT, std::string("CreateInputChannelResource failed for port ")
+            logInfo(RTPS_MSG_OUT, std::string("CreateInputChannelResource failed for port ")
                     << locator.port << " msg: " << e.what());
             return false;
         }
@@ -228,7 +223,7 @@ void SharedMemTransport::clean_up()
     }
     catch (const std::exception& e)
     {
-        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, e.what());
+        logWarning(RTPS_MSG_OUT, e.what());
     }
 }
 
@@ -252,18 +247,9 @@ bool SharedMemTransport::init(
 
     if (configuration_.segment_size() < configuration_.max_message_size())
     {
-        EPROSIMA_LOG_ERROR(RTPS_MSG_OUT, "max_message_size cannot be greater than segment_size");
+        logError(RTPS_MSG_OUT, "max_message_size cannot be greater than segment_size");
         return false;
     }
-
-#ifdef ANDROID
-    if (access(BOOST_INTERPROCESS_SHARED_DIR_PATH, W_OK) != F_OK)
-    {
-        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
-                "Unable to write on " << BOOST_INTERPROCESS_SHARED_DIR_PATH << ". SHM Transport not enabled");
-        return false;
-    }
-#endif // ifdef ANDROID
 
     try
     {
@@ -288,7 +274,7 @@ bool SharedMemTransport::init(
     }
     catch (std::exception& e)
     {
-        EPROSIMA_LOG_ERROR(RTPS_MSG_OUT, e.what());
+        logError(RTPS_MSG_OUT, e.what());
         return false;
     }
 
@@ -365,8 +351,8 @@ bool SharedMemTransport::OpenOutputChannel(
     }
     catch (std::exception& e)
     {
-        EPROSIMA_LOG_ERROR(RTPS_MSG_OUT, "SharedMemTransport error opening port " << std::to_string(locator.port)
-                                                                                  << " with msg: " << e.what());
+        logError(RTPS_MSG_OUT, "SharedMemTransport error opening port " << std::to_string(locator.port)
+                                                                        << " with msg: " << e.what());
 
         return false;
     }
@@ -457,7 +443,7 @@ bool SharedMemTransport::send(
     }
     catch (const std::exception& e)
     {
-        EPROSIMA_LOG_INFO(RTPS_TRANSPORT_SHM, e.what());
+        logInfo(RTPS_TRANSPORT_SHM, e.what());
         (void)e;
 
         // Segment overflow with discard policy doesn't return error.
@@ -504,12 +490,12 @@ bool SharedMemTransport::push_discard(
     {
         if (!find_port(remote_locator.port)->try_push(buffer))
         {
-            EPROSIMA_LOG_INFO(RTPS_MSG_OUT, "Port " << remote_locator.port << " full. Buffer dropped");
+            logInfo(RTPS_MSG_OUT, "Port " << remote_locator.port << " full. Buffer dropped");
         }
     }
     catch (const std::exception& error)
     {
-        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, error.what());
+        logWarning(RTPS_MSG_OUT, error.what());
         return false;
     }
 
@@ -525,7 +511,7 @@ bool SharedMemTransport::send(
         return false;
     }
 
-    EPROSIMA_LOG_INFO(RTPS_MSG_OUT,
+    logInfo(RTPS_MSG_OUT,
             "(ID:" << std::this_thread::get_id() << ") " << "SharedMemTransport: " << buffer->size() << " bytes to port " <<
             remote_locator.port);
 

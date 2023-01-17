@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_STRINGTEST_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -93,7 +91,7 @@ public:
      * @param x Reference to the object StringTest that will be copied.
      */
     eProsima_user_DllExport StringTest(
-            StringTest&& x) noexcept;
+            StringTest&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +105,7 @@ public:
      * @param x Reference to the object StringTest that will be copied.
      */
     eProsima_user_DllExport StringTest& operator =(
-            StringTest&& x) noexcept;
+            StringTest&& x);
 
     /*!
      * @brief Comparison operator.
@@ -128,26 +126,26 @@ public:
      * @param _message New value to be copied in member message
      */
     eProsima_user_DllExport void message(
-            const eprosima::fastrtps::fixed_string<10000>& _message);
+            const std::string& _message);
 
     /*!
      * @brief This function moves the value in member message
      * @param _message New value to be moved in member message
      */
     eProsima_user_DllExport void message(
-            eprosima::fastrtps::fixed_string<10000>&& _message);
+            std::string&& _message);
 
     /*!
      * @brief This function returns a constant reference to member message
      * @return Constant reference to member message
      */
-    eProsima_user_DllExport const eprosima::fastrtps::fixed_string<10000>& message() const;
+    eProsima_user_DllExport const std::string& message() const;
 
     /*!
      * @brief This function returns a reference to member message
      * @return Reference to member message
      */
-    eProsima_user_DllExport eprosima::fastrtps::fixed_string<10000>& message();
+    eProsima_user_DllExport std::string& message();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -208,7 +206,7 @@ public:
 
 private:
 
-    eprosima::fastrtps::fixed_string<10000> m_message;
+    std::string m_message;
 };
 
 #endif // _FAST_DDS_GENERATED_STRINGTEST_H_

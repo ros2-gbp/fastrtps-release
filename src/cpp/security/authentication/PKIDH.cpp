@@ -234,12 +234,11 @@ static bool verify_certificate(
             int errorCode = X509_STORE_CTX_get_error(ctx);
             if (errorCode == X509_V_OK)
             {
-                EPROSIMA_LOG_WARNING(SECURITY_AUTHENTICATION,
-                        "Invalidation error of certificate, but no error code returned.");
+                logWarning(SECURITY_AUTHENTICATION, "Invalidation error of certificate, but no error code returned.");
             }
             else
             {
-                EPROSIMA_LOG_WARNING(SECURITY_AUTHENTICATION, "Invalidation error of certificate  (" << X509_verify_cert_error_string(
+                logWarning(SECURITY_AUTHENTICATION, "Invalidation error of certificate  (" << X509_verify_cert_error_string(
                             errorCode) << ")");
             }
         }
@@ -248,7 +247,7 @@ static bool verify_certificate(
     }
     else
     {
-        EPROSIMA_LOG_WARNING(SECURITY_AUTHENTICATION, "Cannot init context for verifying certificate");
+        logWarning(SECURITY_AUTHENTICATION, "Cannot init context for verifying certificate");
     }
 
     X509_STORE_CTX_free(ctx);
@@ -443,8 +442,7 @@ static bool check_sign_sha256(
                 }
                 else
                 {
-                    EPROSIMA_LOG_WARNING(SECURITY_AUTHENTICATION,
-                            "Signature verification error (" << ERR_get_error() << ")");
+                    logWarning(SECURITY_AUTHENTICATION, "Signature verification error (" << ERR_get_error() << ")");
                 }
             }
             else

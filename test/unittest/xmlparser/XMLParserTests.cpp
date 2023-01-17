@@ -1528,8 +1528,7 @@ TEST_F(XMLParserTests, parseTLSConfigPositiveClauses)
 /*
  * This test checks the negative cases of the TLS configuration via XML.
  * 1. Check that elements <password>, <private_key_file>, <rsa_private_key_file>, <cert_chain_file>, <tmp_dh_file>,
- * <verify_file>, <verify_depth>, <default_verify_path>, <bad_element>, <server_name>
- * return an xml error if their value is empty.
+ * <verify_file>, <verify_depth>, <default_verify_path>, and <bad_element> return an xml error if their value is empty.
  * 2. Check all possible wrong configurations of <verify_paths>.
  * 3. Check all possible wrong configurations of <verify_mode>.
  * 4. Check all possible wrong configurations of <handshake_role>.
@@ -1545,8 +1544,7 @@ TEST_F(XMLParserTests, parseTLSConfigNegativeClauses)
     char xml[600];
 
     // Check that elements <password>, <private_key_file>, <rsa_private_key_file>, <cert_chain_file>, <tmp_dh_file>,
-    // <verify_file>, <verify_depth>, <default_verify_path>, <bad_element>, <server_name>
-    // return an xml error if their value is empty.
+    // <verify_file>, <verify_depth>, <default_verify_path>, and <bad_element> return an xml error if their value is empty.
     {
         // Parametrized XML
         const char* xml_p =
@@ -1560,7 +1558,6 @@ TEST_F(XMLParserTests, parseTLSConfigNegativeClauses)
             "password",
             "private_key_file",
             "rsa_private_key_file",
-            "server_name",
             "cert_chain_file",
             "tmp_dh_file",
             "verify_file",

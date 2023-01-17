@@ -60,7 +60,6 @@ using eprosima::fastdds::rtps::UDPv4TransportDescriptor;
 using eprosima::fastdds::rtps::UDPv6TransportDescriptor;
 
 using SampleLostStatusFunctor = std::function<void (const eprosima::fastdds::dds::SampleLostStatus&)>;
-using SampleRejectedStatusFunctor = std::function<void (const eprosima::fastdds::dds::SampleRejectedStatus&)>;
 
 template<class TypeSupport>
 class PubSubReader
@@ -244,15 +243,6 @@ protected:
             reader_.set_sample_lost_status(status);
         }
 
-        void on_sample_rejected(
-                eprosima::fastdds::dds::DataReader* datareader,
-                const eprosima::fastdds::dds::SampleRejectedStatus& status) override
-        {
-            (void)datareader;
-
-            reader_.set_sample_rejected_status(status);
-        }
-
         unsigned int missed_deadlines() const
         {
             return times_deadline_missed_;
@@ -331,9 +321,8 @@ public:
             datareader_qos_.data_sharing().off();
         }
 
-        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-        datareader_qos_.endpoint().history_memory_policy =
-                eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        // By default, memory mode is preallocated (the most restritive)
+        datareader_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 
         // By default, heartbeat period delay is 100 milliseconds.
         datareader_qos_.reliable_reader_qos().times.heartbeatResponseDelay.seconds = 0;
@@ -351,11 +340,6 @@ public:
     eprosima::fastdds::dds::DataReader& get_native_reader() const
     {
         return *datareader_;
-    }
-
-    eprosima::fastdds::dds::Subscriber& get_native_subscriber() const
-    {
-        return *subscriber_;
     }
 
     void init()
@@ -479,7 +463,7 @@ public:
     }
 
     eprosima::fastrtps::rtps::SequenceNumber_t startReception(
-            const std::list<type>& msgs)
+            std::list<type>& msgs)
     {
         mutex_.lock();
         total_msgs_ = msgs;
@@ -496,7 +480,6 @@ public:
         while (ret);
 
         receiving_.store(true);
-        std::lock_guard<std::mutex> lock(mutex_);
         return get_last_sequence_received();
     }
 
@@ -1304,12 +1287,6 @@ public:
         return *this;
     }
 
-    PubSubReader& ownership_exclusive()
-    {
-        datareader_qos_.ownership().kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
-        return *this;
-    }
-
     PubSubReader& load_participant_attr(
             const std::string& /*xml*/)
     {
@@ -1639,22 +1616,6 @@ public:
         return *this;
     }
 
-    void set_sample_rejected_status(
-            const eprosima::fastdds::dds::SampleRejectedStatus& status)
-    {
-        if (sample_rejected_status_functor_)
-        {
-            sample_rejected_status_functor_(status);
-        }
-    }
-
-    PubSubReader& sample_rejected_status_functor(
-            SampleRejectedStatusFunctor functor)
-    {
-        sample_rejected_status_functor_ = functor;
-        return *this;
-    }
-
     const eprosima::fastrtps::rtps::GUID_t& participant_guid() const
     {
         return participant_guid_;
@@ -1843,8 +1804,8 @@ protected:
     eprosima::fastdds::dds::TypeSupport type_;
     using LastSeqInfo = std::pair<eprosima::fastrtps::rtps::InstanceHandle_t, eprosima::fastrtps::rtps::GUID_t>;
     std::map<LastSeqInfo, eprosima::fastrtps::rtps::SequenceNumber_t> last_seq;
-    std::atomic<size_t> current_processed_count_;
-    std::atomic<size_t> number_samples_expected_;
+    size_t current_processed_count_;
+    size_t number_samples_expected_;
     bool discovery_result_;
 
     std::string xml_file_ = "";
@@ -1896,8 +1857,6 @@ protected:
 
     //! Functor called when called SampleLostStatus listener.
     SampleLostStatusFunctor sample_lost_status_functor_;
-    //! Functor called when called SampleRejectedStatus listener.
-    SampleRejectedStatusFunctor sample_rejected_status_functor_;
 };
 
 template<class TypeSupport>
@@ -2060,13 +2019,6 @@ protected:
                 eprosima::fastdds::dds::SampleLostStatus status;
                 ASSERT_EQ(ReturnCode_t::RETCODE_OK, reader_.datareader_->get_sample_lost_status(status));
                 reader_.set_sample_lost_status(status);
-            }
-
-            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::sample_rejected()))
-            {
-                eprosima::fastdds::dds::SampleRejectedStatus status;
-                ASSERT_EQ(ReturnCode_t::RETCODE_OK, reader_.datareader_->get_sample_rejected_status(status));
-                reader_.set_sample_rejected_status(status);
             }
 
             // We also have to process the subscriber

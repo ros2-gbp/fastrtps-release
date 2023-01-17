@@ -36,9 +36,9 @@ using namespace eprosima::fastcdr::exception;
 
 HelloWorld::HelloWorld()
 {
-    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5c5a1b69
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1a052a00
     m_index = 0;
-    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@627551fb
+    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@4d826d77
     m_message ="";
 
 }
@@ -57,7 +57,7 @@ HelloWorld::HelloWorld(
 }
 
 HelloWorld::HelloWorld(
-        HelloWorld&& x) noexcept 
+        HelloWorld&& x)
 {
     m_index = x.m_index;
     m_message = std::move(x.m_message);
@@ -74,7 +74,7 @@ HelloWorld& HelloWorld::operator =(
 }
 
 HelloWorld& HelloWorld::operator =(
-        HelloWorld&& x) noexcept
+        HelloWorld&& x)
 {
 
     m_index = x.m_index;
@@ -133,7 +133,7 @@ void HelloWorld::serialize(
 {
 
     scdr << m_index;
-    scdr << m_message.c_str();
+    scdr << m_message;
 
 }
 
@@ -142,11 +142,7 @@ void HelloWorld::deserialize(
 {
 
     dcdr >> m_index;
-    {
-        std::string aux;
-        dcdr >> aux;
-        m_message = aux.c_str();
-    }
+    dcdr >> m_message;
 }
 
 /*!
@@ -182,7 +178,7 @@ uint16_t& HelloWorld::index()
  * @param _message New value to be copied in member message
  */
 void HelloWorld::message(
-        const eprosima::fastrtps::fixed_string<128>& _message)
+        const std::string& _message)
 {
     m_message = _message;
 }
@@ -192,7 +188,7 @@ void HelloWorld::message(
  * @param _message New value to be moved in member message
  */
 void HelloWorld::message(
-        eprosima::fastrtps::fixed_string<128>&& _message)
+        std::string&& _message)
 {
     m_message = std::move(_message);
 }
@@ -201,7 +197,7 @@ void HelloWorld::message(
  * @brief This function returns a constant reference to member message
  * @return Constant reference to member message
  */
-const eprosima::fastrtps::fixed_string<128>& HelloWorld::message() const
+const std::string& HelloWorld::message() const
 {
     return m_message;
 }
@@ -210,7 +206,7 @@ const eprosima::fastrtps::fixed_string<128>& HelloWorld::message() const
  * @brief This function returns a reference to member message
  * @return Reference to member message
  */
-eprosima::fastrtps::fixed_string<128>& HelloWorld::message()
+std::string& HelloWorld::message()
 {
     return m_message;
 }

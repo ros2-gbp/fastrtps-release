@@ -32,7 +32,7 @@
 #include <gtest/gtest.h>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastrtps/types/TypesBase.h>
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 #include <utils/SystemInfo.hpp>
 
 #define SIZE 512
@@ -220,14 +220,11 @@ TEST_F(SystemInfoTests, EnvironmentFileTest)
     EXPECT_EQ(0, eprosima::SystemInfo::get_environment_file().compare(value));
 }
 
-#if defined(_WIN32) || defined(__unix__)
 /**
  * This test checks the file watchers
  */
 TEST_F(SystemInfoTests, FileWatchTest)
 {
-    auto _1s = std::chrono::seconds(1);
-
     std::string filename = "environment_test_file.json";
     nlohmann::json file_content;
 
@@ -235,8 +232,10 @@ TEST_F(SystemInfoTests, FileWatchTest)
     eprosima::FileWatchHandle watch =
             eprosima::SystemInfo::watch_file(filename, [&]()
                     {
-                        eprosima::SystemInfo::wait_for_file_closure(filename, _1s);
-                        ++times_called_;
+                        {
+                            std::unique_lock<std::mutex> lck(*mutex_);
+                            times_called_.store(++times_called_, std::memory_order_release);
+                        }
                         cv_.notify_all();
                     });
 
@@ -254,11 +253,19 @@ TEST_F(SystemInfoTests, FileWatchTest)
         file << file_content;
     }
 
+#if defined(_WIN32) || defined(__unix__)
     // Check modifications.
-    uint32_t times_called = 0;
-    block_for_at_least_N_callbacks(times_called + 1);
-    EXPECT_LT(times_called, times_called_);
-    times_called = times_called_;
+    block_for_at_least_N_callbacks(1);
+    uint32_t times_called = times_called_;
+    EXPECT_EQ(1u, times_called);
+#else
+    // Unsupported platforms will not call the callback
+    uint32_t times_called = times_called_;
+    EXPECT_EQ(0u, times_called);
+#endif // defined(_WIN32) || defined(__unix__)
+
+    // Required because the file modification time has resolution of seconds
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
     file_content["EMPTY_ENV_VAR"] = "another_value";
 
@@ -267,29 +274,31 @@ TEST_F(SystemInfoTests, FileWatchTest)
         file << file_content;
     }
 
+#if defined(_WIN32) || defined(__unix__)
     // Check modifications.
-    block_for_at_least_N_callbacks(times_called + 1);
-    EXPECT_LT(times_called, times_called_);
+    block_for_at_least_N_callbacks(2);
     times_called = times_called_;
+    EXPECT_EQ(2u, times_called);
+#else
+    // Unsupported platforms will not call the callback
+    times_called = times_called_;
+    EXPECT_EQ(0u, times_called);
+#endif // defined(_WIN32) || defined(__unix__)
 
     // Remove the watcher
     eprosima::SystemInfo::stop_watching_file(watch);
-    times_called = times_called_;
 
     // Restore content of file
     file_content["EMPTY_ENV_VAR"] = "";
-
     {
         std::ofstream file(filename);
         file << file_content;
     }
 
     // Check no modifications were notified
-    std::this_thread::sleep_for(_1s);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_EQ(times_called, times_called_);
 }
-
-#endif // defined(_WIN32) || defined(__unix__)
 
 int main(
         int argc,

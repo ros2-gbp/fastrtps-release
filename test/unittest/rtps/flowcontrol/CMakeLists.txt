@@ -25,7 +25,6 @@ set(FLOWCONTROLLER_COMMON_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
 
 set(FLOWCONTROLLERFACTORYTESTS_SOURCE
@@ -104,9 +103,3 @@ if(MSVC OR MSVC_IDE)
         )
 endif()
 add_gtest(FlowControllerSchedulersTests SOURCES ${FLOWCONTROLLERSCHEDULERSTESTS_SOURCE})
-
-if(ANDROID)
-    set_property(TARGET FlowControllerFactoryTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET FlowControllerPublishModesTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET FlowControllerSchedulersTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()

@@ -325,9 +325,9 @@ public:
         subscriber_attr_.topic.topicKind =
                 type_.m_isGetKeyDefined ? ::eprosima::fastrtps::rtps::WITH_KEY : ::eprosima::fastrtps::rtps::NO_KEY;
 
-        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        // By default, memory mode is preallocated (the most restritive)
+        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         publisher_attr_.times.heartbeatPeriod.seconds = 0;
@@ -655,6 +655,53 @@ public:
     {
         subscriber_attr_.properties = property_policy;
         return *this;
+    }
+
+    PubSubWriterReader& pub_liveliness_kind(
+            const eprosima::fastrtps::LivelinessQosPolicyKind kind)
+    {
+        publisher_attr_.qos.m_liveliness.kind = kind;
+        return *this;
+    }
+
+    PubSubWriterReader& sub_liveliness_kind(
+            const eprosima::fastrtps::LivelinessQosPolicyKind kind)
+    {
+        subscriber_attr_.qos.m_liveliness.kind = kind;
+        return *this;
+    }
+
+    PubSubWriterReader& pub_liveliness_announcement_period(
+            const eprosima::fastrtps::Duration_t announcement_period)
+    {
+        publisher_attr_.qos.m_liveliness.announcement_period = announcement_period;
+        return *this;
+    }
+
+    PubSubWriterReader& sub_liveliness_announcement_period(
+            const eprosima::fastrtps::Duration_t announcement_period)
+    {
+        subscriber_attr_.qos.m_liveliness.announcement_period = announcement_period;
+        return *this;
+    }
+
+    PubSubWriterReader& pub_liveliness_lease_duration(
+            const eprosima::fastrtps::Duration_t lease_duration)
+    {
+        publisher_attr_.qos.m_liveliness.lease_duration = lease_duration;
+        return *this;
+    }
+
+    PubSubWriterReader& sub_liveliness_lease_duration(
+            const eprosima::fastrtps::Duration_t lease_duration)
+    {
+        subscriber_attr_.qos.m_liveliness.lease_duration = lease_duration;
+        return *this;
+    }
+
+    void assert_liveliness()
+    {
+        publisher_->assert_liveliness();
     }
 
     size_t get_num_discovered_participants() const

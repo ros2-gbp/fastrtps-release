@@ -304,7 +304,7 @@ public:
 
 #ifdef FASTDDS_STATISTICS
 
-    /**
+    /*
      * Add a listener to receive statistics backend callbacks
      * @param listener
      * @return true if successfully added
@@ -312,21 +312,13 @@ public:
     RTPS_DllAPI bool add_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener);
 
-    /**
+    /*
      * Remove a listener from receiving statistics backend callbacks
      * @param listener
      * @return true if successfully removed
      */
     RTPS_DllAPI bool remove_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener);
-
-    /**
-     * @brief Set the enabled statistics writers mask
-     *
-     * @param enabled_writers The new mask to set
-     */
-    RTPS_DllAPI void set_enabled_statistics_writers_mask(
-            uint32_t enabled_writers);
 
 #endif // FASTDDS_STATISTICS
 
@@ -550,8 +542,7 @@ protected:
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(RTPS_WRITER,
-                            "Error sending fragment (" << change->sequenceNumber << ", " << frag << ")");
+                    logError(RTPS_WRITER, "Error sending fragment (" << change->sequenceNumber << ", " << frag << ")");
                     break;
                 }
             }
@@ -565,7 +556,7 @@ protected:
             }
             else
             {
-                EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
+                logError(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
             }
         }
 

@@ -36,11 +36,11 @@ using namespace eprosima::fastcdr::exception;
 
 KeyedHelloWorld::KeyedHelloWorld()
 {
-    // m_key com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7a9273a8
+    // m_key com.eprosima.idl.parser.typecode.PrimitiveTypeCode@8e0379d
     m_key = 0;
-    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@26a7b76d
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@341b80b2
     m_index = 0;
-    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@4abdb505
+    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@55a1c291
     m_message ="";
 
 }
@@ -61,7 +61,7 @@ KeyedHelloWorld::KeyedHelloWorld(
 }
 
 KeyedHelloWorld::KeyedHelloWorld(
-        KeyedHelloWorld&& x) noexcept 
+        KeyedHelloWorld&& x)
 {
     m_key = x.m_key;
     m_index = x.m_index;
@@ -80,7 +80,7 @@ KeyedHelloWorld& KeyedHelloWorld::operator =(
 }
 
 KeyedHelloWorld& KeyedHelloWorld::operator =(
-        KeyedHelloWorld&& x) noexcept
+        KeyedHelloWorld&& x)
 {
 
     m_key = x.m_key;
@@ -147,7 +147,7 @@ void KeyedHelloWorld::serialize(
 
     scdr << m_key;
     scdr << m_index;
-    scdr << m_message.c_str();
+    scdr << m_message;
 
 }
 
@@ -157,11 +157,7 @@ void KeyedHelloWorld::deserialize(
 
     dcdr >> m_key;
     dcdr >> m_index;
-    {
-        std::string aux;
-        dcdr >> aux;
-        m_message = aux.c_str();
-    }
+    dcdr >> m_message;
 }
 
 /*!
@@ -225,7 +221,7 @@ uint16_t& KeyedHelloWorld::index()
  * @param _message New value to be copied in member message
  */
 void KeyedHelloWorld::message(
-        const eprosima::fastrtps::fixed_string<128>& _message)
+        const std::string& _message)
 {
     m_message = _message;
 }
@@ -235,7 +231,7 @@ void KeyedHelloWorld::message(
  * @param _message New value to be moved in member message
  */
 void KeyedHelloWorld::message(
-        eprosima::fastrtps::fixed_string<128>&& _message)
+        std::string&& _message)
 {
     m_message = std::move(_message);
 }
@@ -244,7 +240,7 @@ void KeyedHelloWorld::message(
  * @brief This function returns a constant reference to member message
  * @return Constant reference to member message
  */
-const eprosima::fastrtps::fixed_string<128>& KeyedHelloWorld::message() const
+const std::string& KeyedHelloWorld::message() const
 {
     return m_message;
 }
@@ -253,7 +249,7 @@ const eprosima::fastrtps::fixed_string<128>& KeyedHelloWorld::message() const
  * @brief This function returns a reference to member message
  * @return Reference to member message
  */
-eprosima::fastrtps::fixed_string<128>& KeyedHelloWorld::message()
+std::string& KeyedHelloWorld::message()
 {
     return m_message;
 }

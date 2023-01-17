@@ -230,7 +230,6 @@ public:
      * @param view_states Vector of ViewStateKind
      * @param instance_states Vector of InstanceStateKind
      * @return RETCODE_OK
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_datareaders(
             std::vector<DataReader*>& readers,
@@ -250,7 +249,6 @@ public:
      * attached to the Subscriber.
      *
      * @return RETCODE_OK
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t begin_access();
 
@@ -259,7 +257,6 @@ public:
      * the Subscriber.
      *
      * @return RETCODE_OK
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t end_access();
 
@@ -356,7 +353,6 @@ public:
      * @param[in, out] reader_qos
      * @param[in] topic_qos
      * @return RETCODE_OK if successful, an error code otherwise
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI static ReturnCode_t copy_from_topic_qos(
             DataReaderQos& reader_qos,

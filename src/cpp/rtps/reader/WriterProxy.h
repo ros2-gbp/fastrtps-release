@@ -142,6 +142,13 @@ public:
             const SequenceNumber_t& seq_num);
 
     /**
+     * Called when a change has been removed from the reader's history.
+     * @param seq_num Sequence number of the removed change.
+     */
+    void change_removed_from_history(
+            const SequenceNumber_t& seq_num);
+
+    /**
      * Check if this proxy has any missing change.
      * @return true when there is at least one missing change on this proxy.
      */
@@ -349,13 +356,6 @@ public:
 
 private:
 
-    enum StateCode
-    {
-        IDLE = 0, //! Writer Proxy is not performing any critical operations.
-        BUSY, //! Writer Proxy is performing a critical operation. Some actions (e.g. stop) should wait for its completion.
-        STOPPED, //! Writer Proxy has been requested to \c stop.
-    };
-
     /**
      * Set initial value for last acked sequence number.
      * @param[in] seq_num last acked sequence number.
@@ -378,7 +378,7 @@ private:
     //! Timed event to send initial acknack.
     TimedEvent* initial_acknack_;
     //! Last Heartbeatcount.
-    std::atomic<uint32_t> last_heartbeat_count_;
+    uint32_t last_heartbeat_count_;
     //!Indicates if the heartbeat has the final flag set.
     std::atomic<bool> heartbeat_final_flag_;
     //!Is the writer alive
@@ -415,8 +415,6 @@ private:
     bool is_datasharing_writer_;
     //! Wether at least one heartbeat was recevied.
     bool received_at_least_one_heartbeat_;
-    //! Current state of this Writer Proxy
-    std::atomic<StateCode> state_;
 
     using ChangeIterator = decltype(changes_received_)::iterator;
 

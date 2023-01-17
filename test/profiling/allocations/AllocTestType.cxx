@@ -36,7 +36,7 @@ using namespace eprosima::fastcdr::exception;
 
 AllocTestType::AllocTestType()
 {
-    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@610694f1
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@52f759d7
     m_index = 0;
 
 }
@@ -52,7 +52,7 @@ AllocTestType::AllocTestType(
 }
 
 AllocTestType::AllocTestType(
-        AllocTestType&& x) noexcept 
+        AllocTestType&& x)
 {
     m_index = x.m_index;
 }
@@ -67,7 +67,7 @@ AllocTestType& AllocTestType::operator =(
 }
 
 AllocTestType& AllocTestType::operator =(
-        AllocTestType&& x) noexcept
+        AllocTestType&& x)
 {
 
     m_index = x.m_index;

@@ -31,14 +31,12 @@ if(TLS_FOUND)
         ${CMAKE_CURRENT_BINARY_DIR}/mainsubcert.pem COPYONLY)
     configure_file(${PROJECT_SOURCE_DIR}/test/certs/mainsubkey.pem
         ${CMAKE_CURRENT_BINARY_DIR}/mainsubkey.pem COPYONLY)
-    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/certs/ca.crt
-        ${CMAKE_CURRENT_BINARY_DIR}/ca.crt COPYONLY)
-    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/certs/fastdds.crt
-        ${CMAKE_CURRENT_BINARY_DIR}/fastdds.crt COPYONLY)
-    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/certs/fastdds.key
-        ${CMAKE_CURRENT_BINARY_DIR}/fastdds.key COPYONLY)
-    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/certs/dh_params.pem
-        ${CMAKE_CURRENT_BINARY_DIR}/dh_params.pem COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/ca.pem
+        ${CMAKE_CURRENT_BINARY_DIR}/ca.pem COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/server.pem
+        ${CMAKE_CURRENT_BINARY_DIR}/server.pem COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/dh2048.pem
+        ${CMAKE_CURRENT_BINARY_DIR}/dh2048.pem COPYONLY)
     #configure_file(${PROJECT_SOURCE_DIR}/test/certs/governance_helloworld_all_enable.smime
     #    ${CMAKE_CURRENT_BINARY_DIR}/governance_helloworld_all_enable.smime COPYONLY)
     #configure_file(${PROJECT_SOURCE_DIR}/test/certs/permissions_helloworld.smime
@@ -59,7 +57,6 @@ set(UDPV4TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPChannelResource.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     )
 
@@ -79,7 +76,6 @@ set(UDPV6TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPv6Transport.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
 
 set(TCPV4TESTS_SOURCE
@@ -114,7 +110,6 @@ set(TCPV4TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/System.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
 
 if(TLS_FOUND)
@@ -156,7 +151,6 @@ set(TCPV6TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/System.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
 
 if(TLS_FOUND)
@@ -185,7 +179,6 @@ set(TEST_UDPV4TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPChannelResource.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     )
 
@@ -207,28 +200,7 @@ set(SHAREDMEMTESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
-
-if(ANDROID)
-    if (ANDROID_NATIVE_API_LEVEL LESS 24)
-        list(APPEND TCPV6TESTS_SOURCE
-            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-            )
-        list(APPEND TCPV4TESTS_SOURCE
-            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-            )
-        list(APPEND UDPV6TESTS_SOURCE
-            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-            )
-        list(APPEND UDPV4TESTS_SOURCE
-            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-            )
-        list(APPEND SHAREDMEMTESTS_SOURCE
-            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-            )
-    endif()
-endif()
 
 include_directories(mock/)
 
@@ -245,7 +217,6 @@ target_include_directories(UDPv4Tests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
-    $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
 target_link_libraries(UDPv4Tests GTest::gtest ${MOCKS})
 if(MSVC OR MSVC_IDE)
@@ -293,7 +264,6 @@ if(NOT DISABLE_UDPV6_TESTS)
         ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
         ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
         ${PROJECT_SOURCE_DIR}/src/cpp
-        $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
         )
     target_link_libraries(TCPv6Tests GTest::gtest ${MOCKS}
         $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>)
@@ -321,7 +291,6 @@ target_include_directories(test_UDPv4Tests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
-    $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
 target_link_libraries(test_UDPv4Tests GTest::gtest ${MOCKS})
 if(MSVC OR MSVC_IDE)
@@ -347,7 +316,6 @@ target_include_directories(TCPv4Tests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReceiverResource
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
-    $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
 target_link_libraries(TCPv4Tests GTest::gtest ${MOCKS}
     $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>)
@@ -377,7 +345,6 @@ if(IS_THIRDPARTY_BOOST_OK)
         ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
         ${PROJECT_SOURCE_DIR}/src/cpp
         ${THIRDPARTY_BOOST_INCLUDE_DIR}
-        $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
         )
     target_link_libraries(SharedMemTests GTest::gtest ${MOCKS}
         $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
@@ -396,12 +363,3 @@ endif()
 foreach(TRANSPORT_XFAIL_TEST ${TRANSPORT_XFAIL_LIST})
     add_xfail_label(${CMAKE_CURRENT_SOURCE_DIR}/${TRANSPORT_XFAIL_TEST}.list)
 endforeach()
-
-if(ANDROID)
-    set_property(TARGET UDPv4Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET UDPv6Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET TCPv4Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET TCPv6Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET SharedMemTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET test_UDPv4Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()

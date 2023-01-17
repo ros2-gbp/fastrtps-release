@@ -53,7 +53,7 @@ void FlowControllerFactory::register_flow_controller (
 {
     if (flow_controllers_.end() != flow_controllers_.find(flow_controller_descr.name))
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+        logError(RTPS_PARTICIPANT,
                 "Error registering FlowController " << flow_controller_descr.name << ". Already registered");
         return;
     }
@@ -192,7 +192,7 @@ FlowController* FlowControllerFactory::retrieve_flow_controller(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+        logError(RTPS_PARTICIPANT,
                 "Cannot find FlowController " << flow_controller_name << ".");
     }
 

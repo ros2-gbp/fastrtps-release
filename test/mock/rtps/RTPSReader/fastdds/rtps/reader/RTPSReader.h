@@ -182,14 +182,6 @@ public:
         return true;
     }
 
-    void setHistory(
-            ReaderHistory* history)
-    {
-        history->mp_reader = this;
-        history->mp_mutex = &mp_mutex;
-        history_ = history;
-    }
-
     ReaderHistory* getHistory()
     {
         getHistory_mock();

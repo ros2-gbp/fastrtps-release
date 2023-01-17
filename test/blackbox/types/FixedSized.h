@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_FIXEDSIZED_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -93,7 +91,7 @@ public:
      * @param x Reference to the object FixedSized that will be copied.
      */
     eProsima_user_DllExport FixedSized(
-            FixedSized&& x) noexcept;
+            FixedSized&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +105,7 @@ public:
      * @param x Reference to the object FixedSized that will be copied.
      */
     eProsima_user_DllExport FixedSized& operator =(
-            FixedSized&& x) noexcept;
+            FixedSized&& x);
 
     /*!
      * @brief Comparison operator.

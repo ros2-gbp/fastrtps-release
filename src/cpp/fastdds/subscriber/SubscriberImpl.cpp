@@ -29,7 +29,6 @@
 #include <fastdds/dds/subscriber/SubscriberListener.hpp>
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
-#include <fastdds/utils/QosConverters.hpp>
 
 #include <fastdds/rtps/common/Property.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
@@ -50,6 +49,56 @@ using fastrtps::rtps::Property;
 using fastrtps::Duration_t;
 using fastrtps::SubscriberAttributes;
 
+static void set_qos_from_attributes(
+        DataReaderQos& qos,
+        const SubscriberAttributes& attr)
+{
+    qos.reader_resource_limits().matched_publisher_allocation = attr.matched_publisher_allocation;
+    qos.properties() = attr.properties;
+    qos.expects_inline_qos(attr.expectsInlineQos);
+    qos.endpoint().unicast_locator_list = attr.unicastLocatorList;
+    qos.endpoint().multicast_locator_list = attr.multicastLocatorList;
+    qos.endpoint().remote_locator_list = attr.remoteLocatorList;
+    qos.endpoint().history_memory_policy = attr.historyMemoryPolicy;
+    qos.endpoint().user_defined_id = attr.getUserDefinedID();
+    qos.endpoint().entity_id = attr.getEntityID();
+    qos.reliable_reader_qos().times = attr.times;
+    qos.reliable_reader_qos().disable_positive_ACKs = attr.qos.m_disablePositiveACKs;
+    qos.durability() = attr.qos.m_durability;
+    qos.durability_service() = attr.qos.m_durabilityService;
+    qos.deadline() = attr.qos.m_deadline;
+    qos.latency_budget() = attr.qos.m_latencyBudget;
+    qos.liveliness() = attr.qos.m_liveliness;
+    qos.reliability() = attr.qos.m_reliability;
+    qos.lifespan() = attr.qos.m_lifespan;
+    qos.user_data().setValue(attr.qos.m_userData);
+    qos.ownership() = attr.qos.m_ownership;
+    qos.destination_order() = attr.qos.m_destinationOrder;
+    qos.type_consistency().type_consistency = attr.qos.type_consistency;
+    qos.type_consistency().representation = attr.qos.representation;
+    qos.time_based_filter() = attr.qos.m_timeBasedFilter;
+    qos.history() = attr.topic.historyQos;
+    qos.resource_limits() = attr.topic.resourceLimitsQos;
+    qos.data_sharing() = attr.qos.data_sharing;
+
+    if (attr.qos.m_partition.size() > 0 )
+    {
+        Property property;
+        property.name("partitions");
+        std::string partitions;
+        bool is_first_partition = true;
+
+        for (auto partition : attr.qos.m_partition.names())
+        {
+            partitions += (is_first_partition ? "" : ";") + partition;
+            is_first_partition = false;
+        }
+
+        property.value(std::move(partitions));
+        qos.properties().properties().push_back(std::move(property));
+    }
+}
+
 SubscriberImpl::SubscriberImpl(
         DomainParticipantImpl* p,
         const SubscriberQos& qos,
@@ -59,12 +108,12 @@ SubscriberImpl::SubscriberImpl(
     , listener_(listen)
     , subscriber_listener_(this)
     , user_subscriber_(nullptr)
-    , rtps_participant_(p->get_rtps_participant())
+    , rtps_participant_(p->rtps_participant())
     , default_datareader_qos_(DATAREADER_QOS_DEFAULT)
 {
     SubscriberAttributes sub_attr;
     XMLProfileManager::getDefaultSubscriberAttributes(sub_attr);
-    utils::set_qos_from_attributes(default_datareader_qos_, sub_attr);
+    set_qos_from_attributes(default_datareader_qos_, sub_attr);
 }
 
 ReturnCode_t SubscriberImpl::enable()
@@ -186,7 +235,7 @@ DataReader* SubscriberImpl::create_datareader(
         DataReaderListener* listener,
         const StatusMask& mask)
 {
-    EPROSIMA_LOG_INFO(SUBSCRIBER, "CREATING SUBSCRIBER IN TOPIC: " << topic->get_name());
+    logInfo(SUBSCRIBER, "CREATING SUBSCRIBER IN TOPIC: " << topic->get_name());
     //Look for the correct type registration
     TypeSupport type_support = participant_->find_type(topic->get_type_name());
 
@@ -194,11 +243,11 @@ DataReader* SubscriberImpl::create_datareader(
     // Check the type was registered.
     if (type_support.empty())
     {
-        EPROSIMA_LOG_ERROR(SUBSCRIBER, "Type : " << topic->get_type_name() << " Not Registered");
+        logError(SUBSCRIBER, "Type : " << topic->get_type_name() << " Not Registered");
         return nullptr;
     }
 
-    if (!DataReaderImpl::check_qos_including_resource_limits(qos, type_support))
+    if (!DataReaderImpl::check_qos(qos))
     {
         return nullptr;
     }
@@ -237,7 +286,7 @@ DataReader* SubscriberImpl::create_datareader_with_profile(
     if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr))
     {
         DataReaderQos qos = default_datareader_qos_;
-        utils::set_qos_from_attributes(qos, attr);
+        set_qos_from_attributes(qos, attr);
         return create_datareader(topic, qos, listener, mask);
     }
 
@@ -260,7 +309,7 @@ ReturnCode_t SubscriberImpl::delete_datareader(
         {
             //First extract the reader from the maps to free the mutex
             DataReaderImpl* reader_impl = *dr_it;
-            if (!reader_impl->can_be_deleted(false))
+            if (!reader_impl->can_be_deleted())
             {
                 return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
             }
@@ -319,7 +368,7 @@ bool SubscriberImpl::has_datareaders() const
 /* TODO
    bool SubscriberImpl::begin_access()
    {
-    EPROSIMA_LOG_ERROR(PUBLISHER, "Operation not implemented");
+    logError(PUBLISHER, "Operation not implemented");
     return false;
    }
  */
@@ -327,7 +376,7 @@ bool SubscriberImpl::has_datareaders() const
 /* TODO
    bool SubscriberImpl::end_access()
    {
-    EPROSIMA_LOG_ERROR(PUBLISHER, "Operation not implemented");
+    logError(PUBLISHER, "Operation not implemented");
     return false;
    }
  */
@@ -369,7 +418,7 @@ void SubscriberImpl::reset_default_datareader_qos()
     DataReaderImpl::set_qos(default_datareader_qos_, DATAREADER_QOS_DEFAULT, true);
     SubscriberAttributes attr;
     XMLProfileManager::getDefaultSubscriberAttributes(attr);
-    utils::set_qos_from_attributes(default_datareader_qos_, attr);
+    set_qos_from_attributes(default_datareader_qos_, attr);
 }
 
 const DataReaderQos& SubscriberImpl::get_default_datareader_qos() const
@@ -408,7 +457,7 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
     if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr, false))
     {
         qos = default_datareader_qos_;
-        utils::set_qos_from_attributes(qos, attr);
+        set_qos_from_attributes(qos, attr);
         return ReturnCode_t::RETCODE_OK;
     }
 
@@ -420,7 +469,7 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
         DataReaderQos&,
         const fastrtps::TopicAttributes&) const
    {
-    EPROSIMA_LOG_ERROR(PUBLISHER, "Operation not implemented");
+    logError(PUBLISHER, "Operation not implemented");
     return false;
    }
  */

@@ -326,7 +326,6 @@ public:
 
     eprosima::fastrtps::rtps::SequenceNumber_t get_last_received_sequence_number() const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
         return last_seq_;
     }
 
@@ -603,17 +602,17 @@ private:
     eprosima::fastrtps::ReaderQos reader_qos_;
     eprosima::fastrtps::rtps::ReaderHistory* history_;
     eprosima::fastrtps::rtps::HistoryAttributes hattr_;
-    std::atomic<bool> initialized_;
+    bool initialized_;
     std::list<type> total_msgs_;
-    mutable std::mutex mutex_;
+    std::mutex mutex_;
     std::condition_variable cv_;
     std::mutex mutexDiscovery_;
     std::condition_variable cvDiscovery_;
-    std::atomic<bool> receiving_;
-    std::atomic<uint32_t> matched_;
+    bool receiving_;
+    uint32_t matched_;
     eprosima::fastrtps::rtps::SequenceNumber_t last_seq_;
-    std::atomic<size_t> current_received_count_;
-    std::atomic<size_t> number_samples_expected_;
+    size_t current_received_count_;
+    size_t number_samples_expected_;
     type_support type_;
     std::shared_ptr<eprosima::fastrtps::rtps::IPayloadPool> payload_pool_;
     bool has_payload_pool_ = false;

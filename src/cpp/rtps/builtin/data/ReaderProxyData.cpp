@@ -78,7 +78,7 @@ ReaderProxyData::~ReaderProxyData()
     delete m_type_id;
     delete m_type_information;
 
-    EPROSIMA_LOG_INFO(RTPS_PROXY_DATA, "ReaderProxyData destructor: " << m_guid; );
+    logInfo(RTPS_PROXY_DATA, "ReaderProxyData destructor: " << m_guid; );
 }
 
 ReaderProxyData::ReaderProxyData(
@@ -620,8 +620,13 @@ bool ReaderProxyData::readFromCDRMessage(
         const NetworkFactory& network,
         bool is_shm_transport_available)
 {
-    auto param_process = [this, &network, &is_shm_transport_available](
-        CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
+    bool are_shm_default_locators_present = false;
+    bool is_shm_transport_possible = false;
+
+    auto param_process = [this, &network,
+                    &is_shm_transport_available,
+                    &is_shm_transport_possible,
+                    &are_shm_default_locators_present](CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
                 switch (pid)
                 {
@@ -835,7 +840,9 @@ bool ReaderProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                remote_locators_,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &remote_locators_,
                                 temp_locator,
                                 true);
                         }
@@ -855,7 +862,9 @@ bool ReaderProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                remote_locators_,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &remote_locators_,
                                 temp_locator,
                                 false);
                         }
@@ -981,7 +990,7 @@ bool ReaderProxyData::readFromCDRMessage(
                         if (!fastdds::dds::QosPoliciesSerializer<DataSharingQosPolicy>::read_from_cdr_message(
                                     m_qos.data_sharing, msg, plength))
                         {
-                            EPROSIMA_LOG_ERROR(RTPS_READER_PROXY_DATA,
+                            logError(RTPS_READER_PROXY_DATA,
                                     "Received with error.");
                             return false;
                         }

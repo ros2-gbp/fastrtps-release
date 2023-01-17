@@ -27,7 +27,6 @@
 #include <fastdds/rtps/messages/CDRMessage.h>
 #include <fastdds/subscriber/DataReaderImpl.hpp>
 #include <fastdds/topic/ContentFilterUtils.hpp>
-#include <fastdds/topic/TopicProxy.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -56,7 +55,7 @@ ReturnCode_t ContentFilteredTopicImpl::set_expression_parameters(
         const char* new_expression,
         const std::vector<std::string>& new_expression_parameters)
 {
-    TopicProxy* topic_impl = dynamic_cast<TopicProxy*>(related_topic->get_impl());
+    TopicImpl* topic_impl = dynamic_cast<TopicImpl*>(related_topic->get_impl());
     assert(nullptr != topic_impl);
     const TypeSupport& type = topic_impl->get_type();
 

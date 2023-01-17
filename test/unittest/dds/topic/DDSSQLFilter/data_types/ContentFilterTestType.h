@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_CONTENTFILTERTESTTYPE_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -117,7 +115,7 @@ public:
      * @param x Reference to the object StructType that will be copied.
      */
     eProsima_user_DllExport StructType(
-            StructType&& x) noexcept;
+            StructType&& x);
 
     /*!
      * @brief Copy assignment.
@@ -131,7 +129,7 @@ public:
      * @param x Reference to the object StructType that will be copied.
      */
     eProsima_user_DllExport StructType& operator =(
-            StructType&& x) noexcept;
+            StructType&& x);
 
     /*!
      * @brief Comparison operator.
@@ -546,7 +544,7 @@ public:
      * @param x Reference to the object ContentFilterTestType that will be copied.
      */
     eProsima_user_DllExport ContentFilterTestType(
-            ContentFilterTestType&& x) noexcept;
+            ContentFilterTestType&& x);
 
     /*!
      * @brief Copy assignment.
@@ -560,7 +558,7 @@ public:
      * @param x Reference to the object ContentFilterTestType that will be copied.
      */
     eProsima_user_DllExport ContentFilterTestType& operator =(
-            ContentFilterTestType&& x) noexcept;
+            ContentFilterTestType&& x);
 
     /*!
      * @brief Comparison operator.

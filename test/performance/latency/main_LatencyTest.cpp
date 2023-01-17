@@ -421,12 +421,12 @@ int main(
     {
         if (test_agent == TestAgent::BOTH)
         {
-            EPROSIMA_LOG_ERROR(LatencyTest, "Intra-process delivery NOT supported with security");
+            logError(LatencyTest, "Intra-process delivery NOT supported with security");
             return 1;
         }
         else if (Arg::EnablerValue::ON == data_sharing)
         {
-            EPROSIMA_LOG_ERROR(LatencyTest, "Sharing sample APIs NOT supported with RTPS encryption");
+            logError(LatencyTest, "Sharing sample APIs NOT supported with RTPS encryption");
             return 1;
         }
     }
@@ -434,7 +434,7 @@ int main(
 
     if ((Arg::EnablerValue::ON == data_sharing || data_loans) && dynamic_types)
     {
-        EPROSIMA_LOG_ERROR(LatencyTest, "Sharing sample APIs NOT supported with dynamic types");
+        logError(LatencyTest, "Sharing sample APIs NOT supported with dynamic types");
         return 1;
     }
 

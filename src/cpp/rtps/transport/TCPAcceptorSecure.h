@@ -15,8 +15,6 @@
 #ifndef _FASTDDS_TCP_ACCEPTOR_SECURE_
 #define _FASTDDS_TCP_ACCEPTOR_SECURE_
 
-#define OPENSSL_API_COMPAT 10101
-
 #include <asio/ssl.hpp>
 #include <rtps/transport/TCPAcceptor.h>
 #include <rtps/transport/TCPChannelResourceSecure.h>

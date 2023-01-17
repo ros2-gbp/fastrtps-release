@@ -21,8 +21,6 @@
 
 #include <fastdds/dds/topic/TypeSupport.hpp>
 
-#include <fastdds/dds/common/InstanceHandle.hpp>
-
 namespace eprosima {
 namespace fastdds {
 namespace dds {

@@ -13,12 +13,6 @@
 // limitations under the License.
 //
 #include <fastrtps/xmlparser/XMLParser.h>
-
-#include <cstdlib>
-#include <iostream>
-#include <string>
-#include <unordered_map>
-
 #include <fastrtps/xmlparser/XMLParserCommon.h>
 #include <fastrtps/xmlparser/XMLTree.h>
 
@@ -35,6 +29,8 @@
 #include <fastdds/dds/log/StdoutErrConsumer.hpp>
 
 #include <tinyxml2.h>
+#include <iostream>
+#include <cstdlib>
 
 namespace eprosima {
 namespace fastrtps {
@@ -66,7 +62,7 @@ XMLP_ret XMLParser::parseXML(
                     // Just library_settings config in the XML.
                     if (nullptr == (p_root = xmlDoc.FirstChildElement(LIBRARY_SETTINGS)))
                     {
-                        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found root tag");
+                        logError(XMLPARSER, "Not found root tag");
                         ret = XMLP_ret::XML_ERROR;
                     }
                     else
@@ -169,7 +165,7 @@ XMLP_ret XMLParser::parseXML(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(XMLPARSER, "Not expected tag: '" << tag << "'");
+                    logError(XMLPARSER, "Not expected tag: '" << tag << "'");
                     ret = XMLP_ret::XML_ERROR;
                 }
             }
@@ -208,7 +204,7 @@ XMLP_ret XMLParser::parseXMLTransportsProf(
         ret = parseXMLTransportData(p_element);
         if (ret != XMLP_ret::XML_OK)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing transports");
+            logError(XMLPARSER, "Error parsing transports");
             return ret;
         }
         p_element = p_element->NextSiblingElement(TRANSPORT_DESCRIPTOR);
@@ -256,7 +252,7 @@ XMLP_ret XMLParser::parseXMLTransportData(
     p_aux0 = p_root->FirstChildElement(TRANSPORT_ID);
     if (nullptr == p_aux0)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found '" << TRANSPORT_ID << "' attribute");
+        logError(XMLPARSER, "Not found '" << TRANSPORT_ID << "' attribute");
         return XMLP_ret::XML_ERROR;
     }
     else
@@ -267,7 +263,7 @@ XMLP_ret XMLParser::parseXMLTransportData(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "'" << TRANSPORT_ID << "' attribute cannot be empty");
+            logError(XMLPARSER, "'" << TRANSPORT_ID << "' attribute cannot be empty");
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -275,7 +271,7 @@ XMLP_ret XMLParser::parseXMLTransportData(
     p_aux0 = p_root->FirstChildElement(TYPE);
     if (nullptr == p_aux0)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found '" << TYPE << "' attribute");
+        logError(XMLPARSER, "Not found '" << TYPE << "' attribute");
         return XMLP_ret::XML_ERROR;
     }
     else
@@ -287,7 +283,7 @@ XMLP_ret XMLParser::parseXMLTransportData(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "'" << TYPE << "' attribute cannot be empty");
+            logError(XMLPARSER, "'" << TYPE << "' attribute cannot be empty");
             return XMLP_ret::XML_ERROR;
         }
 
@@ -368,7 +364,7 @@ XMLP_ret XMLParser::parseXMLTransportData(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid transport type: '" << sType << "'");
+            logError(XMLPARSER, "Invalid transport type: '" << sType << "'");
             return XMLP_ret::XML_ERROR;
         }
 
@@ -490,7 +486,7 @@ XMLP_ret XMLParser::parseXMLCommonTransportData(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'interfaceWhiteList'. Name: " << address);
+                    logError(XMLPARSER, "Invalid element found into 'interfaceWhiteList'. Name: " << address);
                     return XMLP_ret::XML_ERROR;
                 }
             }
@@ -512,7 +508,7 @@ XMLP_ret XMLParser::parseXMLCommonTransportData(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
+            logError(XMLPARSER, "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -659,15 +655,14 @@ XMLP_ret XMLParser::parseXMLCommonTCPTransportData(
             }
             else
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
+                logError(XMLPARSER, "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
                 return XMLP_ret::XML_ERROR;
             }
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing TCP Transport data");
+        logError(XMLPARSER, "Error parsing TCP Transport data");
         ret = XMLP_ret::XML_ERROR;
     }
 
@@ -761,15 +756,14 @@ XMLP_ret XMLParser::parseXMLCommonSharedMemTransportData(
             }
             else
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
+                logError(XMLPARSER, "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
                 return XMLP_ret::XML_ERROR;
             }
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing SharedMem Transport data");
+        logError(XMLPARSER, "Error parsing SharedMem Transport data");
         ret = XMLP_ret::XML_ERROR;
     }
 
@@ -929,7 +923,7 @@ XMLP_ret XMLParser::parse_tls_config(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(XMLPARSER, "Unrecognized verify paths label: " << p_path->Value());
+                    logError(XMLPARSER, "Unrecognized verify paths label: " << p_path->Value());
                     ret = XMLP_ret::XML_ERROR;
                     break;
                 }
@@ -979,17 +973,10 @@ XMLP_ret XMLParser::parse_tls_config(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing TLS configuration handshake_mode unrecognized "
+                    logError(XMLPARSER, "Error parsing TLS configuration handshake_mode unrecognized "
                             << handshake_mode << ".");
                     ret = XMLP_ret::XML_ERROR;
                 }
-            }
-        }
-        else if (config.compare(TLS_SERVER_NAME) == 0)
-        {
-            if (XMLP_ret::XML_OK != getXMLString(p_aux0, &pTCPDesc->tls_config.server_name, 0))
-            {
-                ret = XMLP_ret::XML_ERROR;
             }
         }
         else if (config.compare(TLS_VERIFY_MODE) == 0)
@@ -1026,7 +1013,7 @@ XMLP_ret XMLParser::parse_tls_config(
                         }
                         else
                         {
-                            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing TLS configuration verify_mode unrecognized "
+                            logError(XMLPARSER, "Error parsing TLS configuration verify_mode unrecognized "
                                     << verify_mode << ".");
                             ret = XMLP_ret::XML_ERROR;
                         }
@@ -1034,7 +1021,7 @@ XMLP_ret XMLParser::parse_tls_config(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing TLS configuration found unrecognized node "
+                    logError(XMLPARSER, "Error parsing TLS configuration found unrecognized node "
                             << type << ".");
                     ret = XMLP_ret::XML_ERROR;
                 }
@@ -1102,7 +1089,7 @@ XMLP_ret XMLParser::parse_tls_config(
                         }
                         else
                         {
-                            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing TLS configuration option unrecognized "
+                            logError(XMLPARSER, "Error parsing TLS configuration option unrecognized "
                                     << option << ".");
                             ret = XMLP_ret::XML_ERROR;
                         }
@@ -1110,7 +1097,7 @@ XMLP_ret XMLParser::parse_tls_config(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing TLS options found unrecognized node "
+                    logError(XMLPARSER, "Error parsing TLS options found unrecognized node "
                             << type << ".");
                     ret = XMLP_ret::XML_ERROR;
                 }
@@ -1127,14 +1114,14 @@ XMLP_ret XMLParser::parse_tls_config(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing TLS configuration: Field " << config << " not recognized.");
+            logError(XMLPARSER, "Error parsing TLS configuration: Field " << config << " not recognized.");
             ret = XMLP_ret::XML_ERROR;
         }
 
         // Stop parsing on error
         if (ret == XMLP_ret::XML_ERROR)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing TLS configuration's field '" << config << "'.");
+            logError(XMLPARSER, "Error parsing TLS configuration's field '" << config << "'.");
             break;
         }
     }
@@ -1161,7 +1148,7 @@ XMLP_ret XMLParser::parseXMLLibrarySettings(
     p_aux0 = p_root->FirstChildElement(INTRAPROCESS_DELIVERY);
     if (nullptr == p_aux0)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found '" << INTRAPROCESS_DELIVERY << "' attribute");
+        logError(XMLPARSER, "Not found '" << INTRAPROCESS_DELIVERY << "' attribute");
         return XMLP_ret::XML_ERROR;
     }
     else
@@ -1191,7 +1178,7 @@ XMLP_ret XMLParser::parseXMLParticipantProf(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing participant profile");
+        logError(XMLPARSER, "Error parsing participant profile");
         ret = XMLP_ret::XML_ERROR;
     }
 
@@ -1211,7 +1198,7 @@ XMLP_ret XMLParser::parseXMLPublisherProf(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing publisher profile");
+        logError(XMLPARSER, "Error parsing publisher profile");
         ret = XMLP_ret::XML_ERROR;
     }
     return ret;
@@ -1230,7 +1217,7 @@ XMLP_ret XMLParser::parseXMLSubscriberProf(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing subscriber profile");
+        logError(XMLPARSER, "Error parsing subscriber profile");
         ret = XMLP_ret::XML_ERROR;
     }
     return ret;
@@ -1249,7 +1236,7 @@ XMLP_ret XMLParser::parseXMLTopicData(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing topic data node");
+        logError(XMLPARSER, "Error parsing topic data node");
         ret = XMLP_ret::XML_ERROR;
     }
     return ret;
@@ -1268,7 +1255,7 @@ XMLP_ret XMLParser::parseXMLRequesterProf(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing requester profile");
+        logError(XMLPARSER, "Error parsing requester profile");
         ret = XMLP_ret::XML_ERROR;
     }
     return ret;
@@ -1287,7 +1274,7 @@ XMLP_ret XMLParser::parseXMLReplierProf(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing replier profile");
+        logError(XMLPARSER, "Error parsing replier profile");
         ret = XMLP_ret::XML_ERROR;
     }
     return ret;
@@ -1359,26 +1346,26 @@ XMLP_ret XMLParser::parseProfiles(
             }
             else if (strcmp(tag, QOS_PROFILE) == 0)
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Field 'QOS_PROFILE' do not supported for now");
+                logError(XMLPARSER, "Field 'QOS_PROFILE' do not supported for now");
             }
             else if (strcmp(tag, APPLICATION) == 0)
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Field 'APPLICATION' do not supported for now");
+                logError(XMLPARSER, "Field 'APPLICATION' do not supported for now");
             }
             else if (strcmp(tag, TYPE) == 0)
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Field 'TYPE' do not supported for now");
+                logError(XMLPARSER, "Field 'TYPE' do not supported for now");
             }
             else
             {
                 parseOk = false;
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Not expected tag: '" << tag << "'");
+                logError(XMLPARSER, "Not expected tag: '" << tag << "'");
             }
         }
 
         if (!parseOk)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing profile's tag " << tag);
+            logError(XMLPARSER, "Error parsing profile's tag " << tag);
             ret = XMLP_ret::XML_ERROR;
         }
         p_profile = p_profile->NextSiblingElement();
@@ -1442,7 +1429,7 @@ XMLP_ret XMLParser::parseLogConfig(
             }
             else
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Not expected tag: '" << tag << "'");
+                logError(XMLPARSER, "Not expected tag: '" << tag << "'");
                 ret = XMLP_ret::XML_ERROR;
             }
         }
@@ -1507,8 +1494,8 @@ XMLP_ret XMLParser::parseXMLConsumer(
                             if (stderr_threshold_property_count > 1)
                             {
                                 // Continue with the next property if `stderr_threshold` had been already specified.
-                                EPROSIMA_LOG_ERROR(XMLParser, classStr << " only supports one occurrence of 'stderr_threshold'."
-                                                                       << " Only the first one is applied.");
+                                logError(XMLParser, classStr << " only supports one occurrence of 'stderr_threshold'."
+                                                             << " Only the first one is applied.");
                                 property = property->NextSiblingElement(PROPERTY);
                                 ret = XMLP_ret::XML_NOK;
                                 continue;
@@ -1533,16 +1520,16 @@ XMLP_ret XMLParser::parseXMLConsumer(
                                 }
                                 else
                                 {
-                                    EPROSIMA_LOG_ERROR(XMLParser, "Unkown Log::Kind '" << threshold_str
-                                                                                       << "'. Using default threshold.");
+                                    logError(XMLParser, "Unkown Log::Kind '" << threshold_str
+                                                                             << "'. Using default threshold.");
                                     ret = XMLP_ret::XML_NOK;
                                 }
                             }
                         }
                         else
                         {
-                            EPROSIMA_LOG_ERROR(XMLParser, "Unkown property value '" << s << "' in " << classStr
-                                                                                    << " log consumer");
+                            logError(XMLParser, "Unkown property value '" << s << "' in " << classStr
+                                                                          << " log consumer");
                             ret = XMLP_ret::XML_NOK;
                         }
                     }
@@ -1586,8 +1573,8 @@ XMLP_ret XMLParser::parseXMLConsumer(
                             }
                             else
                             {
-                                EPROSIMA_LOG_ERROR(XMLParser, "Filename value cannot be found for " << classStr
-                                                                                                    << " log consumer.");
+                                logError(XMLParser, "Filename value cannot be found for " << classStr
+                                                                                          << " log consumer.");
                                 ret = XMLP_ret::XML_NOK;
                             }
                         }
@@ -1604,15 +1591,15 @@ XMLP_ret XMLParser::parseXMLConsumer(
                             }
                             else
                             {
-                                EPROSIMA_LOG_ERROR(XMLParser, "Append value cannot be found for " << classStr
-                                                                                                  << " log consumer.");
+                                logError(XMLParser, "Append value cannot be found for " << classStr
+                                                                                        << " log consumer.");
                                 ret = XMLP_ret::XML_NOK;
                             }
                         }
                         else
                         {
-                            EPROSIMA_LOG_ERROR(XMLParser, "Unknown property " << s << " in " << classStr
-                                                                              << " log consumer.");
+                            logError(XMLParser, "Unknown property " << s << " in " << classStr
+                                                                    << " log consumer.");
                             ret = XMLP_ret::XML_NOK;
                         }
                     }
@@ -1624,7 +1611,7 @@ XMLP_ret XMLParser::parseXMLConsumer(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLParser, "Unknown log consumer class: " << classStr);
+            logError(XMLParser, "Unknown log consumer class: " << classStr);
             ret = XMLP_ret::XML_ERROR;
         }
     }
@@ -1638,7 +1625,7 @@ XMLP_ret XMLParser::loadXML(
 {
     if (filename.empty())
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error loading XML file, filename empty");
+        logError(XMLPARSER, "Error loading XML file, filename empty");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -1647,12 +1634,12 @@ XMLP_ret XMLParser::loadXML(
     {
         if (filename != std::string(DEFAULT_FASTRTPS_PROFILES))
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error opening '" << filename << "'");
+            logError(XMLPARSER, "Error opening '" << filename << "'");
         }
         return XMLP_ret::XML_ERROR;
     }
 
-    EPROSIMA_LOG_INFO(XMLPARSER, "File '" << filename << "' opened successfully");
+    logInfo(XMLPARSER, "File '" << filename << "' opened successfully");
     return parseXML(xmlDoc, root);
 }
 
@@ -1678,7 +1665,7 @@ XMLP_ret XMLParser::loadXML(
     tinyxml2::XMLDocument xmlDoc;
     if (tinyxml2::XMLError::XML_SUCCESS != xmlDoc.Parse(data, length))
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing XML buffer");
+        logError(XMLPARSER, "Error parsing XML buffer");
         return XMLP_ret::XML_ERROR;
     }
     return parseXML(xmlDoc, root);
@@ -1702,7 +1689,7 @@ XMLP_ret XMLParser::fillDataNode(
 {
     if (nullptr == node)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Bad parameters!");
+        logError(XMLPARSER, "Bad parameters!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -1727,8 +1714,6 @@ XMLP_ret XMLParser::fillDataNode(
                 <xs:element name="domainId" type="uint32Type" minOccurs="0"/>
                 <xs:element name="allocation" type="rtpsParticipantAllocationAttributesType" minOccurs="0"/>
                 <xs:element name="prefix" type="guid" minOccurs="0"/>
-                <xs:element name="default_external_unicast_locators" type="externalLocatorListType" minOccurs="0"/>
-                <xs:element name="ignore_non_matching_locators" type="boolType" minOccurs="0"/>
                 <xs:element name="defaultUnicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="defaultMulticastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="sendSocketBufferSize" type="uint32Type" minOccurs="0"/>
@@ -1748,7 +1733,7 @@ XMLP_ret XMLParser::fillDataNode(
 
     if (nullptr == p_profile)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Bad parameters!");
+        logError(XMLPARSER, "Bad parameters!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -1768,26 +1753,15 @@ XMLP_ret XMLParser::fillDataNode(
     p_element = p_profile->FirstChildElement(RTPS);
     if (nullptr == p_element)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found '" << RTPS << "' tag");
+        logError(XMLPARSER, "Not found '" << RTPS << "' tag");
         return XMLP_ret::XML_ERROR;
     }
 
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
-
-    std::unordered_map<std::string, bool> tags_present;
-
     for (p_aux0 = p_element->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
-
-        if (tags_present[name])
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER,
-                    "Duplicated element found in 'rtpsParticipantAttributesType'. Name: " << name);
-            return XMLP_ret::XML_ERROR;
-        }
-        tags_present[name] = true;
 
         if (strcmp(name, ALLOCATION) == 0)
         {
@@ -1803,25 +1777,6 @@ XMLP_ret XMLParser::fillDataNode(
             // prefix
             if (XMLP_ret::XML_OK !=
                     getXMLguidPrefix(p_aux0, participant_node.get()->rtps.prefix, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, IGN_NON_MATCHING_LOCS) == 0)
-        {
-            // ignore_non_matching_locators - boolType
-            if (XMLP_ret::XML_OK !=
-                    getXMLBool(p_aux0, &participant_node.get()->rtps.ignore_non_matching_locators, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, DEF_EXT_UNI_LOC_LIST) == 0)
-        {
-            // default_external_unicast_locators - externalLocatorListType
-            if (XMLP_ret::XML_OK !=
-                    getXMLExternalLocatorList(p_aux0, participant_node.get()->rtps.default_external_unicast_locators,
-                    ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -1900,7 +1855,7 @@ XMLP_ret XMLParser::fillDataNode(
             {
                 return XMLP_ret::XML_ERROR;
             }
-            EPROSIMA_LOG_WARNING(XML_PARSER, THROUGHPUT_CONT << " XML tag is deprecated");
+            logWarning(XML_PARSER, THROUGHPUT_CONT << " XML tag is deprecated");
         }
         else if (strcmp(name, USER_TRANS) == 0)
         {
@@ -1938,7 +1893,7 @@ XMLP_ret XMLParser::fillDataNode(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'rtpsParticipantAttributesType'. Name: " << name);
+            logError(XMLPARSER, "Invalid element found into 'rtpsParticipantAttributesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -1951,7 +1906,7 @@ XMLP_ret XMLParser::fillDataNode(
 {
     if (nullptr == p_profile)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Bad parameters!");
+        logError(XMLPARSER, "Bad parameters!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -1972,7 +1927,7 @@ XMLP_ret XMLParser::fillDataNode(
 {
     if (nullptr == p_profile)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Bad parameters!");
+        logError(XMLPARSER, "Bad parameters!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2008,7 +1963,7 @@ XMLP_ret XMLParser::fillDataNode(
 
     if (nullptr == p_profile)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Bad parameters!");
+        logError(XMLPARSER, "Bad parameters!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2024,7 +1979,7 @@ XMLP_ret XMLParser::fillDataNode(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found required attribute " << SERVICE_NAME);
+        logError(XMLPARSER, "Not found required attribute " << SERVICE_NAME);
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2035,7 +1990,7 @@ XMLP_ret XMLParser::fillDataNode(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found required attribute " << REQUEST_TYPE);
+        logError(XMLPARSER, "Not found required attribute " << REQUEST_TYPE);
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2046,7 +2001,7 @@ XMLP_ret XMLParser::fillDataNode(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found required attribute " << REPLY_TYPE);
+        logError(XMLPARSER, "Not found required attribute " << REPLY_TYPE);
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2087,7 +2042,7 @@ XMLP_ret XMLParser::fillDataNode(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Not expected tag: '" << name << "'");
+            logError(XMLPARSER, "Not expected tag: '" << name << "'");
             return XMLP_ret::XML_ERROR;
         }
 
@@ -2123,7 +2078,7 @@ XMLP_ret XMLParser::fillDataNode(
 
     if (nullptr == p_profile)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Bad parameters!");
+        logError(XMLPARSER, "Bad parameters!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2139,7 +2094,7 @@ XMLP_ret XMLParser::fillDataNode(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found required attribute " << SERVICE_NAME);
+        logError(XMLPARSER, "Not found required attribute " << SERVICE_NAME);
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2150,7 +2105,7 @@ XMLP_ret XMLParser::fillDataNode(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found required attribute " << REQUEST_TYPE);
+        logError(XMLPARSER, "Not found required attribute " << REQUEST_TYPE);
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2161,7 +2116,7 @@ XMLP_ret XMLParser::fillDataNode(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found required attribute " << REPLY_TYPE);
+        logError(XMLPARSER, "Not found required attribute " << REPLY_TYPE);
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2202,7 +2157,7 @@ XMLP_ret XMLParser::fillDataNode(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Not expected tag: '" << name << "'");
+            logError(XMLPARSER, "Not expected tag: '" << name << "'");
             return XMLP_ret::XML_ERROR;
         }
     }

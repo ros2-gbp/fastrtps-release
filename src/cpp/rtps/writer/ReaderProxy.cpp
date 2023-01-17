@@ -85,7 +85,7 @@ bool ReaderProxy::rtps_is_relevant(
     if (nullptr != filter)
     {
         bool ret = filter->is_relevant(*change, guid());
-        EPROSIMA_LOG_INFO(RTPS_READER_PROXY,
+        logInfo(RTPS_READER_PROXY,
                 "Change " << change->instanceHandle << " is relevant for reader " << guid() << "? " << ret);
         return ret;
     }
@@ -140,7 +140,7 @@ void ReaderProxy::start(
         initial_heartbeat_event_->restart_timer();
     }
 
-    EPROSIMA_LOG_INFO(RTPS_READER_PROXY, "Reader Proxy started");
+    logInfo(RTPS_READER_PROXY, "Reader Proxy started");
 }
 
 bool ReaderProxy::update(
@@ -235,8 +235,8 @@ void ReaderProxy::add_change(
     if (changes_for_reader_.push_back(change) == nullptr)
     {
         // This should never happen
-        EPROSIMA_LOG_ERROR(RTPS_READER_PROXY, "Error adding change " << change.getSequenceNumber()
-                                                                     << " to reader proxy " << guid());
+        logError(RTPS_READER_PROXY, "Error adding change " << change.getSequenceNumber()
+                                                           << " to reader proxy " << guid());
         eprosima::fastdds::dds::Log::Flush();
         assert(false);
     }
@@ -432,7 +432,7 @@ bool ReaderProxy::requested_changes_set(
 
     if (isSomeoneWasSetRequested)
     {
-        EPROSIMA_LOG_INFO(RTPS_READER_PROXY, "Requested Changes: " << seq_num_set);
+        logInfo(RTPS_READER_PROXY, "Requested Changes: " << seq_num_set);
     }
 
     return isSomeoneWasSetRequested;

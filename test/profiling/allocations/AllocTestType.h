@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_ALLOCTESTTYPE_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -93,7 +91,7 @@ public:
      * @param x Reference to the object AllocTestType that will be copied.
      */
     eProsima_user_DllExport AllocTestType(
-            AllocTestType&& x) noexcept;
+            AllocTestType&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +105,7 @@ public:
      * @param x Reference to the object AllocTestType that will be copied.
      */
     eProsima_user_DllExport AllocTestType& operator =(
-            AllocTestType&& x) noexcept;
+            AllocTestType&& x);
 
     /*!
      * @brief Comparison operator.

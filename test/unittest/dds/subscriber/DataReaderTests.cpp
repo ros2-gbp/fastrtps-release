@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <array>
 #include <cassert>
-#include <chrono>
-#include <forward_list>
-#include <iostream>
 #include <thread>
-#include <type_traits>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -32,7 +27,6 @@
 #include <fastdds/dds/core/LoanableCollection.hpp>
 #include <fastdds/dds/core/LoanableSequence.hpp>
 #include <fastdds/dds/core/StackAllocatedSequence.hpp>
-#include <fastdds/dds/core/condition/WaitSet.hpp>
 #include <fastdds/dds/core/status/BaseStatus.hpp>
 #include <fastdds/dds/core/status/SampleRejectedStatus.hpp>
 #include <fastdds/dds/core/status/SubscriptionMatchedStatus.hpp>
@@ -48,8 +42,8 @@
 
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/subscriber/DataReaderListener.hpp>
-#include <fastdds/dds/subscriber/SampleInfo.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
+#include <fastdds/dds/subscriber/SampleInfo.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
 
@@ -67,9 +61,9 @@
 #include <fastdds/rtps/transport/test_UDPv4TransportDescriptor.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
-using namespace eprosima::fastdds::dds;
-using namespace eprosima::fastrtps::rtps;
-using namespace eprosima::fastdds::rtps;
+namespace eprosima {
+namespace fastdds {
+namespace dds {
 
 static constexpr LoanableCollection::size_type num_test_elements = 10;
 
@@ -565,17 +559,17 @@ TEST_F(DataReaderTests, get_guid)
 
         void on_subscriber_discovery(
                 DomainParticipant*,
-                ReaderDiscoveryInfo&& info)
+                fastrtps::rtps::ReaderDiscoveryInfo&& info)
         {
             std::unique_lock<std::mutex> lock(mutex);
-            if (ReaderDiscoveryInfo::DISCOVERED_READER == info.status)
+            if (fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERED_READER == info.status)
             {
                 guid = info.info.guid();
                 cv.notify_one();
             }
         }
 
-        GUID_t guid;
+        fastrtps::rtps::GUID_t guid;
         std::mutex mutex;
         std::condition_variable cv;
     }
@@ -583,9 +577,9 @@ TEST_F(DataReaderTests, get_guid)
 
     DomainParticipantQos participant_qos = PARTICIPANT_QOS_DEFAULT;
     participant_qos.wire_protocol().builtin.discovery_config.ignoreParticipantFlags =
-            static_cast<ParticipantFilteringFlags_t>(
-        ParticipantFilteringFlags_t::FILTER_DIFFERENT_HOST |
-        ParticipantFilteringFlags_t::FILTER_DIFFERENT_PROCESS);
+            static_cast<eprosima::fastrtps::rtps::ParticipantFilteringFlags_t>(
+        eprosima::fastrtps::rtps::ParticipantFilteringFlags_t::FILTER_DIFFERENT_HOST |
+        eprosima::fastrtps::rtps::ParticipantFilteringFlags_t::FILTER_DIFFERENT_PROCESS);
 
     DomainParticipant* listener_participant =
             DomainParticipantFactory::get_instance()->create_participant(0, participant_qos,
@@ -612,7 +606,7 @@ TEST_F(DataReaderTests, get_guid)
     DataReader* datareader = subscriber->create_datareader(topic, DATAREADER_QOS_DEFAULT);
     ASSERT_NE(datareader, nullptr);
 
-    GUID_t guid = datareader->guid();
+    fastrtps::rtps::GUID_t guid = datareader->guid();
 
     participant->enable();
 
@@ -623,7 +617,7 @@ TEST_F(DataReaderTests, get_guid)
         std::unique_lock<std::mutex> lock(discovery_listener.mutex);
         discovery_listener.cv.wait(lock, [&]()
                 {
-                    return GUID_t::unknown() != discovery_listener.guid;
+                    return fastrtps::rtps::GUID_t::unknown() != discovery_listener.guid;
                 });
     }
     ASSERT_EQ(guid, discovery_listener.guid);
@@ -661,11 +655,16 @@ TEST_F(DataReaderTests, InvalidQos)
     const ReturnCode_t inconsistent_code = ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
 
     qos = DATAREADER_QOS_DEFAULT;
+    qos.reliability().kind = BEST_EFFORT_RELIABILITY_QOS;
+    qos.ownership().kind = EXCLUSIVE_OWNERSHIP_QOS;
+    EXPECT_EQ(inconsistent_code, data_reader_->set_qos(qos));
+
+    qos = DATAREADER_QOS_DEFAULT;
     qos.reader_resource_limits().max_samples_per_read = -1;
     EXPECT_EQ(inconsistent_code, data_reader_->set_qos(qos));
 
     qos = DATAREADER_QOS_DEFAULT;
-    Locator_t locator;
+    eprosima::fastrtps::rtps::Locator_t locator;
     qos.endpoint().unicast_locator_list.push_back(locator);
     qos.properties().properties().emplace_back("fastdds.unique_network_flows", "");
     EXPECT_EQ(inconsistent_code, data_reader_->set_qos(qos));
@@ -684,9 +683,7 @@ TEST_F(DataReaderTests, InvalidQos)
     const ReturnCode_t inmutable_code = ReturnCode_t::RETCODE_IMMUTABLE_POLICY;
 
     qos = DATAREADER_QOS_DEFAULT;
-    qos.resource_limits().max_samples = 5000;
-    qos.resource_limits().max_instances = 2;
-    qos.resource_limits().max_samples_per_instance = 100;
+    qos.resource_limits().max_samples++;
     EXPECT_EQ(inmutable_code, data_reader_->set_qos(qos));
 
     qos = DATAREADER_QOS_DEFAULT;
@@ -1994,177 +1991,6 @@ TEST_F(DataReaderTests, sample_info)
     state.run_test(data_reader_, steps);
 }
 
-struct arraybuf : public std::streambuf
-{
-    template <std::size_t Size> arraybuf(
-            std::array<char, Size>& array)
-    {
-        this->setp(array.data(), array.data() + Size - 1);
-        array.fill(0);
-    }
-
-};
-
-struct oarraystream : virtual arraybuf, std::ostream
-{
-    template <std::size_t Size> oarraystream(
-            std::array<char, Size>& array)
-        : arraybuf(array)
-        , std::ostream(this)
-    {
-    }
-
-};
-
-/*
- *  This test deals with issues covered on PR #3044.
- *  It checks (read|take)_next_instance methods iterate properly over all
- *  instances in the history.
- */
-TEST_F(DataReaderTests, check_read_take_iteration)
-{
-    const std::size_t max_handles = 100;
-    std::array<InstanceHandle_t, max_handles> handles;
-    auto loop_timeout = std::chrono::seconds(5);
-
-    // Allocate resources
-    DataReaderQos reader_qos;
-    DataWriterQos writer_qos;
-    SubscriberQos subscriber_qos = SUBSCRIBER_QOS_DEFAULT;
-    PublisherQos publisher_qos = PUBLISHER_QOS_DEFAULT;
-
-    reader_qos.history().kind = KEEP_LAST_HISTORY_QOS;
-    reader_qos.history().depth = 1;
-    writer_qos.history(reader_qos.history());
-
-    reader_qos.durability().kind = TRANSIENT_LOCAL_DURABILITY_QOS;
-    writer_qos.durability(reader_qos.durability());
-
-    reader_qos.resource_limits().max_instances = max_handles;
-    reader_qos.resource_limits().max_samples_per_instance = 1;
-    writer_qos.resource_limits(reader_qos.resource_limits());
-
-    create_entities(nullptr, reader_qos, subscriber_qos, writer_qos, publisher_qos);
-
-    {
-        // Populate the test handles and write on all instances
-        FooType data;
-        for (uint32_t i = 0; i < max_handles; ++i )
-        {
-            // calculate key
-            data.index(i);
-            type_.get_key(&data, &handles[i]);
-
-            // write the index as message
-            oarraystream out(data.message());
-            out << i;
-
-            EXPECT_EQ(data_writer_->write(&data, handles[i]), ReturnCode_t::RETCODE_OK);
-        }
-    }
-
-    // Loop till all samples are received
-    std::size_t received = 0;
-    auto start = std::chrono::system_clock::now();
-    bool timeout = false;
-
-    do
-    {
-        FooSeq data;
-        SampleInfoSeq infos;
-
-        auto ret = data_reader_->read(data, infos, max_handles,
-                        NOT_READ_SAMPLE_STATE,
-                        NEW_VIEW_STATE,
-                        ALIVE_INSTANCE_STATE);
-
-        if ( ret == ReturnCode_t::RETCODE_OK)
-        {
-            received += data.length();
-            EXPECT_EQ(ReturnCode_t::RETCODE_OK, data_reader_->return_loan(data, infos));
-        }
-        else
-        {
-            timeout = (std::chrono::system_clock::now() - start) < loop_timeout;
-            std::this_thread::yield();
-        }
-
-    }
-    while ( received < max_handles && !timeout);
-
-    EXPECT_FALSE(timeout);
-    received = 0;
-
-    // Take only the even handles
-    for (typename std::remove_const<decltype(max_handles)>::type i = 0; i < max_handles; i += 2, ++received )
-    {
-        FooSeq data;
-        SampleInfoSeq infos;
-
-        EXPECT_EQ(data_reader_->take_instance(data, infos, 1, handles[i]),
-                ReturnCode_t::RETCODE_OK);
-
-        EXPECT_EQ(i, std::atoi(data[0].message().data()));
-
-        EXPECT_EQ(ReturnCode_t::RETCODE_OK, data_reader_->return_loan(data, infos));
-    }
-
-    // Iterate over available instances with data and check all are retrieved
-    auto pending = received;
-    InstanceHandle_t handle = HANDLE_NIL;
-    ReturnCode_t ret;
-
-    do
-    {
-        FooSeq data;
-        SampleInfoSeq infos;
-
-        ret = data_reader_->read_next_instance(
-            data,
-            infos,
-            1,
-            handle);
-
-        if (!!ret)
-        {
-            received += data.length();
-            handle = infos[0].instance_handle;
-            EXPECT_TRUE(std::atoi(data[0].message().data()) % 2 == 1);
-            EXPECT_EQ(ReturnCode_t::RETCODE_OK, data_reader_->return_loan(data, infos));
-        }
-    }
-    while (ret == ReturnCode_t::RETCODE_OK);
-
-    EXPECT_EQ(received, max_handles);
-
-    // Iterate over available instances and check all are removed
-    received = pending;
-    handle = HANDLE_NIL;
-
-    do
-    {
-        FooSeq data;
-        SampleInfoSeq infos;
-
-        ret = data_reader_->take_next_instance(
-            data,
-            infos,
-            1,
-            handle);
-
-        if (!!ret)
-        {
-            received += data.length();
-            handle = infos[0].instance_handle;
-            EXPECT_TRUE(std::atoi(data[0].message().data()) % 2 == 1);
-            EXPECT_EQ(ReturnCode_t::RETCODE_OK, data_reader_->return_loan(data, infos));
-        }
-    }
-    while (ret == ReturnCode_t::RETCODE_OK);
-
-    EXPECT_EQ(received, max_handles);
-}
-
 /*
  * This type fails deserialization on odd samples
  */
@@ -2179,7 +2005,7 @@ public:
     }
 
     bool deserialize(
-            SerializedPayload_t* payload,
+            fastrtps::rtps::SerializedPayload_t* payload,
             void* data) override
     {
         //Convert DATA to pointer of your type
@@ -2404,12 +2230,14 @@ TEST_F(DataReaderTests, SetListener)
 
 TEST_F(DataReaderTests, get_listening_locators)
 {
+    using IPLocator = eprosima::fastrtps::rtps::IPLocator;
+
     // Prepare specific listening locators
-    Locator unicast_locator;
+    rtps::Locator unicast_locator;
     IPLocator::setIPv4(unicast_locator, 127, 0, 0, 1);
     IPLocator::setPortRTPS(unicast_locator, 7399);
 
-    Locator multicast_locator;
+    rtps::Locator multicast_locator;
     IPLocator::setIPv4(multicast_locator, 239, 127, 0, 1);
     IPLocator::setPortRTPS(multicast_locator, 7398);
 
@@ -2426,7 +2254,7 @@ TEST_F(DataReaderTests, get_listening_locators)
     EXPECT_FALSE(data_reader_->is_enabled());
 
     // Calling on disabled reader should return NOT_ENABLED
-    LocatorList locator_list;
+    rtps::LocatorList locator_list;
     EXPECT_EQ(ReturnCode_t::RETCODE_NOT_ENABLED, data_reader_->get_listening_locators(locator_list));
 
     // Enable and try again
@@ -2436,7 +2264,7 @@ TEST_F(DataReaderTests, get_listening_locators)
     EXPECT_EQ(locator_list.size(), 2u);
     bool unicast_found = false;
     bool multicast_found = false;
-    for (const Locator& locator : locator_list)
+    for (const rtps::Locator& locator : locator_list)
     {
         unicast_found |= (locator == unicast_locator);
         multicast_found |= (locator == multicast_locator);
@@ -2561,11 +2389,14 @@ public:
 /*
  * This test checks that the DataReader methods defined in the standard not yet implemented in FastDDS return
  * ReturnCode_t::RETCODE_UNSUPPORTED. The following methods are checked:
- * 1. get_matched_publication_data
- * 2. create_querycondition
- * 3. get_matched_publications
- * 4. get_key_value
- * 5. wait_for_historical_data
+ * 1. get_sample_rejected_status
+ * 2. get_matched_publication_data
+ * 3. create_readcondition
+ * 4. create_querycondition
+ * 5. delete_readcondition
+ * 6. get_matched_publications
+ * 7. get_key_value
+ * 8. wait_for_historical_data
  */
 TEST_F(DataReaderUnsupportedTests, UnsupportedDataReaderMethods)
 {
@@ -2585,16 +2416,30 @@ TEST_F(DataReaderUnsupportedTests, UnsupportedDataReaderMethods)
     DataReader* data_reader = subscriber->create_datareader(topic, DATAREADER_QOS_DEFAULT);
     ASSERT_NE(data_reader, nullptr);
 
+    {
+        SampleRejectedStatus status;
+        EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->get_sample_rejected_status(status));
+    }
+
     builtin::PublicationBuiltinTopicData publication_data;
-    InstanceHandle_t publication_handle;
+    fastrtps::rtps::InstanceHandle_t publication_handle;
     EXPECT_EQ(
         ReturnCode_t::RETCODE_UNSUPPORTED,
         data_reader->get_matched_publication_data(publication_data, publication_handle));
 
     {
-        SampleStateMask sample_states = ANY_SAMPLE_STATE;
-        ViewStateMask view_states = ANY_VIEW_STATE;
-        InstanceStateMask instance_states = ANY_INSTANCE_STATE;
+        std::vector<SampleStateKind> sample_states;
+        std::vector<ViewStateKind> view_states;
+        std::vector<InstanceStateKind> instance_states;
+        EXPECT_EQ(
+            nullptr,
+            data_reader->create_readcondition(sample_states, view_states, instance_states));
+    }
+
+    {
+        std::vector<SampleStateKind> sample_states;
+        std::vector<ViewStateKind> view_states;
+        std::vector<InstanceStateKind> instance_states;
         std::string query_expression;
         std::vector<std::string> query_parameters;
         EXPECT_EQ(
@@ -2607,16 +2452,70 @@ TEST_F(DataReaderUnsupportedTests, UnsupportedDataReaderMethods)
                 query_parameters));
     }
 
-    std::vector<InstanceHandle_t> publication_handles;
+    {
+        EXPECT_EQ(
+            ReturnCode_t::RETCODE_UNSUPPORTED,
+            data_reader->delete_readcondition(nullptr));
+    }
+
+    {
+        FooBoundedSeq data_values;
+        SampleInfoSeq sample_infos;
+        int32_t max_samples = LENGTH_UNLIMITED;
+        EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->read_w_condition(
+                    data_values,
+                    sample_infos,
+                    max_samples,
+                    nullptr));
+    }
+
+    {
+        FooBoundedSeq data_values;
+        SampleInfoSeq sample_infos;
+        int32_t max_samples = LENGTH_UNLIMITED;
+        fastrtps::rtps::InstanceHandle_t previous_handle;
+        EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->read_next_instance_w_condition(
+                    data_values,
+                    sample_infos,
+                    max_samples,
+                    previous_handle,
+                    nullptr));
+    }
+
+    {
+        FooBoundedSeq data_values;
+        SampleInfoSeq sample_infos;
+        int32_t max_samples = LENGTH_UNLIMITED;
+        EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->take_w_condition(
+                    data_values,
+                    sample_infos,
+                    max_samples,
+                    nullptr));
+    }
+
+    {
+        FooBoundedSeq data_values;
+        SampleInfoSeq sample_infos;
+        int32_t max_samples = LENGTH_UNLIMITED;
+        fastrtps::rtps::InstanceHandle_t previous_handle;
+        EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->take_next_instance_w_condition(
+                    data_values,
+                    sample_infos,
+                    max_samples,
+                    previous_handle,
+                    nullptr));
+    }
+
+    std::vector<fastrtps::rtps::InstanceHandle_t> publication_handles;
     EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->get_matched_publications(publication_handles));
 
-    InstanceHandle_t key_handle;
+    fastrtps::rtps::InstanceHandle_t key_handle;
     EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->get_key_value(nullptr, key_handle));
 
     EXPECT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->wait_for_historical_data({0, 1}));
 
-    // Expected logWarnings: create_querycondition
-    HELPER_WaitForEntries(1);
+    // Expected logWarnings: create_querycondition, create_readcondition
+    HELPER_WaitForEntries(2);
 
     ASSERT_EQ(subscriber->delete_datareader(data_reader), ReturnCode_t::RETCODE_OK);
     ASSERT_EQ(participant->delete_subscriber(subscriber), ReturnCode_t::RETCODE_OK);
@@ -2627,8 +2526,8 @@ TEST_F(DataReaderUnsupportedTests, UnsupportedDataReaderMethods)
 // Regression test for #12133.
 TEST_F(DataReaderTests, read_samples_with_future_changes)
 {
-    eprosima::fastrtps::LibrarySettingsAttributes att;
-    att.intraprocess_delivery = eprosima::fastrtps::INTRAPROCESS_OFF;
+    fastrtps::LibrarySettingsAttributes att;
+    att.intraprocess_delivery = fastrtps::INTRAPROCESS_OFF;
     eprosima::fastrtps::xmlparser::XMLProfileManager::library_settings(att);
     static constexpr int32_t num_samples = 8;
     static constexpr int32_t expected_samples = 4;
@@ -2636,13 +2535,13 @@ TEST_F(DataReaderTests, read_samples_with_future_changes)
     bool start_dropping_acks = false;
     bool start_dropping_datas = false;
     static const Duration_t time_to_wait(0, 100 * 1000 * 1000);
-    std::shared_ptr<test_UDPv4TransportDescriptor> test_descriptor =
-            std::make_shared<test_UDPv4TransportDescriptor>();
-    test_descriptor->drop_ack_nack_messages_filter_ = [&](CDRMessage_t&) -> bool
+    std::shared_ptr<rtps::test_UDPv4TransportDescriptor> test_descriptor =
+            std::make_shared<rtps::test_UDPv4TransportDescriptor>();
+    test_descriptor->drop_ack_nack_messages_filter_ = [&](fastrtps::rtps::CDRMessage_t&) -> bool
             {
                 return start_dropping_acks;
             };
-    test_descriptor->drop_data_messages_filter_ = [&](CDRMessage_t&) -> bool
+    test_descriptor->drop_data_messages_filter_ = [&](fastrtps::rtps::CDRMessage_t&) -> bool
             {
                 return start_dropping_datas;
             };
@@ -2732,16 +2631,9 @@ TEST_F(DataReaderTests, delete_contained_entities)
     DataReader* data_reader = subscriber->create_datareader(topic, DATAREADER_QOS_DEFAULT);
     ASSERT_NE(data_reader, nullptr);
 
-    SampleStateMask mock_sample_state_kind = ANY_SAMPLE_STATE;
-    ViewStateMask mock_view_state_kind = ANY_VIEW_STATE;
-    InstanceStateMask mock_instance_states = ANY_INSTANCE_STATE;
-
-    ReadCondition* read_condition = data_reader->create_readcondition(
-        mock_sample_state_kind,
-        mock_view_state_kind,
-        mock_instance_states);
-    EXPECT_NE(read_condition, nullptr);
-
+    const std::vector<SampleStateKind> mock_sample_state_kind;
+    const std::vector<ViewStateKind> mock_view_state_kind;
+    const std::vector<InstanceStateKind> mock_instance_states;
     const std::string mock_query_expression;
     const std::vector<std::string> mock_query_parameters;
 
@@ -2756,714 +2648,12 @@ TEST_F(DataReaderTests, delete_contained_entities)
     // To be updated when Query Conditions are available
     ASSERT_EQ(query_condition, nullptr);
 
-    // Should fail with outstanding ReadConditions
-    ASSERT_EQ(subscriber->delete_datareader(data_reader), ReturnCode_t::RETCODE_PRECONDITION_NOT_MET);
-
-    // Should not fail with outstanding ReadConditions
     ASSERT_EQ(data_reader->delete_contained_entities(), ReturnCode_t::RETCODE_OK);
 }
 
-TEST_F(DataReaderTests, read_conditions_management)
-{
-    create_entities();
-    DataReader& reader = *data_reader_;
-
-    // Condition masks
-    SampleStateMask sample_states = 0;
-    ViewStateMask view_states = 0;
-    InstanceStateMask instance_states = 0;
-
-    // Create and destroy testing
-
-    // 1- cannot create a ReadConditon that cannot be triggered
-    ReadCondition* cond = reader.create_readcondition( sample_states, view_states, instance_states);
-    EXPECT_EQ(cond, nullptr);
-
-    // 2- create a ReadCondition and destroy it
-    sample_states = ANY_SAMPLE_STATE;
-    cond = reader.create_readcondition( sample_states, view_states, instance_states);
-    EXPECT_NE(cond, nullptr);
-    ReturnCode_t res = reader.delete_readcondition(cond);
-    EXPECT_EQ(res, ReturnCode_t::RETCODE_OK);
-
-    // 3- Create several ReadConditions associated to the same masks (share implementation)
-    std::forward_list<ReadCondition*> conds;
-
-    for (int i = 0; i < 10; ++i )
-    {
-        conds.push_front(reader.create_readcondition( sample_states, view_states, instance_states));
-    }
-
-    for (ReadCondition* c : conds)
-    {
-        EXPECT_EQ(reader.delete_readcondition(c), ReturnCode_t::RETCODE_OK);
-    }
-    conds.clear();
-
-    // 4- Create several ReadConditions associated to different masks
-    sample_states = 0;
-    view_states = 0;
-    instance_states = 0;
-
-    for (int i = 0; i < 10; ++i )
-    {
-        conds.push_front(reader.create_readcondition( ++sample_states, ++view_states, ++instance_states));
-    }
-
-    for (ReadCondition* c : conds)
-    {
-        EXPECT_EQ(reader.delete_readcondition(c), ReturnCode_t::RETCODE_OK);
-    }
-    conds.clear();
-
-    // 5- Create several ReadConditions and destroy them using delete_contained_entities
-    sample_states = 0;
-    view_states = 0;
-    instance_states = 0;
-
-    for (int i = 0; i < 10; ++i )
-    {
-        conds.push_front(reader.create_readcondition( ++sample_states, ++view_states, ++instance_states));
-    }
-
-    EXPECT_EQ(reader.delete_contained_entities(), ReturnCode_t::RETCODE_OK);
-    conds.clear();
-
-    // 6- Check a DataReader only handles its own ReadConditions
-    DataReader* another_reader = subscriber_->create_datareader(topic_, DATAREADER_QOS_DEFAULT);
-    ASSERT_NE(another_reader, nullptr);
-
-    cond = another_reader->create_readcondition(sample_states, view_states, instance_states);
-    EXPECT_NE(cond, nullptr);
-    EXPECT_EQ(reader.delete_readcondition(cond), ReturnCode_t::RETCODE_PRECONDITION_NOT_MET);
-
-    // 7- Check the DataReader cannot be deleted with outstanding conditions
-    EXPECT_EQ(subscriber_->delete_datareader(another_reader), ReturnCode_t::RETCODE_PRECONDITION_NOT_MET);
-    // but delete_contained_entities() succeeds with outstanding ReadConditions
-    EXPECT_EQ(another_reader->delete_contained_entities(), ReturnCode_t::RETCODE_OK);
-    // no outstanding conditions (killed above)
-    EXPECT_EQ(subscriber_->delete_datareader(another_reader), ReturnCode_t::RETCODE_OK);
-}
-
-TEST_F(DataReaderTests, read_conditions_wait_on_SampleStateMask)
-{
-    DataReaderQos reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.reliability().kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
-
-    DataWriterQos writer_qos = DATAWRITER_QOS_DEFAULT;
-    writer_qos.reliability().kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
-
-    create_entities(nullptr, reader_qos, SUBSCRIBER_QOS_DEFAULT, writer_qos);
-    DataReader& data_reader = *data_reader_;
-    DataWriter& data_writer = *data_writer_;
-
-    // Condition masks
-    ViewStateMask view_states = ANY_VIEW_STATE;
-    InstanceStateMask instance_states = ANY_INSTANCE_STATE;
-
-    // Create the read conditions
-    ReadCondition* read_cond = data_reader.create_readcondition(READ_SAMPLE_STATE, view_states, instance_states);
-    EXPECT_NE(read_cond, nullptr);
-
-    ReadCondition* not_read_cond =
-            data_reader.create_readcondition(NOT_READ_SAMPLE_STATE, view_states, instance_states);
-    EXPECT_NE(not_read_cond, nullptr);
-
-    ReadCondition* any_read_cond = data_reader.create_readcondition(ANY_SAMPLE_STATE, view_states, instance_states);
-    EXPECT_NE(any_read_cond, nullptr);
-
-    // Create the waitset and associate
-    WaitSet ws;
-    EXPECT_EQ(ws.attach_condition(*read_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.attach_condition(*not_read_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.attach_condition(*any_read_cond), ReturnCode_t::RETCODE_OK);
-
-    // 1- Check NOT_READ_SAMPLE_STATE
-    // Send sample from a background thread
-    std::array<char, 256> test_message = {"Testing sample state"};
-    std::thread bw([&]
-            {
-                FooType msg;
-                msg.index(1);
-                msg.message(test_message);
-
-                // Allow main thread entering wait state, before sending
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-                data_writer.write(&msg);
-            });
-
-    ConditionSeq triggered;
-    EXPECT_EQ(ws.wait(triggered, 2.0), ReturnCode_t::RETCODE_OK);
-    bw.join();
-
-    // Check the data is there
-    EXPECT_EQ(data_reader.get_unread_count(), 1);
-
-    // Check the conditions triggered were the expected ones
-    ASSERT_FALSE(read_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), read_cond), triggered.end());
-    ASSERT_TRUE(not_read_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), not_read_cond), triggered.end());
-    ASSERT_TRUE(any_read_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), any_read_cond), triggered.end());
-
-    // 2- Check READ_SAMPLE_STATE
-    // Read sample from a background thread
-    FooSeq datas;
-    SampleInfoSeq infos;
-
-    EXPECT_EQ(data_reader.read_w_condition(
-                datas,
-                infos,
-                1,
-                not_read_cond), ReturnCode_t::RETCODE_OK);
-
-    triggered.clear();
-    EXPECT_EQ(ws.wait(triggered, 1.0), ReturnCode_t::RETCODE_OK);
-
-    // Check data is good
-    ASSERT_TRUE(infos[0].valid_data);
-    EXPECT_EQ(datas[0].index(), 1u);
-    EXPECT_EQ(datas[0].message(), test_message);
-    EXPECT_EQ(data_reader.return_loan(datas, infos), ReturnCode_t::RETCODE_OK);
-
-    // Check the conditions triggered were the expected ones
-    ASSERT_TRUE(read_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), read_cond), triggered.end());
-    ASSERT_FALSE(not_read_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), not_read_cond), triggered.end());
-    ASSERT_TRUE(any_read_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), any_read_cond), triggered.end());
-
-    // take the sample to check the API works
-    EXPECT_EQ(data_reader.take_w_condition(
-                datas,
-                infos,
-                1,
-                read_cond), ReturnCode_t::RETCODE_OK);
-
-    // Check data is good
-    ASSERT_TRUE(infos[0].valid_data);
-    EXPECT_EQ(datas[0].index(), 1u);
-    EXPECT_EQ(datas[0].message(), test_message);
-    EXPECT_EQ(data_reader.return_loan(datas, infos), ReturnCode_t::RETCODE_OK);
-
-    // Detach conditions & destroy
-    EXPECT_EQ(ws.detach_condition(*read_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(read_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.detach_condition(*not_read_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(not_read_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.detach_condition(*any_read_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(any_read_cond), ReturnCode_t::RETCODE_OK);
-}
-
-TEST_F(DataReaderTests, read_conditions_wait_on_ViewStateMask)
-{
-    DataReaderQos reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.reliability().kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
-
-    DataWriterQos writer_qos = DATAWRITER_QOS_DEFAULT;
-    writer_qos.reliability().kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
-
-    create_entities(nullptr, reader_qos, SUBSCRIBER_QOS_DEFAULT, writer_qos);
-    DataReader& data_reader = *data_reader_;
-    DataWriter& data_writer = *data_writer_;
-
-    // Condition masks
-    SampleStateMask sample_states = ANY_SAMPLE_STATE;
-    InstanceStateMask instance_states = ANY_INSTANCE_STATE;
-
-    // Create the read conditions
-    ReadCondition* view_cond = data_reader.create_readcondition(sample_states, NEW_VIEW_STATE, instance_states);
-    EXPECT_NE(view_cond, nullptr);
-
-    ReadCondition* not_view_cond =
-            data_reader.create_readcondition(sample_states, NOT_NEW_VIEW_STATE, instance_states);
-    EXPECT_NE(not_view_cond, nullptr);
-
-    ReadCondition* any_view_cond = data_reader.create_readcondition(sample_states, ANY_VIEW_STATE, instance_states);
-    EXPECT_NE(any_view_cond, nullptr);
-
-    // Create the waitset and associate
-    WaitSet ws;
-    EXPECT_EQ(ws.attach_condition(*view_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.attach_condition(*not_view_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.attach_condition(*any_view_cond), ReturnCode_t::RETCODE_OK);
-
-    // 1- Check NEW_VIEW_STATE
-    // Send sample from a background thread
-    std::array<char, 256> test_message = {"Testing sample state"};
-    std::thread bw([&]
-            {
-                FooType msg;
-                msg.index(1);
-                msg.message(test_message);
-
-                // Allow main thread entering wait state, before sending
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-                data_writer.write(&msg);
-            });
-
-    ConditionSeq triggered;
-    EXPECT_EQ(ws.wait(triggered, 2.0), ReturnCode_t::RETCODE_OK);
-    bw.join();
-
-    // Check the data is there
-    EXPECT_EQ(data_reader.get_unread_count(), 1);
-
-    // Check the conditions triggered were the expected ones
-    ASSERT_TRUE(view_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), view_cond), triggered.end());
-    ASSERT_FALSE(not_view_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), not_view_cond), triggered.end());
-    ASSERT_TRUE(any_view_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), any_view_cond), triggered.end());
-
-    // 2- Check NOT_NEW_VIEW_STATE
-    // Read the sample in order to change instance view state
-    FooSeq datas;
-    SampleInfoSeq infos;
-
-    EXPECT_EQ(data_reader.read_w_condition(
-                datas,
-                infos,
-                1,
-                view_cond), ReturnCode_t::RETCODE_OK);
-
-    triggered.clear();
-    EXPECT_EQ(ws.wait(triggered, 1.0), ReturnCode_t::RETCODE_OK);
-
-    // Check data is good
-    ASSERT_TRUE(infos[0].valid_data);
-    EXPECT_EQ(datas[0].index(), 1u);
-    EXPECT_EQ(datas[0].message(), test_message);
-    EXPECT_EQ(data_reader.return_loan(datas, infos), ReturnCode_t::RETCODE_OK);
-
-    // Check the conditions triggered were the expected ones
-    ASSERT_FALSE(view_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), view_cond), triggered.end());
-    ASSERT_TRUE(not_view_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), not_view_cond), triggered.end());
-    ASSERT_TRUE(any_view_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), any_view_cond), triggered.end());
-
-    // Detach conditions & destroy
-    EXPECT_EQ(ws.detach_condition(*view_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(view_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.detach_condition(*not_view_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(not_view_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.detach_condition(*any_view_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(any_view_cond), ReturnCode_t::RETCODE_OK);
-}
-
-TEST_F(DataReaderTests, read_conditions_wait_on_InstanceStateMask)
-{
-    DataReaderQos reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.reliability().kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
-
-    DataWriterQos writer_qos = DATAWRITER_QOS_DEFAULT;
-    writer_qos.reliability().kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
-
-    create_entities(nullptr, reader_qos, SUBSCRIBER_QOS_DEFAULT, writer_qos);
-    DataReader& data_reader = *data_reader_;
-    DataWriter& data_writer = *data_writer_;
-
-    // Condition masks
-    SampleStateMask sample_states = ANY_SAMPLE_STATE;
-    ViewStateMask view_states = ANY_VIEW_STATE;
-
-    // Create the read conditions
-    ReadCondition* alive_cond = data_reader.create_readcondition(sample_states, view_states, ALIVE_INSTANCE_STATE);
-    EXPECT_NE(alive_cond, nullptr);
-
-    ReadCondition* disposed_cond =
-            data_reader.create_readcondition(sample_states, view_states, NOT_ALIVE_DISPOSED_INSTANCE_STATE);
-    EXPECT_NE(disposed_cond, nullptr);
-
-    ReadCondition* no_writer_cond = data_reader.create_readcondition(sample_states, view_states,
-                    NOT_ALIVE_NO_WRITERS_INSTANCE_STATE);
-    EXPECT_NE(no_writer_cond, nullptr);
-
-    ReadCondition* any_cond = data_reader.create_readcondition(sample_states, view_states, ANY_INSTANCE_STATE);
-    EXPECT_NE(any_cond, nullptr);
-
-    // Create the waitset and associate
-    WaitSet ws;
-    EXPECT_EQ(ws.attach_condition(*alive_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.attach_condition(*disposed_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.attach_condition(*no_writer_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.attach_condition(*any_cond), ReturnCode_t::RETCODE_OK);
-
-    // 1- Check ALIVE_INSTANCE_STATE
-    // Send sample from a background thread
-    std::array<char, 256> test_message = {"Testing sample state"};
-
-    FooType msg;
-    msg.index(1);
-    msg.message(test_message);
-
-    std::thread bw([&]
-            {
-                // Allow main thread entering wait state, before sending
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-                data_writer.write(&msg);
-            });
-
-    ConditionSeq triggered;
-    EXPECT_EQ(ws.wait(triggered, 2.0), ReturnCode_t::RETCODE_OK);
-    bw.join();
-
-    // Check the data is there
-    EXPECT_EQ(data_reader.get_unread_count(), 1);
-
-    // Check the conditions triggered were the expected ones
-    ASSERT_TRUE(alive_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), alive_cond), triggered.end());
-    ASSERT_FALSE(disposed_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), disposed_cond), triggered.end());
-    ASSERT_FALSE(no_writer_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), no_writer_cond), triggered.end());
-    ASSERT_TRUE(any_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), any_cond), triggered.end());
-
-    // 2 - Check NOT_ALIVE_DISPOSED_INSTANCE_STATE
-    // unregister the instance
-    EXPECT_EQ(data_writer.unregister_instance(&msg, HANDLE_NIL), ReturnCode_t::RETCODE_OK);
-
-    triggered.clear();
-    EXPECT_EQ(ws.wait(triggered, 1.0), ReturnCode_t::RETCODE_OK);
-
-    // Check the conditions triggered were the expected ones
-    ASSERT_FALSE(alive_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), alive_cond), triggered.end());
-    ASSERT_TRUE(disposed_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), disposed_cond), triggered.end());
-    ASSERT_FALSE(no_writer_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), no_writer_cond), triggered.end());
-    ASSERT_TRUE(any_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), any_cond), triggered.end());
-
-    // 4 - Check (read|take)_next_instance_w_condition() APIs
-    // take the sample to check the API works
-    FooSeq datas;
-    SampleInfoSeq infos;
-    EXPECT_EQ(data_reader.take_next_instance_w_condition(
-                datas,
-                infos,
-                1,
-                HANDLE_NIL,
-                disposed_cond), ReturnCode_t::RETCODE_OK);
-
-    // Check data is bad because the sample for instance 1 was unregistered
-    ASSERT_FALSE(infos[0].valid_data);
-    InstanceHandle_t prev_handle = infos[0].instance_handle;
-    EXPECT_EQ(data_reader.return_loan(datas, infos), ReturnCode_t::RETCODE_OK);
-
-    // new instance
-    msg.index(2u);
-    data_writer.write(&msg);
-
-    EXPECT_EQ(data_reader.read_next_instance_w_condition(
-                datas,
-                infos,
-                1,
-                prev_handle,
-                alive_cond), ReturnCode_t::RETCODE_OK);
-
-    // Check data is good
-    ASSERT_TRUE(infos[0].valid_data);
-    EXPECT_EQ(datas[0].index(), 2u);
-    EXPECT_EQ(datas[0].message(), test_message);
-    EXPECT_EQ(data_reader.return_loan(datas, infos), ReturnCode_t::RETCODE_OK);
-
-    // 5 - Check NOT_ALIVE_NO_WRITERS_INSTANCE_STATE
-    // delete the writer to remove all writers from a new instance
-    ASSERT_EQ(publisher_->delete_datawriter(data_writer_), ReturnCode_t::RETCODE_OK);
-    data_writer_ = nullptr;
-
-    triggered.clear();
-    EXPECT_EQ(ws.wait(triggered, 1.0), ReturnCode_t::RETCODE_OK);
-
-    // Check the conditions triggered were the expected ones
-    ASSERT_FALSE(alive_cond->get_trigger_value());
-    EXPECT_EQ(std::find(triggered.begin(), triggered.end(), alive_cond), triggered.end());
-    ASSERT_TRUE(disposed_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), disposed_cond), triggered.end());
-    ASSERT_TRUE(no_writer_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), no_writer_cond), triggered.end());
-    ASSERT_TRUE(any_cond->get_trigger_value());
-    EXPECT_NE(std::find(triggered.begin(), triggered.end(), any_cond), triggered.end());
-
-    // Detach conditions & destroy
-    EXPECT_EQ(ws.detach_condition(*alive_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(alive_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.detach_condition(*disposed_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(disposed_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.detach_condition(*no_writer_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(no_writer_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(ws.detach_condition(*any_cond), ReturnCode_t::RETCODE_OK);
-    EXPECT_EQ(data_reader.delete_readcondition(any_cond), ReturnCode_t::RETCODE_OK);
-}
-
-/*
- * This test checks the allocation consistency when NOT using instances.
- * If the topic is keyed,
- * max_samples should be greater or equal than max_instances * max_samples_per_instance.
- * If that condition is not met, the endpoint creation should fail.
- * If not keyed (not using instances), the only property that is used is max_samples,
- * thus, should not fail with the previously mentioned configuration.
- * The following method is checked:
- * 1. Subscriber::create_datareader
- * 2. DataReader::set_qos
- */
-TEST_F(DataReaderTests, InstancePolicyAllocationConsistencyNotKeyed)
-{
-    DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
-    ASSERT_NE(participant, nullptr);
-
-    Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
-    ASSERT_NE(subscriber, nullptr);
-
-    TypeSupport type(new FooTypeSupport());
-    type.register_type(participant);
-
-    // This test pretends to use topic with no instances, so the following flag is set false.
-    type.get()->m_isGetKeyDefined = false;
-
-    Topic* topic = participant->create_topic("footopic", type.get_type_name(), TOPIC_QOS_DEFAULT);
-    ASSERT_NE(topic, nullptr);
-
-    // Next QoS config checks the default qos configuration,
-    // create_datareader() should NOT return nullptr.
-    DataReaderQos qos = DATAREADER_QOS_DEFAULT;
-
-    DataReader* data_reader1 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader1, nullptr);
-
-    // Below an ampliation of the last comprobation, for which it is proved the case of < 0 (-1),
-    // which also means infinite value, and does not make any change.
-    qos.resource_limits().max_instances = -1;
-
-    DataReader* data_reader2 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader2, nullptr);
-
-    // Next QoS config checks that if user sets max_samples < ( max_instances * max_samples_per_instance ) ,
-    // create_datareader() should NOT return nullptr.
-    // By not using instances, instance allocation consistency is not checked.
-    qos.resource_limits().max_samples = 4999;
-    qos.resource_limits().max_instances = 10;
-    qos.resource_limits().max_samples_per_instance = 500;
-
-    DataReader* data_reader3 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader3, nullptr);
-
-    // Next QoS config checks that if user sets max_samples > ( max_instances * max_samples_per_instance ) ,
-    // create_datareader() should NOT return nullptr.
-    // By not using instances, instance allocation consistency is not checked.
-    qos.resource_limits().max_samples = 5001;
-    qos.resource_limits().max_instances = 10;
-    qos.resource_limits().max_samples_per_instance = 500;
-
-    DataReader* data_reader4 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader4, nullptr);
-
-    // Next QoS config checks that if user sets max_samples infinite
-    // and ( max_instances * max_samples_per_instance ) finite,
-    // create_datareader() should NOT return nullptr.
-    // By not using instances, instance allocation consistency is not checked.
-    qos.resource_limits().max_samples = 0;
-    qos.resource_limits().max_instances = 10;
-    qos.resource_limits().max_samples_per_instance = 500;
-
-    DataReader* data_reader5 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader5, nullptr);
-
-    // It is needed to disable the creation of enabled entities from the subscriber for following checks.
-    // This allows to change inmutable policies
-    SubscriberQos subscriber_qos = SUBSCRIBER_QOS_DEFAULT;
-    subscriber_qos.entity_factory().autoenable_created_entities = false;
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, subscriber->set_qos(subscriber_qos));
-
-    // Next QoS config checks the default qos configuration,
-    // set_qos() should return ReturnCode_t::RETCODE_OK = 0
-    DataReaderQos qos2 = DATAREADER_QOS_DEFAULT;
-    DataReader* default_data_reader2 = subscriber->create_datareader(topic, qos2);
-    ASSERT_NE(default_data_reader2, nullptr);
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Below an ampliation of the last comprobation, for which it is proved the case of < 0 (-1),
-    // which also means infinite value.
-    // By not using instances, instance allocation consistency is not checked.
-    qos2.resource_limits().max_instances = -1;
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Next QoS config checks that if user sets max_samples < ( max_instances * max_samples_per_instance ) ,
-    // set_qos() should return ReturnCode_t::RETCODE_OK = 0
-    // By not using instances, instance allocation consistency is not checked.
-    qos2.resource_limits().max_samples = 4999;
-    qos2.resource_limits().max_instances = 10;
-    qos2.resource_limits().max_samples_per_instance = 500;
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Next QoS config checks that if user sets max_samples > ( max_instances * max_samples_per_instance ) ,
-    // set_qos() should return ReturnCode_t::RETCODE_OK = 0
-    // By not using instances, instance allocation consistency is not checked.
-    qos2.resource_limits().max_samples = 5001;
-    qos2.resource_limits().max_instances = 10;
-    qos2.resource_limits().max_samples_per_instance = 500;
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Next QoS config checks that if user sets max_samples infinite
-    // and ( max_instances * max_samples_per_instance ) finite,
-    // set_qos() should return ReturnCode_t::RETCODE_OK = 0
-    // By not using instances, instance allocation consistency is not checked.
-    qos2.resource_limits().max_samples = 0;
-    qos2.resource_limits().max_instances = 10;
-    qos2.resource_limits().max_samples_per_instance = 500;
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-}
-
-/*
- * This test checks the allocation consistency when USING instances.
- * If the topic is keyed,
- * max_samples should be greater or equal than max_instances * max_samples_per_instance.
- * If that condition is not met, the endpoint creation should fail.
- * If not keyed (not using instances), the only property that is used is max_samples,
- * thus, should not fail with the previously mentioned configuration.
- * The following method is checked:
- * 1. Subscriber::create_datareader
- * 2. DataReader::set_qos
- */
-TEST_F(DataReaderTests, InstancePolicyAllocationConsistencyKeyed)
-{
-    DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
-    ASSERT_NE(participant, nullptr);
-
-    Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
-    ASSERT_NE(subscriber, nullptr);
-
-    TypeSupport type(new FooTypeSupport());
-    type.register_type(participant);
-
-    // This test pretends to use topic with instances, so the following flag is set.
-    type.get()->m_isGetKeyDefined = true;
-
-    Topic* topic = participant->create_topic("footopic", type.get_type_name(), TOPIC_QOS_DEFAULT);
-    ASSERT_NE(topic, nullptr);
-
-    // Next QoS config checks the default qos configuration,
-    // create_datareader() should not return nullptr.
-    DataReaderQos qos = DATAREADER_QOS_DEFAULT;
-
-    DataReader* data_reader1 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader1, nullptr);
-
-    // Below an ampliation of the last comprobation, for which it is proved the case of < 0 (-1),
-    // which also means infinite value.
-    qos.resource_limits().max_samples = 0;
-    qos.resource_limits().max_instances = -1;
-
-    DataReader* data_reader2 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader2, nullptr);
-
-    // Next QoS config checks that if user sets max_samples < ( max_instances * max_samples_per_instance ) ,
-    // create_datareader() should return nullptr.
-    qos.resource_limits().max_samples = 4999;
-    qos.resource_limits().max_instances = 10;
-    qos.resource_limits().max_samples_per_instance = 500;
-
-    DataReader* data_reader3 = subscriber->create_datareader(topic, qos);
-    ASSERT_EQ(data_reader3, nullptr);
-
-    // Next QoS config checks that if user sets max_samples > ( max_instances * max_samples_per_instance ) ,
-    // create_datareader() should not return nullptr.
-    qos.resource_limits().max_samples = 5001;
-    qos.resource_limits().max_instances = 10;
-    qos.resource_limits().max_samples_per_instance = 500;
-
-    DataReader* data_reader4 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader4, nullptr);
-
-    // Next QoS config checks that if user sets max_samples = ( max_instances * max_samples_per_instance ) ,
-    // create_datareader() should not return nullptr.
-    qos.resource_limits().max_samples = 5000;
-    qos.resource_limits().max_instances = 10;
-    qos.resource_limits().max_samples_per_instance = 500;
-
-    DataReader* data_reader5 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader5, nullptr);
-
-    // Next QoS config checks that if user sets max_samples infinite
-    // and ( max_instances * max_samples_per_instance ) finite,
-    // create_datareader() should not return nullptr.
-    qos.resource_limits().max_samples = 0;
-    qos.resource_limits().max_instances = 10;
-    qos.resource_limits().max_samples_per_instance = 500;
-
-    DataReader* data_reader6 = subscriber->create_datareader(topic, qos);
-    ASSERT_NE(data_reader6, nullptr);
-
-    // It is needed to disable the creation of enabled entities from the subscriber for following checks.
-    // This allows to change inmutable policies
-    SubscriberQos subscriber_qos = SUBSCRIBER_QOS_DEFAULT;
-    subscriber_qos.entity_factory().autoenable_created_entities = false;
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, subscriber->set_qos(subscriber_qos));
-
-    // Next QoS config checks the default qos configuration,
-    // set_qos() should return ReturnCode_t::RETCODE_OK = 0, as the by default values are already infinite.
-    DataReaderQos qos2 = DATAREADER_QOS_DEFAULT;
-    DataReader* default_data_reader2 = subscriber->create_datareader(topic, qos2);
-    ASSERT_NE(default_data_reader2, nullptr);
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Below an ampliation of the last comprobation, for which it is proved the case of < 0 (-1),
-    // which also means infinite value.
-    qos2.resource_limits().max_samples = 0;
-    qos2.resource_limits().max_instances = -1;
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Next QoS config checks that if user sets max_samples < ( max_instances * max_samples_per_instance ) ,
-    // set_qos() should return a value != 0 (not OK)
-    qos2.resource_limits().max_samples = 4999;
-    qos2.resource_limits().max_instances = 10;
-    qos2.resource_limits().max_samples_per_instance = 500;
-
-    ASSERT_NE(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Next QoS config checks that if user sets max_samples > ( max_instances * max_samples_per_instance ) ,
-    // set_qos() should return ReturnCode_t::RETCODE_OK = 0.
-    qos2.resource_limits().max_samples = 5001;
-    qos2.resource_limits().max_instances = 10;
-    qos2.resource_limits().max_samples_per_instance = 500;
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Next QoS config checks that if user sets max_samples = ( max_instances * max_samples_per_instance ) ,
-    // set_qos() should return ReturnCode_t::RETCODE_OK = 0.
-    qos2.resource_limits().max_samples = 5000;
-    qos2.resource_limits().max_instances = 10;
-    qos2.resource_limits().max_samples_per_instance = 500;
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-
-    // Next QoS config checks that if user sets max_samples infinite
-    // and ( max_instances * max_samples_per_instance ) finite,
-    // set_qos() should return ReturnCode_t::RETCODE_OK = 0.
-    qos2.resource_limits().max_samples = 0;
-    qos2.resource_limits().max_instances = 10;
-    qos2.resource_limits().max_samples_per_instance = 500;
-
-    ASSERT_EQ(ReturnCode_t::RETCODE_OK, default_data_reader2->set_qos(qos2));
-}
+} // namespace dds
+} // namespace fastdds
+} // namespace eprosima
 
 int main(
         int argc,

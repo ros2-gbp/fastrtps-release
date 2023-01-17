@@ -168,8 +168,7 @@ protected:
     {
         if (mp_writer == nullptr || mp_mutex == nullptr)
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
-                    "You need to create a Writer with this History before adding any changes");
+            logError(RTPS_WRITER_HISTORY, "You need to create a Writer with this History before adding any changes");
             return false;
         }
 

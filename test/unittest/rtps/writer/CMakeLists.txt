@@ -24,7 +24,7 @@ set(WRITERPROXYTESTS_SOURCE ReaderProxyTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/LocatorSelectorSender.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/FlowControllerConsts.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
+    )
 
 if(WIN32)
     add_definitions(-D_WIN32_WINNT=0x0601)
@@ -72,8 +72,7 @@ set(LIVELINESSMANAGERTESTS_SOURCE LivelinessManagerTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEventImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
-
+    )
 add_executable(LivelinessManagerTests ${LIVELINESSMANAGERTESTS_SOURCE})
 target_compile_definitions(LivelinessManagerTests PRIVATE FASTRTPS_NO_LIB
     BOOST_ASIO_STANDALONE
@@ -106,9 +105,3 @@ target_link_libraries(RTPSWriterTests fastcdr fastrtps foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
 add_gtest(RTPSWriterTests SOURCES ${RTPSWRITERTESTS_SOURCE})
-
-if(ANDROID)
-    set_property(TARGET ReaderProxyTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET LivelinessManagerTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET RTPSWriterTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()

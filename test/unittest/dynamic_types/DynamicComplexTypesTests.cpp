@@ -43,7 +43,7 @@ public:
 
     DynamicComplexTypesTests()
     {
-        registerTestTypes();
+        CompleteStruct toRegisterStatic;
         m_factory = DynamicTypeBuilderFactory::get_instance();
         init();
     }
@@ -58,12 +58,12 @@ public:
 
         if (!DynamicTypeBuilderFactory::get_instance()->is_empty())
         {
-            EPROSIMA_LOG_ERROR(DYN_TEST, "DynamicTypeBuilderFactory is not empty.");
+            logError(DYN_TEST, "DynamicTypeBuilderFactory is not empty.");
         }
 
         if (!DynamicDataFactory::get_instance()->is_empty())
         {
-            EPROSIMA_LOG_ERROR(DYN_TEST, "DynamicDataFactory is not empty.");
+            logError(DYN_TEST, "DynamicDataFactory is not empty.");
         }
 
         DynamicDataFactory::delete_instance();
