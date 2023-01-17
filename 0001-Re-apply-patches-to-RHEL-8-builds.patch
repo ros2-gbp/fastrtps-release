@@ -1,4 +1,4 @@
-From 52167a00206b2fe49a00b209e09e841003efeaa8 Mon Sep 17 00:00:00 2001
+From a6f2f39c84bedb42815b63d93f0f3507367765f6 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?=
  <nuclearsandwich@users.noreply.github.com>
 Date: Tue, 15 Feb 2022 17:09:05 -0500
@@ -33,7 +33,7 @@ index 2a2d782d..d534e842 100644
                  RESULT_VARIABLE EXECUTE_RESULT
                  )
 diff --git a/package.xml b/package.xml
-index 42271c4b..9ece249f 100644
+index c0798842..d45c192c 100644
 --- a/package.xml
 +++ b/package.xml
 @@ -14,8 +14,6 @@
@@ -46,18 +46,18 @@ index 42271c4b..9ece249f 100644
    <depend>foonathan_memory_vendor</depend>
    <depend>libssl-dev</depend>
 diff --git a/rpm/ros-humble-fastrtps.spec b/rpm/ros-humble-fastrtps.spec
-index 74092cb7..dad1a438 100644
+index 682692e8..7557dfe3 100644
 --- a/rpm/ros-humble-fastrtps.spec
 +++ b/rpm/ros-humble-fastrtps.spec
-@@ -19,7 +19,6 @@ Requires:       ros-humble-fastcdr
+@@ -20,7 +20,6 @@ Requires:       ros-humble-fastcdr
  Requires:       ros-humble-foonathan-memory-vendor
  Requires:       tinyxml2-devel
  Requires:       ros-humble-ros-workspace
 -BuildRequires:  asio-devel
  BuildRequires:  cmake3
  BuildRequires:  openssl-devel
- BuildRequires:  ros-humble-fastcdr
-@@ -65,6 +64,7 @@ mkdir -p .obj-%{_target_platform} && cd .obj-%{_target_platform}
+ BuildRequires:  python%{python3_pkgversion}-devel
+@@ -67,6 +66,7 @@ mkdir -p .obj-%{_target_platform} && cd .obj-%{_target_platform}
      -DINSTALL_EXAMPLES=OFF \
      -DSECURITY=ON \
      -DAPPEND_PROJECT_NAME_TO_INCLUDEDIR=ON \
