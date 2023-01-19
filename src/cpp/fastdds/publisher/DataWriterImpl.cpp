@@ -63,6 +63,19 @@ namespace eprosima {
 namespace fastdds {
 namespace dds {
 
+static ChangeKind_t unregister_change_kind(
+        bool dispose,
+        const DataWriterQos& qos)
+{
+    if (dispose)
+    {
+        return NOT_ALIVE_DISPOSED;
+    }
+
+    return qos.writer_data_lifecycle().autodispose_unregistered_instances ?
+           NOT_ALIVE_DISPOSED_UNREGISTERED : NOT_ALIVE_UNREGISTERED;
+}
+
 static bool qos_has_pull_mode_request(
         const DataWriterQos& qos)
 {
@@ -184,14 +197,17 @@ ReturnCode_t DataWriterImpl::enable()
     w_att.throughputController = qos_.throughput_controller();
     w_att.endpoint.durabilityKind = qos_.durability().durabilityKind();
     w_att.endpoint.endpointKind = WRITER;
-    w_att.endpoint.multicastLocatorList = qos_.endpoint().multicast_locator_list;
     w_att.endpoint.reliabilityKind = qos_.reliability().kind == RELIABLE_RELIABILITY_QOS ? RELIABLE : BEST_EFFORT;
     w_att.endpoint.topicKind = type_->m_isGetKeyDefined ? WITH_KEY : NO_KEY;
+    w_att.endpoint.multicastLocatorList = qos_.endpoint().multicast_locator_list;
     w_att.endpoint.unicastLocatorList = qos_.endpoint().unicast_locator_list;
     w_att.endpoint.remoteLocatorList = qos_.endpoint().remote_locator_list;
+    w_att.endpoint.external_unicast_locators = qos_.endpoint().external_unicast_locators;
+    w_att.endpoint.ignore_non_matching_locators = qos_.endpoint().ignore_non_matching_locators;
     w_att.mode = qos_.publish_mode().kind == SYNCHRONOUS_PUBLISH_MODE ? SYNCHRONOUS_WRITER : ASYNCHRONOUS_WRITER;
     w_att.flow_controller_name = qos_.publish_mode().flow_controller_name;
     w_att.endpoint.properties = qos_.properties();
+    w_att.endpoint.ownershipKind = qos_.ownership().kind;
     w_att.endpoint.setEntityID(qos_.endpoint().entity_id);
     w_att.endpoint.setUserDefinedID(qos_.endpoint().user_defined_id);
     w_att.times = qos_.reliable_writer_qos().times;
@@ -270,14 +286,14 @@ ReturnCode_t DataWriterImpl::enable()
     auto change_pool = get_change_pool();
     if (!change_pool)
     {
-        logError(DATA_WRITER, "Problem creating change pool for associated Writer");
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Problem creating change pool for associated Writer");
         return ReturnCode_t::RETCODE_ERROR;
     }
 
     auto pool = get_payload_pool();
     if (!pool)
     {
-        logError(DATA_WRITER, "Problem creating payload pool for associated Writer");
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Problem creating payload pool for associated Writer");
         return ReturnCode_t::RETCODE_ERROR;
     }
 
@@ -293,7 +309,7 @@ ReturnCode_t DataWriterImpl::enable()
     if (writer == nullptr &&
             w_att.endpoint.data_sharing_configuration().kind() == DataSharingKind::AUTO)
     {
-        logInfo(DATA_WRITER, "Trying with a non-datasharing pool");
+        EPROSIMA_LOG_INFO(DATA_WRITER, "Trying with a non-datasharing pool");
         release_payload_pool();
         is_data_sharing_compatible_ = false;
         DataSharingQosPolicy datasharing;
@@ -303,7 +319,7 @@ ReturnCode_t DataWriterImpl::enable()
         pool = get_payload_pool();
         if (!pool)
         {
-            logError(DATA_WRITER, "Problem creating payload pool for associated Writer");
+            EPROSIMA_LOG_ERROR(DATA_WRITER, "Problem creating payload pool for associated Writer");
             return ReturnCode_t::RETCODE_ERROR;
         }
 
@@ -319,7 +335,7 @@ ReturnCode_t DataWriterImpl::enable()
     if (writer == nullptr)
     {
         release_payload_pool();
-        logError(DATA_WRITER, "Problem creating associated Writer");
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Problem creating associated Writer");
         return ReturnCode_t::RETCODE_ERROR;
     }
 
@@ -403,7 +419,7 @@ DataWriterImpl::~DataWriterImpl()
 
     if (writer_ != nullptr)
     {
-        logInfo(DATA_WRITER, guid().entityId << " in topic: " << type_->getName());
+        EPROSIMA_LOG_INFO(DATA_WRITER, guid().entityId << " in topic: " << type_->getName());
         RTPSDomain::removeRTPSWriter(writer_);
         release_payload_pool();
     }
@@ -460,7 +476,7 @@ ReturnCode_t DataWriterImpl::loan_sample(
     switch (initialization)
     {
         default:
-            logWarning(DATA_WRITER, "Using wrong LoanInitializationKind value ("
+            EPROSIMA_LOG_WARNING(DATA_WRITER, "Using wrong LoanInitializationKind value ("
                     << static_cast<int>(initialization) << "). Using default NO_LOAN_INITIALIZATION");
             break;
 
@@ -528,7 +544,7 @@ bool DataWriterImpl::write(
         return false;
     }
 
-    logInfo(DATA_WRITER, "Writing new data");
+    EPROSIMA_LOG_INFO(DATA_WRITER, "Writing new data");
     return ReturnCode_t::RETCODE_OK == create_new_change(ALIVE, data);
 }
 
@@ -541,20 +557,20 @@ bool DataWriterImpl::write(
         return false;
     }
 
-    logInfo(DATA_WRITER, "Writing new data with WriteParams");
+    EPROSIMA_LOG_INFO(DATA_WRITER, "Writing new data with WriteParams");
     return ReturnCode_t::RETCODE_OK == create_new_change_with_params(ALIVE, data, params);
 }
 
-ReturnCode_t DataWriterImpl::write(
+ReturnCode_t DataWriterImpl::check_write_preconditions(
         void* data,
-        const InstanceHandle_t& handle)
+        const InstanceHandle_t& handle,
+        InstanceHandle_t& instance_handle)
 {
     if (writer_ == nullptr)
     {
         return ReturnCode_t::RETCODE_NOT_ENABLED;
     }
 
-    InstanceHandle_t instance_handle;
     if (type_.get()->m_isGetKeyDefined)
     {
         bool is_key_protected = false;
@@ -570,38 +586,139 @@ ReturnCode_t DataWriterImpl::write(
     {
         return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
-    logInfo(DATA_WRITER, "Writing new data with Handle");
-    WriteParams wparams;
-    return create_new_change_with_params(ALIVE, data, wparams, instance_handle);
+
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataWriterImpl::write(
+        void* data,
+        const InstanceHandle_t& handle)
+{
+    InstanceHandle_t instance_handle;
+    ReturnCode_t ret = check_write_preconditions(data, handle, instance_handle);
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        EPROSIMA_LOG_INFO(DATA_WRITER, "Writing new data with Handle");
+        WriteParams wparams;
+        ret = create_new_change_with_params(ALIVE, data, wparams, instance_handle);
+    }
+
+    return ret;
+}
+
+ReturnCode_t DataWriterImpl::write_w_timestamp(
+        void* data,
+        const InstanceHandle_t& handle,
+        const fastrtps::Time_t& timestamp)
+{
+    InstanceHandle_t instance_handle;
+    ReturnCode_t ret = ReturnCode_t::RETCODE_OK;
+    if (timestamp.is_infinite() || timestamp.seconds < 0)
+    {
+        ret = ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        ret = check_write_preconditions(data, handle, instance_handle);
+    }
+
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        EPROSIMA_LOG_INFO(DATA_WRITER, "Writing new data with Handle and timestamp");
+        WriteParams wparams;
+        wparams.source_timestamp(timestamp);
+        ret = create_new_change_with_params(ALIVE, data, wparams, instance_handle);
+    }
+
+    return ret;
+}
+
+ReturnCode_t DataWriterImpl::check_instance_preconditions(
+        void* data,
+        const InstanceHandle_t& handle,
+        InstanceHandle_t& instance_handle)
+{
+    if (nullptr == writer_)
+    {
+        return ReturnCode_t::RETCODE_NOT_ENABLED;
+    }
+
+    if (nullptr == data)
+    {
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Data pointer not valid");
+        return ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+
+    if (!type_->m_isGetKeyDefined)
+    {
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    instance_handle = handle;
+
+#if defined(NDEBUG)
+    if (!instance_handle.isDefined())
+#endif // if !defined(NDEBUG)
+    {
+        bool is_key_protected = false;
+#if HAVE_SECURITY
+        is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
+#endif // if HAVE_SECURITY
+        type_->getKey(data, &instance_handle, is_key_protected);
+    }
+
+#if !defined(NDEBUG)
+    if (handle.isDefined() && instance_handle != handle)
+    {
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "handle differs from data's key.");
+        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+#endif // if !defined(NDEBUG)
+
+    return ReturnCode_t::RETCODE_OK;
 }
 
 InstanceHandle_t DataWriterImpl::register_instance(
         void* key)
 {
     /// Preconditions
-    if (writer_ == nullptr)
+    InstanceHandle_t instance_handle;
+    if (ReturnCode_t::RETCODE_OK != check_instance_preconditions(key, HANDLE_NIL, instance_handle))
     {
-        return c_InstanceHandle_Unknown;
+        return HANDLE_NIL;
     }
 
-    if (key == nullptr)
+    WriteParams wparams;
+    return do_register_instance(key, instance_handle, wparams);
+}
+
+InstanceHandle_t DataWriterImpl::register_instance_w_timestamp(
+        void* key,
+        const fastrtps::Time_t& timestamp)
+{
+    /// Preconditions
+    InstanceHandle_t instance_handle;
+    if (timestamp.is_infinite() || timestamp.seconds < 0 ||
+            (ReturnCode_t::RETCODE_OK != check_instance_preconditions(key, HANDLE_NIL, instance_handle)))
     {
-        logError(DATA_WRITER, "Data pointer not valid");
-        return c_InstanceHandle_Unknown;
+        return HANDLE_NIL;
     }
 
-    if (!type_->m_isGetKeyDefined)
-    {
-        logError(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
-        return c_InstanceHandle_Unknown;
-    }
+    WriteParams wparams;
+    wparams.source_timestamp(timestamp);
+    return do_register_instance(key, instance_handle, wparams);
+}
 
-    InstanceHandle_t instance_handle = c_InstanceHandle_Unknown;
-    bool is_key_protected = false;
-#if HAVE_SECURITY
-    is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif // if HAVE_SECURITY
-    type_->getKey(key, &instance_handle, is_key_protected);
+InstanceHandle_t DataWriterImpl::do_register_instance(
+        void* key,
+        const InstanceHandle_t instance_handle,
+        WriteParams& wparams)
+{
+    // TODO(MiguelCompany): wparams should be used when propagating the register_instance operation to the DataReader.
+    // See redmine issue #14494
+    static_cast<void>(wparams);
 
     // Block lowlevel writer
     auto max_blocking_time = std::chrono::steady_clock::now() +
@@ -625,7 +742,7 @@ InstanceHandle_t DataWriterImpl::register_instance(
                 payload->reserve(size);
                 if (!type_->serialize(key, payload))
                 {
-                    logWarning(DATA_WRITER, "Key data serialization failed");
+                    EPROSIMA_LOG_WARNING(DATA_WRITER, "Key data serialization failed");
 
                     // Serialization of the sample failed. Remove the instance to keep original state.
                     // Note that we will only end-up here if the instance has just been created, so it will be empty
@@ -637,7 +754,7 @@ InstanceHandle_t DataWriterImpl::register_instance(
         }
     }
 
-    return c_InstanceHandle_Unknown;
+    return HANDLE_NIL;
 }
 
 ReturnCode_t DataWriterImpl::unregister_instance(
@@ -645,65 +762,57 @@ ReturnCode_t DataWriterImpl::unregister_instance(
         const InstanceHandle_t& handle,
         bool dispose)
 {
-    /// Preconditions
-    if (writer_ == nullptr)
-    {
-        return ReturnCode_t::RETCODE_NOT_ENABLED;
-    }
-
-    if (instance == nullptr)
-    {
-        logError(DATA_WRITER, "Data pointer not valid");
-        return ReturnCode_t::RETCODE_BAD_PARAMETER;
-    }
-
-    if (!type_->m_isGetKeyDefined)
-    {
-        logError(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
-        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
-    }
-
-    ReturnCode_t returned_value = ReturnCode_t::RETCODE_ERROR;
-    InstanceHandle_t ih = handle;
-
-#if defined(NDEBUG)
-    if (c_InstanceHandle_Unknown == ih)
-#endif // if !defined(NDEBUG)
-    {
-        bool is_key_protected = false;
-#if HAVE_SECURITY
-        is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif // if HAVE_SECURITY
-        type_->getKey(instance, &ih, is_key_protected);
-    }
-
-#if !defined(NDEBUG)
-    if (c_InstanceHandle_Unknown != handle && ih != handle)
-    {
-        logError(DATA_WRITER, "handle differs from data's key.");
-        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
-    }
-#endif // if !defined(NDEBUG)
-
-    if (history_.is_key_registered(ih))
-    {
-        WriteParams wparams;
-        ChangeKind_t change_kind = NOT_ALIVE_DISPOSED;
-        if (!dispose)
-        {
-            change_kind = qos_.writer_data_lifecycle().autodispose_unregistered_instances ?
-                    NOT_ALIVE_DISPOSED_UNREGISTERED :
-                    NOT_ALIVE_UNREGISTERED;
-        }
-
-        returned_value = create_new_change_with_params(change_kind, instance, wparams, ih);
-    }
-    else
+    // Preconditions
+    InstanceHandle_t ih;
+    ReturnCode_t returned_value = check_instance_preconditions(instance, handle, ih);
+    if (ReturnCode_t::RETCODE_OK == returned_value && !history_.is_key_registered(ih))
     {
         returned_value = ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
     }
 
+    // Operation
+    if (ReturnCode_t::RETCODE_OK == returned_value)
+    {
+        WriteParams wparams;
+        ChangeKind_t change_kind = unregister_change_kind(dispose, qos_);
+        returned_value = create_new_change_with_params(change_kind, instance, wparams, ih);
+    }
+
     return returned_value;
+}
+
+ReturnCode_t DataWriterImpl::unregister_instance_w_timestamp(
+        void* instance,
+        const InstanceHandle_t& handle,
+        const fastrtps::Time_t& timestamp,
+        bool dispose)
+{
+    // Preconditions
+    InstanceHandle_t instance_handle;
+    ReturnCode_t ret = ReturnCode_t::RETCODE_OK;
+    if (timestamp.is_infinite() || timestamp.seconds < 0)
+    {
+        ret = ReturnCode_t::RETCODE_BAD_PARAMETER;
+    }
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        ret = check_instance_preconditions(instance, handle, instance_handle);
+    }
+    if (ReturnCode_t::RETCODE_OK == ret && !history_.is_key_registered(instance_handle))
+    {
+        ret = ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+    }
+
+    // Operation
+    if (ReturnCode_t::RETCODE_OK == ret)
+    {
+        WriteParams wparams;
+        wparams.source_timestamp(timestamp);
+        ChangeKind_t change_kind = unregister_change_kind(dispose, qos_);
+        ret = create_new_change_with_params(change_kind, instance, wparams, instance_handle);
+    }
+
+    return ret;
 }
 
 ReturnCode_t DataWriterImpl::get_key_value(
@@ -713,13 +822,13 @@ ReturnCode_t DataWriterImpl::get_key_value(
     /// Preconditions
     if (key_holder == nullptr || !handle.isDefined())
     {
-        logError(DATA_WRITER, "Key holder pointer not valid");
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Key holder pointer not valid");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 
     if (!type_->m_isGetKeyDefined)
     {
-        logError(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
         return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
     }
 
@@ -766,7 +875,7 @@ ReturnCode_t DataWriterImpl::check_new_change_preconditions(
     // Preconditions
     if (data == nullptr)
     {
-        logError(DATA_WRITER, "Data pointer not valid");
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Data pointer not valid");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 
@@ -776,7 +885,7 @@ ReturnCode_t DataWriterImpl::check_new_change_preconditions(
     {
         if (!type_->m_isGetKeyDefined)
         {
-            logError(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
+            EPROSIMA_LOG_ERROR(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
             return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
         }
     }
@@ -815,7 +924,7 @@ ReturnCode_t DataWriterImpl::perform_create_new_change(
 
         if ((ALIVE == change_kind) && !type_->serialize(data, &payload.payload))
         {
-            logWarning(DATA_WRITER, "Data serialization returned false");
+            EPROSIMA_LOG_WARNING(DATA_WRITER, "Data serialization returned false");
             return_payload_to_pool(payload);
             return ReturnCode_t::RETCODE_ERROR;
         }
@@ -859,7 +968,7 @@ ReturnCode_t DataWriterImpl::perform_create_new_change(
                         handle,
                         steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
             {
-                logError(DATA_WRITER, "Could not set the next deadline in the history");
+                EPROSIMA_LOG_ERROR(DATA_WRITER, "Could not set the next deadline in the history");
             }
             else
             {
@@ -980,7 +1089,7 @@ ReturnCode_t DataWriterImpl::set_qos(
     // Default qos is always considered consistent
     if (&qos != &DATAWRITER_QOS_DEFAULT)
     {
-        ReturnCode_t ret_val = check_qos(qos_to_set);
+        ReturnCode_t ret_val = check_qos_including_resource_limits(qos_to_set, type_);
         if (!ret_val)
         {
             return ret_val;
@@ -1163,44 +1272,13 @@ ReturnCode_t DataWriterImpl::wait_for_acknowledgments(
         const InstanceHandle_t& handle,
         const Duration_t& max_wait)
 {
-    /// Preconditions
-    if (nullptr == writer_)
+    // Preconditions
+    InstanceHandle_t ih;
+    ReturnCode_t returned_value = check_instance_preconditions(instance, handle, ih);
+    if (ReturnCode_t::RETCODE_OK != returned_value)
     {
-        return ReturnCode_t::RETCODE_NOT_ENABLED;
+        return returned_value;
     }
-
-    if (nullptr == instance)
-    {
-        logError(DATA_WRITER, "Data pointer not valid");
-        return ReturnCode_t::RETCODE_BAD_PARAMETER;
-    }
-
-    if (!type_->m_isGetKeyDefined)
-    {
-        logError(DATA_WRITER, "Topic is NO_KEY, operation not permitted");
-        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
-    }
-
-    InstanceHandle_t ih = handle;
-
-#if defined(NDEBUG)
-    if (c_InstanceHandle_Unknown == ih)
-#endif // NDEBUG
-    {
-        bool is_key_protected = false;
-#if HAVE_SECURITY
-        is_key_protected = writer_->getAttributes().security_attributes().is_key_protected;
-#endif // HAVE_SECURITY
-        type_->getKey(instance, &ih, is_key_protected);
-    }
-
-#if !defined(NDEBUG)
-    if (c_InstanceHandle_Unknown != handle && ih != handle)
-    {
-        logError(DATA_WRITER, "handle differs from data's key");
-        return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
-    }
-#endif // NDEBUG */
 
     // Block low-level writer
     auto max_blocking_time = steady_clock::now() +
@@ -1282,7 +1360,7 @@ bool DataWriterImpl::deadline_timer_reschedule()
     steady_clock::time_point next_deadline_us;
     if (!history_.get_next_deadline(timer_owner_, next_deadline_us))
     {
-        logError(DATA_WRITER, "Could not get the next deadline from the history");
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Could not get the next deadline from the history");
         return false;
     }
 
@@ -1313,7 +1391,7 @@ bool DataWriterImpl::deadline_missed()
                 timer_owner_,
                 steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
     {
-        logError(DATA_WRITER, "Could not set the next deadline in the history");
+        EPROSIMA_LOG_ERROR(DATA_WRITER, "Could not set the next deadline in the history");
         return false;
     }
     return deadline_timer_reschedule();
@@ -1430,7 +1508,7 @@ ReturnCode_t DataWriterImpl::assert_liveliness()
                 writer_->get_liveliness_kind(),
                 writer_->get_liveliness_lease_duration()))
     {
-        logError(DATAWRITER, "Could not assert liveliness of writer " << writer_->getGuid());
+        EPROSIMA_LOG_ERROR(DATAWRITER, "Could not assert liveliness of writer " << writer_->getGuid());
         return ReturnCode_t::RETCODE_ERROR;
     }
 
@@ -1615,22 +1693,35 @@ void DataWriterImpl::set_qos(
     }
 }
 
+ReturnCode_t DataWriterImpl::check_qos_including_resource_limits(
+        const DataWriterQos& qos,
+        const TypeSupport& type)
+{
+    ReturnCode_t check_qos_return = check_qos(qos);
+    if (ReturnCode_t::RETCODE_OK == check_qos_return &&
+            type->m_isGetKeyDefined)
+    {
+        check_qos_return = check_allocation_consistency(qos);
+    }
+    return check_qos_return;
+}
+
 ReturnCode_t DataWriterImpl::check_qos(
         const DataWriterQos& qos)
 {
     if (qos.durability().kind == PERSISTENT_DURABILITY_QOS)
     {
-        logError(RTPS_QOS_CHECK, "PERSISTENT Durability not supported");
+        EPROSIMA_LOG_ERROR(RTPS_QOS_CHECK, "PERSISTENT Durability not supported");
         return ReturnCode_t::RETCODE_UNSUPPORTED;
     }
     if (qos.destination_order().kind == BY_SOURCE_TIMESTAMP_DESTINATIONORDER_QOS)
     {
-        logError(RTPS_QOS_CHECK, "BY SOURCE TIMESTAMP DestinationOrder not supported");
+        EPROSIMA_LOG_ERROR(RTPS_QOS_CHECK, "BY SOURCE TIMESTAMP DestinationOrder not supported");
         return ReturnCode_t::RETCODE_UNSUPPORTED;
     }
     if (nullptr != PropertyPolicyHelper::find_property(qos.properties(), "fastdds.unique_network_flows"))
     {
-        logError(RTPS_QOS_CHECK, "Unique network flows not supported on writers");
+        EPROSIMA_LOG_ERROR(RTPS_QOS_CHECK, "Unique network flows not supported on writers");
         return ReturnCode_t::RETCODE_UNSUPPORTED;
     }
     bool is_pull_mode = qos_has_pull_mode_request(qos);
@@ -1638,19 +1729,14 @@ ReturnCode_t DataWriterImpl::check_qos(
     {
         if (BEST_EFFORT_RELIABILITY_QOS == qos.reliability().kind)
         {
-            logError(RTPS_QOS_CHECK, "BEST_EFFORT incompatible with pull mode");
+            EPROSIMA_LOG_ERROR(RTPS_QOS_CHECK, "BEST_EFFORT incompatible with pull mode");
             return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
         }
         if (c_TimeInfinite == qos.reliable_writer_qos().times.heartbeatPeriod)
         {
-            logError(RTPS_QOS_CHECK, "Infinite heartbeat period incompatible with pull mode");
+            EPROSIMA_LOG_ERROR(RTPS_QOS_CHECK, "Infinite heartbeat period incompatible with pull mode");
             return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
         }
-    }
-    if (qos.reliability().kind == BEST_EFFORT_RELIABILITY_QOS && qos.ownership().kind == EXCLUSIVE_OWNERSHIP_QOS)
-    {
-        logError(RTPS_QOS_CHECK, "BEST_EFFORT incompatible with EXCLUSIVE ownership");
-        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
     }
     if (qos.liveliness().kind == AUTOMATIC_LIVELINESS_QOS ||
             qos.liveliness().kind == MANUAL_BY_PARTICIPANT_LIVELINESS_QOS)
@@ -1658,7 +1744,7 @@ ReturnCode_t DataWriterImpl::check_qos(
         if (qos.liveliness().lease_duration < eprosima::fastrtps::c_TimeInfinite &&
                 qos.liveliness().lease_duration <= qos.liveliness().announcement_period)
         {
-            logError(RTPS_QOS_CHECK, "WRITERQOS: LeaseDuration <= announcement period.");
+            EPROSIMA_LOG_ERROR(RTPS_QOS_CHECK, "WRITERQOS: LeaseDuration <= announcement period.");
             return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
         }
     }
@@ -1666,7 +1752,28 @@ ReturnCode_t DataWriterImpl::check_qos(
             (qos.endpoint().history_memory_policy != PREALLOCATED_MEMORY_MODE &&
             qos.endpoint().history_memory_policy != PREALLOCATED_WITH_REALLOC_MEMORY_MODE))
     {
-        logError(RTPS_QOS_CHECK, "DATA_SHARING cannot be used with memory policies other than PREALLOCATED.");
+        EPROSIMA_LOG_ERROR(RTPS_QOS_CHECK, "DATA_SHARING cannot be used with memory policies other than PREALLOCATED.");
+        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+    }
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DataWriterImpl::check_allocation_consistency(
+        const DataWriterQos& qos)
+{
+    if ((qos.resource_limits().max_samples > 0) &&
+            (qos.resource_limits().max_samples <
+            (qos.resource_limits().max_instances * qos.resource_limits().max_samples_per_instance)))
+    {
+        EPROSIMA_LOG_ERROR(DDS_QOS_CHECK,
+                "max_samples should be greater than max_instances * max_samples_per_instance");
+        return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
+    }
+    if ((qos.resource_limits().max_instances <= 0 || qos.resource_limits().max_samples_per_instance <= 0) &&
+            (qos.resource_limits().max_samples > 0))
+    {
+        EPROSIMA_LOG_ERROR(DDS_QOS_CHECK,
+                "max_samples should be infinite when max_instances or max_samples_per_instance are infinite");
         return ReturnCode_t::RETCODE_INCONSISTENT_POLICY;
     }
     return ReturnCode_t::RETCODE_OK;
@@ -1680,56 +1787,62 @@ bool DataWriterImpl::can_qos_be_updated(
     if (to.durability().kind != from.durability().kind)
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Durability kind cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK, "Durability kind cannot be changed after the creation of a DataWriter.");
     }
 
     if (to.liveliness().kind !=  from.liveliness().kind)
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Liveliness Kind cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK, "Liveliness Kind cannot be changed after the creation of a DataWriter.");
     }
 
     if (to.liveliness().lease_duration != from.liveliness().lease_duration)
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Liveliness lease duration cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK,
+                "Liveliness lease duration cannot be changed after the creation of a DataWriter.");
     }
 
     if (to.liveliness().announcement_period != from.liveliness().announcement_period)
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Liveliness announcement cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK,
+                "Liveliness announcement cannot be changed after the creation of a DataWriter.");
     }
 
     if (to.reliability().kind != from.reliability().kind)
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Reliability Kind cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK, "Reliability Kind cannot be changed after the creation of a DataWriter.");
     }
     if (to.ownership().kind != from.ownership().kind)
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Ownership Kind cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK, "Ownership Kind cannot be changed after the creation of a DataWriter.");
     }
     if (to.destination_order().kind != from.destination_order().kind)
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Destination order Kind cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK,
+                "Destination order Kind cannot be changed after the creation of a DataWriter.");
     }
     if (to.data_sharing().kind() != from.data_sharing().kind())
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Data sharing configuration cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK,
+                "Data sharing configuration cannot be changed after the creation of a DataWriter.");
     }
     if (to.data_sharing().shm_directory() != from.data_sharing().shm_directory())
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Data sharing configuration cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK,
+                "Data sharing configuration cannot be changed after the creation of a DataWriter.");
     }
     if (to.data_sharing().domain_ids() != from.data_sharing().domain_ids())
     {
         updatable = false;
-        logWarning(RTPS_QOS_CHECK, "Data sharing configuration cannot be changed after the creation of a DataWriter.");
+        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK,
+                "Data sharing configuration cannot be changed after the creation of a DataWriter.");
     }
     return updatable;
 }
@@ -1864,21 +1977,21 @@ ReturnCode_t DataWriterImpl::check_datasharing_compatible(
 #if HAVE_SECURITY
             if (has_security_enabled)
             {
-                logError(DATA_WRITER, "Data sharing cannot be used with security protection.");
+                EPROSIMA_LOG_ERROR(DATA_WRITER, "Data sharing cannot be used with security protection.");
                 return ReturnCode_t::RETCODE_NOT_ALLOWED_BY_SECURITY;
             }
 #endif // HAVE_SECURITY
 
             if (!has_bound_payload_size)
             {
-                logError(DATA_WRITER, "Data sharing cannot be used with " <<
+                EPROSIMA_LOG_ERROR(DATA_WRITER, "Data sharing cannot be used with " <<
                         (type_.is_bounded() ? "memory policies other than PREALLOCATED" : "unbounded data types"));
                 return ReturnCode_t::RETCODE_BAD_PARAMETER;
             }
 
             if (has_key)
             {
-                logError(DATA_WRITER, "Data sharing cannot be used with keyed data types");
+                EPROSIMA_LOG_ERROR(DATA_WRITER, "Data sharing cannot be used with keyed data types");
                 return ReturnCode_t::RETCODE_BAD_PARAMETER;
             }
 
@@ -1889,21 +2002,21 @@ ReturnCode_t DataWriterImpl::check_datasharing_compatible(
 #if HAVE_SECURITY
             if (has_security_enabled)
             {
-                logInfo(DATA_WRITER, "Data sharing disabled due to security configuration.");
+                EPROSIMA_LOG_INFO(DATA_WRITER, "Data sharing disabled due to security configuration.");
                 return ReturnCode_t::RETCODE_OK;
             }
 #endif // HAVE_SECURITY
 
             if (!has_bound_payload_size)
             {
-                logInfo(DATA_WRITER, "Data sharing disabled because " <<
+                EPROSIMA_LOG_INFO(DATA_WRITER, "Data sharing disabled because " <<
                         (type_.is_bounded() ? "memory policy is not PREALLOCATED" : "data type is not bounded"));
                 return ReturnCode_t::RETCODE_OK;
             }
 
             if (has_key)
             {
-                logInfo(DATA_WRITER, "Data sharing disabled because data type is keyed");
+                EPROSIMA_LOG_INFO(DATA_WRITER, "Data sharing disabled because data type is keyed");
                 return ReturnCode_t::RETCODE_OK;
             }
 
@@ -1911,7 +2024,7 @@ ReturnCode_t DataWriterImpl::check_datasharing_compatible(
             return ReturnCode_t::RETCODE_OK;
             break;
         default:
-            logError(DATA_WRITER, "Unknown data sharing kind.");
+            EPROSIMA_LOG_ERROR(DATA_WRITER, "Unknown data sharing kind.");
             return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }

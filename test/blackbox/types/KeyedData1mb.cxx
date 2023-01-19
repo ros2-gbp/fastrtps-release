@@ -36,9 +36,9 @@ using namespace eprosima::fastcdr::exception;
 
 KeyedData1mb::KeyedData1mb()
 {
-    // m_key com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5d20e46
+    // m_key com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6a1aab78
     m_key = 0;
-    // m_data com.eprosima.idl.parser.typecode.SequenceTypeCode@709ba3fb
+    // m_data com.eprosima.idl.parser.typecode.SequenceTypeCode@69b0fd6f
 
 
 }
@@ -57,7 +57,7 @@ KeyedData1mb::KeyedData1mb(
 }
 
 KeyedData1mb::KeyedData1mb(
-        KeyedData1mb&& x)
+        KeyedData1mb&& x) noexcept 
 {
     m_key = x.m_key;
     m_data = std::move(x.m_data);
@@ -74,7 +74,7 @@ KeyedData1mb& KeyedData1mb::operator =(
 }
 
 KeyedData1mb& KeyedData1mb::operator =(
-        KeyedData1mb&& x)
+        KeyedData1mb&& x) noexcept
 {
 
     m_key = x.m_key;

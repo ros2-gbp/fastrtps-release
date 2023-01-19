@@ -23,6 +23,8 @@
 #define _FAST_DDS_GENERATED_DATA1MB_H_
 
 
+#include <fastrtps/utils/fixed_size_string.hpp>
+
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -91,7 +93,7 @@ public:
      * @param x Reference to the object Data1mb that will be copied.
      */
     eProsima_user_DllExport Data1mb(
-            Data1mb&& x);
+            Data1mb&& x) noexcept;
 
     /*!
      * @brief Copy assignment.
@@ -105,7 +107,7 @@ public:
      * @param x Reference to the object Data1mb that will be copied.
      */
     eProsima_user_DllExport Data1mb& operator =(
-            Data1mb&& x);
+            Data1mb&& x) noexcept;
 
     /*!
      * @brief Comparison operator.

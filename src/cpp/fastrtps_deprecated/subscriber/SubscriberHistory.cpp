@@ -28,6 +28,8 @@
 #include <fastdds/rtps/reader/RTPSReader.h>
 
 #include <fastrtps_deprecated/subscriber/SubscriberImpl.h>
+
+#include <rtps/common/ChangeComparison.hpp>
 #include <rtps/reader/WriterProxy.h>
 #include <utils/collections/sorted_vector_insert.hpp>
 
@@ -160,7 +162,7 @@ bool SubscriberHistory::received_change(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -225,7 +227,7 @@ bool SubscriberHistory::received_change_keep_all_with_key(
             }
             else
             {
-                logWarning(SUBSCRIBER, "Change not added due to maximum number of samples per instance");
+                EPROSIMA_LOG_WARNING(SUBSCRIBER, "Change not added due to maximum number of samples per instance");
             }
         }
     }
@@ -243,7 +245,8 @@ bool SubscriberHistory::received_change_keep_all_with_key(
         else
         {
             // Discarting the sample.
-            logWarning(SUBSCRIBER, "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
+            EPROSIMA_LOG_WARNING(SUBSCRIBER,
+                    "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
         }
     }
 
@@ -294,7 +297,8 @@ bool SubscriberHistory::received_change_keep_last_with_key(
         else
         {
             // Discarting the sample.
-            logWarning(SUBSCRIBER, "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
+            EPROSIMA_LOG_WARNING(SUBSCRIBER,
+                    "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
         }
     }
 
@@ -307,7 +311,8 @@ bool SubscriberHistory::add_received_change(
     if (m_isHistoryFull)
     {
         // Discarding the sample.
-        logWarning(SUBSCRIBER, "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
+        EPROSIMA_LOG_WARNING(SUBSCRIBER,
+                "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
         return false;
     }
 
@@ -318,7 +323,7 @@ bool SubscriberHistory::add_received_change(
             m_isHistoryFull = true;
         }
 
-        logInfo(SUBSCRIBER, topic_att_.getTopicDataType()
+        EPROSIMA_LOG_INFO(SUBSCRIBER, topic_att_.getTopicDataType()
                 << ": Change " << a_change->sequenceNumber << " added from: "
                 << a_change->writerGUID; );
 
@@ -335,7 +340,8 @@ bool SubscriberHistory::add_received_change_with_key(
     if (m_isHistoryFull)
     {
         // Discarting the sample.
-        logWarning(SUBSCRIBER, "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
+        EPROSIMA_LOG_WARNING(SUBSCRIBER,
+                "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
         return false;
     }
 
@@ -348,12 +354,9 @@ bool SubscriberHistory::add_received_change_with_key(
 
         //ADD TO KEY VECTOR
         eprosima::utilities::collections::sorted_vector_insert(instance_changes, a_change,
-                [](const CacheChange_t* lhs, const CacheChange_t* rhs)
-                {
-                    return lhs->sourceTimestamp < rhs->sourceTimestamp;
-                });
+                fastdds::rtps::history_order_cmp);
 
-        logInfo(SUBSCRIBER, mp_reader->getGuid().entityId
+        EPROSIMA_LOG_INFO(SUBSCRIBER, mp_reader->getGuid().entityId
                 << ": Change " << a_change->sequenceNumber << " added from: "
                 << a_change->writerGUID << " with KEY: " << a_change->instanceHandle; );
 
@@ -369,7 +372,7 @@ bool SubscriberHistory::find_key_for_change(
 {
     if (!a_change->instanceHandle.isDefined() && type_ != nullptr)
     {
-        logInfo(SUBSCRIBER, "Getting Key of change with no Key transmitted");
+        EPROSIMA_LOG_INFO(SUBSCRIBER, "Getting Key of change with no Key transmitted");
         type_->deserialize(&a_change->serializedPayload, get_key_object_);
         bool is_key_protected = false;
 #if HAVE_SECURITY
@@ -382,8 +385,8 @@ bool SubscriberHistory::find_key_for_change(
     }
     else if (!a_change->instanceHandle.isDefined())
     {
-        logWarning(SUBSCRIBER, "NO KEY in topic: " << topic_att_.topicName
-                                                   << " and no method to obtain it"; );
+        EPROSIMA_LOG_WARNING(SUBSCRIBER, "NO KEY in topic: " << topic_att_.topicName
+                                                             << " and no method to obtain it"; );
         return false;
     }
 
@@ -400,7 +403,7 @@ bool SubscriberHistory::deserialize_change(
     {
         if (!type_->deserialize(&change->serializedPayload, data))
         {
-            logError(SUBSCRIBER, "Deserialization of data failed");
+            EPROSIMA_LOG_ERROR(SUBSCRIBER, "Deserialization of data failed");
             return false;
         }
     }
@@ -431,7 +434,7 @@ bool SubscriberHistory::readNextData(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -443,7 +446,7 @@ bool SubscriberHistory::readNextData(
         WriterProxy* wp = nullptr;
         if (mp_reader->nextUnreadCache(&change, &wp))
         {
-            logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": reading " << change->sequenceNumber);
+            EPROSIMA_LOG_INFO(SUBSCRIBER, mp_reader->getGuid().entityId << ": reading " << change->sequenceNumber);
             uint32_t ownership = wp && qos_.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
                     wp->ownership_strength() : 0;
             bool deserialized = deserialize_change(change, ownership, data, info);
@@ -461,7 +464,7 @@ bool SubscriberHistory::takeNextData(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -473,7 +476,8 @@ bool SubscriberHistory::takeNextData(
         WriterProxy* wp = nullptr;
         if (mp_reader->nextUntakenCache(&change, &wp))
         {
-            logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": taking seqNum" << change->sequenceNumber <<
+            EPROSIMA_LOG_INFO(SUBSCRIBER,
+                    mp_reader->getGuid().entityId << ": taking seqNum" << change->sequenceNumber <<
                     " from writer: " << change->writerGUID);
             uint32_t ownership = wp && qos_.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
                     wp->ownership_strength() : 0;
@@ -531,7 +535,7 @@ bool SubscriberHistory::find_key(
                 return true;
             }
         }
-        logWarning(SUBSCRIBER, "History has reached the maximum number of instances");
+        EPROSIMA_LOG_WARNING(SUBSCRIBER, "History has reached the maximum number of instances");
     }
     return false;
 }
@@ -541,7 +545,7 @@ bool SubscriberHistory::remove_change_sub(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -564,7 +568,7 @@ bool SubscriberHistory::remove_change_sub(
         }
         if (!found)
         {
-            logError(SUBSCRIBER, "Change not found on this key, something is wrong");
+            EPROSIMA_LOG_ERROR(SUBSCRIBER, "Change not found on this key, something is wrong");
         }
     }
 
@@ -583,7 +587,7 @@ bool SubscriberHistory::remove_change_sub(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -607,14 +611,14 @@ bool SubscriberHistory::remove_change_sub(
         }
         if (!found)
         {
-            logError(SUBSCRIBER, "Change not found on this key, something is wrong");
+            EPROSIMA_LOG_ERROR(SUBSCRIBER, "Change not found on this key, something is wrong");
         }
     }
 
     const_iterator chit = find_change_nts(change);
     if (chit == changesEnd())
     {
-        logInfo(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
+        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
         return false;
     }
 
@@ -635,7 +639,7 @@ bool SubscriberHistory::set_next_deadline(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
     std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
@@ -665,7 +669,7 @@ bool SubscriberHistory::get_next_deadline(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
     std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
@@ -745,19 +749,16 @@ bool SubscriberHistory::completed_change_keep_all_with_key(
             {
                 //ADD TO KEY VECTOR
                 eprosima::utilities::collections::sorted_vector_insert(instance_changes, a_change,
-                        [](const CacheChange_t* lhs, const CacheChange_t* rhs)
-                        {
-                            return lhs->sourceTimestamp < rhs->sourceTimestamp;
-                        });
+                        fastdds::rtps::history_order_cmp);
                 ret_value = true;
 
-                logInfo(SUBSCRIBER, mp_reader->getGuid().entityId
+                EPROSIMA_LOG_INFO(SUBSCRIBER, mp_reader->getGuid().entityId
                         << ": Change " << a_change->sequenceNumber << " added from: "
                         << a_change->writerGUID << " with KEY: " << a_change->instanceHandle; );
             }
             else
             {
-                logWarning(SUBSCRIBER, "Change not added due to maximum number of samples per instance");
+                EPROSIMA_LOG_WARNING(SUBSCRIBER, "Change not added due to maximum number of samples per instance");
 
                 const_iterator chit = find_change_nts(a_change);
                 if (chit != changesEnd())
@@ -767,7 +768,7 @@ bool SubscriberHistory::completed_change_keep_all_with_key(
                 }
                 else
                 {
-                    logError(RTPS_WRITER_HISTORY, "Change should exists but didn't find it");
+                    EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY, "Change should exists but didn't find it");
                 }
             }
         }
@@ -804,13 +805,10 @@ bool SubscriberHistory::completed_change_keep_last_with_key(
             {
                 //ADD TO KEY VECTOR
                 eprosima::utilities::collections::sorted_vector_insert(instance_changes, a_change,
-                        [](const CacheChange_t* lhs, const CacheChange_t* rhs)
-                        {
-                            return lhs->sourceTimestamp < rhs->sourceTimestamp;
-                        });
+                        fastdds::rtps::history_order_cmp);
                 ret_value = true;
 
-                logInfo(SUBSCRIBER, mp_reader->getGuid().entityId
+                EPROSIMA_LOG_INFO(SUBSCRIBER, mp_reader->getGuid().entityId
                         << ": Change " << a_change->sequenceNumber << " added from: "
                         << a_change->writerGUID << " with KEY: " << a_change->instanceHandle; );
             }
@@ -824,7 +822,7 @@ bool SubscriberHistory::completed_change_keep_last_with_key(
                 }
                 else
                 {
-                    logError(RTPS_WRITER_HISTORY, "Change should exists but didn't find it");
+                    EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY, "Change should exists but didn't find it");
                 }
             }
         }

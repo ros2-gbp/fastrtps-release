@@ -20,6 +20,7 @@
 #define _FASTDDS_RTPS_CACHECHANGE_H_
 
 #include <cassert>
+#include <atomic>
 
 #include <fastdds/rtps/common/ChangeKind_t.hpp>
 #include <fastdds/rtps/common/FragmentNumber.h>
@@ -48,6 +49,8 @@ struct CacheChangeWriterInfo_t
     //! Used to link with next node in a list. Used by FlowControllerImpl.
     //! Cannot be cached because there are several comparisons without locking.
     CacheChange_t* volatile next = nullptr;
+    //! Used to know if the object is already in a list.
+    std::atomic_bool is_linked {false};
 };
 
 /*!
@@ -61,6 +64,8 @@ struct CacheChangeReaderInfo_t
     int32_t disposed_generation_count;
     //! No-writers generation of the instance when this entry was added to it
     int32_t no_writers_generation_count;
+    //! Ownership stregth of its writer when the sample was received.
+    uint32_t writer_ownership_strength;
 };
 
 /**
@@ -169,7 +174,7 @@ struct RTPS_DllAPI CacheChange_t
         setFragmentSize(ch_ptr->fragment_size_, false);
     }
 
-    ~CacheChange_t()
+    virtual ~CacheChange_t()
     {
         if (payload_owner_ != nullptr)
         {
@@ -203,6 +208,14 @@ struct RTPS_DllAPI CacheChange_t
     bool is_fully_assembled()
     {
         return first_missing_fragment_ >= fragment_count_;
+    }
+
+    /*! Checks if the first fragment is present.
+     * @return true when it contains the first fragment. In other case, false.
+     */
+    bool contains_first_fragment()
+    {
+        return 0 < first_missing_fragment_;
     }
 
     /*!

@@ -36,7 +36,7 @@ using namespace eprosima::fastcdr::exception;
 
 Data1mb::Data1mb()
 {
-    // m_data com.eprosima.idl.parser.typecode.SequenceTypeCode@53ca01a2
+    // m_data com.eprosima.idl.parser.typecode.SequenceTypeCode@76707e36
 
 
 }
@@ -52,7 +52,7 @@ Data1mb::Data1mb(
 }
 
 Data1mb::Data1mb(
-        Data1mb&& x)
+        Data1mb&& x) noexcept 
 {
     m_data = std::move(x.m_data);
 }
@@ -67,7 +67,7 @@ Data1mb& Data1mb::operator =(
 }
 
 Data1mb& Data1mb::operator =(
-        Data1mb&& x)
+        Data1mb&& x) noexcept
 {
 
     m_data = std::move(x.m_data);

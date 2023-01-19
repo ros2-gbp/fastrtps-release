@@ -48,6 +48,7 @@
 #include <rtps/RTPSDomainImpl.hpp>
 #include <rtps/history/CacheChangePool.h>
 #include <rtps/messages/RTPSGapBuilder.hpp>
+#include <rtps/network/ExternalLocatorsProcessor.hpp>
 
 #include "../builtin/discovery/database/DiscoveryDataBase.hpp"
 
@@ -310,7 +311,7 @@ void StatefulWriter::init(
 
 StatefulWriter::~StatefulWriter()
 {
-    logInfo(RTPS_WRITER, "StatefulWriter destructor");
+    EPROSIMA_LOG_INFO(RTPS_WRITER, "StatefulWriter destructor");
 
     // Disable timed events, because their callbacks use cache changes
     if (disable_positive_acks_)
@@ -379,7 +380,7 @@ void StatefulWriter::prepare_datasharing_delivery(
     assert (pool != nullptr);
 
     pool->add_to_shared_history(change);
-    logInfo(RTPS_WRITER, "Notifying readers of cache change with SN " << change->sequenceNumber);
+    EPROSIMA_LOG_INFO(RTPS_WRITER, "Notifying readers of cache change with SN " << change->sequenceNumber);
 }
 
 void StatefulWriter::unsent_change_added_to_history(
@@ -450,7 +451,7 @@ void StatefulWriter::unsent_change_added_to_history(
     }
     else
     {
-        logInfo(RTPS_WRITER, "No reader proxy to add change.");
+        EPROSIMA_LOG_INFO(RTPS_WRITER, "No reader proxy to add change.");
         check_acked_status();
     }
 
@@ -529,7 +530,7 @@ bool StatefulWriter::change_removed_by_history(
     SequenceNumber_t sequence_number = a_change->sequenceNumber;
 
     std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
-    logInfo(RTPS_WRITER, "Change " << sequence_number << " to be removed.");
+    EPROSIMA_LOG_INFO(RTPS_WRITER, "Change " << sequence_number << " to be removed.");
 
     flow_controller_->remove_change(a_change);
 
@@ -555,7 +556,7 @@ bool StatefulWriter::change_removed_by_history(
         assert (pool != nullptr);
 
         pool->remove_from_shared_history(a_change);
-        logInfo(RTPS_WRITER, "Removing shared cache change with SN " << a_change->sequenceNumber);
+        EPROSIMA_LOG_INFO(RTPS_WRITER, "Removing shared cache change with SN " << a_change->sequenceNumber);
     }
 
     may_remove_change_ = 2;
@@ -911,7 +912,7 @@ DeliveryRetCode StatefulWriter::deliver_sample_to_network(
                                 }
                                 else
                                 {
-                                    logError(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
+                                    EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
                                     ret_code = DeliveryRetCode::NOT_DELIVERED;
                                 }
                             }
@@ -927,7 +928,7 @@ DeliveryRetCode StatefulWriter::deliver_sample_to_network(
         }
         catch (const RTPSMessageGroup::timeout&)
         {
-            logError(RTPS_WRITER, "Max blocking time reached");
+            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Max blocking time reached");
             ret_code = DeliveryRetCode::NOT_DELIVERED;
         }
         catch (const RTPSMessageGroup::limit_exceeded&)
@@ -994,9 +995,11 @@ void StatefulWriter::select_all_readers_nts(
 bool StatefulWriter::matched_reader_add(
         const ReaderProxyData& rdata)
 {
+    using fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators;
+
     if (rdata.guid() == c_Guid_Unknown)
     {
-        logError(RTPS_WRITER, "Reliable Writer need GUID_t of matched readers");
+        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Reliable Writer need GUID_t of matched readers");
         return false;
     }
 
@@ -1010,9 +1013,13 @@ bool StatefulWriter::matched_reader_add(
             {
                 if (reader->guid() == rdata.guid())
                 {
-                    logInfo(RTPS_WRITER, "Attempting to add existing reader, updating information.");
+                    EPROSIMA_LOG_INFO(RTPS_WRITER, "Attempting to add existing reader, updating information.");
                     if (reader->update(rdata))
                     {
+                        filter_remote_locators(*reader->general_locator_selector_entry(),
+                        m_att.external_unicast_locators, m_att.ignore_non_matching_locators);
+                        filter_remote_locators(*reader->async_locator_selector_entry(),
+                        m_att.external_unicast_locators, m_att.ignore_non_matching_locators);
                         update_reader_info(locator_selector_general_, true);
                         update_reader_info(locator_selector_async_, true);
                     }
@@ -1045,7 +1052,7 @@ bool StatefulWriter::matched_reader_add(
         }
         else
         {
-            logWarning(RTPS_WRITER, "Maximum number of reader proxies (" << max_readers <<
+            EPROSIMA_LOG_WARNING(RTPS_WRITER, "Maximum number of reader proxies (" << max_readers <<
                     ") reached for writer " << m_guid);
             return false;
         }
@@ -1058,28 +1065,32 @@ bool StatefulWriter::matched_reader_add(
 
     // Add info of new datareader.
     rp->start(rdata, is_datasharing_compatible_with(rdata));
-    locator_selector_general_.locator_selector.add_entry(rp->locator_selector_entry());
-    locator_selector_async_.locator_selector.add_entry(rp->locator_selector_entry());
+    filter_remote_locators(*rp->general_locator_selector_entry(),
+            m_att.external_unicast_locators, m_att.ignore_non_matching_locators);
+    filter_remote_locators(*rp->async_locator_selector_entry(),
+            m_att.external_unicast_locators, m_att.ignore_non_matching_locators);
+    locator_selector_general_.locator_selector.add_entry(rp->general_locator_selector_entry());
+    locator_selector_async_.locator_selector.add_entry(rp->async_locator_selector_entry());
 
     if (rp->is_local_reader())
     {
         matched_local_readers_.push_back(rp);
-        logInfo(RTPS_WRITER, "Adding reader " << rdata.guid() << " to " << this->m_guid.entityId
-                                              << " as local reader");
+        EPROSIMA_LOG_INFO(RTPS_WRITER, "Adding reader " << rdata.guid() << " to " << this->m_guid.entityId
+                                                        << " as local reader");
     }
     else
     {
         if (rp->is_datasharing_reader())
         {
             matched_datasharing_readers_.push_back(rp);
-            logInfo(RTPS_WRITER, "Adding reader " << rdata.guid() << " to " << this->m_guid.entityId
-                                                  << " as data sharing");
+            EPROSIMA_LOG_INFO(RTPS_WRITER, "Adding reader " << rdata.guid() << " to " << this->m_guid.entityId
+                                                            << " as data sharing");
         }
         else
         {
             matched_remote_readers_.push_back(rp);
-            logInfo(RTPS_WRITER, "Adding reader " << rdata.guid() << " to " << this->m_guid.entityId
-                                                  << " as remote reader");
+            EPROSIMA_LOG_INFO(RTPS_WRITER, "Adding reader " << rdata.guid() << " to " << this->m_guid.entityId
+                                                            << " as remote reader");
         }
     }
 
@@ -1161,7 +1172,7 @@ bool StatefulWriter::matched_reader_add(
             }
             catch (const RTPSMessageGroup::timeout&)
             {
-                logError(RTPS_WRITER, "Max blocking time reached");
+                EPROSIMA_LOG_ERROR(RTPS_WRITER, "Max blocking time reached");
             }
         }
 
@@ -1181,9 +1192,9 @@ bool StatefulWriter::matched_reader_add(
         rp->acked_changes_set(mp_history->next_sequence_number());
     }
 
-    logInfo(RTPS_WRITER, "Reader Proxy " << rp->guid() << " added to " << this->m_guid.entityId << " with "
-                                         << rdata.remote_locators().unicast.size() << "(u)-"
-                                         << rdata.remote_locators().multicast.size() <<
+    EPROSIMA_LOG_INFO(RTPS_WRITER, "Reader Proxy " << rp->guid() << " added to " << this->m_guid.entityId << " with "
+                                                   << rdata.remote_locators().unicast.size() << "(u)-"
+                                                   << rdata.remote_locators().multicast.size() <<
             "(m) locators");
 
     if (nullptr != mp_listener)
@@ -1211,7 +1222,7 @@ bool StatefulWriter::matched_reader_remove(
     {
         if ((*it)->guid() == reader_guid)
         {
-            logInfo(RTPS_WRITER, "Reader Proxy removed: " << reader_guid);
+            EPROSIMA_LOG_INFO(RTPS_WRITER, "Reader Proxy removed: " << reader_guid);
             rproxy = std::move(*it);
             it = matched_local_readers_.erase(it);
             break;
@@ -1225,7 +1236,7 @@ bool StatefulWriter::matched_reader_remove(
         {
             if ((*it)->guid() == reader_guid)
             {
-                logInfo(RTPS_WRITER, "Reader Proxy removed: " << reader_guid);
+                EPROSIMA_LOG_INFO(RTPS_WRITER, "Reader Proxy removed: " << reader_guid);
                 rproxy = std::move(*it);
                 it = matched_datasharing_readers_.erase(it);
                 break;
@@ -1240,7 +1251,7 @@ bool StatefulWriter::matched_reader_remove(
         {
             if ((*it)->guid() == reader_guid)
             {
-                logInfo(RTPS_WRITER, "Reader Proxy removed: " << reader_guid);
+                EPROSIMA_LOG_INFO(RTPS_WRITER, "Reader Proxy removed: " << reader_guid);
                 rproxy = std::move(*it);
                 it = matched_remote_readers_.erase(it);
                 break;
@@ -1277,7 +1288,7 @@ bool StatefulWriter::matched_reader_remove(
         return true;
     }
 
-    logInfo(RTPS_HISTORY, "Reader Proxy doesn't exist in this writer");
+    EPROSIMA_LOG_INFO(RTPS_HISTORY, "Reader Proxy doesn't exist in this writer");
     return false;
 }
 
@@ -1318,7 +1329,7 @@ bool StatefulWriter::is_acked_by_all(
 
     if (change->writerGUID != this->getGuid())
     {
-        logWarning(RTPS_WRITER, "The given change is not from this Writer");
+        EPROSIMA_LOG_WARNING(RTPS_WRITER, "The given change is not from this Writer");
         return false;
     }
 
@@ -1330,7 +1341,7 @@ bool StatefulWriter::is_acked_by_all(
 {
     assert(mp_history->next_sequence_number() > seq);
     return (seq < next_all_acked_notify_sequence_) ||
-           !for_matched_readers(matched_local_readers_, matched_remote_readers_,
+           !for_matched_readers(matched_local_readers_, matched_datasharing_readers_, matched_remote_readers_,
                    [seq](const ReaderProxy* reader)
                    {
                        return !(reader->change_is_acked(seq));
@@ -1508,7 +1519,7 @@ bool StatefulWriter::try_remove_change(
         const std::chrono::steady_clock::time_point& max_blocking_time_point,
         std::unique_lock<RecursiveTimedMutex>& lock)
 {
-    logInfo(RTPS_WRITER, "Starting process try remove change for writer " << getGuid());
+    EPROSIMA_LOG_INFO(RTPS_WRITER, "Starting process try remove change for writer " << getGuid());
 
     SequenceNumber_t min_low_mark;
 
@@ -1638,7 +1649,7 @@ bool StatefulWriter::send_periodic_heartbeat(
             }
             catch (const RTPSMessageGroup::timeout&)
             {
-                logError(RTPS_WRITER, "Max blocking time reached");
+                EPROSIMA_LOG_ERROR(RTPS_WRITER, "Max blocking time reached");
             }
         }
     }
@@ -1683,7 +1694,7 @@ bool StatefulWriter::send_periodic_heartbeat(
         }
         catch (const RTPSMessageGroup::timeout&)
         {
-            logError(RTPS_WRITER, "Max blocking time reached");
+            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Max blocking time reached");
         }
     }
 
@@ -1732,7 +1743,7 @@ void StatefulWriter::send_heartbeat_to_nts(
             }
             catch (const RTPSMessageGroup::timeout&)
             {
-                logError(RTPS_WRITER, "Max blocking time reached");
+                EPROSIMA_LOG_ERROR(RTPS_WRITER, "Max blocking time reached");
             }
         }
     }
@@ -1776,7 +1787,8 @@ void StatefulWriter::send_heartbeat_nts_(
     // Update calculate of heartbeat piggyback.
     currentUsageSendBufferSize_ = static_cast<int32_t>(sendBufferSize_);
 
-    logInfo(RTPS_WRITER, getGuid().entityId << " Sending Heartbeat (" << firstSeq << " - " << lastSeq << ")" );
+    EPROSIMA_LOG_INFO(RTPS_WRITER,
+            getGuid().entityId << " Sending Heartbeat (" << firstSeq << " - " << lastSeq << ")" );
 }
 
 void StatefulWriter::send_heartbeat_piggyback_nts_(
@@ -2022,7 +2034,7 @@ void StatefulWriter::print_inconsistent_acknack(
         const SequenceNumber_t& max_requested_sequence_number,
         const SequenceNumber_t& next_sequence_number)
 {
-    logWarning(RTPS_WRITER, "Inconsistent acknack received. Local Writer "
+    EPROSIMA_LOG_WARNING(RTPS_WRITER, "Inconsistent acknack received. Local Writer "
             << writer_guid << " next SequenceNumber " << next_sequence_number << ". Remote Reader "
             << reader_guid << " requested range is  [" << min_requested_sequence_number
             << ", " << max_requested_sequence_number << "].");

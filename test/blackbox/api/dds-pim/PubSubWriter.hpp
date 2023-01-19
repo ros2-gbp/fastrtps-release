@@ -295,8 +295,9 @@ public:
             datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
         }
 
-        // By default, memory mode is preallocated (the most restritive)
-        datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
+        datawriter_qos_.endpoint().history_memory_policy =
+                eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         datawriter_qos_.reliable_writer_qos().times.heartbeatPeriod.seconds = 0;
@@ -506,6 +507,7 @@ public:
     bool send_sample(
             type& msg)
     {
+        default_send_print(msg);
         return datawriter_->write((void*)&msg);
     }
 
@@ -1267,6 +1269,14 @@ public:
         return *this;
     }
 
+    PubSubWriter& ownership_strength(
+            uint32_t strength)
+    {
+        datawriter_qos_.ownership().kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
+        datawriter_qos_.ownership_strength().value = strength;
+        return *this;
+    }
+
     PubSubWriter& load_publisher_attr(
             const std::string& /*xml*/)
     {
@@ -1378,6 +1388,11 @@ public:
         publisher_qos_.partition().clear();
         publisher_qos_.partition().push_back(partition.c_str());
         return (ReturnCode_t::RETCODE_OK == publisher_->set_qos(publisher_qos_));
+    }
+
+    bool set_qos()
+    {
+        return (ReturnCode_t::RETCODE_OK == datawriter_->set_qos(datawriter_qos_));
     }
 
     bool remove_all_changes(
