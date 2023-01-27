@@ -1,4 +1,4 @@
-From f58b386c2fb3647f2889886bf3ed3cdf12ad42fb Mon Sep 17 00:00:00 2001
+From 02152c8517c6f8fba093d98fa979668f5fa45411 Mon Sep 17 00:00:00 2001
 From: Chris Lalancette <clalancette@openrobotics.org>
 Date: Thu, 25 Feb 2021 15:09:35 -0500
 Subject: [PATCH] Make sure to set SECURITY=ON when building Fast-RTPS. (#12)
@@ -9,20 +9,20 @@ Signed-off-by: Chris Lalancette <clalancette@openrobotics.org>
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/debian/rules.em b/debian/rules.em
-index 33424088..d56bb299 100755
+index 284a0714..ef66ba8e 100755
 --- a/debian/rules.em
 +++ b/debian/rules.em
-@@ -31,7 +31,9 @@ override_dh_auto_configure:
- 	if [ -f "@(InstallationPrefix)/setup.sh" ]; then . "@(InstallationPrefix)/setup.sh"; fi && \
+@@ -37,7 +37,9 @@ override_dh_auto_configure:
  	dh_auto_configure -- \
  		-DCMAKE_INSTALL_PREFIX="@(InstallationPrefix)" \
--		-DCMAKE_PREFIX_PATH="@(InstallationPrefix)"
-+		-DCMAKE_PREFIX_PATH="@(InstallationPrefix)" \
+ 		-DCMAKE_PREFIX_PATH="@(InstallationPrefix)" \
+-		$(BUILD_TESTING_ARG)
++		$(BUILD_TESTING_ARG) \
 +		-DINSTALL_EXAMPLES=OFF \
 +		-DSECURITY=ON
  
  override_dh_auto_build:
  	# In case we're installing to a non-standard location, look for a setup.sh
 -- 
-2.37.2
+2.34.1
 
