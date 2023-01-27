@@ -42,9 +42,9 @@ ReqRepHelloWorldReplier::ReqRepHelloWorldReplier()
     , initialized_(false)
     , matched_(0)
 {
-    // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-    sattr.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-    puattr.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+    // By default, memory mode is preallocated (the most restritive)
+    sattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
+    puattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
 }
 
 ReqRepHelloWorldReplier::~ReqRepHelloWorldReplier()
@@ -67,14 +67,14 @@ void ReqRepHelloWorldReplier::init()
 
     //Create subscriber
     sattr.topic.topicKind = NO_KEY;
-    sattr.topic.topicDataType = type_.getName();
+    sattr.topic.topicDataType = "HelloWorldType";
     configSubscriber("Request");
     request_subscriber_ = Domain::createSubscriber(participant_, sattr, &request_listener_);
     ASSERT_NE(request_subscriber_, nullptr);
 
     //Create publisher
     puattr.topic.topicKind = NO_KEY;
-    puattr.topic.topicDataType = type_.getName();
+    puattr.topic.topicDataType = "HelloWorldType";
     puattr.topic.topicName = "HelloWorldTopicReply";
     configPublisher("Reply");
     reply_publisher_ = Domain::createPublisher(participant_, puattr, &reply_listener_);
@@ -101,10 +101,9 @@ void ReqRepHelloWorldReplier::wait_discovery()
 
     std::cout << "Replier is waiting discovery..." << std::endl;
 
-    cvDiscovery_.wait(lock, [&]()
-            {
-                return matched_ > 1;
-            });
+    cvDiscovery_.wait(lock, [&](){
+        return matched_ > 1;
+    });
 
     std::cout << "Replier discovery finished..." << std::endl;
 }

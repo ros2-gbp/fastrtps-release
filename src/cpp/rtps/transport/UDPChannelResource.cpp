@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/UDPChannelResource.h>
-
 #include <asio.hpp>
+#include <fastdds/rtps/transport/UDPTransportInterface.h>
+#include <fastdds/rtps/transport/UDPChannelResource.h>
 #include <fastdds/rtps/messages/MessageReceiver.h>
-#include <rtps/transport/UDPTransportInterface.h>
 
 namespace eprosima {
 namespace fastdds {
 namespace rtps {
 
+using Locator_t = fastrtps::rtps::Locator_t;
 using octet = fastrtps::rtps::octet;
 using Log = fastdds::dds::Log;
 
@@ -29,7 +29,7 @@ UDPChannelResource::UDPChannelResource(
         UDPTransportInterface* transport,
         eProsimaUDPSocket& socket,
         uint32_t maxMsgSize,
-        const Locator& locator,
+        const Locator_t& locator,
         const std::string& sInterface,
         TransportReceiverInterface* receiver)
     : ChannelResource(maxMsgSize)
@@ -50,10 +50,9 @@ UDPChannelResource::~UDPChannelResource()
     socket()->close(ec);
 }
 
-void UDPChannelResource::perform_listen_operation(
-        Locator input_locator)
+void UDPChannelResource::perform_listen_operation(Locator_t input_locator)
 {
-    Locator remote_locator;
+    Locator_t remote_locator;
 
     while (alive())
     {
@@ -71,7 +70,7 @@ void UDPChannelResource::perform_listen_operation(
         }
         else if (alive())
         {
-            EPROSIMA_LOG_WARNING(RTPS_MSG_IN, "Received Message, but no receiver attached");
+            logWarning(RTPS_MSG_IN, "Received Message, but no receiver attached");
         }
     }
 
@@ -82,7 +81,7 @@ bool UDPChannelResource::Receive(
         octet* receive_buffer,
         uint32_t receive_buffer_capacity,
         uint32_t& receive_buffer_size,
-        Locator& remote_locator)
+        Locator_t& remote_locator)
 {
     try
     {
@@ -104,8 +103,8 @@ bool UDPChannelResource::Receive(
     catch (const std::exception& error)
     {
         (void)error;
-        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, "Error receiving data: " << error.what() << " - " << message_receiver()
-                                                                    << " (" << this << ")");
+        logWarning(RTPS_MSG_OUT, "Error receiving data: " << error.what() << " - " << message_receiver()
+            << " (" << this << ")");
         return false;
     }
 }

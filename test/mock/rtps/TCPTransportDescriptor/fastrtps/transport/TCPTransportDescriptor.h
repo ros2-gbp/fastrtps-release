@@ -17,14 +17,14 @@
 
 #include <fastrtps/transport/SocketTransportDescriptor.h>
 
-namespace eprosima {
-namespace fastrtps {
-namespace rtps {
+namespace eprosima{
+namespace fastrtps{
+namespace rtps{
 
 /**
- * Transport configuration
- * @ingroup TRANSPORT_MODULE
- */
+* Transport configuration
+* @ingroup TRANSPORT_MODULE
+*/
 typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
 {
     struct TLSConfig
@@ -71,28 +71,23 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
         int32_t verify_depth = -1; // don't override
         std::string rsa_private_key_file;
         TLSHandShakeRole handshake_role;
-        std::string server_name;
 
-        void add_verify_mode(
-                const TLSVerifyMode verify)
+        void add_verify_mode(const TLSVerifyMode verify)
         {
             verify_mode |= verify;
         }
 
-        bool get_verify_mode(
-                const TLSVerifyMode verify) const
+        bool get_verify_mode(const TLSVerifyMode verify) const
         {
             return (verify_mode & verify) == verify;
         }
 
-        void add_option(
-                const TLSOptions option)
+        void add_option(const TLSOptions option)
         {
             options |= option;
         }
 
-        bool get_option(
-                const TLSOptions option) const
+        bool get_option(const TLSOptions option) const
         {
             return (options & option) == option;
         }
@@ -104,8 +99,7 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
         {
         }
 
-        TLSConfig(
-                const TLSConfig& t)
+        TLSConfig(const TLSConfig& t)
             : password(t.password)
             , options(t.options)
             , cert_chain_file(t.cert_chain_file)
@@ -118,12 +112,10 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
             , verify_depth(t.verify_depth)
             , rsa_private_key_file(t.rsa_private_key_file)
             , handshake_role(t.handshake_role)
-            , server_name(t.server_name)
         {
         }
 
-        TLSConfig(
-                TLSConfig&& t)
+        TLSConfig(TLSConfig&& t)
             : password(std::move(t.password))
             , options(std::move(t.options))
             , cert_chain_file(std::move(t.cert_chain_file))
@@ -136,12 +128,10 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
             , verify_depth(std::move(t.verify_depth))
             , rsa_private_key_file(std::move(t.rsa_private_key_file))
             , handshake_role(std::move(t.handshake_role))
-            , server_name(std::move(t.server_name))
         {
         }
 
-        TLSConfig& operator =(
-                const TLSConfig& t)
+        TLSConfig& operator=(const TLSConfig& t)
         {
             password = t.password;
             options = t.options;
@@ -155,11 +145,9 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
             verify_depth = t.verify_depth;
             rsa_private_key_file = t.rsa_private_key_file;
             handshake_role = t.handshake_role;
-            server_name = t.server_name;
 
             return *this;
         }
-
     };
 
     std::vector<uint16_t> listening_ports;
@@ -168,15 +156,16 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
     uint16_t max_logical_port;
     uint16_t logical_port_range;
     uint16_t logical_port_increment;
+    uint32_t tcp_negotiation_timeout;
     bool enable_tcp_nodelay;
+    bool wait_for_tcp_negotiation;
     bool calculate_crc;
     bool check_crc;
     bool apply_security;
 
     TLSConfig tls_config;
 
-    void add_listener_port(
-            uint16_t port)
+    void add_listener_port(uint16_t port)
     {
         listening_ports.push_back(port);
     }
@@ -187,16 +176,13 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
 
     }
 
-    RTPS_DllAPI TCPTransportDescriptor(
-            const TCPTransportDescriptor& /*t*/)
+    RTPS_DllAPI TCPTransportDescriptor(const TCPTransportDescriptor& /*t*/)
         : SocketTransportDescriptor(65550, 4)
     {
 
     }
 
-    virtual ~TCPTransportDescriptor()
-    {
-    }
+    virtual ~TCPTransportDescriptor() {}
 
 } TCPTransportDescriptor;
 

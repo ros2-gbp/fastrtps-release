@@ -34,7 +34,6 @@ namespace rtps {
 class RTPSParticipantImpl;
 class RTPSWriter;
 class RTPSReader;
-class IDataSharingNotifier;
 
 /**
  * Class ReaderLocator, contains information about a remote reader, without saving its state.
@@ -45,7 +44,7 @@ class ReaderLocator : public RTPSMessageSenderInterface
 {
 public:
 
-    virtual ~ReaderLocator();
+    virtual ~ReaderLocator() = default;
 
     /**
      * Construct a ReaderLocator.
@@ -79,17 +78,12 @@ public:
 
     const GUID_t& remote_guid() const
     {
-        return general_locator_info_.remote_guid;
+        return locator_info_.remote_guid;
     }
 
-    LocatorSelectorEntry* general_locator_selector_entry()
+    LocatorSelectorEntry* locator_selector_entry()
     {
-        return &general_locator_info_;
-    }
-
-    LocatorSelectorEntry* async_locator_selector_entry()
-    {
-        return &async_locator_info_;
+        return &locator_info_;
     }
 
     /**
@@ -99,7 +93,6 @@ public:
      * @param unicast_locators    Unicast locators of the remote reader.
      * @param multicast_locators  Multicast locators of the remote reader.
      * @param expects_inline_qos  Whether remote reader expects to receive inline QoS.
-     * @param is_datasharing      Whether remote reader can be reached through datasharing.
      *
      * @return false when this object was already started, true otherwise.
      */
@@ -107,8 +100,7 @@ public:
             const GUID_t& remote_guid,
             const ResourceLimitedVector<Locator_t>& unicast_locators,
             const ResourceLimitedVector<Locator_t>& multicast_locators,
-            bool expects_inline_qos,
-            bool is_datasharing = false);
+            bool expects_inline_qos);
 
     /**
      * Try to update information of this object.
@@ -135,11 +127,6 @@ public:
             const GUID_t& remote_guid);
 
     /**
-     * Try to stop using this object for an unmatched reader.
-     */
-    void stop();
-
-    /**
      * Check if the destinations managed by this sender interface have changed.
      *
      * @return true if destinations have changed, false otherwise.
@@ -158,7 +145,7 @@ public:
      */
     GuidPrefix_t destination_guid_prefix() const override
     {
-        return general_locator_info_.remote_guid.guidPrefix;
+        return locator_info_.remote_guid.guidPrefix;
     }
 
     /**
@@ -189,86 +176,23 @@ public:
      */
     bool send(
             CDRMessage_t* message,
-            std::chrono::steady_clock::time_point max_blocking_time_point) const override;
-
-    /**
-     * Check if the reader is datasharing compatible with this writer
-     * @return true if the reader datasharing compatible with this writer
-     */
-    bool is_datasharing_reader() const;
-
-    /**
-     * @return The datasharing notifier for this reader or nullptr if the reader is not datasharing.
-     */
-    IDataSharingNotifier* datasharing_notifier()
-    {
-        return datasharing_notifier_;
-    }
-
-    /**
-     * @return The datasharing notifier for this reader or nullptr if the reader is not datasharing.
-     */
-    const IDataSharingNotifier* datasharing_notifier() const
-    {
-        return datasharing_notifier_;
-    }
-
-    /**
-     * Performs datasharing notification of changes on the state of a writer to the reader represented by this class.
-     */
-    void datasharing_notify();
-
-    size_t locators_size() const
-    {
-        if (general_locator_info_.remote_guid != c_Guid_Unknown && !is_local_reader_)
-        {
-            if (general_locator_info_.unicast.size() > 0)
-            {
-                return general_locator_info_.unicast.size();
-            }
-            else
-            {
-                return general_locator_info_.multicast.size();
-            }
-        }
-
-        return 0;
-
-    }
-
-    /*
-     * Do nothing.
-     * This object always is protected by writer's mutex.
-     */
-    void lock() override
-    {
-    }
-
-    /*
-     * Do nothing.
-     * This object always is protected by writer's mutex.
-     */
-    void unlock() override
-    {
-    }
+            std::chrono::steady_clock::time_point& max_blocking_time_point) const override;
 
 private:
 
     RTPSWriter* owner_;
     RTPSParticipantImpl* participant_owner_;
-    LocatorSelectorEntry general_locator_info_;
-    LocatorSelectorEntry async_locator_info_;
+    LocatorSelectorEntry locator_info_;
     bool expects_inline_qos_;
     bool is_local_reader_;
     RTPSReader* local_reader_;
     std::vector<GuidPrefix_t> guid_prefix_as_vector_;
     std::vector<GUID_t> guid_as_vector_;
-    IDataSharingNotifier* datasharing_notifier_;
 };
 
 } /* namespace rtps */
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+#endif
 #endif /* _FASTDDS_RTPS_READERLOCATOR_H_ */

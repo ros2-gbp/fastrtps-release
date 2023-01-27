@@ -27,50 +27,28 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-enum communication_type
-{
-    TRANSPORT,
-    INTRAPROCESS,
-    DATASHARING
-};
-
-class DeadlineQos : public testing::TestWithParam<communication_type>
+class DeadlineQos : public testing::TestWithParam<bool>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = true;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
+
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = false;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
     }
 
@@ -83,8 +61,8 @@ TEST_P(DeadlineQos, NoKeyTopicLongDeadline)
     // not missed
     // Uses a topic with no key
 
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 10;
@@ -127,8 +105,8 @@ TEST_P(DeadlineQos, NoKeyTopicShortDeadline)
     // makes the writer send a few samples and checks that the deadline was missed every time
     // Uses a topic with no key
 
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 1000;
@@ -172,8 +150,8 @@ TEST_P(DeadlineQos, KeyedTopicLongDeadline)
     // makes the writer send a few samples and checks that the deadline was met
     // Uses a topic with key
 
-    PubSubReader<KeyedHelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<KeyedHelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 10;
@@ -217,8 +195,8 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
     // makes the writer send a few samples and checks that the deadline was missed every time
     // Uses a topic with key
 
-    PubSubReader<KeyedHelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<KeyedHelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Number of samples to send
     uint32_t writer_samples = 4;
@@ -263,7 +241,7 @@ TEST_P(DeadlineQos, KeyedTopicShortDeadline)
  */
 TEST_P(DeadlineQos, KeyedTopicNoReaderVolatileWriterSetDeadline)
 {
-    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.durability_kind(VOLATILE_DURABILITY_QOS);
 
@@ -287,8 +265,8 @@ TEST_P(DeadlineQos, KeyedTopicNoReaderVolatileWriterSetDeadline)
  */
 TEST_P(DeadlineQos, KeyedTopicBestEffortReaderVolatileWriterSetDeadline)
 {
-    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
-    PubSubReader<KeyedHelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<KeyedHelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<KeyedHelloWorldType> reader(TEST_TOPIC_NAME);
 
     writer.durability_kind(VOLATILE_DURABILITY_QOS);
 
@@ -319,19 +297,12 @@ TEST_P(DeadlineQos, KeyedTopicBestEffortReaderVolatileWriterSetDeadline)
 
 GTEST_INSTANTIATE_TEST_MACRO(DeadlineQos,
         DeadlineQos,
-        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
+        testing::Values(false, true),
         [](const testing::TestParamInfo<DeadlineQos::ParamType>& info)
         {
-            switch (info.param)
+            if (info.param)
             {
-                case INTRAPROCESS:
-                    return "Intraprocess";
-                    break;
-                case DATASHARING:
-                    return "Datasharing";
-                    break;
-                case TRANSPORT:
-                default:
-                    return "Transport";
+                return "Intraprocess";
             }
+            return "NonIntraprocess";
         });

@@ -21,7 +21,6 @@
 
 #include <fastdds/rtps/common/Locator.h>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
-#include <fastdds/dds/log/Log.hpp>
 
 namespace eprosima {
 namespace fastrtps {
@@ -139,31 +138,19 @@ inline std::ostream& operator <<(
         std::ostream& output,
         const RemoteLocatorList& remote_locators)
 {
-    // Stored multicast locators
-    output << "{";
-    if (!remote_locators.multicast.empty())
+    output << remote_locators.multicast.max_size() << ",";
+    output << remote_locators.multicast.size() << ",";
+    output << remote_locators.unicast.max_size() << ",";
+    output << remote_locators.unicast.size() << "(";
+    for (auto it = remote_locators.multicast.begin(); it != remote_locators.multicast.end(); ++it)
     {
-        output << "MULTICAST:[";
-        output << remote_locators.multicast[0];
-        for (auto it = remote_locators.multicast.begin() + 1; it != remote_locators.multicast.end(); ++it)
-        {
-            output << "," << *it;
-        }
-        output << "]";
+        output << *it << ",";
     }
-
-    // Stored unicast locators
-    if (!remote_locators.unicast.empty())
+    for (auto it = remote_locators.unicast.begin(); it != remote_locators.unicast.end(); ++it)
     {
-        output << "UNICAST:[";
-        output << remote_locators.unicast[0];
-        for (auto it = remote_locators.unicast.begin() + 1; it != remote_locators.unicast.end(); ++it)
-        {
-            output << "," << *it;
-        }
-        output << "]";
+        output << *it << ",";
     }
-    output << "}";
+    output << ")";
     return output;
 }
 
@@ -172,59 +159,46 @@ inline std::istream& operator >>(
         RemoteLocatorList& locList)
 {
     std::istream::sentry s(input);
-    locList = RemoteLocatorList();
 
     if (s)
     {
-        char punct;
-        char letter;
+        unsigned long size_m, size_m_max, size_u, size_u_max;
+        char coma;
         Locator_t l;
         std::ios_base::iostate excp_mask = input.exceptions();
 
         try
         {
             input.exceptions(excp_mask | std::ios_base::failbit | std::ios_base::badbit);
-            std::stringbuf sb_aux;
-            Locator_t locator;
 
-            // Read {_
-            input >> punct >> letter;
+            input >> size_m_max >> coma >> size_m >> coma;
+            input >> size_u_max >> coma >> size_u >> coma; // last coma is (
 
-            if (letter == 'M')
+            // locList = RemoteLocatorList(size_u_max, size_m_max);
+
+            for (unsigned int i = 0; i < size_m; ++i)
             {
-                input.get(sb_aux, '[');
-
-                // Read every locator
-                while (punct != ']')
+                input >> l >> coma;
+                if ( coma != ',')
                 {
-                    input >> locator;
-                    locList.add_multicast_locator(locator);
-                    input >> punct;
+                    input.setstate(std::ios_base::failbit);
                 }
-
-                input >> letter;
+                locList.add_multicast_locator(l);
             }
 
-            if (letter == 'U')
+            for (unsigned int i = 0; i < size_u; ++i)
             {
-                input >> punct;
-
-                // Read every locator
-                while (punct != ']')
+                input >> l >> coma;
+                if ( coma != ',')
                 {
-                    input >> locator;
-                    locList.add_unicast_locator(locator);
-                    input >> punct;
+                    input.setstate(std::ios_base::failbit);
                 }
-
-                input >> letter;
+                locList.add_unicast_locator(l);
             }
+            input >> coma; // read )
         }
         catch (std::ios_base::failure& )
         {
-            locList.unicast.clear();
-            locList.multicast.clear();
-            EPROSIMA_LOG_WARNING(REMOTE_LOCATOR_LIST, "Error deserializing RemoteLocatorList");
         }
 
         input.exceptions(excp_mask);

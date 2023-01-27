@@ -41,7 +41,7 @@ Publisher::~Publisher()
 bool Publisher::write(
         void* Data)
 {
-    EPROSIMA_LOG_INFO(PUBLISHER, "Writing new data");
+    logInfo(PUBLISHER, "Writing new data");
     return mp_impl->create_new_change(ALIVE, Data);
 }
 
@@ -49,7 +49,7 @@ bool Publisher::write(
         void* Data,
         WriteParams& wparams)
 {
-    EPROSIMA_LOG_INFO(PUBLISHER, "Writing new data with WriteParams");
+    logInfo(PUBLISHER, "Writing new data with WriteParams");
     return mp_impl->create_new_change_with_params(ALIVE, Data, wparams);
 }
 
@@ -63,7 +63,7 @@ bool Publisher::dispose(
         void* data,
         const rtps::InstanceHandle_t& handle)
 {
-    EPROSIMA_LOG_INFO(PUBLISHER, "Disposing of Data");
+    logInfo(PUBLISHER, "Disposing of Data");
     return mp_impl->unregister_instance(data, handle, true);
 }
 
@@ -78,14 +78,14 @@ bool Publisher::unregister_instance(
 bool Publisher::removeAllChange(
         size_t* removed )
 {
-    EPROSIMA_LOG_INFO(PUBLISHER, "Removing all data from history");
+    logInfo(PUBLISHER, "Removing all data from history");
     return mp_impl->removeAllChange(removed);
 }
 
 bool Publisher::wait_for_all_acked(
         const eprosima::fastrtps::Duration_t& max_wait)
 {
-    EPROSIMA_LOG_INFO(PUBLISHER, "Waiting for all samples acknowledged");
+    logInfo(PUBLISHER, "Waiting for all samples acknowledged");
     return mp_impl->wait_for_all_acked(max_wait);
 }
 
@@ -120,10 +120,4 @@ void Publisher::get_liveliness_lost_status(
 void Publisher::assert_liveliness()
 {
     mp_impl->assert_liveliness();
-}
-
-void Publisher::get_sending_locators(
-        rtps::LocatorList_t& locators) const
-{
-    mp_impl->get_sending_locators(locators);
 }

@@ -21,25 +21,36 @@
 #define _FASTDDS_RTPS_PDP_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <atomic>
 #include <mutex>
 #include <functional>
 
+#include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
-#include <fastdds/rtps/common/Guid.h>
-#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
 #include <fastrtps/qos/QosPolicies.h>
-#include <fastrtps/utils/ProxyPool.hpp>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
+#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
 
 namespace eprosima {
 
 namespace fastdds {
 namespace rtps {
 
-class PDPServerListener;
+class PDPServerListener2;
+
+/**
+ * Struct to define participant types to set participant type parameter property
+ *@ingroup DISCOVERY_MODULE
+ */
+struct ParticipantType
+{
+    static const char SIMPLE[];
+    static const char SERVER[];
+    static const char CLIENT[];
+    static const char BACKUP[];
+    static const char SUPER_CLIENT[];
+};
 
 } // namespace rtps
 } // namespace fastdds
@@ -73,7 +84,7 @@ class PDP
 {
     friend class PDPListener;
     friend class PDPServerListener;
-    friend class fastdds::rtps::PDPServerListener;
+    friend class fastdds::rtps::PDPServerListener2;
 
 public:
 
@@ -99,11 +110,6 @@ public:
     bool initPDP(
             RTPSParticipantImpl* part);
 
-    /**
-     * @brief Enable the Participant Discovery Protocol
-     *
-     * @return true if enabled correctly, or if already enabled; false otherwise
-     */
     bool enable();
 
     virtual bool init(
@@ -358,24 +364,6 @@ public:
      */
     std::list<eprosima::fastdds::rtps::RemoteServerAttributes>& remote_server_attributes();
 
-    /**
-     * Access the temporary proxy pool for reader proxies
-     * @return pool reference
-     */
-    ProxyPool<ReaderProxyData>& get_temporary_reader_proxies_pool()
-    {
-        return temp_reader_proxies_;
-    }
-
-    /**
-     * Access the temporary proxy pool for writer proxies
-     * @return pool reference
-     */
-    ProxyPool<WriterProxyData>& get_temporary_writer_proxies_pool()
-    {
-        return temp_writer_proxies_;
-    }
-
 protected:
 
     //!Pointer to the builtin protocols object.
@@ -416,16 +404,16 @@ protected:
     ReaderHistory* mp_PDPReaderHistory;
     //!Reader payload pool
     std::shared_ptr<ITopicPayloadPool> reader_payload_pool_;
-    //! ProxyPool for temporary reader proxies
-    ProxyPool<ReaderProxyData> temp_reader_proxies_;
-    //! ProxyPool for temporary writer proxies
-    ProxyPool<WriterProxyData> temp_writer_proxies_;
+    //!ReaderProxyData to allow preallocation of remote locators
+    ReaderProxyData temp_reader_data_;
+    //!WriterProxyData to allow preallocation of remote locators
+    WriterProxyData temp_writer_data_;
+    //!To protect temp_writer_data_ and temp_reader_data_
+    std::mutex temp_data_lock_;
     //!Participant data atomic access assurance
     std::recursive_mutex* mp_mutex;
     //!To protect callbacks (ParticipantProxyData&)
     std::mutex callback_mtx_;
-    //!Tell if object is enabled
-    std::atomic<bool> enabled_ {false};
 
     /**
      * Adds an entry to the collection of participant proxy information.
@@ -433,14 +421,12 @@ protected:
      *
      * @param participant_guid GUID of the participant for which to create the proxy object.
      * @param with_lease_duration indicates whether lease duration event should be created.
-     * @param participant_proxy_data The participant proxy data from which the copy is made (if provided)
      *
      * @return pointer to the currently inserted entry, nullptr if allocation limits were reached.
      */
     ParticipantProxyData* add_participant_proxy_data(
             const GUID_t& participant_guid,
-            bool with_lease_duration,
-            const ParticipantProxyData* participant_proxy_data = nullptr);
+            bool with_lease_duration);
 
     /**
      * Gets the key of a participant proxy data.
@@ -491,11 +477,6 @@ private:
      */
     void set_initial_announcement_interval();
 
-    /**
-     * Set to a Participant Proxy those properties from this participant that must be sent.
-     */
-    void set_external_participant_properties_(
-            ParticipantProxyData* participant_data);
 };
 
 

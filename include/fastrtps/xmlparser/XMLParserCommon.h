@@ -19,6 +19,9 @@ namespace eprosima {
 namespace fastrtps {
 namespace xmlparser {
 
+#define draw(ident, text, ...) for (uint8_t i = ident + 1; i > 0; --i)(i == 1) ? printf(text, ## __VA_ARGS__) : printf( \
+        "\t")
+
 /**
  * Enum class XMLP_ret, used to provide a strongly typed result from the operations within this module.
  * @ingroup XMLPARSER_MODULE
@@ -33,8 +36,6 @@ enum class XMLP_ret
 
 extern const char* DEFAULT_FASTRTPS_ENV_VARIABLE;
 extern const char* DEFAULT_FASTRTPS_PROFILES;
-extern const char* DEFAULT_STATISTICS_DATAWRITER_PROFILE;
-extern const char* SKIP_DEFAULT_XML_FILE;
 
 extern const char* ROOT;
 extern const char* PROFILES;
@@ -80,7 +81,6 @@ extern const char* HEALTHY_CHECK_TIMEOUT_MS;
 extern const char* DISCARD;
 extern const char* FAIL;
 extern const char* RTPS_DUMP_FILE;
-extern const char* ON;
 
 // IntraprocessDeliveryType
 extern const char* OFF;
@@ -101,7 +101,6 @@ extern const char* INTRAPROCESS_DELIVERY;
 extern const char* ALLOCATION;
 extern const char* PREFIX;
 extern const char* DEF_UNI_LOC_LIST;
-extern const char* DEF_EXT_UNI_LOC_LIST;
 extern const char* DEF_MULTI_LOC_LIST;
 extern const char* SEND_SOCK_BUF_SIZE;
 extern const char* LIST_SOCK_BUF_SIZE;
@@ -136,7 +135,6 @@ extern const char* MAX_PARTITIONS;
 extern const char* TOPIC;
 extern const char* QOS;
 extern const char* TIMES;
-extern const char* EXT_UNI_LOC_LIST;
 extern const char* UNI_LOC_LIST;
 extern const char* MULTI_LOC_LIST;
 extern const char* REM_LOC_LIST;
@@ -150,7 +148,6 @@ extern const char* MATCHED_SUBSCRIBERS_ALLOCATION;
 extern const char* MATCHED_PUBLISHERS_ALLOCATION;
 
 ///
-extern const char* IGN_NON_MATCHING_LOCS;
 extern const char* PROPERTIES;
 extern const char* BIN_PROPERTIES;
 extern const char* PROPERTY;
@@ -209,8 +206,6 @@ extern const char* TOPIC_DATA;
 extern const char* GROUP_DATA;
 extern const char* PUB_MODE;
 extern const char* DISABLE_POSITIVE_ACKS;
-extern const char* DISABLE_HEARTBEAT_PIGGYBACK;
-extern const char* DATA_SHARING;
 
 extern const char* SYNCHRONOUS;
 extern const char* ASYNCHRONOUS;
@@ -252,7 +247,6 @@ extern const char* HISTORY_QOS;
 extern const char* RES_LIMITS_QOS;
 extern const char* DEPTH;
 extern const char* ALLOCATED_SAMPLES;
-extern const char* EXTRA_SAMPLES;
 extern const char* BYTES_PER_SECOND;
 extern const char* PERIOD_MILLISECS;
 extern const char* PORT_BASE;
@@ -281,7 +275,6 @@ extern const char* LEASE_ANNOUNCE;
 extern const char* INITIAL_ANNOUNCEMENTS;
 extern const char* AVOID_BUILTIN_MULTICAST;
 extern const char* SIMPLE_EDP;
-extern const char* META_EXT_UNI_LOC_LIST;
 extern const char* META_UNI_LOC_LIST;
 extern const char* META_MULTI_LOC_LIST;
 extern const char* INIT_PEERS_LIST;
@@ -293,7 +286,6 @@ extern const char* STATIC;
 extern const char* PUBWRITER_SUBREADER;
 extern const char* PUBREADER_SUBWRITER;
 extern const char* STATIC_ENDPOINT_XML;
-extern const char* STATIC_ENDPOINT_XML_URI;
 extern const char* READER_HIST_MEM_POLICY;
 extern const char* WRITER_HIST_MEM_POLICY;
 extern const char* READER_PAYLOAD_SIZE;
@@ -301,9 +293,6 @@ extern const char* WRITER_PAYLOAD_SIZE;
 extern const char* MUTATION_TRIES;
 extern const char* ACCESS_SCOPE;
 extern const char* ENABLED;
-extern const char* DOMAIN_IDS;
-extern const char* SHARED_DIR;
-extern const char* MAX_DOMAINS;
 
 // Endpoint parser
 extern const char* STATICDISCOVERY;
@@ -320,8 +309,6 @@ extern const char* MULTICAST_LOCATOR;
 extern const char* _RELIABLE_RELIABILITY_QOS;
 extern const char* _BEST_EFFORT_RELIABILITY_QOS;
 extern const char* DURABILITY_QOS;
-extern const char* _PERSISTENT_DURABILITY_QOS;
-extern const char* _TRANSIENT_DURABILITY_QOS;
 extern const char* _TRANSIENT_LOCAL_DURABILITY_QOS;
 extern const char* _VOLATILE_DURABILITY_QOS;
 extern const char* OWNERSHIP_QOS;
@@ -413,7 +400,6 @@ extern const char* TLS_DEFAULT_VERIFY_PATH;
 extern const char* TLS_VERIFY_DEPTH;
 extern const char* TLS_RSA_PRIVATE_KEY_FILE;
 extern const char* TLS_HANDSHAKE_ROLE;
-extern const char* TLS_SERVER_NAME;
 
 // TLS HandShake Role
 extern const char* TLS_HANDSHAKE_ROLE_DEFAULT;

@@ -48,8 +48,8 @@ public:
     }
 
     void run_partial_send_recv_test(
-            RTPSWithRegistrationReader<HelloWorldPubSubType>& reader,
-            RTPSWithRegistrationWriter<HelloWorldPubSubType>& writer)
+            RTPSWithRegistrationReader<HelloWorldType>& reader,
+            RTPSWithRegistrationWriter<HelloWorldType>& writer)
     {
         // Wait for discovery.
         writer.wait_discovery();
@@ -131,10 +131,20 @@ protected:
     std::string db_file_name_reader_;
     GuidPrefix_t guid_prefix_;
 
+    void block(
+            std::function<bool()> checker)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        mock_consumer_->cv().wait(lock, checker);
+    }
+
     std::vector<Log::Entry> helper_block_for_at_least_entries(
             uint32_t amount)
     {
-        mock_consumer_->wait(amount);
+        block([this, amount]() -> bool
+                {
+                    return mock_consumer_->ConsumedEntries().size() >= amount;
+                });
         return mock_consumer_->ConsumedEntries();
     }
 
@@ -160,7 +170,7 @@ protected:
         const int32_t pid = GET_PID();
         memcpy(guid_prefix_.value + 4, &pid, sizeof(pid));
         guid_prefix_.value[8] = HAVE_SECURITY;
-        guid_prefix_.value[9] = 3;
+        guid_prefix_.value[9] = 3; // PREALLOCATED_MEMORY_MODE
         LocatorList_t loc;
         IPFinder::getIP4Address(&loc);
         if (loc.size() > 0)
@@ -181,6 +191,9 @@ protected:
         std::remove(db_file_name_writer_.c_str());
     }
 
+private:
+
+    std::mutex mutex_;
 };
 
 TEST_F(PersistenceNonIntraprocess, InconsistentAcknackReceived)
@@ -192,8 +205,8 @@ TEST_F(PersistenceNonIntraprocess, InconsistentAcknackReceived)
     Log::SetCategoryFilter(std::regex("(RTPS_WRITER)"));
     Log::SetErrorStringFilter(std::regex("(Inconsistent acknack)"));
 
-    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
     std::string ip("239.255.1.4");
 
     reader.make_persistent(db_file_name_reader(), guid_prefix()).add_to_multicast_locator_list(ip, global_port).

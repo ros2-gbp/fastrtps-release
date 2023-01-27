@@ -24,9 +24,9 @@
 #include <fastdds/rtps/common/GuidPrefix_t.hpp>
 #include <fastrtps/utils/fixed_size_string.hpp>
 
-#include <rtps/builtin/discovery/database/DiscoverySharedInfo.hpp>
+#include "./DiscoverySharedInfo.hpp"
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 namespace eprosima {
 namespace fastdds {

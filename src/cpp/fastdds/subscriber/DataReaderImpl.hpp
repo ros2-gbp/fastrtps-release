@@ -21,35 +21,25 @@
 #define _FASTRTPS_DATAREADERIMPL_HPP_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <mutex>
-
-#include <fastdds/dds/core/LoanableCollection.hpp>
-#include <fastdds/dds/core/LoanableSequence.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
-#include <fastdds/dds/subscriber/DataReaderListener.hpp>
-#include <fastdds/dds/subscriber/SampleInfo.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
+#include <fastdds/dds/subscriber/DataReaderListener.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
-#include <fastdds/dds/subscriber/ReadCondition.hpp>
 
 #include <fastdds/rtps/attributes/ReaderAttributes.h>
-#include <fastdds/rtps/common/LocatorList.hpp>
+#include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/history/IPayloadPool.h>
 #include <fastdds/rtps/reader/ReaderListener.h>
 
 #include <fastrtps/attributes/TopicAttributes.h>
+#include <fastrtps/subscriber/SubscriberHistory.h>
 #include <fastrtps/qos/LivelinessChangedStatus.h>
 #include <fastrtps/types/TypesBase.h>
 
-#include <fastdds/subscriber/DataReaderImpl/DataReaderLoanManager.hpp>
-#include <fastdds/subscriber/DataReaderImpl/SampleInfoPool.hpp>
-#include <fastdds/subscriber/DataReaderImpl/SampleLoanManager.hpp>
-#include <fastdds/subscriber/DataReaderImpl/StateFilter.hpp>
-#include <fastdds/subscriber/SubscriberImpl.hpp>
 #include <rtps/history/ITopicPayloadPool.h>
 
-#include <fastdds/subscriber/history/DataReaderHistory.hpp>
+using eprosima::fastrtps::types::ReturnCode_t;
 
 namespace eprosima {
 namespace fastrtps {
@@ -64,19 +54,10 @@ class TimedEvent;
 namespace fastdds {
 namespace dds {
 
-class ContentFilteredTopicImpl;
 class Subscriber;
 class SubscriberImpl;
 class TopicDescription;
-
-using SampleInfoSeq = LoanableSequence<SampleInfo>;
-
-namespace detail {
-
-struct ReadTakeCommand;
-class ReadConditionImpl;
-
-} // namespace detail
+struct SampleInfo;
 
 /**
  * Class DataReader, contains the actual implementation of the behaviour of the Subscriber.
@@ -84,9 +65,6 @@ class ReadConditionImpl;
  */
 class DataReaderImpl
 {
-    friend struct detail::ReadTakeCommand;
-    friend class detail::ReadConditionImpl;
-
 protected:
 
     using ITopicPayloadPool = eprosima::fastrtps::rtps::ITopicPayloadPool;
@@ -99,7 +77,7 @@ protected:
      */
     DataReaderImpl(
             SubscriberImpl* s,
-            const TypeSupport& type,
+            TypeSupport& type,
             TopicDescription* topic,
             const DataReaderQos& qos,
             DataReaderListener* listener = nullptr);
@@ -108,15 +86,7 @@ public:
 
     virtual ~DataReaderImpl();
 
-    virtual ReturnCode_t enable();
-
-    /**
-     * Method to check if a DataReader can be deleted
-     * @param recursive == true if is used from delete_contained_entities otherwise delete_datareader
-     * @return true if can be deleted according to the standard rules
-     */
-    bool can_be_deleted(
-            bool recursive = true) const;
+    ReturnCode_t enable();
 
     /**
      * Method to block the current thread until an unread message is available
@@ -131,71 +101,29 @@ public:
 
     ///@{
 
-    ReturnCode_t read(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            SampleStateMask sample_states = ANY_SAMPLE_STATE,
-            ViewStateMask view_states = ANY_VIEW_STATE,
-            InstanceStateMask instance_states = ANY_INSTANCE_STATE);
-
-    ReturnCode_t read_instance(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            const InstanceHandle_t& a_handle = HANDLE_NIL,
-            SampleStateMask sample_states = ANY_SAMPLE_STATE,
-            ViewStateMask view_states = ANY_VIEW_STATE,
-            InstanceStateMask instance_states = ANY_INSTANCE_STATE);
-
-    ReturnCode_t read_next_instance(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            const InstanceHandle_t& previous_handle = HANDLE_NIL,
-            SampleStateMask sample_states = ANY_SAMPLE_STATE,
-            ViewStateMask view_states = ANY_VIEW_STATE,
-            InstanceStateMask instance_states = ANY_INSTANCE_STATE);
+    /* TODO
+       bool read(
+            std::vector<void*>& data_values,
+            std::vector<fastrtps::SampleInfo>& sample_infos,
+            uint32_t max_samples);
+     */
 
     ReturnCode_t read_next_sample(
             void* data,
             SampleInfo* info);
 
-    ReturnCode_t take(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            SampleStateMask sample_states = ANY_SAMPLE_STATE,
-            ViewStateMask view_states = ANY_VIEW_STATE,
-            InstanceStateMask instance_states = ANY_INSTANCE_STATE);
-
-    ReturnCode_t take_instance(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            const InstanceHandle_t& a_handle = HANDLE_NIL,
-            SampleStateMask sample_states = ANY_SAMPLE_STATE,
-            ViewStateMask view_states = ANY_VIEW_STATE,
-            InstanceStateMask instance_states = ANY_INSTANCE_STATE);
-
-    ReturnCode_t take_next_instance(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t max_samples = LENGTH_UNLIMITED,
-            const InstanceHandle_t& previous_handle = HANDLE_NIL,
-            SampleStateMask sample_states = ANY_SAMPLE_STATE,
-            ViewStateMask view_states = ANY_VIEW_STATE,
-            InstanceStateMask instance_states = ANY_INSTANCE_STATE);
+    /* TODO
+       bool take(
+            std::vector<void*>& data_values,
+            std::vector<fastrtps::SampleInfo>& sample_infos,
+            uint32_t max_samples);
+     */
 
     ReturnCode_t take_next_sample(
             void* data,
             SampleInfo* info);
 
     ///@}
-
-    ReturnCode_t return_loan(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos);
 
     /**
      * @brief Returns information about the first untaken sample.
@@ -204,16 +132,6 @@ public:
      */
     ReturnCode_t get_first_untaken_info(
             SampleInfo* info);
-
-    /**
-     * Get the number of samples pending to be read.
-     *
-     * @param mark_as_read  Whether the unread samples should be marked as read or not.
-     *
-     * @return the number of samples on the reader history that have never been read.
-     */
-    uint64_t get_unread_count(
-            bool mark_as_read);
 
     /**
      * Get associated GUID
@@ -234,9 +152,6 @@ public:
      * @return TopicDescription
      */
     const TopicDescription* get_topicdescription() const;
-
-    ReturnCode_t get_subscription_matched_status(
-            SubscriptionMatchedStatus& status);
 
     ReturnCode_t get_requested_deadline_missed_status(
             fastrtps::RequestedDeadlineMissedStatus& status);
@@ -263,58 +178,30 @@ public:
     ReturnCode_t get_requested_incompatible_qos_status(
             RequestedIncompatibleQosStatus& status);
 
-    /*!
-     * @brief Get the SAMPLE_LOST communication status
-     *
-     * @param[out] status SampleLostStatus object where the status is returned.
-     *
-     * @return RETCODE_OK
+    /* TODO
+       bool get_sample_lost_status(
+            fastrtps::SampleLostStatus& status) const;
      */
-    ReturnCode_t get_sample_lost_status(
-            fastdds::dds::SampleLostStatus& status);
 
-    /*!
-     * @brief Get the SAMPLE_REJECTED communication status
-     *
-     * @param[out] status SampleRejectedStatus object where the status is returned.
-     *
-     * @return RETCODE_OK
+    /* TODO
+       bool get_sample_rejected_status(
+            fastrtps::SampleRejectedStatus& status) const;
      */
-    ReturnCode_t get_sample_rejected_status(
-            fastrtps::SampleRejectedStatus& status);
 
     const Subscriber* get_subscriber() const;
 
     /* TODO
        bool wait_for_historical_data(
-       const fastrtps::Duration_t& max_wait) const;
+            const fastrtps::Duration_t& max_wait) const;
      */
 
     //! Remove all listeners in the hierarchy to allow a quiet destruction
-    virtual void disable();
-
-    /* Extends the check_qos() call, including the check for
-     * resource limits policy.
-     * @param qos Pointer to the qos to be checked.
-     * @param type Pointer to the associated TypeSupport object.
-     * @return True if correct.
-     */
-    static ReturnCode_t check_qos_including_resource_limits(
-            const DataReaderQos& qos,
-            const TypeSupport& type);
+    void disable();
 
     /* Check whether values in the DataReaderQos are compatible among them or not
-     * @param qos Pointer to the qos to be checked.
      * @return True if correct.
      */
     static ReturnCode_t check_qos (
-            const DataReaderQos& qos);
-
-    /* Checks resource limits policy: Instance allocation consistency
-     * @param qos Pointer to the qos to be checked.
-     * @return True if correct.
-     */
-    static ReturnCode_t check_allocation_consistency(
             const DataReaderQos& qos);
 
     /* Check whether the DataReaderQos can be updated with the values provided. This method DOES NOT update anything.
@@ -336,48 +223,6 @@ public:
             const DataReaderQos& from,
             bool first_time);
 
-    /**
-     * Checks whether the sample is still valid or is corrupted
-     * @param data Pointer to the sample data to check
-     * @param info Pointer to the SampleInfo related to \c data
-     * @return true if the sample is valid
-     */
-    bool is_sample_valid(
-            const void* data,
-            const SampleInfo* info) const;
-
-    /**
-     * Get the list of locators on which this DataReader is listening.
-     *
-     * @param [out] locators  LocatorList where the list of locators will be stored.
-     *
-     * @return NOT_ENABLED if the reader has not been enabled.
-     * @return OK if a list of locators is returned.
-     */
-    ReturnCode_t get_listening_locators(
-            rtps::LocatorList& locators) const;
-
-    ReturnCode_t delete_contained_entities();
-
-    void filter_has_been_updated();
-
-    InstanceHandle_t lookup_instance(
-            const void* instance) const;
-
-    ReadCondition* create_readcondition(
-            SampleStateMask sample_states,
-            ViewStateMask view_states,
-            InstanceStateMask instance_states) noexcept;
-
-    ReturnCode_t delete_readcondition(
-            ReadCondition* a_condition) noexcept;
-
-    const detail::StateFilter& get_last_mask_state() const;
-
-    void try_notify_read_conditions() noexcept;
-
-    std::recursive_mutex& get_conditions_mutex() const noexcept;
-
 protected:
 
     //!Subscriber
@@ -394,13 +239,10 @@ protected:
     DataReaderQos qos_;
 
     //!History
-    detail::DataReaderHistory history_;
+    fastrtps::SubscriberHistory history_;
 
     //!Listener
     DataReaderListener* listener_ = nullptr;
-    mutable std::mutex listener_mutex_;
-
-    fastrtps::rtps::GUID_t guid_;
 
     class InnerDataReaderListener : public fastrtps::rtps::ReaderListener
     {
@@ -420,12 +262,9 @@ protected:
                 fastrtps::rtps::RTPSReader* reader,
                 const SubscriptionMatchedStatus& info) override;
 
-        void on_data_available(
+        void onNewCacheChangeAdded(
                 fastrtps::rtps::RTPSReader* reader,
-                const fastrtps::rtps::GUID_t& writer_guid,
-                const fastrtps::rtps::SequenceNumber_t& first_sequence,
-                const fastrtps::rtps::SequenceNumber_t& last_sequence,
-                bool& should_notify_individual_changes) override;
+                const fastrtps::rtps::CacheChange_t* const change) override;
 
         void on_liveliness_changed(
                 fastrtps::rtps::RTPSReader* reader,
@@ -434,15 +273,6 @@ protected:
         void on_requested_incompatible_qos(
                 fastrtps::rtps::RTPSReader* reader,
                 fastdds::dds::PolicyMask qos) override;
-
-        void on_sample_lost(
-                fastrtps::rtps::RTPSReader* reader,
-                int32_t sample_lost_since_last_update) override;
-
-        void on_sample_rejected(
-                fastrtps::rtps::RTPSReader* reader,
-                SampleRejectedStatusKind reason,
-                const fastrtps::rtps::CacheChange_t* const change) override;
 
         DataReaderImpl* data_reader_;
     }
@@ -457,9 +287,6 @@ protected:
     //! The current timer owner, i.e. the instance which started the deadline timer
     fastrtps::rtps::InstanceHandle_t timer_owner_;
 
-    //! Subscription matched status
-    SubscriptionMatchedStatus subscription_matched_status_;
-
     //! Liveliness changed status
     LivelinessChangedStatus liveliness_changed_status_;
 
@@ -468,11 +295,6 @@ protected:
 
     //! Requested incompatible QoS status
     RequestedIncompatibleQosStatus requested_incompatible_qos_status_;
-
-    //! Sample lost status
-    SampleLostStatus sample_lost_status_;
-    //! Sample rejected status
-    SampleRejectedStatus sample_rejected_status_;
 
     //! A timed callback to remove expired samples
     fastrtps::rtps::TimedEvent* lifespan_timer_ = nullptr;
@@ -483,94 +305,6 @@ protected:
     DataReader* user_datareader_ = nullptr;
 
     std::shared_ptr<ITopicPayloadPool> payload_pool_;
-    std::shared_ptr<detail::SampleLoanManager> sample_pool_;
-
-    detail::SampleInfoPool sample_info_pool_;
-    detail::DataReaderLoanManager loan_manager_;
-
-    /**
-     * Mutex to protect ReadCondition collection
-     * is required because the RTPSReader mutex is only available when the object is enabled
-     * @note use get_conditions_mutex() instead of directly referencing it
-     * @note lock get_conditions_mutex() after lock reader_->getMutex() to avoid ABBAs because
-     *       try_notify_read_conditions() will be called from the callbacks with the reader
-     *       mutex locked
-     */
-    mutable std::recursive_mutex conditions_mutex_;
-
-    // Order for the ReadCondition collection
-    struct ReadConditionOrder
-    {
-        using is_transparent = void;
-
-        bool operator ()(
-                const detail::ReadConditionImpl* lhs,
-                const detail::ReadConditionImpl* rhs) const;
-        bool operator ()(
-                const detail::ReadConditionImpl* lhs,
-                const detail::StateFilter& rhs) const;
-        bool operator ()(
-                const detail::StateFilter& lhs,
-                const detail::ReadConditionImpl* rhs) const;
-
-        template<class S, class V, class I>
-        static inline bool less(
-                S&& s1,
-                V&& v1,
-                I&& i1,
-                S&& s2,
-                V&& v2,
-                I&& i2)
-        {
-            return s1 < s2 || (s1 == s2 && (v1 < v2 || (v1 == v2 && i1 < i2)));
-        }
-
-    };
-
-    // ReadConditions collection
-    std::set<detail::ReadConditionImpl*, ReadConditionOrder> read_conditions_;
-
-    // State of the History mask last time it was queried
-    // protected with the RTPSReader mutex
-    detail::StateFilter last_mask_state_ {};
-
-    ReturnCode_t check_collection_preconditions_and_calc_max_samples(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t& max_samples);
-
-    ReturnCode_t prepare_loan(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t& max_samples);
-
-    ReturnCode_t read_or_take(
-            LoanableCollection& data_values,
-            SampleInfoSeq& sample_infos,
-            int32_t max_samples,
-            const InstanceHandle_t& handle,
-            SampleStateMask sample_states,
-            ViewStateMask view_states,
-            InstanceStateMask instance_states,
-            bool exact_instance,
-            bool single_instance,
-            bool should_take);
-
-    ReturnCode_t read_or_take_next_sample(
-            void* data,
-            SampleInfo* info,
-            bool should_take);
-
-    void set_read_communication_status(
-            bool trigger_value);
-
-    void update_subscription_matched_status(
-            const SubscriptionMatchedStatus& status);
-
-    bool on_data_available(
-            const fastrtps::rtps::GUID_t& writer_guid,
-            const fastrtps::rtps::SequenceNumber_t& first_sequence,
-            const fastrtps::rtps::SequenceNumber_t& last_sequence);
 
     /**
      * @brief A method called when a new cache change is added
@@ -605,19 +339,6 @@ protected:
     LivelinessChangedStatus& update_liveliness_status(
             const fastrtps::LivelinessChangedStatus& status);
 
-    const SampleLostStatus& update_sample_lost_status(
-            int32_t sample_lost_since_last_update);
-
-    /*!
-     * @brief Update SampleRejectedStatus with information about a new rejected sample.
-     *
-     * @param[in] Reason why the new sample was rejected.
-     * @param[in] New sample which was rejected.
-     */
-    const SampleRejectedStatus& update_sample_rejected_status(
-            SampleRejectedStatusKind reason,
-            const fastrtps::rtps::CacheChange_t* const change_in);
-
     /**
      * Returns the most appropriate listener to handle the callback for the given status,
      * or nullptr if there is no appropriate listener.
@@ -628,16 +349,6 @@ protected:
     std::shared_ptr<IPayloadPool> get_payload_pool();
 
     void release_payload_pool();
-
-    void stop();
-
-    ReturnCode_t check_datasharing_compatible(
-            const fastrtps::rtps::ReaderAttributes& reader_attributes,
-            bool& is_datasharing_compatible) const;
-
-private:
-
-    void update_rtps_reader_qos();
 
 };
 

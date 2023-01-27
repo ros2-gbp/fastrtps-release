@@ -24,9 +24,9 @@
 #include <fastdds/rtps/common/GuidPrefix_t.hpp>
 #include <fastdds/dds/log/Log.hpp>
 
-#include <rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.hpp>
+#include "./DiscoveryParticipantsAckStatus.hpp"
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -46,7 +46,9 @@ public:
             eprosima::fastrtps::rtps::CacheChange_t* change,
             const eprosima::fastrtps::rtps::GuidPrefix_t& known_participant);
 
-    ~DiscoverySharedInfo() = default;
+    ~DiscoverySharedInfo()
+    {
+    }
 
     virtual eprosima::fastrtps::rtps::CacheChange_t* update_and_unmatch(
             eprosima::fastrtps::rtps::CacheChange_t* change);
@@ -58,11 +60,8 @@ public:
             const eprosima::fastrtps::rtps::GuidPrefix_t& guid_p,
             bool status = false)
     {
-        EPROSIMA_LOG_INFO(
-            DISCOVERY_DATABASE,
-            "Adding relevant participant " << guid_p
-                                           << " with status " << status
-                                           << " to " << fastrtps::rtps::iHandle2GUID(change_->instanceHandle));
+        logInfo(DISCOVERY_DATABASE, "Adding relevant participant " << guid_p << " with status " << status << " to " <<
+                fastrtps::rtps::iHandle2GUID(change_->instanceHandle));
         relevant_participants_builtin_ack_status_.add_or_update_participant(guid_p, status);
     }
 
@@ -102,7 +101,7 @@ public:
     virtual void to_json(
             nlohmann::json& j) const;
 
-protected:
+private:
 
     eprosima::fastrtps::rtps::CacheChange_t* change_;
 

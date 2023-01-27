@@ -18,9 +18,8 @@
  */
 
 #include <fastdds/dds/domain/DomainParticipant.hpp>
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/log/Log.hpp>
 #include <fastdds/domain/DomainParticipantImpl.hpp>
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 
 using namespace eprosima;
 using namespace eprosima::fastdds::dds;
@@ -29,6 +28,16 @@ DomainParticipant::DomainParticipant(
         const StatusMask& mask)
     : Entity(mask)
     , impl_(nullptr)
+{
+}
+
+DomainParticipant::DomainParticipant(
+        DomainId_t domain_id,
+        const DomainParticipantQos& qos,
+        DomainParticipantListener* listener,
+        const StatusMask& mask)
+    : Entity(mask)
+    , impl_(DomainParticipantFactory::get_instance()->create_participant(domain_id, qos, listener, mask)->impl_)
 {
 }
 
@@ -43,62 +52,6 @@ DomainParticipant::~DomainParticipant()
     }
 }
 
-ReturnCode_t DomainParticipant::get_qos(
-        DomainParticipantQos& qos) const
-{
-    return impl_->get_qos(qos);
-}
-
-const DomainParticipantQos& DomainParticipant::get_qos() const
-{
-    return impl_->get_qos();
-}
-
-ReturnCode_t DomainParticipant::set_qos(
-        const DomainParticipantQos& qos) const
-{
-    return impl_->set_qos(qos);
-}
-
-const DomainParticipantListener* DomainParticipant::get_listener() const
-{
-    return impl_->get_listener();
-}
-
-ReturnCode_t DomainParticipant::set_listener(
-        DomainParticipantListener* listener)
-{
-    return set_listener(listener, std::chrono::seconds::max());
-}
-
-ReturnCode_t DomainParticipant::set_listener(
-        DomainParticipantListener* listener,
-        const std::chrono::seconds timeout)
-{
-    return set_listener(listener, StatusMask::all(), timeout);
-}
-
-ReturnCode_t DomainParticipant::set_listener(
-        DomainParticipantListener* listener,
-        const StatusMask& mask)
-{
-    return set_listener(listener, mask, std::chrono::seconds::max());
-}
-
-ReturnCode_t DomainParticipant::set_listener(
-        DomainParticipantListener* listener,
-        const StatusMask& mask,
-        const std::chrono::seconds timeout)
-{
-    ReturnCode_t ret_val = impl_->set_listener(listener, timeout);
-    if (ret_val == ReturnCode_t::RETCODE_OK)
-    {
-        status_mask_ = mask;
-    }
-
-    return ret_val;
-}
-
 ReturnCode_t DomainParticipant::enable()
 {
     if (enable_)
@@ -110,6 +63,47 @@ ReturnCode_t DomainParticipant::enable()
     ReturnCode_t ret_code = impl_->enable();
     enable_ = !!ret_code;
     return ret_code;
+}
+
+ReturnCode_t DomainParticipant::set_qos(
+        const DomainParticipantQos& qos) const
+{
+    return impl_->set_qos(qos);
+}
+
+ReturnCode_t DomainParticipant::get_qos(
+        DomainParticipantQos& qos) const
+{
+    return impl_->get_qos(qos);
+}
+
+const DomainParticipantQos& DomainParticipant::get_qos() const
+{
+    return impl_->get_qos();
+}
+
+ReturnCode_t DomainParticipant::set_listener(
+        DomainParticipantListener* listener)
+{
+    return set_listener(listener, StatusMask::all());
+}
+
+ReturnCode_t DomainParticipant::set_listener(
+        DomainParticipantListener* listener,
+        const StatusMask& mask)
+{
+    ReturnCode_t ret_val = impl_->set_listener(listener);
+    if (ret_val == ReturnCode_t::RETCODE_OK)
+    {
+        status_mask_ = mask;
+    }
+
+    return ret_val;
+}
+
+const DomainParticipantListener* DomainParticipant::get_listener() const
+{
+    return impl_->get_listener();
 }
 
 Publisher* DomainParticipant::create_publisher(
@@ -129,7 +123,7 @@ Publisher* DomainParticipant::create_publisher_with_profile(
 }
 
 ReturnCode_t DomainParticipant::delete_publisher(
-        const Publisher* publisher)
+        Publisher* publisher)
 {
     return impl_->delete_publisher(publisher);
 }
@@ -151,7 +145,7 @@ Subscriber* DomainParticipant::create_subscriber_with_profile(
 }
 
 ReturnCode_t DomainParticipant::delete_subscriber(
-        const Subscriber* subscriber)
+        Subscriber* subscriber)
 {
     return impl_->delete_subscriber(subscriber);
 }
@@ -177,83 +171,9 @@ Topic* DomainParticipant::create_topic_with_profile(
 }
 
 ReturnCode_t DomainParticipant::delete_topic(
-        const Topic* topic)
+        Topic* topic)
 {
     return impl_->delete_topic(topic);
-}
-
-ContentFilteredTopic* DomainParticipant::create_contentfilteredtopic(
-        const std::string& name,
-        Topic* related_topic,
-        const std::string& filter_expression,
-        const std::vector<std::string>& expression_parameters)
-{
-    return impl_->create_contentfilteredtopic(name, related_topic, filter_expression, expression_parameters,
-                   FASTDDS_SQLFILTER_NAME);
-}
-
-ContentFilteredTopic* DomainParticipant::create_contentfilteredtopic(
-        const std::string& name,
-        Topic* related_topic,
-        const std::string& filter_expression,
-        const std::vector<std::string>& expression_parameters,
-        const char* filter_class_name)
-{
-    return impl_->create_contentfilteredtopic(name, related_topic, filter_expression, expression_parameters,
-                   filter_class_name);
-}
-
-ReturnCode_t DomainParticipant::delete_contentfilteredtopic(
-        const ContentFilteredTopic* a_contentfilteredtopic)
-{
-    return impl_->delete_contentfilteredtopic(a_contentfilteredtopic);
-}
-
-MultiTopic* DomainParticipant::create_multitopic(
-        const std::string& name,
-        const std::string& type_name,
-        const std::string& subscription_expression,
-        const std::vector<std::string>& expression_parameters)
-{
-    static_cast<void> (name);
-    static_cast<void> (type_name);
-    static_cast<void> (subscription_expression);
-    static_cast<void> (expression_parameters);
-    EPROSIMA_LOG_WARNING(DOMAIN_PARTICIPANT, "create_multitopic method not implemented");
-    return nullptr;
-}
-
-ReturnCode_t DomainParticipant::delete_multitopic(
-        const MultiTopic* a_multitopic)
-{
-    static_cast<void> (a_multitopic);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-}
-
-ReturnCode_t DomainParticipant::register_content_filter_factory(
-        const char* filter_class_name,
-        IContentFilterFactory* const filter_factory)
-{
-    return impl_->register_content_filter_factory(filter_class_name, filter_factory);
-}
-
-IContentFilterFactory* DomainParticipant::lookup_content_filter_factory(
-        const char* filter_class_name)
-{
-    return impl_->lookup_content_filter_factory(filter_class_name);
-}
-
-ReturnCode_t DomainParticipant::unregister_content_filter_factory(
-        const char* filter_class_name)
-{
-    return impl_->unregister_content_filter_factory(filter_class_name);
-}
-
-Topic* DomainParticipant::find_topic(
-        const std::string& topic_name,
-        const fastrtps::Duration_t& timeout)
-{
-    return impl_->find_topic(topic_name, timeout);
 }
 
 TopicDescription* DomainParticipant::lookup_topicdescription(
@@ -262,49 +182,75 @@ TopicDescription* DomainParticipant::lookup_topicdescription(
     return impl_->lookup_topicdescription(topic_name);
 }
 
-const Subscriber* DomainParticipant::get_builtin_subscriber() const
+ReturnCode_t DomainParticipant::register_type(
+        TypeSupport type,
+        const std::string& type_name)
 {
-    EPROSIMA_LOG_WARNING(DOMAIN_PARTICIPANT, "get_builtin_subscriber method not implemented");
-    return nullptr;
+    return impl_->register_type(type, type_name);
 }
 
-ReturnCode_t DomainParticipant::ignore_participant(
-        const InstanceHandle_t& handle)
+ReturnCode_t DomainParticipant::register_type(
+        TypeSupport type)
 {
-    static_cast<void> (handle);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    return impl_->register_type(type, type.get_type_name());
 }
 
-ReturnCode_t DomainParticipant::ignore_topic(
-        const InstanceHandle_t& handle)
+ReturnCode_t DomainParticipant::unregister_type(
+        const std::string& typeName)
 {
-    static_cast<void> (handle);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    return impl_->unregister_type(typeName);
 }
 
-ReturnCode_t DomainParticipant::ignore_publication(
-        const InstanceHandle_t& handle)
-{
-    static_cast<void> (handle);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-}
+/* TODO
+   Subscriber* DomainParticipant::get_builtin_subscriber()
+   {
+    return impl_->get_builtin_subscriber();
+   }
+ */
 
-ReturnCode_t DomainParticipant::ignore_subscription(
-        const InstanceHandle_t& handle)
-{
-    static_cast<void> (handle);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-}
+/* TODO
+   bool DomainParticipant::ignore_participant(
+        const fastrtps::rtps::InstanceHandle_t& handle)
+   {
+    return impl_->ignore_participant(handle);
+   }
+ */
+
+/* TODO
+   bool DomainParticipant::ignore_topic(
+        const fastrtps::rtps::InstanceHandle_t& handle)
+   {
+    return impl_->ignore_topic(handle);
+   }
+ */
+
+/* TODO
+   bool DomainParticipant::ignore_publication(
+        const fastrtps::rtps::InstanceHandle_t& handle)
+   {
+    return impl_->ignore_publication(handle);
+   }
+ */
+
+/* TODO
+   bool DomainParticipant::ignore_subscription(
+        const fastrtps::rtps::InstanceHandle_t& handle)
+   {
+    return impl_->ignore_subscription(handle);
+   }
+ */
 
 DomainId_t DomainParticipant::get_domain_id() const
 {
     return impl_->get_domain_id();
 }
 
-ReturnCode_t DomainParticipant::delete_contained_entities()
-{
+/* TODO
+   bool DomainParticipant::delete_contained_entities()
+   {
     return impl_->delete_contained_entities();
-}
+   }
+ */
 
 ReturnCode_t DomainParticipant::assert_liveliness()
 {
@@ -386,43 +332,27 @@ ReturnCode_t DomainParticipant::get_topic_qos_from_profile(
     return impl_->get_topic_qos_from_profile(profile_name, qos);
 }
 
-ReturnCode_t DomainParticipant::get_discovered_participants(
-        std::vector<InstanceHandle_t>& participant_handles) const
-{
-    static_cast<void> (participant_handles);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-}
+/* TODO
+   bool DomainParticipant::get_discovered_participants(
+        std::vector<fastrtps::rtps::InstanceHandle_t>& participant_handles) const
+   {
+    return impl_->get_discovered_participants(participant_handles);
+   }
+ */
 
-ReturnCode_t DomainParticipant::get_discovered_participant_data(
-        builtin::ParticipantBuiltinTopicData& participant_data,
-        const InstanceHandle_t& participant_handle) const
-{
-    static_cast<void> (participant_data);
-    static_cast<void> (participant_handle);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-}
-
-ReturnCode_t DomainParticipant::get_discovered_topics(
-        std::vector<InstanceHandle_t>& topic_handles) const
-{
-    static_cast<void> (topic_handles);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-}
-
-ReturnCode_t DomainParticipant::get_discovered_topic_data(
-        builtin::TopicBuiltinTopicData& topic_data,
-        const InstanceHandle_t& topic_handle) const
-{
-    static_cast<void> (topic_data);
-    static_cast<void> (topic_handle);
-    return ReturnCode_t::RETCODE_UNSUPPORTED;
-}
+/* TODO
+   bool DomainParticipant::get_discovered_topics(
+        std::vector<fastrtps::rtps::InstanceHandle_t>& topic_handles) const
+   {
+    return impl_->get_discovered_topics(topic_handles);
+   }
+ */
 
 bool DomainParticipant::contains_entity(
-        const InstanceHandle_t& a_handle,
-        bool recursive /* = true */) const
+        const fastrtps::rtps::InstanceHandle_t& handle,
+        bool recursive) const
 {
-    return impl_->contains_entity(a_handle, recursive);
+    return impl_->contains_entity(handle, recursive);
 }
 
 ReturnCode_t DomainParticipant::get_current_time(
@@ -431,32 +361,13 @@ ReturnCode_t DomainParticipant::get_current_time(
     return impl_->get_current_time(current_time);
 }
 
-ReturnCode_t DomainParticipant::register_type(
-        TypeSupport type,
-        const std::string& type_name)
-{
-    return impl_->register_type(type, type_name);
-}
-
-ReturnCode_t DomainParticipant::register_type(
-        TypeSupport type)
-{
-    return impl_->register_type(type, type.get_type_name());
-}
-
-ReturnCode_t DomainParticipant::unregister_type(
-        const std::string& typeName)
-{
-    return impl_->unregister_type(typeName);
-}
-
 TypeSupport DomainParticipant::find_type(
         const std::string& type_name) const
 {
     return impl_->find_type(type_name);
 }
 
-const InstanceHandle_t& DomainParticipant::get_instance_handle() const
+const fastrtps::rtps::InstanceHandle_t& DomainParticipant::get_instance_handle() const
 {
     return impl_->get_instance_handle();
 }

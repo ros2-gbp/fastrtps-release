@@ -12,19 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _RTPS_RTPSDOMAINIMPL_HPP_
-#define _RTPS_RTPSDOMAINIMPL_HPP_
-
-#include <memory>
-
-#include <fastdds/rtps/RTPSDomain.h>
-
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
 class RTPSWriter;
-class IChangePool;
 
 /**
  * @brief Class RTPSDomainImpl, contains the private implementation of the RTPSDomain
@@ -33,12 +25,6 @@ class IChangePool;
 class RTPSDomainImpl
 {
 public:
-
-    static std::shared_ptr<RTPSDomainImpl> get_instance()
-    {
-        static std::shared_ptr<RTPSDomainImpl> instance = std::make_shared<RTPSDomainImpl>();
-        return instance;
-    }
 
     /**
      * Check whether intraprocess delivery should be used between two GUIDs.
@@ -67,45 +53,8 @@ public:
     {
     }
 
-    /**
-     * Create a RTPSWriter in a participant.
-     * @param p Pointer to the RTPSParticipant.
-     * @param entity_id Specific entity id to use for the created writer.
-     * @param watt Writer Attributes.
-     * @param payload_pool Shared pointer to the IPayloadPool
-     * @param hist Pointer to the WriterHistory.
-     * @param listen Pointer to the WriterListener.
-     * @return Pointer to the created RTPSWriter.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSWriter() or stopAll(),
-     *          so its use may result in undefined behaviour.
-     */
-    static RTPSWriter* create_rtps_writer(
-            RTPSParticipant* p,
-            const EntityId_t& entity_id,
-            WriterAttributes& watt,
-            const std::shared_ptr<IPayloadPool>& payload_pool,
-            const std::shared_ptr<IChangePool>& change_pool,
-            WriterHistory* hist,
-            WriterListener* listen = nullptr)
-    {
-        static_cast<void>(change_pool);
-        return RTPSDomain::createRTPSWriter(p, entity_id, watt, payload_pool, hist, listen);
-    }
-
-    static RTPSParticipant* clientServerEnvironmentCreationOverride(
-            uint32_t domain_id,
-            bool enabled,
-            const RTPSParticipantAttributes& att,
-            RTPSParticipantListener* listen)
-    {
-        return RTPSDomain::createParticipant(domain_id, enabled, att, listen);
-    }
-
 };
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
-
-#endif  // _RTPS_RTPSDOMAINIMPL_HPP_

@@ -41,16 +41,11 @@ ResourceEvent::~ResourceEvent()
     assert(pending_timers_.empty());
     assert(timers_count_ == 0);
 
-    stop_thread();
-}
-
-void ResourceEvent::stop_thread()
-{
-    EPROSIMA_LOG_INFO(RTPS_PARTICIPANT, "Removing event thread");
+    logInfo(RTPS_PARTICIPANT, "Removing event thread");
     if (thread_.joinable())
     {
         {
-            std::lock_guard<TimedMutex> guard(mutex_);
+            std::unique_lock<TimedMutex> lock(mutex_);
             stop_.store(true);
             cv_.notify_one();
         }
@@ -61,10 +56,11 @@ void ResourceEvent::stop_thread()
 void ResourceEvent::register_timer(
         TimedEventImpl* /*event*/)
 {
-    {
-        std::lock_guard<TimedMutex> lock(mutex_);
-        ++timers_count_;
-    }
+    assert(!stop_.load());
+
+    std::lock_guard<TimedMutex> lock(mutex_);
+
+    ++timers_count_;
 
     // Notify the execution thread that something changed
     cv_.notify_one();
@@ -73,6 +69,8 @@ void ResourceEvent::register_timer(
 void ResourceEvent::unregister_timer(
         TimedEventImpl* event)
 {
+    assert(!stop_.load());
+
     std::unique_lock<TimedMutex> lock(mutex_);
 
     bool is_service_thread = std::this_thread::get_id() == thread_.get_id();
@@ -195,25 +193,12 @@ void ResourceEvent::event_service()
                 current_time_ + std::chrono::seconds(1) :
                 active_timers_[0]->next_trigger_time();
 
-        auto current_time = std::chrono::steady_clock::now();
-        if (current_time > next_trigger)
-        {
-            next_trigger = current_time + std::chrono::microseconds(10);
-        }
-
         cv_.wait_until(lock, next_trigger);
 
         // Don't allow other threads to manipulate the timer collections
         allow_vector_manipulation_ = false;
         resize_collections();
     }
-
-    // Thread being stopped. Allow other threads to manipulate the timer collections.
-    {
-        std::lock_guard<TimedMutex> guard(mutex_);
-        allow_vector_manipulation_ = true;
-    }
-    cv_manipulation_.notify_all();
 }
 
 void ResourceEvent::sort_timers()
@@ -304,7 +289,6 @@ void ResourceEvent::init_thread()
     std::lock_guard<TimedMutex> lock(mutex_);
 
     allow_vector_manipulation_ = false;
-    stop_.store(false);
     resize_collections();
 
     thread_ = std::thread(&ResourceEvent::event_service, this);

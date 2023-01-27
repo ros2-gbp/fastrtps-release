@@ -20,41 +20,22 @@
 #include "ThroughputTypes.hpp"
 
 #include <cstring>
-#include <cstddef>
-
-const size_t ThroughputType::overhead = offsetof(ThroughputType, data);
-const std::string ThroughputDataType::type_name_ = "ThroughputType";
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
-
-bool ThroughputDataType::compare_data(
-        const ThroughputType& lt1,
-        const ThroughputType& lt2) const
-{
-    if (lt1.seqnum != lt2.seqnum)
-    {
-        return false;
-    }
-
-    return 0 == memcmp(lt1.data, lt2.data, buffer_size_);
-}
 
 // Serialization and deserialization functions
 bool ThroughputDataType::serialize(
         void* data,
         SerializedPayload_t* payload)
 {
-    static uint8_t encapsulation[4] = { 0x0, 0x1, 0x0, 0x0 };
     ThroughputType* lt = (ThroughputType*)data;
-
-    auto ser_data = payload->data;
-    memcpy(ser_data, encapsulation, SerializedPayload_t::representation_header_size);
-    ser_data += SerializedPayload_t::representation_header_size;
-    memcpy(ser_data, &lt->seqnum, sizeof(lt->seqnum));
-    ser_data += sizeof(lt->seqnum);
-    memcpy(ser_data, lt->data, buffer_size_);
-    payload->length = m_typeSize;
+    memcpy(payload->data, &lt->seqnum, sizeof(lt->seqnum));
+    const auto data_size = static_cast<uint32_t>(lt->data.size());
+    memcpy(payload->data + 4, &data_size, sizeof(data_size));
+    //	std::copy(lt->data.begin(),lt->data.end(),payload->data+8);
+    memcpy(payload->data + 8, lt->data.data(), lt->data.size());
+    payload->length = 8 + static_cast<uint32_t>(lt->data.size());
     return true;
 }
 
@@ -64,36 +45,41 @@ bool ThroughputDataType::deserialize(
 {
     if (payload->length > 0)
     {
-        // payload members endiannes matches local machine
         ThroughputType* lt = (ThroughputType*)data;
-        auto ser_data = payload->data + SerializedPayload_t::representation_header_size;
-        lt->seqnum = *reinterpret_cast<uint32_t*>(ser_data);
-        ser_data += sizeof(lt->seqnum);
-        std::copy(ser_data, ser_data + buffer_size_, lt->data);
+        memcpy(&lt->seqnum, payload->data, sizeof(lt->seqnum));
+        uint32_t size;
+        memcpy(&size, payload->data + 4, sizeof(size));
+        //std::copy(payload->data+8,payload->data+8+siz,lt->data.begin());
+        std::copy(payload->data + 8, payload->data + 8 + size, lt->data.begin());
+        //		lt->data.clear();
+        //		lt->data.insert(lt->data.end(),payload->data+8,payload->data+8+siz);
     }
     return true;
 }
 
 std::function<uint32_t()> ThroughputDataType::getSerializedSizeProvider(
-        void* )
+        void* data)
 {
-    // uint32_t seqnum + uint32_t buffer_size_ + actual data
-    uint32_t size = m_typeSize;
-    return [size]() -> uint32_t
+    return [data]() -> uint32_t
            {
+               ThroughputType* tdata = static_cast<ThroughputType*>(data);
+               uint32_t size = 0;
+
+               size = (uint32_t)(sizeof(uint32_t) + sizeof(uint32_t) + tdata->data.size());
+
                return size;
            };
 }
 
 void* ThroughputDataType::createData()
 {
-    return (void*)new uint8_t[m_typeSize];
+    return (void*)new ThroughputType(this->m_typeSize);
 }
 
 void ThroughputDataType::deleteData(
         void* data)
 {
-    delete[] (uint8_t*)(data);
+    delete((ThroughputType*)data);
 }
 
 bool ThroughputCommandDataType::serialize(

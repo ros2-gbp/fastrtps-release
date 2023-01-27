@@ -18,7 +18,6 @@
  */
 
 #include "ReqRepHelloWorldReplier.hpp"
-#include "../../common/BlackboxTests.hpp"
 
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
@@ -47,12 +46,9 @@ ReqRepHelloWorldReplier::ReqRepHelloWorldReplier()
     , initialized_(false)
     , matched_(0)
 {
-    // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-    datareader_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-    datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-
-    datawriter_qos_.reliable_writer_qos().times.heartbeatPeriod.seconds = 1;
-    datawriter_qos_.reliable_writer_qos().times.heartbeatPeriod.nanosec = 0;
+    // By default, memory mode is preallocated (the most restritive)
+    datareader_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+    datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 }
 
 ReqRepHelloWorldReplier::~ReqRepHelloWorldReplier()
@@ -96,7 +92,7 @@ void ReqRepHelloWorldReplier::init()
     ASSERT_TRUE(participant_->is_enabled());
 
     // Register type
-    type_.reset(new HelloWorldPubSubType());
+    type_.reset(new HelloWorldType());
     ASSERT_EQ(participant_->register_type(type_), ReturnCode_t::RETCODE_OK);
 
     configDatareader("Request");
@@ -118,22 +114,6 @@ void ReqRepHelloWorldReplier::init()
     reply_publisher_ = participant_->create_publisher(eprosima::fastdds::dds::PUBLISHER_QOS_DEFAULT);
     ASSERT_NE(reply_publisher_, nullptr);
     ASSERT_TRUE(reply_publisher_->is_enabled());
-
-    if (enable_datasharing)
-    {
-        datareader_qos_.data_sharing().automatic();
-        datawriter_qos_.data_sharing().automatic();
-    }
-    else
-    {
-        datareader_qos_.data_sharing().off();
-        datawriter_qos_.data_sharing().off();
-    }
-
-    if (use_pull_mode)
-    {
-        datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
-    }
 
     //Create datareader
     request_datareader_ = request_subscriber_->create_datareader(request_topic_, datareader_qos_,
@@ -167,10 +147,9 @@ void ReqRepHelloWorldReplier::wait_discovery()
 
     std::cout << "Replier is waiting discovery..." << std::endl;
 
-    cvDiscovery_.wait(lock, [&]()
-            {
-                return matched_ > 1;
-            });
+    cvDiscovery_.wait(lock, [&](){
+        return matched_ > 1;
+    });
 
     std::cout << "Replier discovery finished..." << std::endl;
 }
@@ -195,7 +174,7 @@ void ReqRepHelloWorldReplier::ReplyListener::on_data_available(
 
     if (ReturnCode_t::RETCODE_OK == datareader->take_next_sample((void*)&hello, &info))
     {
-        if (info.valid_data)
+        if (info.instance_state == eprosima::fastdds::dds::InstanceStateKind::ALIVE)
         {
             ASSERT_EQ(hello.message().compare("HelloWorld"), 0);
             replier_.newNumber(info.sample_identity, hello.index());

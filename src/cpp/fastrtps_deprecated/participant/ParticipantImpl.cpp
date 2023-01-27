@@ -18,24 +18,32 @@
  */
 
 #include <fastrtps_deprecated/participant/ParticipantImpl.h>
-
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/dds/topic/TopicDataType.hpp>
-#include <fastdds/rtps/RTPSDomain.h>
-#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastrtps/participant/Participant.h>
 #include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
-#include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
 #include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
-#include <fastdds/rtps/resources/TimedEvent.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/participant/ParticipantListener.h>
-#include <fastrtps/participant/Participant.h>
-#include <fastrtps/publisher/Publisher.h>
-#include <fastrtps/subscriber/Subscriber.h>
+
+#include <fastdds/dds/topic/TopicDataType.hpp>
+
+#include <fastdds/rtps/participant/RTPSParticipant.h>
+
+#include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps_deprecated/publisher/PublisherImpl.h>
+#include <fastrtps/publisher/Publisher.h>
+
+#include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps_deprecated/subscriber/SubscriberImpl.h>
+#include <fastrtps/subscriber/Subscriber.h>
+
+#include <fastdds/rtps/RTPSDomain.h>
+
+#include <fastdds/rtps/transport/UDPv4Transport.h>
+#include <fastdds/rtps/transport/UDPv6Transport.h>
+#include <fastdds/rtps/transport/test_UDPv4Transport.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
+
+#include <fastdds/dds/log/Log.hpp>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -114,7 +122,7 @@ Publisher* ParticipantImpl::createPublisher(
         const PublisherAttributes& att,
         PublisherListener* listen)
 {
-    EPROSIMA_LOG_INFO(PARTICIPANT, "CREATING PUBLISHER IN TOPIC: " << att.topic.getTopicName());
+    logInfo(PARTICIPANT, "CREATING PUBLISHER IN TOPIC: " << att.topic.getTopicName());
     //Look for the correct type registration
 
     TopicDataType* p_type = nullptr;
@@ -123,13 +131,13 @@ Publisher* ParticipantImpl::createPublisher(
     // Check the type was registered.
     if (!getRegisteredType(att.topic.getTopicDataType().c_str(), &p_type))
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Type : " << att.topic.getTopicDataType() << " Not Registered");
+        logError(PARTICIPANT, "Type : " << att.topic.getTopicDataType() << " Not Registered");
         return nullptr;
     }
     // Check the type supports keys.
     if (att.topic.topicKind == WITH_KEY && !p_type->m_isGetKeyDefined)
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Keyed Topic needs getKey function");
+        logError(PARTICIPANT, "Keyed Topic needs getKey function");
         return nullptr;
     }
 
@@ -137,23 +145,23 @@ Publisher* ParticipantImpl::createPublisher(
     {
         if (att.getUserDefinedID() <= 0)
         {
-            EPROSIMA_LOG_ERROR(PARTICIPANT, "Static EDP requires user defined Id");
+            logError(PARTICIPANT, "Static EDP requires user defined Id");
             return nullptr;
         }
     }
     if (!att.unicastLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Unicast Locator List for Publisher contains invalid Locator");
+        logError(PARTICIPANT, "Unicast Locator List for Publisher contains invalid Locator");
         return nullptr;
     }
     if (!att.multicastLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, " Multicast Locator List for Publisher contains invalid Locator");
+        logError(PARTICIPANT, " Multicast Locator List for Publisher contains invalid Locator");
         return nullptr;
     }
     if (!att.remoteLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Remote Locator List for Publisher contains invalid Locator");
+        logError(PARTICIPANT, "Remote Locator List for Publisher contains invalid Locator");
         return nullptr;
     }
     if (!att.qos.checkQos() || !att.topic.checkQos())
@@ -179,7 +187,6 @@ Publisher* ParticipantImpl::createPublisher(
     watt.mode = att.qos.m_publishMode.kind ==
             eprosima::fastrtps::SYNCHRONOUS_PUBLISH_MODE ? SYNCHRONOUS_WRITER : ASYNCHRONOUS_WRITER;
     watt.endpoint.properties = att.properties;
-    watt.flow_controller_name = att.qos.m_publishMode.flow_controller_name;
     if (att.getEntityID() > 0)
     {
         watt.endpoint.setEntityID((uint8_t)att.getEntityID());
@@ -193,7 +200,6 @@ Publisher* ParticipantImpl::createPublisher(
     watt.liveliness_lease_duration = att.qos.m_liveliness.lease_duration;
     watt.liveliness_announcement_period = att.qos.m_liveliness.announcement_period;
     watt.matched_readers_allocation = att.matched_subscriber_allocation;
-    watt.disable_heartbeat_piggyback = att.qos.disable_heartbeat_piggyback;
 
     // TODO(Ricardo) Remove in future
     // Insert topic_name and partitions
@@ -228,7 +234,7 @@ Publisher* ParticipantImpl::createPublisher(
         (WriterListener*)&pubimpl->m_writerListener);
     if (writer == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Problem creating associated Writer");
+        logError(PARTICIPANT, "Problem creating associated Writer");
         delete(pubimpl);
         return nullptr;
     }
@@ -236,13 +242,6 @@ Publisher* ParticipantImpl::createPublisher(
 
     // In case it has been loaded from the persistence DB, rebuild instances on history
     pubimpl->m_history.rebuild_instances();
-    if (att.qos.m_lifespan.duration != c_TimeInfinite)
-    {
-        if (pubimpl->lifespan_expired())
-        {
-            pubimpl->lifespan_timer_->restart_timer();
-        }
-    }
 
     //SAVE THE PUBLISHER PAIR
     t_p_PublisherPair pubpair;
@@ -265,42 +264,42 @@ Subscriber* ParticipantImpl::createSubscriber(
         const SubscriberAttributes& att,
         SubscriberListener* listen)
 {
-    EPROSIMA_LOG_INFO(PARTICIPANT, "CREATING SUBSCRIBER IN TOPIC: " << att.topic.getTopicName());
+    logInfo(PARTICIPANT, "CREATING SUBSCRIBER IN TOPIC: " << att.topic.getTopicName())
     //Look for the correct type registration
 
     TopicDataType* p_type = nullptr;
 
     if (!getRegisteredType(att.topic.getTopicDataType().c_str(), &p_type))
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Type : " << att.topic.getTopicDataType() << " Not Registered");
+        logError(PARTICIPANT, "Type : " << att.topic.getTopicDataType() << " Not Registered");
         return nullptr;
     }
     if (att.topic.topicKind == WITH_KEY && !p_type->m_isGetKeyDefined)
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Keyed Topic needs getKey function");
+        logError(PARTICIPANT, "Keyed Topic needs getKey function");
         return nullptr;
     }
     if (m_att.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol)
     {
         if (att.getUserDefinedID() <= 0)
         {
-            EPROSIMA_LOG_ERROR(PARTICIPANT, "Static EDP requires user defined Id");
+            logError(PARTICIPANT, "Static EDP requires user defined Id");
             return nullptr;
         }
     }
     if (!att.unicastLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Unicast Locator List for Subscriber contains invalid Locator");
+        logError(PARTICIPANT, "Unicast Locator List for Subscriber contains invalid Locator");
         return nullptr;
     }
     if (!att.multicastLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, " Multicast Locator List for Subscriber contains invalid Locator");
+        logError(PARTICIPANT, " Multicast Locator List for Subscriber contains invalid Locator");
         return nullptr;
     }
     if (!att.remoteLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Output Locator List for Subscriber contains invalid Locator");
+        logError(PARTICIPANT, "Output Locator List for Subscriber contains invalid Locator");
         return nullptr;
     }
     if (!att.qos.checkQos() || !att.topic.checkQos())
@@ -366,7 +365,7 @@ Subscriber* ParticipantImpl::createSubscriber(
                     (ReaderListener*)&subimpl->m_readerListener);
     if (reader == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Problem creating associated Reader");
+        logError(PARTICIPANT, "Problem creating associated Reader");
         delete(subimpl);
         return nullptr;
     }
@@ -404,25 +403,25 @@ bool ParticipantImpl::registerType(
 {
     if (type->m_typeSize <= 0)
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Registered Type must have maximum byte size > 0");
+        logError(PARTICIPANT, "Registered Type must have maximum byte size > 0");
         return false;
     }
     const char* name = type->getName();
     if (strlen(name) <= 0)
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Registered Type must have a name");
+        logError(PARTICIPANT, "Registered Type must have a name");
         return false;
     }
     for (auto ty = m_types.begin(); ty != m_types.end(); ++ty)
     {
         if (strcmp((*ty)->getName(), type->getName()) == 0)
         {
-            EPROSIMA_LOG_ERROR(PARTICIPANT, "Type with the same name already exists:" << type->getName());
+            logError(PARTICIPANT, "Type with the same name already exists:" << type->getName());
             return false;
         }
     }
     m_types.push_back(type);
-    EPROSIMA_LOG_INFO(PARTICIPANT, "Type " << type->getName() << " registered.");
+    logInfo(PARTICIPANT, "Type " << type->getName() << " registered.");
     return true;
 }
 
@@ -545,7 +544,7 @@ void ParticipantImpl::assert_liveliness()
     }
     else
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Invalid WLP, cannot assert liveliness of participant");
+        logError(PARTICIPANT, "Invalid WLP, cannot assert liveliness of participant");
     }
 }
 

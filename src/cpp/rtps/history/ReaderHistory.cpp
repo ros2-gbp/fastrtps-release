@@ -24,7 +24,6 @@
 #include <fastdds/rtps/reader/RTPSReader.h>
 #include <fastdds/rtps/reader/ReaderListener.h>
 
-#include <rtps/common/ChangeComparison.hpp>
 #include <utils/collections/sorted_vector_insert.hpp>
 
 #include <mutex>
@@ -44,36 +43,6 @@ ReaderHistory::~ReaderHistory()
 {
 }
 
-bool ReaderHistory::can_change_be_added_nts(
-        const GUID_t& writer_guid,
-        uint32_t total_payload_size,
-        size_t unknown_missing_changes_up_to,
-        bool& will_never_be_accepted) const
-{
-    static_cast<void>(unknown_missing_changes_up_to);
-
-    will_never_be_accepted = false;
-
-    if (m_att.memoryPolicy == PREALLOCATED_MEMORY_MODE && total_payload_size > m_att.payloadMaxSize)
-    {
-        EPROSIMA_LOG_ERROR(RTPS_READER_HISTORY,
-                "Change payload size of '" << total_payload_size <<
-                "' bytes is larger than the history payload size of '" << m_att.payloadMaxSize <<
-                "' bytes and cannot be resized.");
-        will_never_be_accepted = true;
-        return false;
-    }
-
-    if (writer_guid == c_Guid_Unknown)
-    {
-        EPROSIMA_LOG_ERROR(RTPS_READER_HISTORY, "The Writer GUID_t must be defined");
-        will_never_be_accepted = true;
-        return false;
-    }
-
-    return true;
-}
-
 bool ReaderHistory::received_change(
         CacheChange_t* change,
         size_t)
@@ -86,15 +55,14 @@ bool ReaderHistory::add_change(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_READER_HISTORY,
-                "You need to create a Reader with this History before adding any changes");
+        logError(RTPS_READER_HISTORY, "You need to create a Reader with this History before adding any changes");
         return false;
     }
 
     std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
     if (m_att.memoryPolicy == PREALLOCATED_MEMORY_MODE && a_change->serializedPayload.length > m_att.payloadMaxSize)
     {
-        EPROSIMA_LOG_ERROR(RTPS_READER_HISTORY,
+        logError(RTPS_READER_HISTORY,
                 "Change payload size of '" << a_change->serializedPayload.length <<
                 "' bytes is larger than the history payload size of '" << m_att.payloadMaxSize <<
                 "' bytes and cannot be resized.");
@@ -102,11 +70,15 @@ bool ReaderHistory::add_change(
     }
     if (a_change->writerGUID == c_Guid_Unknown)
     {
-        EPROSIMA_LOG_ERROR(RTPS_READER_HISTORY, "The Writer GUID_t must be defined");
+        logError(RTPS_READER_HISTORY, "The Writer GUID_t must be defined");
     }
 
-    eprosima::utilities::collections::sorted_vector_insert(m_changes, a_change, fastdds::rtps::history_order_cmp);
-    EPROSIMA_LOG_INFO(RTPS_READER_HISTORY,
+    eprosima::utilities::collections::sorted_vector_insert(m_changes, a_change,
+            [](const CacheChange_t* lhs, const CacheChange_t* rhs)
+            {
+                return lhs->sourceTimestamp < rhs->sourceTimestamp;
+            });
+    logInfo(RTPS_READER_HISTORY,
             "Change " << a_change->sequenceNumber << " added with " << a_change->serializedPayload.length << " bytes");
 
     return true;
@@ -119,7 +91,7 @@ bool ReaderHistory::matches_change(
     if (nullptr == outer_change
             || nullptr == inner_change)
     {
-        EPROSIMA_LOG_ERROR(RTPS_READER_HISTORY, "Pointer is not valid");
+        logError(RTPS_READER_HISTORY, "Pointer is not valid")
         return false;
     }
 
@@ -133,57 +105,58 @@ History::iterator ReaderHistory::remove_change_nts(
 {
     if ( mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
-                "You need to create a Writer with this History before removing any changes");
+        logError(RTPS_WRITER_HISTORY, "You need to create a Writer with this History before removing any changes");
         return changesEnd();
     }
 
     if ( removal == changesEnd())
     {
-        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Trying to remove without a proper CacheChange_t referenced");
+        logInfo(RTPS_WRITER_HISTORY, "Trying to remove without a proper CacheChange_t referenced");
         return changesEnd();
     }
 
     CacheChange_t* change = *removal;
-    auto ret_val = m_changes.erase(removal);
-    m_isHistoryFull = false;
-
     mp_reader->change_removed_by_history(change);
-    if (release)
+    if ( release )
     {
         mp_reader->releaseCache(change);
     }
 
-    return ret_val;
-}
-
-void ReaderHistory::writer_unmatched(
-        const GUID_t& writer_guid,
-        const SequenceNumber_t& last_notified_seq)
-{
-    static_cast<void>(last_notified_seq);
-    remove_changes_with_pred(
-        [&writer_guid](CacheChange_t* ch)
-        {
-            return writer_guid == ch->writerGUID;
-        });
+    return m_changes.erase(removal);
 }
 
 bool ReaderHistory::remove_changes_with_guid(
         const GUID_t& a_guid)
 {
+    std::vector<CacheChange_t*> changes_to_remove;
+
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_READER_HISTORY, "You need to create a Reader with History before removing any changes");
+        logError(RTPS_READER_HISTORY, "You need to create a Reader with History before removing any changes");
         return false;
     }
 
-    remove_changes_with_pred(
-        [a_guid](CacheChange_t* ch)
+    {
+        //Lock scope
+        std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+        for (std::vector<CacheChange_t*>::iterator chit = m_changes.begin(); chit != m_changes.end(); ++chit)
         {
-            return a_guid == ch->writerGUID;
-        });
+            if ((*chit)->writerGUID == a_guid)
+            {
+                changes_to_remove.push_back((*chit));
+            }
+        }
+    }//End lock scope
 
+    for (std::vector<CacheChange_t*>::iterator chit = changes_to_remove.begin(); chit != changes_to_remove.end();
+            ++chit)
+    {
+        if (!remove_change(*chit))
+        {
+            logError(RTPS_READER_HISTORY, "One of the cachechanged in the GUID removal bulk could not be removed");
+            return false;
+        }
+    }
     return true;
 }
 
@@ -193,7 +166,7 @@ bool ReaderHistory::remove_fragmented_changes_until(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_READER_HISTORY, "You need to create a Reader with History before removing any changes");
+        logError(RTPS_READER_HISTORY, "You need to create a Reader with History before removing any changes");
         return false;
     }
 
@@ -208,8 +181,10 @@ bool ReaderHistory::remove_fragmented_changes_until(
             {
                 if (item->is_fully_assembled() == false)
                 {
-                    EPROSIMA_LOG_INFO(RTPS_READER_HISTORY, "Removing change " << item->sequenceNumber);
-                    chit = remove_change_nts(chit);
+                    logInfo(RTPS_READER_HISTORY, "Removing change " << item->sequenceNumber);
+                    mp_reader->change_removed_by_history(item);
+                    mp_reader->releaseCache(item);
+                    chit = m_changes.erase(chit);
                     continue;
                 }
             }

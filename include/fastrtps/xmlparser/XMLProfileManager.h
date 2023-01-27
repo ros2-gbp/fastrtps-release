@@ -47,6 +47,7 @@ using replier_map_iterator_t = replier_map_t::iterator;
 using xmlfiles_map_t = std::map<std::string, XMLP_ret>;
 using xmlfile_map_iterator_t = xmlfiles_map_t::iterator;
 
+
 /**
  * Class XMLProfileManager, used to make available profiles from XML file.
  * @ingroup XMLPROFILEMANAGER_MODULE
@@ -68,17 +69,6 @@ public:
      */
     RTPS_DllAPI static XMLP_ret loadXMLFile(
             const std::string& filename);
-
-    /**
-     * Load a profiles XML string.
-     * @param data Buffer containing the data.
-     * @param length Length of data.
-     * @return XMLP_ret::XML_OK if all profiles are correct, XMLP_ret::XML_NOK if some are and some are not,
-     *         XMLP_ret::XML_ERROR in other case.
-     */
-    RTPS_DllAPI static XMLP_ret loadXMLString(
-            const char* data,
-            size_t length);
 
     /**
      * Load a profiles XML node.
@@ -221,9 +211,9 @@ public:
             ReplierAttributes& atts);
 
     /**
-     * Deletes the XMLProfileManager instance.
-     * FastDDS's Domain calls this method automatically on its destructor, but
-     * if using XMLProfileManager outside of FastDDS, it should be called manually.
+     * Deletes the XMLProsileManager instance.
+     * FastRTPS's Domain calls this method automatically on its destructor, but
+     * if using XMLProfileManager outside of FastRTPS, it should be called manually.
      */
     RTPS_DllAPI static void DeleteInstance()
     {
@@ -232,7 +222,6 @@ public:
         subscriber_profiles_.clear();
         requester_profiles_.clear();
         replier_profiles_.clear();
-        topic_profiles_.clear();
         xml_files_.clear();
         transport_profiles_.clear();
     }
@@ -263,6 +252,10 @@ public:
     }
 
 private:
+
+    RTPS_DllAPI static XMLP_ret extractDynamicTypes(
+            up_base_node_t properties,
+            const std::string& filename);
 
     RTPS_DllAPI static XMLP_ret extractProfiles(
             up_base_node_t properties,

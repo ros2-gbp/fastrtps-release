@@ -325,9 +325,9 @@ public:
         subscriber_attr_.topic.topicKind =
                 type_.m_isGetKeyDefined ? ::eprosima::fastrtps::rtps::WITH_KEY : ::eprosima::fastrtps::rtps::NO_KEY;
 
-        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        // By default, memory mode is preallocated (the most restritive)
+        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         publisher_attr_.times.heartbeatPeriod.seconds = 0;
@@ -389,12 +389,8 @@ public:
     }
 
     bool create_additional_topics(
-            size_t num_topics,
-            const char* suffix,
-            const eprosima::fastrtps::rtps::PropertySeq& writer_properties = eprosima::fastrtps::rtps::PropertySeq())
+            size_t num_topics)
     {
-        (void)writer_properties;
-
         bool ret_val = initialized_;
         if (ret_val)
         {
@@ -402,7 +398,7 @@ public:
 
             for (size_t i = 0; ret_val && (i < num_topics); i++)
             {
-                topic_name += suffix;
+                topic_name += "/";
                 publisher_attr_.topic.topicName = topic_name;
                 ret_val &=
                         nullptr != eprosima::fastrtps::Domain::createPublisher(participant_, publisher_attr_,
@@ -413,7 +409,7 @@ public:
 
             for (size_t i = 0; ret_val && (i < num_topics); i++)
             {
-                topic_name += suffix;
+                topic_name += "/";
                 subscriber_attr_.topic.topicName = topic_name;
                 ret_val &=
                         nullptr != eprosima::fastrtps::Domain::createSubscriber(participant_, subscriber_attr_,
@@ -657,53 +653,6 @@ public:
         return *this;
     }
 
-    PubSubWriterReader& pub_liveliness_kind(
-            const eprosima::fastrtps::LivelinessQosPolicyKind kind)
-    {
-        publisher_attr_.qos.m_liveliness.kind = kind;
-        return *this;
-    }
-
-    PubSubWriterReader& sub_liveliness_kind(
-            const eprosima::fastrtps::LivelinessQosPolicyKind kind)
-    {
-        subscriber_attr_.qos.m_liveliness.kind = kind;
-        return *this;
-    }
-
-    PubSubWriterReader& pub_liveliness_announcement_period(
-            const eprosima::fastrtps::Duration_t announcement_period)
-    {
-        publisher_attr_.qos.m_liveliness.announcement_period = announcement_period;
-        return *this;
-    }
-
-    PubSubWriterReader& sub_liveliness_announcement_period(
-            const eprosima::fastrtps::Duration_t announcement_period)
-    {
-        subscriber_attr_.qos.m_liveliness.announcement_period = announcement_period;
-        return *this;
-    }
-
-    PubSubWriterReader& pub_liveliness_lease_duration(
-            const eprosima::fastrtps::Duration_t lease_duration)
-    {
-        publisher_attr_.qos.m_liveliness.lease_duration = lease_duration;
-        return *this;
-    }
-
-    PubSubWriterReader& sub_liveliness_lease_duration(
-            const eprosima::fastrtps::Duration_t lease_duration)
-    {
-        subscriber_attr_.qos.m_liveliness.lease_duration = lease_duration;
-        return *this;
-    }
-
-    void assert_liveliness()
-    {
-        publisher_->assert_liveliness();
-    }
-
     size_t get_num_discovered_participants() const
     {
         return participant_listener_.get_num_discovered_participants();
@@ -729,24 +678,6 @@ public:
     {
         std::lock_guard<std::mutex> guard(mutexDiscovery_);
         return matched_readers_.size();
-    }
-
-    PubSubWriterReader& add_throughput_controller_descriptor_to_pparams(
-            eprosima::fastdds::rtps::FlowControllerSchedulerPolicy,
-            uint32_t bytesPerPeriod,
-            uint32_t periodInMs)
-    {
-        eprosima::fastrtps::rtps::ThroughputControllerDescriptor descriptor {bytesPerPeriod, periodInMs};
-        publisher_attr_.throughputController = descriptor;
-
-        return *this;
-    }
-
-    PubSubWriterReader& asynchronously(
-            const eprosima::fastrtps::PublishModeQosPolicyKind kind)
-    {
-        publisher_attr_.qos.m_publishMode.kind = kind;
-        return *this;
     }
 
 private:

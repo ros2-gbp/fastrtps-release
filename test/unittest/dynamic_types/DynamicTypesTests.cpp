@@ -32,6 +32,8 @@
 #include "idl/BasicTypeObject.h"
 #include <tinyxml2.h>
 
+#include <dds/core/LengthUnlimited.hpp>
+
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::types;
@@ -90,10 +92,8 @@ TEST_F(DynamicTypesTests, DynamicType_basic_unit_tests)
     // Create basic types
     DynamicTypeBuilder_ptr int32_builder = DynamicTypeBuilderFactory::get_instance()->create_int32_builder();
     ASSERT_TRUE(int32_builder != nullptr);
-    ASSERT_FALSE(int32_builder == nullptr);
     DynamicType_ptr int32_type = DynamicTypeBuilderFactory::get_instance()->create_type(int32_builder.get());
     ASSERT_TRUE(int32_type != nullptr);
-    ASSERT_FALSE(int32_type == nullptr);
     DynamicType_ptr type2 = DynamicTypeBuilderFactory::get_instance()->create_type(int32_builder.get());
     ASSERT_TRUE(type2 != nullptr);
     ASSERT_TRUE(type2->equals(int32_type.get()));
@@ -328,7 +328,7 @@ TEST_F(DynamicTypesTests, DynamicTypeBuilderFactory_unit_tests)
         ASSERT_TRUE(DynamicDataFactory::get_instance()->delete_data(data2) == ReturnCode_t::RETCODE_OK);
 
         created_builder =
-                DynamicTypeBuilderFactory::get_instance()->create_string_builder(BOUND_UNLIMITED);
+                DynamicTypeBuilderFactory::get_instance()->create_string_builder(::dds::core::LENGTH_UNLIMITED);
         ASSERT_TRUE(created_builder != nullptr);
         type = created_builder->build();
         ASSERT_TRUE(type != nullptr);
@@ -344,7 +344,8 @@ TEST_F(DynamicTypesTests, DynamicTypeBuilderFactory_unit_tests)
         ASSERT_TRUE(DynamicDataFactory::get_instance()->delete_data(data) == ReturnCode_t::RETCODE_OK);
         ASSERT_TRUE(DynamicDataFactory::get_instance()->delete_data(data2) == ReturnCode_t::RETCODE_OK);
 
-        created_builder = DynamicTypeBuilderFactory::get_instance()->create_wstring_builder(BOUND_UNLIMITED);
+        created_builder = DynamicTypeBuilderFactory::get_instance()->create_wstring_builder(
+            ::dds::core::LENGTH_UNLIMITED);
         ASSERT_TRUE(created_builder != nullptr);
         type = created_builder->build();
         ASSERT_TRUE(type != nullptr);

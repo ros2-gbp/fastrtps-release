@@ -1,7 +1,6 @@
 #include "Publisher.hpp"
 
 #include <fastrtps/Domain.h>
-#include <fastrtps/TopicDataType.h>
 
 int main(
         int argc,
@@ -9,7 +8,6 @@ int main(
 {
     int arg_count = 1;
     bool exit_on_lost_liveliness = false;
-    bool fixed_type = false;
     uint32_t seed = 7800, wait = 0;
     char* xml_file = nullptr;
     uint32_t samples = 4;
@@ -20,11 +18,6 @@ int main(
         if (strcmp(argv[arg_count], "--exit_on_lost_liveliness") == 0)
         {
             exit_on_lost_liveliness = true;
-        }
-        else if (strcmp(argv[arg_count], "--fixed_type") == 0)
-        {
-            std::cout << "--fixed_type set: using FixedSizedType" << std::endl;
-            fixed_type = true;
         }
         else if (strcmp(argv[arg_count], "--seed") == 0)
         {
@@ -76,11 +69,6 @@ int main(
 
             xml_file = argv[arg_count];
         }
-        else
-        {
-            std::cout << "Wrong argument " << argv[arg_count] << std::endl;
-            return -1;
-        }
 
         ++arg_count;
     }
@@ -92,7 +80,7 @@ int main(
 
     Publisher publisher(exit_on_lost_liveliness);
 
-    if (publisher.init(seed, magic, fixed_type))
+    if (publisher.init(seed, magic))
     {
         if (wait > 0)
         {

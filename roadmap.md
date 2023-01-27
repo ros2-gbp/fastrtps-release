@@ -1,4 +1,4 @@
-# Fast DDS Roadmap
+# Fast RTPS Roadmap
 
 This product is a FIWARE Generic Enabler.
 If you would like to learn about the overall Roadmap of FIWARE, please check section "Roadmap" on the FIWARE Catalogue.
@@ -15,31 +15,24 @@ at any time.
 
 Disclaimer:
 
-* This section has been last updated in December 2022.
+* This section has been last updated in May 2020.
   Please take into account its content could be obsolete.
 
 ## Short term
 
-The following list of features are planned to be addressed in the short term, and incorporated into the following
-minor release of the product:
+The following list of features are planned to be addressed in the short term, and incorporated into the coming
+release(s) of the product:
 
-* Complete support for dynamic network interfaces
-* Secure Discovery Server
-* XML generation tool
-* DomainParticipant DDS API implementation:
-    - `DomainParticipant::ignore_participant`
-    - `DomainParticipant::ignore_topic`
-    - `DomainParticipant::ignore_publication`
-    - `DomainParticipant::ignore_subscription`
+* Full compliance with DDS minimum-profile
+* Support of DDS-RPC Enhanced Discovery Mechanism
 
 ## Medium term
 
 The following list of features are planned to be addressed in the medium term, typically within the subsequent
 release(s) generated in the next **9 months** after next planned release:
 
-* Support for Time-based filter QoS
-* Service aware DataWriter
-* DDS-XTypes 1.3
+* Localhost zero-copy delivery
+* DDS x-types 1.2
 
 ## Long term
 

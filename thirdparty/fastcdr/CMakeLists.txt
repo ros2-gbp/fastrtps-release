@@ -15,7 +15,7 @@
 ###############################################################################
 # CMake build rules for FastCDR                                               #
 ###############################################################################
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 2.8.12)
 
 set(IS_TOP_LEVEL TRUE)
 if(PROJECT_SOURCE_DIR)
@@ -145,19 +145,8 @@ endif()
 ###############################################################################
 # Installation paths
 ###############################################################################
-option(APPEND_PROJECT_NAME_TO_INCLUDEDIR
-  "When ON headers are installed to a path ending with a folder called \
-  ${PROJECT_NAME}. This avoids include directory search order issues when \
-  overriding this package from a merged catkin, ament, or colcon workspace."
-  OFF)
-
 set(BIN_INSTALL_DIR bin/ CACHE PATH "Installation directory for binaries")
-set(_include_dir "include/")
-if(APPEND_PROJECT_NAME_TO_INCLUDEDIR)
-  string(APPEND _include_dir "${PROJECT_NAME}/")
-endif()
-set(INCLUDE_INSTALL_DIR "${_include_dir}" CACHE PATH "Installation directory for C++ headers")
-unset(_include_dir)
+set(INCLUDE_INSTALL_DIR include/ CACHE PATH "Installation directory for C++ headers")
 set(LIB_INSTALL_DIR lib${LIB_SUFFIX}/ CACHE PATH "Installation directory for libraries")
 set(DATA_INSTALL_DIR share/ CACHE PATH "Installation directory for data")
 if(WIN32)

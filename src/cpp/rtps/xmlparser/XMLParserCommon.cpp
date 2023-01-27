@@ -20,8 +20,6 @@ namespace xmlparser {
 
 const char* DEFAULT_FASTRTPS_ENV_VARIABLE = "FASTRTPS_DEFAULT_PROFILES_FILE";
 const char* DEFAULT_FASTRTPS_PROFILES = "DEFAULT_FASTRTPS_PROFILES.xml";
-const char* DEFAULT_STATISTICS_DATAWRITER_PROFILE = "GENERIC_STATISTICS_PROFILE";
-const char* SKIP_DEFAULT_XML_FILE = "SKIP_DEFAULT_XML_FILE";
 
 const char* ROOT = "dds";
 const char* PROFILES = "profiles";
@@ -67,7 +65,6 @@ const char* HEALTHY_CHECK_TIMEOUT_MS = "healthy_check_timeout_ms";
 const char* DISCARD = "DISCARD";
 const char* FAIL = "FAIL";
 const char* RTPS_DUMP_FILE = "rtps_dump_file";
-const char* ON = "ON";
 
 const char* OFF = "OFF";
 const char* USER_DATA_ONLY = "USER_DATA_ONLY";
@@ -86,7 +83,6 @@ const char* INTRAPROCESS_DELIVERY = "intraprocess_delivery";
 /// RTPS Participant attributes
 const char* ALLOCATION = "allocation";
 const char* PREFIX = "prefix";
-const char* DEF_EXT_UNI_LOC_LIST = "default_external_unicast_locators";
 const char* DEF_UNI_LOC_LIST = "defaultUnicastLocatorList";
 const char* DEF_MULTI_LOC_LIST = "defaultMulticastLocatorList";
 const char* SEND_SOCK_BUF_SIZE = "sendSocketBufferSize";
@@ -120,7 +116,6 @@ const char* MAX_PARTITIONS = "max_partitions";
 const char* TOPIC = "topic";
 const char* QOS = "qos";
 const char* TIMES = "times";
-const char* EXT_UNI_LOC_LIST = "external_unicast_locators";
 const char* UNI_LOC_LIST = "unicastLocatorList";
 const char* MULTI_LOC_LIST = "multicastLocatorList";
 const char* REM_LOC_LIST = "remoteLocatorList";
@@ -134,7 +129,6 @@ const char* MATCHED_SUBSCRIBERS_ALLOCATION = "matchedSubscribersAllocation";
 const char* MATCHED_PUBLISHERS_ALLOCATION = "matchedPublishersAllocation";
 
 ///
-const char* IGN_NON_MATCHING_LOCS = "ignore_non_matching_locators";
 const char* PROPERTIES = "properties";
 const char* BIN_PROPERTIES = "binary_properties";
 const char* PROPERTY = "property";
@@ -196,8 +190,6 @@ const char* TOPIC_DATA = "topicData";
 const char* GROUP_DATA = "groupData";
 const char* PUB_MODE = "publishMode";
 const char* DISABLE_POSITIVE_ACKS = "disablePositiveAcks";
-const char* DISABLE_HEARTBEAT_PIGGYBACK = "disable_heartbeat_piggyback";
-const char* DATA_SHARING = "data_sharing";
 
 const char* SYNCHRONOUS = "SYNCHRONOUS";
 const char* ASYNCHRONOUS = "ASYNCHRONOUS";
@@ -239,7 +231,6 @@ const char* HISTORY_QOS = "historyQos";
 const char* RES_LIMITS_QOS = "resourceLimitsQos";
 const char* DEPTH = "depth";
 const char* ALLOCATED_SAMPLES = "allocated_samples";
-const char* EXTRA_SAMPLES = "extra_samples";
 const char* BYTES_PER_SECOND = "bytesPerPeriod";
 const char* PERIOD_MILLISECS = "periodMillisecs";
 const char* PORT_BASE = "portBase";
@@ -268,7 +259,6 @@ const char* LEASE_ANNOUNCE = "leaseAnnouncement";
 const char* INITIAL_ANNOUNCEMENTS = "initialAnnouncements";
 const char* AVOID_BUILTIN_MULTICAST = "avoid_builtin_multicast";
 const char* SIMPLE_EDP = "simpleEDP";
-const char* META_EXT_UNI_LOC_LIST = "metatraffic_external_unicast_locators";
 const char* META_UNI_LOC_LIST = "metatrafficUnicastLocatorList";
 const char* META_MULTI_LOC_LIST = "metatrafficMulticastLocatorList";
 const char* INIT_PEERS_LIST = "initialPeersList";
@@ -280,7 +270,6 @@ const char* STATIC = "STATIC";
 const char* PUBWRITER_SUBREADER = "PUBWRITER_SUBREADER";
 const char* PUBREADER_SUBWRITER = "PUBREADER_SUBWRITER";
 const char* STATIC_ENDPOINT_XML = "staticEndpointXMLFilename";
-const char* STATIC_ENDPOINT_XML_URI = "static_edp_xml_config";
 const char* READER_HIST_MEM_POLICY = "readerHistoryMemoryPolicy";
 const char* WRITER_HIST_MEM_POLICY = "writerHistoryMemoryPolicy";
 const char* READER_PAYLOAD_SIZE = "readerPayloadSize";
@@ -288,9 +277,6 @@ const char* WRITER_PAYLOAD_SIZE = "writerPayloadSize";
 const char* MUTATION_TRIES = "mutation_tries";
 const char* ACCESS_SCOPE = "access_scope";
 const char* ENABLED = "enabled";
-const char* DOMAIN_IDS = "domain_ids";
-const char* SHARED_DIR = "shared_dir";
-const char* MAX_DOMAINS = "max_domains";
 
 // Endpoint parser
 const char* STATICDISCOVERY = "staticdiscovery";
@@ -307,8 +293,6 @@ const char* MULTICAST_LOCATOR = "multicastLocator";
 const char* _RELIABLE_RELIABILITY_QOS = "RELIABLE_RELIABILITY_QOS";
 const char* _BEST_EFFORT_RELIABILITY_QOS = "BEST_EFFORT_RELIABILITY_QOS";
 const char* DURABILITY_QOS = "durabilityQos";
-const char* _PERSISTENT_DURABILITY_QOS = "PERSISTENT_DURABILITY_QOS";
-const char* _TRANSIENT_DURABILITY_QOS = "TRANSIENT_DURABILITY_QOS";
 const char* _TRANSIENT_LOCAL_DURABILITY_QOS = "TRANSIENT_LOCAL_DURABILITY_QOS";
 const char* _VOLATILE_DURABILITY_QOS = "VOLATILE_DURABILITY_QOS";
 const char* OWNERSHIP_QOS = "ownershipQos";
@@ -399,7 +383,6 @@ const char* TLS_DEFAULT_VERIFY_PATH = "default_verify_path";
 const char* TLS_VERIFY_DEPTH = "verify_depth";
 const char* TLS_RSA_PRIVATE_KEY_FILE = "rsa_private_key_file";
 const char* TLS_HANDSHAKE_ROLE = "handshake_role";
-const char* TLS_SERVER_NAME = "server_name";
 
 // TLS HandShake Role
 const char* TLS_HANDSHAKE_ROLE_DEFAULT = "DEFAULT";

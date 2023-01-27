@@ -1,4 +1,4 @@
-// Copyright 2016 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+// Copyright 2019 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,33 +17,34 @@
  *
  */
 
-#include <fastdds/rtps/writer/StatefulWriter.h>
-#include <fastdds/rtps/history/WriterHistory.h>
-#include <fastdds/rtps/history/ReaderHistory.h>
-#include <fastdds/rtps/reader/RTPSReader.h>
+#include <rtps/builtin/discovery/endpoint/EDPServerListeners.h>
+#include <fastdds/rtps/builtin/discovery/endpoint/EDPServer.h>
+#include <fastdds/rtps/builtin/discovery/participant/PDPServer.h>
 
-#include <fastrtps/utils/fixed_size_string.hpp>
+#include <fastdds/rtps/builtin/data/WriterProxyData.h>
+#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
+#include <fastrtps_deprecated/participant/ParticipantImpl.h>
+#include <fastdds/rtps/reader/StatefulReader.h>
+#include <fastdds/rtps/writer/StatefulWriter.h>
+
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/history/WriterHistory.h>
+
+#include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
+
+#include <mutex>
 
 #include <fastdds/dds/log/Log.hpp>
 
-#include <rtps/builtin/discovery/endpoint/EDPServerListeners.hpp>
-#include <rtps/builtin/discovery/endpoint/EDPServer.hpp>
-#include <rtps/builtin/discovery/participant/PDPServer.hpp>
-
 namespace eprosima {
-namespace fastdds {
+namespace fastrtps {
 namespace rtps {
-
-using namespace eprosima::fastrtps::rtps;
-
-PDPServer* EDPServerPUBListener::get_pdp()
-{
-    return sedp_->get_pdp();
-}
 
 EDPServerPUBListener::EDPServerPUBListener(
         EDPServer* sedp)
-    : sedp_(sedp)
+    : EDPBasePUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators,
+            sedp->mp_RTPSParticipant->getAttributes().allocation.data_limits)
+    , sedp_(sedp)
 {
 }
 
@@ -51,113 +52,68 @@ void EDPServerPUBListener::onNewCacheChangeAdded(
         RTPSReader* reader,
         const CacheChange_t* const change_in)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "");
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "------------------ EDP PUB SERVER LISTENER START ------------------");
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER,
-            "-------------------- " << sedp_->mp_RTPSParticipant->getGuid() << " --------------------");
-
-    // Create a new change from the one received
     CacheChange_t* change = (CacheChange_t*)change_in;
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "EDP Server PUB Message received: " << change_in->instanceHandle);
-
-    // DATA(w)s should have key
+    //std::lock_guard<std::recursive_mutex> guard(*this->sedp_->publications_reader_.first->getMutex());
+    logInfo(RTPS_EDP, "");
     if (!computeKey(change))
     {
-        EPROSIMA_LOG_WARNING(RTPS_EDP_LISTENER, "Received change with no Key");
+        logWarning(RTPS_EDP, "Received change with no Key");
     }
 
-    // Get writer's GUID and EDP publications' reader history
-    GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
     ReaderHistory* reader_history = sedp_->publications_reader_.second;
 
-    // Related_sample_identity could be lost in message delivered, so we set as sample_identity
-    // An empty related_sample_identity could lead into an empty sample_identity when resending this msg
-    if (change->write_params.related_sample_identity() == SampleIdentity::unknown())
+    // update the EDP Writer with this reader info
+    if (!sedp_->addPublisherFromHistory(*change))
     {
-        change->write_params.related_sample_identity(change->write_params.sample_identity());
+        reader_history->remove_change(change);
+        return; // already there
     }
 
-    // Reset the internal CacheChange_t union.
-    change->writer_info.next = nullptr;
-    change->writer_info.previous = nullptr;
-    change->writer_info.num_sent_submessages = 0;
-
-    // String to store the topic of the writer
-    std::string topic_name = "";
-
-    // DATA(w) case: new writer or updated information about an existing writer
     if (change->kind == ALIVE)
     {
-        // Note: add_writer_from_change() removes the change from the EDP publications' reader history, but it does not
-        // return it to the pool
-        add_writer_from_change(reader, reader_history, change, sedp_, false);
-
-        // Retrieve the topic after creating the WriterProxyData (in add_writer_from_change()). This way, not matter
-        // whether the DATA(w) is a new one or an update, the WriterProxyData exists, and so the topic can be retrieved
-        auto temp_writer_data = get_pdp()->get_temporary_writer_proxies_pool().get();
-        if (get_pdp()->lookupWriterProxyData(auxGUID, *temp_writer_data))
-        {
-            topic_name = temp_writer_data->topicName().to_string();
-        }
+        // Note: change is removed from history inside this method.
+        add_writer_from_change(reader, reader_history, change, sedp_);
     }
-    // DATA(Uw) case
     else
     {
-        EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "Disposed Remote Writer, removing...");
+        //REMOVE WRITER FROM OUR READERS:
+        logInfo(RTPS_EDP, "Disposed Remote Writer, removing...");
 
-        // Retrieve the topic before removing the WriterProxyData. We need it to add the DATA(Uw) to the database
-        auto temp_writer_data = get_pdp()->get_temporary_writer_proxies_pool().get();
-        if (get_pdp()->lookupWriterProxyData(auxGUID, *temp_writer_data))
-        {
-            topic_name = temp_writer_data->topicName().to_string();
-        }
-        else
-        {
-            EPROSIMA_LOG_WARNING(RTPS_EDP_LISTENER, "Writer Proxy Data missing for change " << auxGUID);
-        }
+        GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
+        this->sedp_->mp_PDP->removeWriterProxyData(auxGUID);
+        sedp_->removePublisherFromHistory(change->instanceHandle);
 
-
-        // Remove WriterProxy data information
-        get_pdp()->removeWriterProxyData(auxGUID);
-
-        // Removing change from history, not returning the change to the pool, since the ownership will be yielded to
-        // the database
-        reader_history->remove_change(reader_history->find_change(change), false);
+        //Removing change from history
+        reader_history->remove_change(change);
     }
 
-    // Notify the DiscoveryDataBase if it is enabled already
-    // In case it is not enable, the change should not be updated or released because it is been
-    // updated from a backup
-    if (!get_pdp()->discovery_db().backup_in_progress())
-    {
-        if (topic_name.size() > 0 &&
-                get_pdp()->discovery_db().update(change, topic_name))
-        {
-            // From here on, the discovery database takes ownership of the CacheChange_t. Henceforth there are no
-            // references to the CacheChange_t.
-            // Ensure processing time for the cache by triggering the Server thread (which process the updates
-            get_pdp()->awake_routine_thread();
-        }
-        else
-        {
-            // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-            reader->releaseCache(change);
-        }
-    }
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER,
-            "-------------------- " << sedp_->mp_RTPSParticipant->getGuid() << " --------------------");
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "------------------ EDP PUB SERVER LISTENER END ------------------");
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "");
+    return;
 }
 
-PDPServer* EDPServerSUBListener::get_pdp()
+void EDPServerPUBListener::onWriterChangeReceivedByAll(
+        RTPSWriter* writer,
+        CacheChange_t* change)
 {
-    return sedp_->get_pdp();
+    (void)writer;
+
+    if (ChangeKind_t::NOT_ALIVE_DISPOSED_UNREGISTERED == change->kind)
+    {
+        WriterHistory* writer_history =
+#if HAVE_SECURITY
+                writer == sedp_->publications_secure_writer_.first ?
+                sedp_->publications_secure_writer_.second :
+#endif // if HAVE_SECURITY
+                sedp_->publications_writer_.second;
+
+        writer_history->remove_change(change);
+    }
 }
 
 EDPServerSUBListener::EDPServerSUBListener(
         EDPServer* sedp)
-    : sedp_(sedp)
+    : EDPBaseSUBListener(sedp->mp_RTPSParticipant->getAttributes().allocation.locators,
+            sedp->mp_RTPSParticipant->getAttributes().allocation.data_limits)
+    , sedp_(sedp)
 {
 }
 
@@ -165,106 +121,63 @@ void EDPServerSUBListener::onNewCacheChangeAdded(
         RTPSReader* reader,
         const CacheChange_t* const change_in)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "");
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "------------------ EDP SUB SERVER LISTENER START ------------------");
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER,
-            "-------------------- " << sedp_->mp_RTPSParticipant->getGuid() << " --------------------");
-
-    // Create a new change from the one received
     CacheChange_t* change = (CacheChange_t*)change_in;
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "EDP Server SUB Message received: " << change_in->instanceHandle);
-
-    // DATA(r)s should have key
+    //std::lock_guard<std::recursive_mutex> guard(*this->sedp_->subscriptions_reader_.first->getMutex());
+    logInfo(RTPS_EDP, "");
     if (!computeKey(change))
     {
-        EPROSIMA_LOG_WARNING(RTPS_EDP_LISTENER, "Received change with no Key");
+        logWarning(RTPS_EDP, "Received change with no Key");
     }
 
-    // Related_sample_identity could be lost in message delivered, so we set as sample_identity
-    // An empty related_sample_identity could lead into an empty sample_identity when resending this msg
-    if (change->write_params.related_sample_identity() == SampleIdentity::unknown())
-    {
-        change->write_params.related_sample_identity(change->write_params.sample_identity());
-    }
-
-    // Reset the internal CacheChange_t union.
-    change->writer_info.next = nullptr;
-    change->writer_info.previous = nullptr;
-    change->writer_info.num_sent_submessages = 0;
-
-    // Get readers's GUID and EDP subscriptions' reader history
-    GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
     ReaderHistory* reader_history = sedp_->subscriptions_reader_.second;
 
-    // String to store the topic of the reader
-    std::string topic_name = "";
+    // update the PDP Writer with this reader info
+    if (!sedp_->addSubscriberFromHistory(*change))
+    {
+        reader_history->remove_change(change);
+        return; // already there
+    }
 
-    // DATA(r) case: new reader or updated information about an existing reader
     if (change->kind == ALIVE)
     {
-        // Note: add_reader_from_change() removes the change from the EDP subscriptions' reader history, but it does not
-        // return it to the pool
-        add_reader_from_change(reader, reader_history, change, sedp_, false);
-
-        // Retrieve the topic after creating the ReaderProxyData (in add_reader_from_change()). This way, not matter
-        // whether the DATA(r) is a new one or an update, the ReaderProxyData exists, and so the topic can be retrieved
-        auto temp_reader_data = get_pdp()->get_temporary_reader_proxies_pool().get();
-        if (get_pdp()->lookupReaderProxyData(auxGUID, *temp_reader_data))
-        {
-            topic_name = temp_reader_data->topicName().to_string();
-        }
-        else
-        {
-            EPROSIMA_LOG_WARNING(RTPS_EDP_LISTENER, "Reader Proxy Data missing for change " << auxGUID);
-        }
+        // Note: change is removed from history inside this method.
+        add_reader_from_change(reader, reader_history, change, sedp_);
     }
-    // DATA(Ur) case
     else
     {
         //REMOVE WRITER FROM OUR READERS:
-        EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "Disposed Remote Reader, removing...");
+        logInfo(RTPS_EDP, "Disposed Remote Reader, removing...");
 
-        // Retrieve the topic before removing the ReaderProxyData. We need it to add the DATA(Ur) to the database
-        auto temp_reader_data = get_pdp()->get_temporary_reader_proxies_pool().get();
-        if (get_pdp()->lookupReaderProxyData(auxGUID, *temp_reader_data))
-        {
-            topic_name = temp_reader_data->topicName().to_string();
-        }
+        GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
+        this->sedp_->mp_PDP->removeReaderProxyData(auxGUID);
+        sedp_->removeSubscriberFromHistory(change->instanceHandle);
 
-        // Remove ReaderProxy data information
-        get_pdp()->removeReaderProxyData(auxGUID);
-
-        // Removing change from history, not returning the change to the pool, since the ownership will be yielded to
-        // the database
-        reader_history->remove_change(reader_history->find_change(change), false);
+        // Remove change from history.
+        reader_history->remove_change(change);
     }
+}
 
-    // Notify the DiscoveryDataBase if it is enabled already
-    // In case it is not enable, the change should not be updated or released because it is been
-    // updated from a backup
-    if (!get_pdp()->discovery_db().backup_in_progress())
+void EDPServerSUBListener::onWriterChangeReceivedByAll(
+        RTPSWriter* writer,
+        CacheChange_t* change)
+{
+    (void)writer;
+
+    if (ChangeKind_t::NOT_ALIVE_DISPOSED_UNREGISTERED == change->kind)
     {
-        if (topic_name.size() > 0 &&
-                get_pdp()->discovery_db().update(change, topic_name))
-        {
-            // From here on, the discovery database takes ownership of the CacheChange_t. Henceforth there are no
-            // references to the CacheChange_t.
-            // Ensure processing time for the cache by triggering the Server thread (which process the updates
-            get_pdp()->awake_routine_thread();
-        }
-        else
-        {
-            // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-            reader->releaseCache(change);
-        }
+        WriterHistory* writer_history =
+#if HAVE_SECURITY
+                writer == sedp_->subscriptions_secure_writer_.first ?
+                sedp_->subscriptions_secure_writer_.second :
+#endif // if HAVE_SECURITY
+                sedp_->subscriptions_writer_.second;
+
+        writer_history->remove_change(change);
     }
 
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER,
-            "-------------------- " << sedp_->mp_RTPSParticipant->getGuid() << " --------------------");
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "------------------ EDP SUB SERVER LISTENER END ------------------");
-    EPROSIMA_LOG_INFO(RTPS_EDP_LISTENER, "");
 }
 
 } /* namespace rtps */
-} // namespace fastdds
+} // namespace fastrtps
 } /* namespace eprosima */
+

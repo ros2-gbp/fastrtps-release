@@ -20,7 +20,7 @@
 #ifndef _TEST_BLACKBOX_TCPReqRepHelloWorldRequester_HPP_
 #define _TEST_BLACKBOX_TCPReqRepHelloWorldRequester_HPP_
 
-#include "../types/HelloWorldPubSubTypes.h"
+#include "../types/HelloWorldType.h"
 
 #include <fastrtps/fastrtps_fwd.h>
 #include <fastrtps/subscriber/SubscriberListener.h>
@@ -195,7 +195,7 @@ private:
     std::mutex mutexDiscovery_;
     std::condition_variable cvDiscovery_;
     std::atomic<unsigned int> matched_;
-    HelloWorldPubSubType type_;
+    HelloWorldType type_;
     eprosima::fastrtps::rtps::SampleIdentity related_sample_identity_;
     eprosima::fastrtps::rtps::SampleIdentity received_sample_identity_;
 };

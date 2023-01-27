@@ -74,7 +74,7 @@ public:
     /**
      * Initialize the WLP protocol.
      * @param p Pointer to the RTPS participant implementation.
-     * @return true if the initialziacion was successful.
+     * @return true if the initialziacion was succesful.
      */
     bool initWL(
             RTPSParticipantImpl* p);

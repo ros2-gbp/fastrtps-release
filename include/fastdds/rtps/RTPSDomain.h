@@ -19,14 +19,14 @@
 #ifndef _FASTDDS_RTPS_DOMAIN_H_
 #define _FASTDDS_RTPS_DOMAIN_H_
 
+#include <fastdds/rtps/common/Types.h>
+#include <fastdds/rtps/history/IPayloadPool.h>
+
+#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
+
 #include <atomic>
 #include <mutex>
 #include <set>
-
-#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastdds/rtps/common/Types.h>
-#include <fastdds/rtps/history/IPayloadPool.h>
-#include <fastdds/rtps/history/IChangePool.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -47,20 +47,20 @@ class RTPSDomainImpl;
 
 /**
  * Class RTPSDomain,it manages the creation and destruction of RTPSParticipant RTPSWriter and RTPSReader. It stores
- * a list of all created RTPSParticipant. It has only static methods.
+ * a list of all created RTPSParticipant. Is has only static methods.
  * @ingroup RTPS_MODULE
  */
 class RTPSDomain
 {
+
+    friend class RTPSDomainImpl;
+
 public:
 
     /**
      * Method to shut down all RTPSParticipants, readers, writers, etc.
      * It must be called at the end of the process to avoid memory leaks.
      * It also shut downs the DomainRTPSParticipant.
-     *
-     * \post After this call, all the pointers to RTPS entities are invalidated and their use may
-     *       result in undefined behaviour.
      */
     RTPS_DllAPI static void stopAll();
 
@@ -70,9 +70,6 @@ public:
      * @param attrs RTPSParticipant Attributes.
      * @param plisten Pointer to the ParticipantListener.
      * @return Pointer to the RTPSParticipant.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSParticipant() or stopAll(),
-     *          so its use may result in undefined behaviour.
      */
     RTPS_DllAPI static RTPSParticipant* createParticipant(
             uint32_t domain_id,
@@ -86,9 +83,6 @@ public:
      * @param attrs RTPSParticipant Attributes.
      * @param plisten Pointer to the ParticipantListener.
      * @return Pointer to the RTPSParticipant.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSParticipant() or stopAll(),
-     *          so its use may result in undefined behaviour.
      */
     RTPS_DllAPI static RTPSParticipant* createParticipant(
             uint32_t domain_id,
@@ -103,9 +97,6 @@ public:
      * @param hist Pointer to the WriterHistory.
      * @param listen Pointer to the WriterListener.
      * @return Pointer to the created RTPSWriter.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSWriter() or stopAll(),
-     *          so its use may result in undefined behaviour.
      */
     RTPS_DllAPI static RTPSWriter* createRTPSWriter(
             RTPSParticipant* p,
@@ -121,77 +112,9 @@ public:
      * @param hist Pointer to the WriterHistory.
      * @param listen Pointer to the WriterListener.
      * @return Pointer to the created RTPSWriter.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSWriter() or stopAll(),
-     *          so its use may result in undefined behaviour.
      */
     RTPS_DllAPI static RTPSWriter* createRTPSWriter(
             RTPSParticipant* p,
-            WriterAttributes& watt,
-            const std::shared_ptr<IPayloadPool>& payload_pool,
-            WriterHistory* hist,
-            WriterListener* listen = nullptr);
-
-    /**
-     * Create a RTPSWriter in a participant using a custom payload pool.
-     * @param p Pointer to the RTPSParticipant.
-     * @param watt Writer Attributes.
-     * @param payload_pool Shared pointer to the IPayloadPool
-     * @param change_pool Shared pointer to the IChangePool
-     * @param hist Pointer to the WriterHistory.
-     * @param listen Pointer to the WriterListener.
-     * @return Pointer to the created RTPSWriter.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSWriter() or stopAll(),
-     *          so its use may result in undefined behaviour.
-     */
-    RTPS_DllAPI static RTPSWriter* createRTPSWriter(
-            RTPSParticipant* p,
-            WriterAttributes& watt,
-            const std::shared_ptr<IPayloadPool>& payload_pool,
-            const std::shared_ptr<IChangePool>& change_pool,
-            WriterHistory* hist,
-            WriterListener* listen = nullptr);
-
-    /**
-     * Create a RTPSWriter in a participant using a custom payload pool.
-     * @param p Pointer to the RTPSParticipant.
-     * @param entity_id Specific entity id to use for the created writer.
-     * @param watt Writer Attributes.
-     * @param payload_pool Shared pointer to the IPayloadPool
-     * @param change_pool Shared pointer to the IChangePool
-     * @param hist Pointer to the WriterHistory.
-     * @param listen Pointer to the WriterListener.
-     * @return Pointer to the created RTPSWriter.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSWriter() or stopAll(),
-     *          so its use may result in undefined behaviour.
-     */
-    RTPS_DllAPI static RTPSWriter* createRTPSWriter(
-            RTPSParticipant* p,
-            const EntityId_t& entity_id,
-            WriterAttributes& watt,
-            const std::shared_ptr<IPayloadPool>& payload_pool,
-            const std::shared_ptr<IChangePool>& change_pool,
-            WriterHistory* hist,
-            WriterListener* listen = nullptr);
-
-    /**
-     * Create a RTPSWriter in a participant.
-     * @param p Pointer to the RTPSParticipant.
-     * @param entity_id Specific entity id to use for the created writer.
-     * @param watt Writer Attributes.
-     * @param payload_pool Shared pointer to the IPayloadPool
-     * @param hist Pointer to the WriterHistory.
-     * @param listen Pointer to the WriterListener.
-     * @return Pointer to the created RTPSWriter.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSWriter() or stopAll(),
-     *          so its use may result in undefined behaviour.
-     */
-    RTPS_DllAPI static RTPSWriter* createRTPSWriter(
-            RTPSParticipant* p,
-            const EntityId_t& entity_id,
             WriterAttributes& watt,
             const std::shared_ptr<IPayloadPool>& payload_pool,
             WriterHistory* hist,
@@ -212,9 +135,6 @@ public:
      * @param hist Pointer to the ReaderHistory.
      * @param listen Pointer to the ReaderListener.
      * @return Pointer to the created RTPSReader.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSReader() or stopAll(),
-     *          so its use may result in undefined behaviour.
      */
     RTPS_DllAPI static RTPSReader* createRTPSReader(
             RTPSParticipant* p,
@@ -223,40 +143,16 @@ public:
             ReaderListener* listen = nullptr);
 
     /**
-     * Create a RTPReader in a participant using a custom payload pool.
+     * Create a RTPSWriter in a participant using a custom payload pool.
      * @param p Pointer to the RTPSParticipant.
      * @param ratt Reader Attributes.
      * @param payload_pool Shared pointer to the IPayloadPool
      * @param hist Pointer to the ReaderHistory.
      * @param listen Pointer to the ReaderListener.
      * @return Pointer to the created RTPSReader.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSReader() or stopAll(),
-     *          so its use may result in undefined behaviour.
      */
     RTPS_DllAPI static RTPSReader* createRTPSReader(
             RTPSParticipant* p,
-            ReaderAttributes& ratt,
-            const std::shared_ptr<IPayloadPool>& payload_pool,
-            ReaderHistory* hist,
-            ReaderListener* listen = nullptr);
-
-    /**
-     * Create a RTPSReader in a participant using a custom payload pool.
-     * @param p Pointer to the RTPSParticipant.
-     * @param entity_id Specific entity id to use for the created reader.
-     * @param ratt Reader Attributes.
-     * @param payload_pool Shared pointer to the IPayloadPool
-     * @param hist Pointer to the ReaderHistory.
-     * @param listen Pointer to the ReaderListener.
-     * @return Pointer to the created RTPSReader.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSReader() or stopAll(),
-     *          so its use may result in undefined behaviour.
-     */
-    RTPS_DllAPI static RTPSReader* createRTPSReader(
-            RTPSParticipant* p,
-            const EntityId_t& entity_id,
             ReaderAttributes& ratt,
             const std::shared_ptr<IPayloadPool>& payload_pool,
             ReaderHistory* hist,
@@ -278,7 +174,33 @@ public:
     RTPS_DllAPI static bool removeRTPSParticipant(
             RTPSParticipant* p);
 
+    /**
+     * Set the maximum RTPSParticipantID.
+     * @param maxRTPSParticipantId ID.
+     */
+    static inline void setMaxRTPSParticipantId(
+            uint32_t maxRTPSParticipantId)
+    {
+        m_maxRTPSParticipantID = maxRTPSParticipantId;
+    }
+
+    /**
+     * Creates a RTPSParticipant as default server or client if ROS_MASTER_URI environment variable is set.
+     * @param domain_id DDS domain associated
+     * @param enabled True if the RTPSParticipant should be enabled on creation. False if it will be enabled later with RTPSParticipant::enable()
+     * @param attrs RTPSParticipant Attributes.
+     * @param listen Pointer to the ParticipantListener.
+     * @return Pointer to the RTPSParticipant.
+     */
+    static RTPSParticipant* clientServerEnvironmentCreationOverride(
+            uint32_t domain_id,
+            bool enabled,
+            const RTPSParticipantAttributes& attrs,
+            RTPSParticipantListener* listen /*= nullptr*/);
+
 private:
+
+    typedef std::pair<RTPSParticipant*, RTPSParticipantImpl*> t_p_RTPSParticipant;
 
     RTPSDomain() = delete;
 
@@ -286,6 +208,26 @@ private:
      * DomainRTPSParticipant destructor
      */
     ~RTPSDomain() = delete;
+
+    /**
+     * @brief Get Id to create a RTPSParticipant.
+     * @return Different ID for each call.
+     */
+    static inline uint32_t getNewId()
+    {
+        return m_maxRTPSParticipantID++;
+    }
+
+    static void removeRTPSParticipant_nts(
+            t_p_RTPSParticipant&);
+
+    static std::mutex m_mutex;
+
+    static std::atomic<uint32_t> m_maxRTPSParticipantID;
+
+    static std::vector<t_p_RTPSParticipant> m_RTPSParticipants;
+
+    static std::set<uint32_t> m_RTPSParticipantIDs;
 };
 
 } // namespace rtps

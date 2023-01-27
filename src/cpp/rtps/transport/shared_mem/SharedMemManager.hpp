@@ -20,9 +20,8 @@
 #include <unordered_map>
 
 #include <rtps/transport/shared_mem/SharedMemGlobal.hpp>
-
-#include <utils/shared_memory/RobustSharedLock.hpp>
-#include <utils/shared_memory/SharedMemWatchdog.hpp>
+#include <rtps/transport/shared_mem/RobustSharedLock.hpp>
+#include <rtps/transport/shared_mem/SharedMemWatchdog.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -110,7 +109,7 @@ private:
                     std::memory_order_relaxed))
             {
             }
-            EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
+            logWarning(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
             return (s.processing_count == 0);
         }
 
@@ -368,8 +367,8 @@ public:
             }
             catch (const std::exception& e)
             {
-                EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to create segment " << segment_name_
-                                                                                   << ": " << e.what());
+                logError(RTPS_TRANSPORT_SHM, "Failed to create segment " << segment_name_
+                                                                         << ": " << e.what());
 
                 throw;
             }
@@ -402,7 +401,7 @@ public:
 
             if (overflows_count_)
             {
-                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM,
+                logWarning(RTPS_TRANSPORT_SHM,
                         "Segment " << segment_id_.to_string().c_str()
                                    << " closed. It had " << "overflows_count "
                                    << overflows_count_);
@@ -650,7 +649,7 @@ public:
                 }
                 catch (const std::exception& e)
                 {
-                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, e.what());
+                    logWarning(RTPS_TRANSPORT_SHM, e.what());
                 }
             }
         }
@@ -754,9 +753,8 @@ public:
                 }
                 else
                 {
-                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM,
-                            "SHM Listener on port " << global_port_->port_id() << " failure: "
-                                                    << e.what());
+                    logWarning(RTPS_TRANSPORT_SHM, "SHM Listener on port " << global_port_->port_id() << " failure: "
+                                                                           << e.what());
 
                     regenerate_port();
                 }
@@ -849,11 +847,9 @@ public:
 
             try
             {
-                ret = global_port_->try_push(
-                    SharedMemGlobal::BufferDescriptor{shared_mem_buffer->segment_id(),
-                                                      shared_mem_buffer->node_offset(),
-                                                      validity_id},
-                    &are_listeners_active);
+                ret = global_port_->try_push( {shared_mem_buffer->segment_id(), shared_mem_buffer->node_offset(),
+                                               validity_id},
+                                &are_listeners_active);
 
                 if (!are_listeners_active)
                 {
@@ -866,8 +862,8 @@ public:
 
                 if (!global_port_->is_port_ok())
                 {
-                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "SHM Port " << global_port_->port_id() << " failure: "
-                                                                         << e.what());
+                    logWarning(RTPS_TRANSPORT_SHM, "SHM Port " << global_port_->port_id() << " failure: "
+                                                               << e.what());
 
                     regenerate_port();
                     ret = false;

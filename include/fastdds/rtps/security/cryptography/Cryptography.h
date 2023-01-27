@@ -34,13 +34,17 @@ class Cryptography
 {
 public:
 
-    Cryptography() = default;
-    virtual ~Cryptography() = default;
+    Cryptography(): m_cryptokeyexchange(nullptr), m_cryptokeyfactory(nullptr),
+    m_cryptotransform(nullptr), m_logger(nullptr) {}
 
-    /* Specializations should add functions to access the different modules */
-    virtual CryptoKeyExchange* cryptokeyexchange() = 0;
-    virtual CryptoKeyFactory* cryptokeyfactory() = 0;
-    virtual CryptoTransform* cryptotransform() = 0;
+    virtual ~Cryptography() {}
+
+    /* Specializations should add functions to access the private members */
+    CryptoKeyExchange* cryptkeyexchange() { return m_cryptokeyexchange; }
+
+    CryptoKeyFactory* cryptokeyfactory() { return m_cryptokeyfactory; }
+
+    CryptoTransform* cryptotransform() { return m_cryptotransform; }
 
     bool set_logger(
             Logging* logger,
@@ -57,9 +61,13 @@ protected:
         return m_logger;
     }
 
+    CryptoKeyExchange *m_cryptokeyexchange;
+    CryptoKeyFactory *m_cryptokeyfactory;
+    CryptoTransform *m_cryptotransform;
+
 private:
 
-    Logging* m_logger;
+    Logging *m_logger;
 };
 
 } //namespace security

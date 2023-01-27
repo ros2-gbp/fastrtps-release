@@ -17,37 +17,31 @@
 
 #include <fastdds/rtps/transport/UDPTransportDescriptor.h>
 
-namespace eprosima {
-namespace fastdds {
-namespace rtps {
+namespace eprosima{
+namespace fastdds{
+namespace rtps{
 
 /**
- * UDPv4 Transport configuration
- * The kind value for UDPv4TransportDescriptor is given by \c eprosima::fastrtps::rtps::LOCATOR_KIND_UDPv4.
+ * Transport configuration
  *
+ * - bufferSize:    length of the buffers used for transmission. Passing
+ *                  a buffer of different size will cause transmission to
+ *                  fail.
+ *
+ * - interfaceWhiteList: Lists the allowed interfaces.
  * @ingroup TRANSPORT_MODULE
  */
-struct UDPv4TransportDescriptor : public UDPTransportDescriptor
+typedef struct UDPv4TransportDescriptor: public UDPTransportDescriptor
 {
-    //! Destructor
-    virtual ~UDPv4TransportDescriptor() = default;
+   virtual ~UDPv4TransportDescriptor(){}
 
-    virtual TransportInterface* create_transport() const override;
+   virtual TransportInterface* create_transport() const override;
 
-    //! Constructor
-    RTPS_DllAPI UDPv4TransportDescriptor();
+   RTPS_DllAPI UDPv4TransportDescriptor();
 
-    //! Copy constructor
-    RTPS_DllAPI UDPv4TransportDescriptor(
-            const UDPv4TransportDescriptor& t) = default;
+   RTPS_DllAPI UDPv4TransportDescriptor(const UDPv4TransportDescriptor& t);
 
-    //! Copy assignment
-    RTPS_DllAPI UDPv4TransportDescriptor& operator =(
-            const UDPv4TransportDescriptor& t) = default;
-
-    RTPS_DllAPI bool operator ==(
-            const UDPv4TransportDescriptor& t) const;
-};
+} UDPv4TransportDescriptor;
 
 } // namespace rtps
 } // namespace fastdds

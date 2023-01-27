@@ -21,10 +21,8 @@
 
 #ifdef _WIN32
 // Remove linker warning LNK4221 on Visual Studio
-namespace {
-char dummy;
-} // namespace
-#endif // ifdef _WIN32
+namespace { char dummy; }
+#endif
 
 #include <fastrtps/types/BuiltinAnnotationsTypeObject.h>
 #include <utility>
@@ -38,8 +36,7 @@ char dummy;
 
 using namespace eprosima::fastrtps::rtps;
 
-void register_builtin_annotations_types(
-        TypeObjectFactory* factory)
+void register_builtin_annotations_types(TypeObjectFactory* factory)
 {
     factory->add_type_object("id", GetidIdentifier(true), GetidObject(true));
     factory->add_type_object("id", GetidIdentifier(false), GetidObject(false));
@@ -68,10 +65,8 @@ void register_builtin_annotations_types(
     {
         using namespace extensibility;
 
-        factory->add_type_object("ExtensibilityKind", GetExtensibilityKindIdentifier(true),
-                GetExtensibilityKindObject(true));
-        factory->add_type_object("ExtensibilityKind", GetExtensibilityKindIdentifier(false),
-                GetExtensibilityKindObject(false));
+        factory->add_type_object("ExtensibilityKind", GetExtensibilityKindIdentifier(true), GetExtensibilityKindObject(true));
+        factory->add_type_object("ExtensibilityKind", GetExtensibilityKindIdentifier(false), GetExtensibilityKindObject(false));
 
 
     }
@@ -86,9 +81,6 @@ void register_builtin_annotations_types(
 
     factory->add_type_object("key", GetkeyIdentifier(true), GetkeyObject(true));
     factory->add_type_object("key", GetkeyIdentifier(false), GetkeyObject(false));
-
-    factory->add_type_object("Key", GetkeyIdentifier(true), GetkeyObject(true));
-    factory->add_type_object("Key", GetkeyIdentifier(false), GetkeyObject(false));
 
     factory->add_type_object("must_understand", Getmust_understandIdentifier(true), Getmust_understandObject(true));
     factory->add_type_object("must_understand", Getmust_understandIdentifier(false), Getmust_understandObject(false));
@@ -144,8 +136,7 @@ void register_builtin_annotations_types(
 
 }
 
-const TypeIdentifier* GetidIdentifier(
-        bool complete)
+const TypeIdentifier* GetidIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("id", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -157,8 +148,7 @@ const TypeIdentifier* GetidIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("id", complete);
 }
 
-const TypeObject* GetidObject(
-        bool complete)
+const TypeObject* GetidObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("id", complete);
     if (c_type_object != nullptr)
@@ -181,7 +171,7 @@ const TypeObject* GetMinimalidObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -196,7 +186,7 @@ const TypeObject* GetMinimalidObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -209,7 +199,7 @@ const TypeObject* GetMinimalidObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -227,7 +217,7 @@ const TypeObject* GetCompleteidObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -253,7 +243,7 @@ const TypeObject* GetCompleteidObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -266,7 +256,7 @@ const TypeObject* GetCompleteidObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -276,8 +266,8 @@ const TypeObject* GetCompleteidObject()
     return TypeObjectFactory::get_instance()->get_type_object("id", true);
 }
 
-const TypeIdentifier* GetautoidIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetautoidIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("autoid", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -289,8 +279,7 @@ const TypeIdentifier* GetautoidIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("autoid", complete);
 }
 
-const TypeObject* GetautoidObject(
-        bool complete)
+const TypeObject* GetautoidObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("autoid", complete);
     if (c_type_object != nullptr)
@@ -314,7 +303,7 @@ const TypeObject* GetMinimalautoidObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -333,7 +322,7 @@ const TypeObject* GetMinimalautoidObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -346,7 +335,7 @@ const TypeObject* GetMinimalautoidObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -365,7 +354,7 @@ const TypeObject* GetCompleteautoidObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -395,7 +384,7 @@ const TypeObject* GetCompleteautoidObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -408,7 +397,7 @@ const TypeObject* GetCompleteautoidObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -418,9 +407,9 @@ const TypeObject* GetCompleteautoidObject()
     return TypeObjectFactory::get_instance()->get_type_object("autoid", true);
 }
 
-namespace autoid {
-const TypeIdentifier* GetAutoidKindIdentifier(
-        bool complete)
+namespace autoid
+{
+const TypeIdentifier* GetAutoidKindIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("AutoidKind", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -432,8 +421,7 @@ const TypeIdentifier* GetAutoidKindIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("AutoidKind", complete);
 }
 
-const TypeObject* GetAutoidKindObject(
-        bool complete)
+const TypeObject* GetAutoidKindObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("AutoidKind", complete);
     if (c_type_object != nullptr)
@@ -456,7 +444,7 @@ const TypeObject* GetMinimalAutoidKindObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ENUM);
 
@@ -480,7 +468,7 @@ const TypeObject* GetMinimalAutoidKindObject()
     mel_SEQUENTIAL.common().flags().IS_DEFAULT(false);
     mel_SEQUENTIAL.common().value(value++);
     MD5 SEQUENTIAL_hash("SEQUENTIAL");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_SEQUENTIAL.detail().name_hash()[i] = SEQUENTIAL_hash.digest[i];
     }
@@ -496,7 +484,7 @@ const TypeObject* GetMinimalAutoidKindObject()
     mel_HASH.common().flags().IS_DEFAULT(false);
     mel_HASH.common().value(value++);
     MD5 HASH_hash("HASH");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_HASH.detail().name_hash()[i] = HASH_hash.digest[i];
     }
@@ -507,7 +495,7 @@ const TypeObject* GetMinimalAutoidKindObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalEnumeratedType::getCdrSerializedSize(type_object->minimal().enumerated_type()) + 4));
+        MinimalEnumeratedType::getCdrSerializedSize(type_object->minimal().enumerated_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -520,7 +508,7 @@ const TypeObject* GetMinimalAutoidKindObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -538,7 +526,7 @@ const TypeObject* GetCompleteAutoidKindObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ENUM);
 
@@ -588,7 +576,7 @@ const TypeObject* GetCompleteAutoidKindObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteEnumeratedType::getCdrSerializedSize(type_object->complete().enumerated_type()) + 4));
+        CompleteEnumeratedType::getCdrSerializedSize(type_object->complete().enumerated_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -601,7 +589,7 @@ const TypeObject* GetCompleteAutoidKindObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -611,9 +599,10 @@ const TypeObject* GetCompleteAutoidKindObject()
     return TypeObjectFactory::get_instance()->get_type_object("AutoidKind", true);
 }
 
+
+
 } // autoid namespace
-const TypeIdentifier* GetoptionalIdentifier(
-        bool complete)
+const TypeIdentifier* GetoptionalIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("optional", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -625,8 +614,7 @@ const TypeIdentifier* GetoptionalIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("optional", complete);
 }
 
-const TypeObject* GetoptionalObject(
-        bool complete)
+const TypeObject* GetoptionalObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("optional", complete);
     if (c_type_object != nullptr)
@@ -649,7 +637,7 @@ const TypeObject* GetMinimaloptionalObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -668,7 +656,7 @@ const TypeObject* GetMinimaloptionalObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -681,7 +669,7 @@ const TypeObject* GetMinimaloptionalObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -699,7 +687,7 @@ const TypeObject* GetCompleteoptionalObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -729,7 +717,7 @@ const TypeObject* GetCompleteoptionalObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -742,7 +730,7 @@ const TypeObject* GetCompleteoptionalObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -752,8 +740,8 @@ const TypeObject* GetCompleteoptionalObject()
     return TypeObjectFactory::get_instance()->get_type_object("optional", true);
 }
 
-const TypeIdentifier* GetpositionIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetpositionIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("position", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -765,8 +753,7 @@ const TypeIdentifier* GetpositionIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("position", complete);
 }
 
-const TypeObject* GetpositionObject(
-        bool complete)
+const TypeObject* GetpositionObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("position", complete);
     if (c_type_object != nullptr)
@@ -789,7 +776,7 @@ const TypeObject* GetMinimalpositionObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -804,7 +791,7 @@ const TypeObject* GetMinimalpositionObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -817,7 +804,7 @@ const TypeObject* GetMinimalpositionObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -835,7 +822,7 @@ const TypeObject* GetCompletepositionObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -861,7 +848,7 @@ const TypeObject* GetCompletepositionObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -874,7 +861,7 @@ const TypeObject* GetCompletepositionObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -884,8 +871,8 @@ const TypeObject* GetCompletepositionObject()
     return TypeObjectFactory::get_instance()->get_type_object("position", true);
 }
 
-const TypeIdentifier* GetvalueIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetvalueIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("value", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -897,8 +884,7 @@ const TypeIdentifier* GetvalueIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("value", complete);
 }
 
-const TypeObject* GetvalueObject(
-        bool complete)
+const TypeObject* GetvalueObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("value", complete);
     if (c_type_object != nullptr)
@@ -921,7 +907,7 @@ const TypeObject* GetMinimalvalueObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -936,7 +922,7 @@ const TypeObject* GetMinimalvalueObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -949,7 +935,7 @@ const TypeObject* GetMinimalvalueObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -967,7 +953,7 @@ const TypeObject* GetCompletevalueObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -993,7 +979,7 @@ const TypeObject* GetCompletevalueObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1006,7 +992,7 @@ const TypeObject* GetCompletevalueObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1016,11 +1002,10 @@ const TypeObject* GetCompletevalueObject()
     return TypeObjectFactory::get_instance()->get_type_object("value", true);
 }
 
-const TypeIdentifier* GetextensibilityIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetextensibilityIdentifier(bool complete)
 {
-    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("extensibility",
-                    complete);
+    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("extensibility", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
     {
         return c_identifier;
@@ -1030,8 +1015,7 @@ const TypeIdentifier* GetextensibilityIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("extensibility", complete);
 }
 
-const TypeObject* GetextensibilityObject(
-        bool complete)
+const TypeObject* GetextensibilityObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("extensibility", complete);
     if (c_type_object != nullptr)
@@ -1055,7 +1039,7 @@ const TypeObject* GetMinimalextensibilityObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -1070,7 +1054,7 @@ const TypeObject* GetMinimalextensibilityObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1083,7 +1067,7 @@ const TypeObject* GetMinimalextensibilityObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1102,7 +1086,7 @@ const TypeObject* GetCompleteextensibilityObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -1128,7 +1112,7 @@ const TypeObject* GetCompleteextensibilityObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1141,7 +1125,7 @@ const TypeObject* GetCompleteextensibilityObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1151,12 +1135,11 @@ const TypeObject* GetCompleteextensibilityObject()
     return TypeObjectFactory::get_instance()->get_type_object("extensibility", true);
 }
 
-namespace extensibility {
-const TypeIdentifier* GetExtensibilityKindIdentifier(
-        bool complete)
+namespace extensibility
 {
-    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("ExtensibilityKind",
-                    complete);
+const TypeIdentifier* GetExtensibilityKindIdentifier(bool complete)
+{
+    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("ExtensibilityKind", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
     {
         return c_identifier;
@@ -1166,8 +1149,7 @@ const TypeIdentifier* GetExtensibilityKindIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("ExtensibilityKind", complete);
 }
 
-const TypeObject* GetExtensibilityKindObject(
-        bool complete)
+const TypeObject* GetExtensibilityKindObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("ExtensibilityKind", complete);
     if (c_type_object != nullptr)
@@ -1190,7 +1172,7 @@ const TypeObject* GetMinimalExtensibilityKindObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ENUM);
 
@@ -1214,7 +1196,7 @@ const TypeObject* GetMinimalExtensibilityKindObject()
     mel_FINAL.common().flags().IS_DEFAULT(false);
     mel_FINAL.common().value(value++);
     MD5 FINAL_hash("FINAL");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_FINAL.detail().name_hash()[i] = FINAL_hash.digest[i];
     }
@@ -1230,7 +1212,7 @@ const TypeObject* GetMinimalExtensibilityKindObject()
     mel_APPENDABLE.common().flags().IS_DEFAULT(false);
     mel_APPENDABLE.common().value(value++);
     MD5 APPENDABLE_hash("APPENDABLE");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_APPENDABLE.detail().name_hash()[i] = APPENDABLE_hash.digest[i];
     }
@@ -1246,7 +1228,7 @@ const TypeObject* GetMinimalExtensibilityKindObject()
     mel_MUTABLE.common().flags().IS_DEFAULT(false);
     mel_MUTABLE.common().value(value++);
     MD5 MUTABLE_hash("MUTABLE");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_MUTABLE.detail().name_hash()[i] = MUTABLE_hash.digest[i];
     }
@@ -1257,7 +1239,7 @@ const TypeObject* GetMinimalExtensibilityKindObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalEnumeratedType::getCdrSerializedSize(type_object->minimal().enumerated_type()) + 4));
+        MinimalEnumeratedType::getCdrSerializedSize(type_object->minimal().enumerated_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1270,7 +1252,7 @@ const TypeObject* GetMinimalExtensibilityKindObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1288,7 +1270,7 @@ const TypeObject* GetCompleteExtensibilityKindObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ENUM);
 
@@ -1352,7 +1334,7 @@ const TypeObject* GetCompleteExtensibilityKindObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteEnumeratedType::getCdrSerializedSize(type_object->complete().enumerated_type()) + 4));
+        CompleteEnumeratedType::getCdrSerializedSize(type_object->complete().enumerated_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1365,7 +1347,7 @@ const TypeObject* GetCompleteExtensibilityKindObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1375,9 +1357,10 @@ const TypeObject* GetCompleteExtensibilityKindObject()
     return TypeObjectFactory::get_instance()->get_type_object("ExtensibilityKind", true);
 }
 
+
+
 } // extensibility namespace
-const TypeIdentifier* GetfinalIdentifier(
-        bool complete)
+const TypeIdentifier* GetfinalIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("final", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -1389,8 +1372,7 @@ const TypeIdentifier* GetfinalIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("final", complete);
 }
 
-const TypeObject* GetfinalObject(
-        bool complete)
+const TypeObject* GetfinalObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("final", complete);
     if (c_type_object != nullptr)
@@ -1413,7 +1395,7 @@ const TypeObject* GetMinimalfinalObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -1422,7 +1404,7 @@ const TypeObject* GetMinimalfinalObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1435,7 +1417,7 @@ const TypeObject* GetMinimalfinalObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1453,7 +1435,7 @@ const TypeObject* GetCompletefinalObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -1473,7 +1455,7 @@ const TypeObject* GetCompletefinalObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1486,7 +1468,7 @@ const TypeObject* GetCompletefinalObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1496,8 +1478,8 @@ const TypeObject* GetCompletefinalObject()
     return TypeObjectFactory::get_instance()->get_type_object("final", true);
 }
 
-const TypeIdentifier* GetappendableIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetappendableIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("appendable", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -1509,8 +1491,7 @@ const TypeIdentifier* GetappendableIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("appendable", complete);
 }
 
-const TypeObject* GetappendableObject(
-        bool complete)
+const TypeObject* GetappendableObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("appendable", complete);
     if (c_type_object != nullptr)
@@ -1533,7 +1514,7 @@ const TypeObject* GetMinimalappendableObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -1542,7 +1523,7 @@ const TypeObject* GetMinimalappendableObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1555,7 +1536,7 @@ const TypeObject* GetMinimalappendableObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1573,7 +1554,7 @@ const TypeObject* GetCompleteappendableObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -1593,7 +1574,7 @@ const TypeObject* GetCompleteappendableObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1606,7 +1587,7 @@ const TypeObject* GetCompleteappendableObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1616,8 +1597,8 @@ const TypeObject* GetCompleteappendableObject()
     return TypeObjectFactory::get_instance()->get_type_object("appendable", true);
 }
 
-const TypeIdentifier* GetmutableIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetmutableIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("mutable", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -1629,8 +1610,7 @@ const TypeIdentifier* GetmutableIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("mutable", complete);
 }
 
-const TypeObject* GetmutableObject(
-        bool complete)
+const TypeObject* GetmutableObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("mutable", complete);
     if (c_type_object != nullptr)
@@ -1653,7 +1633,7 @@ const TypeObject* GetMinimalmutableObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -1662,7 +1642,7 @@ const TypeObject* GetMinimalmutableObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1675,7 +1655,7 @@ const TypeObject* GetMinimalmutableObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1693,7 +1673,7 @@ const TypeObject* GetCompletemutableObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -1713,7 +1693,7 @@ const TypeObject* GetCompletemutableObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1726,7 +1706,7 @@ const TypeObject* GetCompletemutableObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1736,8 +1716,8 @@ const TypeObject* GetCompletemutableObject()
     return TypeObjectFactory::get_instance()->get_type_object("mutable", true);
 }
 
-const TypeIdentifier* GetkeyIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetkeyIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("key", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -1749,8 +1729,7 @@ const TypeIdentifier* GetkeyIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("key", complete);
 }
 
-const TypeObject* GetkeyObject(
-        bool complete)
+const TypeObject* GetkeyObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("key", complete);
     if (c_type_object != nullptr)
@@ -1773,7 +1752,7 @@ const TypeObject* GetMinimalkeyObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -1792,7 +1771,7 @@ const TypeObject* GetMinimalkeyObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1805,7 +1784,7 @@ const TypeObject* GetMinimalkeyObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1823,7 +1802,7 @@ const TypeObject* GetCompletekeyObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -1853,7 +1832,7 @@ const TypeObject* GetCompletekeyObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1866,7 +1845,7 @@ const TypeObject* GetCompletekeyObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1876,11 +1855,10 @@ const TypeObject* GetCompletekeyObject()
     return TypeObjectFactory::get_instance()->get_type_object("key", true);
 }
 
-const TypeIdentifier* Getmust_understandIdentifier(
-        bool complete)
+
+const TypeIdentifier* Getmust_understandIdentifier(bool complete)
 {
-    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("must_understand",
-                    complete);
+    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("must_understand", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
     {
         return c_identifier;
@@ -1890,8 +1868,7 @@ const TypeIdentifier* Getmust_understandIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("must_understand", complete);
 }
 
-const TypeObject* Getmust_understandObject(
-        bool complete)
+const TypeObject* Getmust_understandObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("must_understand", complete);
     if (c_type_object != nullptr)
@@ -1914,7 +1891,7 @@ const TypeObject* GetMinimalmust_understandObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -1933,7 +1910,7 @@ const TypeObject* GetMinimalmust_understandObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -1946,7 +1923,7 @@ const TypeObject* GetMinimalmust_understandObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -1964,7 +1941,7 @@ const TypeObject* GetCompletemust_understandObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -1994,7 +1971,7 @@ const TypeObject* GetCompletemust_understandObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2007,7 +1984,7 @@ const TypeObject* GetCompletemust_understandObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2017,11 +1994,10 @@ const TypeObject* GetCompletemust_understandObject()
     return TypeObjectFactory::get_instance()->get_type_object("must_understand", true);
 }
 
-const TypeIdentifier* Getdefault_literalIdentifier(
-        bool complete)
+
+const TypeIdentifier* Getdefault_literalIdentifier(bool complete)
 {
-    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("default_literal",
-                    complete);
+    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("default_literal", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
     {
         return c_identifier;
@@ -2031,8 +2007,7 @@ const TypeIdentifier* Getdefault_literalIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("default_literal", complete);
 }
 
-const TypeObject* Getdefault_literalObject(
-        bool complete)
+const TypeObject* Getdefault_literalObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("default_literal", complete);
     if (c_type_object != nullptr)
@@ -2055,7 +2030,7 @@ const TypeObject* GetMinimaldefault_literalObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -2064,7 +2039,7 @@ const TypeObject* GetMinimaldefault_literalObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2077,7 +2052,7 @@ const TypeObject* GetMinimaldefault_literalObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2095,7 +2070,7 @@ const TypeObject* GetCompletedefault_literalObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -2115,7 +2090,7 @@ const TypeObject* GetCompletedefault_literalObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2128,7 +2103,7 @@ const TypeObject* GetCompletedefault_literalObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2138,8 +2113,8 @@ const TypeObject* GetCompletedefault_literalObject()
     return TypeObjectFactory::get_instance()->get_type_object("default_literal", true);
 }
 
-const TypeIdentifier* GetdefaultIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetdefaultIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("default", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -2151,8 +2126,7 @@ const TypeIdentifier* GetdefaultIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("default", complete);
 }
 
-const TypeObject* GetdefaultObject(
-        bool complete)
+const TypeObject* GetdefaultObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("default", complete);
     if (c_type_object != nullptr)
@@ -2175,7 +2149,7 @@ const TypeObject* GetMinimaldefaultObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -2190,7 +2164,7 @@ const TypeObject* GetMinimaldefaultObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2203,7 +2177,7 @@ const TypeObject* GetMinimaldefaultObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2221,7 +2195,7 @@ const TypeObject* GetCompletedefaultObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -2247,7 +2221,7 @@ const TypeObject* GetCompletedefaultObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2260,7 +2234,7 @@ const TypeObject* GetCompletedefaultObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2270,8 +2244,8 @@ const TypeObject* GetCompletedefaultObject()
     return TypeObjectFactory::get_instance()->get_type_object("default", true);
 }
 
-const TypeIdentifier* GetrangeIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetrangeIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("range", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -2283,8 +2257,7 @@ const TypeIdentifier* GetrangeIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("range", complete);
 }
 
-const TypeObject* GetrangeObject(
-        bool complete)
+const TypeObject* GetrangeObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("range", complete);
     if (c_type_object != nullptr)
@@ -2307,7 +2280,7 @@ const TypeObject* GetMinimalrangeObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -2328,7 +2301,7 @@ const TypeObject* GetMinimalrangeObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2341,7 +2314,7 @@ const TypeObject* GetMinimalrangeObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2359,7 +2332,7 @@ const TypeObject* GetCompleterangeObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -2391,7 +2364,7 @@ const TypeObject* GetCompleterangeObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2404,7 +2377,7 @@ const TypeObject* GetCompleterangeObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2414,8 +2387,8 @@ const TypeObject* GetCompleterangeObject()
     return TypeObjectFactory::get_instance()->get_type_object("range", true);
 }
 
-const TypeIdentifier* GetminIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetminIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("min", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -2427,8 +2400,7 @@ const TypeIdentifier* GetminIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("min", complete);
 }
 
-const TypeObject* GetminObject(
-        bool complete)
+const TypeObject* GetminObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("min", complete);
     if (c_type_object != nullptr)
@@ -2451,7 +2423,7 @@ const TypeObject* GetMinimalminObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -2466,7 +2438,7 @@ const TypeObject* GetMinimalminObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2479,7 +2451,7 @@ const TypeObject* GetMinimalminObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2497,7 +2469,7 @@ const TypeObject* GetCompleteminObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -2523,7 +2495,7 @@ const TypeObject* GetCompleteminObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2536,7 +2508,7 @@ const TypeObject* GetCompleteminObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2546,8 +2518,8 @@ const TypeObject* GetCompleteminObject()
     return TypeObjectFactory::get_instance()->get_type_object("min", true);
 }
 
-const TypeIdentifier* GetmaxIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetmaxIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("max", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -2559,8 +2531,7 @@ const TypeIdentifier* GetmaxIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("max", complete);
 }
 
-const TypeObject* GetmaxObject(
-        bool complete)
+const TypeObject* GetmaxObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("max", complete);
     if (c_type_object != nullptr)
@@ -2583,7 +2554,7 @@ const TypeObject* GetMinimalmaxObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -2598,7 +2569,7 @@ const TypeObject* GetMinimalmaxObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2611,7 +2582,7 @@ const TypeObject* GetMinimalmaxObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2629,7 +2600,7 @@ const TypeObject* GetCompletemaxObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -2655,7 +2626,7 @@ const TypeObject* GetCompletemaxObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2668,7 +2639,7 @@ const TypeObject* GetCompletemaxObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2678,8 +2649,8 @@ const TypeObject* GetCompletemaxObject()
     return TypeObjectFactory::get_instance()->get_type_object("max", true);
 }
 
-const TypeIdentifier* GetunitIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetunitIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("unit", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -2691,8 +2662,7 @@ const TypeIdentifier* GetunitIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("unit", complete);
 }
 
-const TypeObject* GetunitObject(
-        bool complete)
+const TypeObject* GetunitObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("unit", complete);
     if (c_type_object != nullptr)
@@ -2715,7 +2685,7 @@ const TypeObject* GetMinimalunitObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -2730,7 +2700,7 @@ const TypeObject* GetMinimalunitObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2743,7 +2713,7 @@ const TypeObject* GetMinimalunitObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2761,7 +2731,7 @@ const TypeObject* GetCompleteunitObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -2787,7 +2757,7 @@ const TypeObject* GetCompleteunitObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2800,7 +2770,7 @@ const TypeObject* GetCompleteunitObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2810,8 +2780,8 @@ const TypeObject* GetCompleteunitObject()
     return TypeObjectFactory::get_instance()->get_type_object("unit", true);
 }
 
-const TypeIdentifier* Getbit_boundIdentifier(
-        bool complete)
+
+const TypeIdentifier* Getbit_boundIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("bit_bound", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -2823,8 +2793,7 @@ const TypeIdentifier* Getbit_boundIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("bit_bound", complete);
 }
 
-const TypeObject* Getbit_boundObject(
-        bool complete)
+const TypeObject* Getbit_boundObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("bit_bound", complete);
     if (c_type_object != nullptr)
@@ -2847,7 +2816,7 @@ const TypeObject* GetMinimalbit_boundObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -2862,7 +2831,7 @@ const TypeObject* GetMinimalbit_boundObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2875,7 +2844,7 @@ const TypeObject* GetMinimalbit_boundObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2893,7 +2862,7 @@ const TypeObject* GetCompletebit_boundObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -2919,7 +2888,7 @@ const TypeObject* GetCompletebit_boundObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -2932,7 +2901,7 @@ const TypeObject* GetCompletebit_boundObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -2942,8 +2911,8 @@ const TypeObject* GetCompletebit_boundObject()
     return TypeObjectFactory::get_instance()->get_type_object("bit_bound", true);
 }
 
-const TypeIdentifier* GetexternalIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetexternalIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("external", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -2955,8 +2924,7 @@ const TypeIdentifier* GetexternalIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("external", complete);
 }
 
-const TypeObject* GetexternalObject(
-        bool complete)
+const TypeObject* GetexternalObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("external", complete);
     if (c_type_object != nullptr)
@@ -2979,7 +2947,7 @@ const TypeObject* GetMinimalexternalObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -2998,7 +2966,7 @@ const TypeObject* GetMinimalexternalObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3011,7 +2979,7 @@ const TypeObject* GetMinimalexternalObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3029,7 +2997,7 @@ const TypeObject* GetCompleteexternalObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -3059,7 +3027,7 @@ const TypeObject* GetCompleteexternalObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3072,7 +3040,7 @@ const TypeObject* GetCompleteexternalObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3082,8 +3050,8 @@ const TypeObject* GetCompleteexternalObject()
     return TypeObjectFactory::get_instance()->get_type_object("external", true);
 }
 
-const TypeIdentifier* GetnestedIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetnestedIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("nested", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -3095,8 +3063,7 @@ const TypeIdentifier* GetnestedIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("nested", complete);
 }
 
-const TypeObject* GetnestedObject(
-        bool complete)
+const TypeObject* GetnestedObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("nested", complete);
     if (c_type_object != nullptr)
@@ -3119,7 +3086,7 @@ const TypeObject* GetMinimalnestedObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -3138,7 +3105,7 @@ const TypeObject* GetMinimalnestedObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3151,7 +3118,7 @@ const TypeObject* GetMinimalnestedObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3169,7 +3136,7 @@ const TypeObject* GetCompletenestedObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -3199,7 +3166,7 @@ const TypeObject* GetCompletenestedObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3212,7 +3179,7 @@ const TypeObject* GetCompletenestedObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3222,8 +3189,8 @@ const TypeObject* GetCompletenestedObject()
     return TypeObjectFactory::get_instance()->get_type_object("nested", true);
 }
 
-const TypeIdentifier* GetverbatimIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetverbatimIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("verbatim", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -3235,8 +3202,7 @@ const TypeIdentifier* GetverbatimIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("verbatim", complete);
 }
 
-const TypeObject* GetverbatimObject(
-        bool complete)
+const TypeObject* GetverbatimObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("verbatim", complete);
     if (c_type_object != nullptr)
@@ -3260,7 +3226,7 @@ const TypeObject* GetMinimalverbatimObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -3295,7 +3261,7 @@ const TypeObject* GetMinimalverbatimObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3308,7 +3274,7 @@ const TypeObject* GetMinimalverbatimObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3327,7 +3293,7 @@ const TypeObject* GetCompleteverbatimObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -3373,7 +3339,7 @@ const TypeObject* GetCompleteverbatimObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3386,7 +3352,7 @@ const TypeObject* GetCompleteverbatimObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3396,12 +3362,11 @@ const TypeObject* GetCompleteverbatimObject()
     return TypeObjectFactory::get_instance()->get_type_object("verbatim", true);
 }
 
-namespace verbatim {
-const TypeIdentifier* GetPlacementKindIdentifier(
-        bool complete)
+namespace verbatim
 {
-    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("PlacementKind",
-                    complete);
+const TypeIdentifier* GetPlacementKindIdentifier(bool complete)
+{
+    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("PlacementKind", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
     {
         return c_identifier;
@@ -3411,8 +3376,7 @@ const TypeIdentifier* GetPlacementKindIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("PlacementKind", complete);
 }
 
-const TypeObject* GetPlacementKindObject(
-        bool complete)
+const TypeObject* GetPlacementKindObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("PlacementKind", complete);
     if (c_type_object != nullptr)
@@ -3435,7 +3399,7 @@ const TypeObject* GetMinimalPlacementKindObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ENUM);
 
@@ -3459,7 +3423,7 @@ const TypeObject* GetMinimalPlacementKindObject()
     mel_BEGIN_FILE.common().flags().IS_DEFAULT(false);
     mel_BEGIN_FILE.common().value(value++);
     MD5 BEGIN_FILE_hash("BEGIN_FILE");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_BEGIN_FILE.detail().name_hash()[i] = BEGIN_FILE_hash.digest[i];
     }
@@ -3475,7 +3439,7 @@ const TypeObject* GetMinimalPlacementKindObject()
     mel_BEFORE_DECLARATION.common().flags().IS_DEFAULT(false);
     mel_BEFORE_DECLARATION.common().value(value++);
     MD5 BEFORE_DECLARATION_hash("BEFORE_DECLARATION");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_BEFORE_DECLARATION.detail().name_hash()[i] = BEFORE_DECLARATION_hash.digest[i];
     }
@@ -3491,7 +3455,7 @@ const TypeObject* GetMinimalPlacementKindObject()
     mel_BEGIN_DECLARATION.common().flags().IS_DEFAULT(false);
     mel_BEGIN_DECLARATION.common().value(value++);
     MD5 BEGIN_DECLARATION_hash("BEGIN_DECLARATION");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_BEGIN_DECLARATION.detail().name_hash()[i] = BEGIN_DECLARATION_hash.digest[i];
     }
@@ -3507,7 +3471,7 @@ const TypeObject* GetMinimalPlacementKindObject()
     mel_END_DECLARATION.common().flags().IS_DEFAULT(false);
     mel_END_DECLARATION.common().value(value++);
     MD5 END_DECLARATION_hash("END_DECLARATION");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_END_DECLARATION.detail().name_hash()[i] = END_DECLARATION_hash.digest[i];
     }
@@ -3523,7 +3487,7 @@ const TypeObject* GetMinimalPlacementKindObject()
     mel_AFTER_DECLARATION.common().flags().IS_DEFAULT(false);
     mel_AFTER_DECLARATION.common().value(value++);
     MD5 AFTER_DECLARATION_hash("AFTER_DECLARATION");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_AFTER_DECLARATION.detail().name_hash()[i] = AFTER_DECLARATION_hash.digest[i];
     }
@@ -3539,7 +3503,7 @@ const TypeObject* GetMinimalPlacementKindObject()
     mel_END_FILE.common().flags().IS_DEFAULT(false);
     mel_END_FILE.common().value(value++);
     MD5 END_FILE_hash("END_FILE");
-    for (int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         mel_END_FILE.detail().name_hash()[i] = END_FILE_hash.digest[i];
     }
@@ -3550,7 +3514,7 @@ const TypeObject* GetMinimalPlacementKindObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalEnumeratedType::getCdrSerializedSize(type_object->minimal().enumerated_type()) + 4));
+        MinimalEnumeratedType::getCdrSerializedSize(type_object->minimal().enumerated_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3563,7 +3527,7 @@ const TypeObject* GetMinimalPlacementKindObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3581,7 +3545,7 @@ const TypeObject* GetCompletePlacementKindObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ENUM);
 
@@ -3687,7 +3651,7 @@ const TypeObject* GetCompletePlacementKindObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteEnumeratedType::getCdrSerializedSize(type_object->complete().enumerated_type()) + 4));
+        CompleteEnumeratedType::getCdrSerializedSize(type_object->complete().enumerated_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3700,7 +3664,7 @@ const TypeObject* GetCompletePlacementKindObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3710,9 +3674,10 @@ const TypeObject* GetCompletePlacementKindObject()
     return TypeObjectFactory::get_instance()->get_type_object("PlacementKind", true);
 }
 
+
+
 } // verbatim namespace
-const TypeIdentifier* GetserviceIdentifier(
-        bool complete)
+const TypeIdentifier* GetserviceIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("service", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -3724,8 +3689,7 @@ const TypeIdentifier* GetserviceIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("service", complete);
 }
 
-const TypeObject* GetserviceObject(
-        bool complete)
+const TypeObject* GetserviceObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("service", complete);
     if (c_type_object != nullptr)
@@ -3748,7 +3712,7 @@ const TypeObject* GetMinimalserviceObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -3767,7 +3731,7 @@ const TypeObject* GetMinimalserviceObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3780,7 +3744,7 @@ const TypeObject* GetMinimalserviceObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3798,7 +3762,7 @@ const TypeObject* GetCompleteserviceObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -3828,7 +3792,7 @@ const TypeObject* GetCompleteserviceObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3841,7 +3805,7 @@ const TypeObject* GetCompleteserviceObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3851,8 +3815,8 @@ const TypeObject* GetCompleteserviceObject()
     return TypeObjectFactory::get_instance()->get_type_object("service", true);
 }
 
-const TypeIdentifier* GetonewayIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetonewayIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("oneway", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -3864,8 +3828,7 @@ const TypeIdentifier* GetonewayIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("oneway", complete);
 }
 
-const TypeObject* GetonewayObject(
-        bool complete)
+const TypeObject* GetonewayObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("oneway", complete);
     if (c_type_object != nullptr)
@@ -3888,7 +3851,7 @@ const TypeObject* GetMinimalonewayObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -3907,7 +3870,7 @@ const TypeObject* GetMinimalonewayObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3920,7 +3883,7 @@ const TypeObject* GetMinimalonewayObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3938,7 +3901,7 @@ const TypeObject* GetCompleteonewayObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -3968,7 +3931,7 @@ const TypeObject* GetCompleteonewayObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -3981,7 +3944,7 @@ const TypeObject* GetCompleteonewayObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -3991,8 +3954,8 @@ const TypeObject* GetCompleteonewayObject()
     return TypeObjectFactory::get_instance()->get_type_object("oneway", true);
 }
 
-const TypeIdentifier* GetamiIdentifier(
-        bool complete)
+
+const TypeIdentifier* GetamiIdentifier(bool complete)
 {
     const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("ami", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
@@ -4004,8 +3967,7 @@ const TypeIdentifier* GetamiIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("ami", complete);
 }
 
-const TypeObject* GetamiObject(
-        bool complete)
+const TypeObject* GetamiObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("ami", complete);
     if (c_type_object != nullptr)
@@ -4028,7 +3990,7 @@ const TypeObject* GetMinimalamiObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -4047,7 +4009,7 @@ const TypeObject* GetMinimalamiObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -4060,7 +4022,7 @@ const TypeObject* GetMinimalamiObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -4078,7 +4040,7 @@ const TypeObject* GetCompleteamiObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -4108,7 +4070,7 @@ const TypeObject* GetCompleteamiObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -4121,7 +4083,7 @@ const TypeObject* GetCompleteamiObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -4131,11 +4093,10 @@ const TypeObject* GetCompleteamiObject()
     return TypeObjectFactory::get_instance()->get_type_object("ami", true);
 }
 
-const TypeIdentifier* Getnon_serializedIdentifier(
-        bool complete)
+
+const TypeIdentifier* Getnon_serializedIdentifier(bool complete)
 {
-    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("non_serialized",
-                    complete);
+    const TypeIdentifier* c_identifier = TypeObjectFactory::get_instance()->get_type_identifier("non_serialized", complete);
     if (c_identifier != nullptr && (!complete || c_identifier->_d() == EK_COMPLETE))
     {
         return c_identifier;
@@ -4145,8 +4106,7 @@ const TypeIdentifier* Getnon_serializedIdentifier(
     return TypeObjectFactory::get_instance()->get_type_identifier("non_serialized", complete);
 }
 
-const TypeObject* Getnon_serializedObject(
-        bool complete)
+const TypeObject* Getnon_serializedObject(bool complete)
 {
     const TypeObject* c_type_object = TypeObjectFactory::get_instance()->get_type_object("non_serialized", complete);
     if (c_type_object != nullptr)
@@ -4169,7 +4129,7 @@ const TypeObject* GetMinimalnon_serializedObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_MINIMAL);
     type_object->minimal()._d(TK_ANNOTATION);
 
@@ -4188,7 +4148,7 @@ const TypeObject* GetMinimalnon_serializedObject()
     identifier._d(EK_MINIMAL);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
+        MinimalAnnotationType::getCdrSerializedSize(type_object->minimal().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -4201,7 +4161,7 @@ const TypeObject* GetMinimalnon_serializedObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }
@@ -4219,7 +4179,7 @@ const TypeObject* GetCompletenon_serializedObject()
         return c_type_object;
     }
 
-    TypeObject* type_object = new TypeObject();
+    TypeObject *type_object = new TypeObject();
     type_object->_d(EK_COMPLETE);
     type_object->complete()._d(TK_ANNOTATION);
 
@@ -4249,7 +4209,7 @@ const TypeObject* GetCompletenon_serializedObject()
     identifier._d(EK_COMPLETE);
 
     SerializedPayload_t payload(static_cast<uint32_t>(
-                CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
+        CompleteAnnotationType::getCdrSerializedSize(type_object->complete().annotation_type()) + 4));
     eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
     // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
     eprosima::fastcdr::Cdr ser(
@@ -4262,7 +4222,7 @@ const TypeObject* GetCompletenon_serializedObject()
     MD5 objectHash;
     objectHash.update((char*)payload.data, payload.length);
     objectHash.finalize();
-    for (int i = 0; i < 14; ++i)
+    for(int i = 0; i < 14; ++i)
     {
         identifier.equivalence_hash()[i] = objectHash.digest[i];
     }

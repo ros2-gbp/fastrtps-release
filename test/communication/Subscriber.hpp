@@ -22,10 +22,8 @@
 #include <fastrtps/participant/ParticipantListener.h>
 #include <fastrtps/subscriber/SubscriberListener.h>
 #include <fastrtps/subscriber/SampleInfo.h>
-#include <fastrtps/TopicDataType.h>
 
-#include "types/FixedSizedPubSubTypes.h"
-#include "types/HelloWorldPubSubTypes.h"
+#include "types/HelloWorldType.h"
 
 #include <mutex>
 #include <condition_variable>
@@ -102,8 +100,7 @@ public:
 
     bool init(
             uint32_t seed,
-            const std::string& magic,
-            bool fixed_type = false);
+            const std::string& magic);
 
     bool run(
             bool notexit);
@@ -121,7 +118,7 @@ private:
     std::map<eprosima::fastrtps::rtps::GUID_t, uint32_t> number_samples_;
     bool run_ = true;
     eprosima::fastrtps::Participant* participant_ = nullptr;
-    eprosima::fastrtps::TopicDataType* type_ = nullptr;
+    HelloWorldType type_;
     eprosima::fastrtps::Subscriber* subscriber_ = nullptr;
     bool die_on_data_received_ = false;
 };

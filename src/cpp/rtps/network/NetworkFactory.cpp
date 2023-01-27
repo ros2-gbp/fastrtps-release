@@ -13,17 +13,13 @@
 // limitations under the License.
 
 #include <fastdds/rtps/network/NetworkFactory.h>
-
-#include <limits>
-#include <utility>
-
-#include <fastdds/rtps/common/Guid.h>
-#include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/transport/TransportDescriptorInterface.h>
+#include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <fastdds/rtps/common/Guid.h>
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/IPLocator.h>
-
-#include <rtps/transport/UDPv4Transport.h>
+#include <utility>
+#include <limits>
 
 using namespace std;
 using namespace eprosima::fastdds::rtps;
@@ -89,18 +85,16 @@ bool NetworkFactory::BuildReceiverResources(
 }
 
 bool NetworkFactory::RegisterTransport(
-        const TransportDescriptorInterface* descriptor,
-        const fastrtps::rtps::PropertyPolicy* properties)
+        const TransportDescriptorInterface* descriptor)
 {
     bool wasRegistered = false;
-
     uint32_t minSendBufferSize = std::numeric_limits<uint32_t>::max();
 
     std::unique_ptr<TransportInterface> transport(descriptor->create_transport());
 
     if (transport)
     {
-        if (transport->init(properties))
+        if (transport->init())
         {
             minSendBufferSize = transport->get_configuration()->min_send_buffer_size();
             mRegisteredTransports.emplace_back(std::move(transport));
@@ -377,7 +371,7 @@ uint16_t NetworkFactory::calculate_well_known_port(
 
     if (port > 65535)
     {
-        EPROSIMA_LOG_ERROR(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
+        logError(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
                 << "too much participants created or portBase is too high.");
         std::cout << "Calculated port number is too high. Probably the domainId is over 232, there are "
                   << "too much participants created or portBase is too high." << std::endl;
@@ -386,14 +380,6 @@ uint16_t NetworkFactory::calculate_well_known_port(
     }
 
     return static_cast<uint16_t>(port);
-}
-
-void NetworkFactory::update_network_interfaces()
-{
-    for (auto& transport : mRegisteredTransports)
-    {
-        transport->update_network_interfaces();
-    }
 }
 
 } // namespace rtps

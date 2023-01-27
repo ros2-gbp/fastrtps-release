@@ -79,18 +79,6 @@ public:
 
     static RTPSWriter* createRTPSWriter(
             RTPSParticipant*,
-            const EntityId_t&,
-            WriterAttributes&,
-            const std::shared_ptr<IPayloadPool>&,
-            WriterHistory*,
-            WriterListener* listen = nullptr)
-    {
-        writer_->set_listener(listen);
-        return writer_;
-    }
-
-    static RTPSWriter* createRTPSWriter(
-            RTPSParticipant*,
             WriterAttributes&,
             const std::shared_ptr<IPayloadPool>&,
             WriterHistory*,
@@ -109,10 +97,9 @@ public:
     static RTPSReader* createRTPSReader(
             RTPSParticipant*,
             ReaderAttributes&,
-            ReaderHistory* history,
+            ReaderHistory*,
             ReaderListener* listen = nullptr)
     {
-        reader_->setHistory(history);
         reader_->setListener(listen);
         return reader_;
     }
@@ -121,23 +108,9 @@ public:
             RTPSParticipant*,
             ReaderAttributes&,
             const std::shared_ptr<IPayloadPool>&,
-            ReaderHistory* history,
+            ReaderHistory*,
             ReaderListener* listen = nullptr)
     {
-        reader_->setHistory(history);
-        reader_->setListener(listen);
-        return reader_;
-    }
-
-    static RTPSReader* createRTPSReader(
-            RTPSParticipant*,
-            const EntityId_t&,
-            ReaderAttributes&,
-            const std::shared_ptr<IPayloadPool>&,
-            ReaderHistory* history,
-            ReaderListener* listen = nullptr)
-    {
-        reader_->setHistory(history);
         reader_->setListener(listen);
         return reader_;
     }
@@ -158,6 +131,16 @@ public:
             uint32_t maxRTPSParticipantId)
     {
         m_maxRTPSParticipantID = maxRTPSParticipantId;
+    }
+
+    static RTPSParticipant* clientServerEnvironmentCreationOverride(
+            uint32_t,
+            bool,
+            const RTPSParticipantAttributes&,
+            RTPSParticipantListener* listen /*= nullptr*/)
+    {
+        participant_->set_listener(listen);
+        return participant_;
     }
 
     static inline uint32_t getNewId()

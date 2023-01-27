@@ -13,13 +13,13 @@
                     <discovery_config>
                         <ignoreParticipantFlags>FILTER_DIFFERENT_PROCESS | FILTER_DIFFERENT_HOST</ignoreParticipantFlags>
                         <leaseAnnouncement>
-                            <sec>180</sec>
+                            <sec>DURATION_INFINITY</sec>
                         </leaseAnnouncement>
                         <leaseDuration>
                             <sec>DURATION_INFINITY</sec>
                         </leaseDuration>
                         <initialAnnouncements>
-                            <count>2</count>
+                            <count>0</count>
                         </initialAnnouncements>
                     </discovery_config>
                 </builtin>
@@ -39,9 +39,6 @@
                 <durability>
                     <kind>VOLATILE</kind>
                 </durability>
-                <data_sharing>
-                    <kind>OFF</kind>
-                </data_sharing>
             </qos>
         </publisher>
         <subscriber profile_name="pub_subscriber_profile">
@@ -57,9 +54,6 @@
                 <durability>
                     <kind>VOLATILE</kind>
                 </durability>
-                <data_sharing>
-                    <kind>OFF</kind>
-                </data_sharing>
             </qos>
         </subscriber>
 
@@ -71,13 +65,13 @@
                     <discovery_config>
                         <ignoreParticipantFlags>FILTER_DIFFERENT_PROCESS | FILTER_DIFFERENT_HOST</ignoreParticipantFlags>
                         <leaseAnnouncement>
-                            <sec>180</sec>
+                            <sec>DURATION_INFINITY</sec>
                         </leaseAnnouncement>
                         <leaseDuration>
                             <sec>DURATION_INFINITY</sec>
                         </leaseDuration>
                         <initialAnnouncements>
-                            <count>2</count>
+                            <count>0</count>
                         </initialAnnouncements>
                     </discovery_config>
                 </builtin>
@@ -97,9 +91,6 @@
                 <durability>
                     <kind>VOLATILE</kind>
                 </durability>
-                <data_sharing>
-                    <kind>OFF</kind>
-                </data_sharing>
             </qos>
         </publisher>
         <subscriber profile_name="sub_subscriber_profile">
@@ -115,9 +106,6 @@
                 <durability>
                     <kind>VOLATILE</kind>
                 </durability>
-                <data_sharing>
-                    <kind>OFF</kind>
-                </data_sharing>
             </qos>
         </subscriber>
     </profiles>

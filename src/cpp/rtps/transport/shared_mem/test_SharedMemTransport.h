@@ -37,7 +37,7 @@ public:
             const std::chrono::steady_clock::time_point& max_blocking_time_point) override;
 
     SharedMemChannelResource* CreateInputChannelResource(
-            const Locator& locator,
+            const fastrtps::rtps::Locator_t& locator,
             uint32_t max_msg_size,
             TransportReceiverInterface* receiver) override;
 
