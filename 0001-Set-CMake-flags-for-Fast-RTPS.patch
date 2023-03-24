@@ -1,0 +1,28 @@
+From 6746cb1eaac0394f0802807d72937ab910aacf9e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?=
+ <nuclearsandwich@users.noreply.github.com>
+Date: Sat, 12 Feb 2022 10:36:47 -0500
+Subject: [PATCH 1/2] Set CMake flags for Fast-RTPS.
+
+Co-authored-by: Scott K Logan <logans@cottsay.net>
+Signed-off-by: Scott K Logan <logans@cottsay.net>
+---
+ rpm/template.spec.em | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/rpm/template.spec.em b/rpm/template.spec.em
+index b1217d05..adfa6050 100644
+--- a/rpm/template.spec.em
++++ b/rpm/template.spec.em
+@@ -51,6 +51,8 @@ mkdir -p .obj-%{_target_platform} && cd .obj-%{_target_platform}
+ %if !0%{?with_tests}
+     -DBUILD_TESTING=OFF \
+ %endif
++    -DINSTALL_EXAMPLES=OFF \
++    -DSECURITY=ON \
+     ..
+ 
+ %make_build
+-- 
+2.39.2
+
