@@ -1,4 +1,4 @@
-From 6746cb1eaac0394f0802807d72937ab910aacf9e Mon Sep 17 00:00:00 2001
+From ae07033a2584f7d2da010c62c1275078275a0d19 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?=
  <nuclearsandwich@users.noreply.github.com>
 Date: Sat, 12 Feb 2022 10:36:47 -0500
@@ -24,5 +24,5 @@ index b1217d05..adfa6050 100644
  
  %make_build
 -- 
-2.39.2
+2.34.1
 
