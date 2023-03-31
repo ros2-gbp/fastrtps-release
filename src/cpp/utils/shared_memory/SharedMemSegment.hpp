@@ -85,7 +85,6 @@ public:
     explicit SharedSegmentBase(
             const std::string& name)
         : name_(name)
-        , boost_singleton_handler_(eprosima::detail::BoostAtExitRegistry::get_instance())
     {
     }
 
@@ -306,8 +305,6 @@ private:
 
     std::string name_;
 
-    std::shared_ptr<eprosima::detail::BoostAtExitRegistry> boost_singleton_handler_;
-
     static std::mutex& mtx_()
     {
         static std::mutex mtx_;
@@ -398,7 +395,7 @@ public:
     }
 
     /**
-     * Estimates the extra segment space required for an allocation
+     * Estimates the extra segment space required for an allocation. This may throw
      */
     static uint32_t compute_per_allocation_extra_size(
             size_t allocation_alignment,
