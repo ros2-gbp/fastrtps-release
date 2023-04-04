@@ -1,4 +1,4 @@
-From 6157c19865d9f620eef563aaa0316887758d923e Mon Sep 17 00:00:00 2001
+From 433b2bfdf31b211b9f233b3ce79475cc86c566d9 Mon Sep 17 00:00:00 2001
 From: Shane Loretz <shane.loretz@gmail.com>
 Date: Mon, 21 Mar 2022 14:16:31 -0700
 Subject: [PATCH 2/2] Set APPEND_PROJECT_NAME_TO_INCLUDEDIR to ON
