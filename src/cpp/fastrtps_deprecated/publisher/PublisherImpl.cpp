@@ -39,7 +39,6 @@
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
 
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
-#include <rtps/participant/RTPSParticipantImpl.h>
 
 using namespace eprosima::fastrtps;
 using namespace ::rtps;
@@ -70,6 +69,7 @@ PublisherImpl::PublisherImpl(
     , m_writerListener(this)
     , mp_userPublisher(nullptr)
     , mp_rtpsParticipant(nullptr)
+    , high_mark_for_frag_(0)
     , deadline_duration_us_(m_att.qos.m_deadline.period.to_ns() * 1e-3)
     , timer_owner_()
     , deadline_missed_status_()
@@ -102,7 +102,7 @@ PublisherImpl::~PublisherImpl()
 
     if (mp_writer != nullptr)
     {
-        EPROSIMA_LOG_INFO(PUBLISHER, this->getGuid().entityId << " in topic: " << this->m_att.topic.topicName);
+        logInfo(PUBLISHER, this->getGuid().entityId << " in topic: " << this->m_att.topic.topicName);
     }
 
     RTPSDomain::removeRTPSWriter(mp_writer);
@@ -111,6 +111,7 @@ PublisherImpl::~PublisherImpl()
     std::string topic_name = m_att.topic.getTopicName().to_string();
     PoolConfig pool_cfg = PoolConfig::from_history_attributes(m_history.m_att);
     payload_pool_->release_history(pool_cfg, false);
+    TopicPayloadPoolRegistry::release(payload_pool_);
 }
 
 bool PublisherImpl::create_new_change(
@@ -148,7 +149,7 @@ bool PublisherImpl::create_new_change_with_params(
     /// Preconditions
     if (data == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Data pointer not valid");
+        logError(PUBLISHER, "Data pointer not valid");
         return false;
     }
 
@@ -157,7 +158,7 @@ bool PublisherImpl::create_new_change_with_params(
     {
         if (m_att.topic.topicKind == NO_KEY)
         {
-            EPROSIMA_LOG_ERROR(PUBLISHER, "Topic is NO_KEY, operation not permitted");
+            logError(PUBLISHER, "Topic is NO_KEY, operation not permitted");
             return false;
         }
     }
@@ -181,10 +182,46 @@ bool PublisherImpl::create_new_change_with_params(
                 //If these two checks are correct, we asume the cachechange is valid and thwn we can write to it.
                 if (!mp_type->serialize(data, &ch->serializedPayload))
                 {
-                    EPROSIMA_LOG_WARNING(RTPS_WRITER, "RTPSWriter:Serialization returns false"; );
+                    logWarning(RTPS_WRITER, "RTPSWriter:Serialization returns false"; );
                     mp_writer->release_change(ch);
                     return false;
                 }
+            }
+
+            //TODO(Ricardo) This logic in a class. Then a user of rtps layer can use it.
+            if (high_mark_for_frag_ == 0)
+            {
+                uint32_t max_data_size = mp_writer->getMaxDataSize();
+                uint32_t writer_throughput_controller_bytes =
+                        mp_writer->calculateMaxDataSize(m_att.throughputController.bytesPerPeriod);
+                uint32_t participant_throughput_controller_bytes =
+                        mp_writer->calculateMaxDataSize(
+                    mp_rtpsParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod);
+
+                high_mark_for_frag_ =
+                        max_data_size > writer_throughput_controller_bytes ?
+                        writer_throughput_controller_bytes :
+                        (max_data_size > participant_throughput_controller_bytes ?
+                        participant_throughput_controller_bytes :
+                        max_data_size);
+                high_mark_for_frag_ &= ~3;
+            }
+
+            uint32_t final_high_mark_for_frag = high_mark_for_frag_;
+
+            // If needed inlineqos for related_sample_identity, then remove the inlinqos size from final fragment size.
+            if (wparams.related_sample_identity() != SampleIdentity::unknown())
+            {
+                final_high_mark_for_frag -= 32;
+            }
+
+            // If it is big data, fragment it.
+            if (ch->serializedPayload.length > final_high_mark_for_frag)
+            {
+                // Fragment the data.
+                // Set the fragment size to the cachechange.
+                ch->setFragmentSize(static_cast<uint16_t>(
+                            (std::min)(final_high_mark_for_frag, RTPSMessageGroup::get_max_fragment_payload_size())));
             }
 
             InstanceHandle_t change_handle = ch->instanceHandle;
@@ -200,7 +237,7 @@ bool PublisherImpl::create_new_change_with_params(
                             change_handle,
                             steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
                 {
-                    EPROSIMA_LOG_ERROR(PUBLISHER, "Could not set the next deadline in the history");
+                    logError(PUBLISHER, "Could not set the next deadline in the history");
                 }
                 else
                 {
@@ -236,13 +273,13 @@ InstanceHandle_t PublisherImpl::register_instance(
     /// Preconditions
     if (instance == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Data pointer not valid");
+        logError(PUBLISHER, "Data pointer not valid");
         return c_InstanceHandle_Unknown;
     }
 
     if (m_att.topic.topicKind == NO_KEY)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Topic is NO_KEY, operation not permitted");
+        logError(PUBLISHER, "Topic is NO_KEY, operation not permitted");
         return c_InstanceHandle_Unknown;
     }
 
@@ -281,13 +318,13 @@ bool PublisherImpl::unregister_instance(
     /// Preconditions
     if (instance == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Data pointer not valid");
+        logError(PUBLISHER, "Data pointer not valid");
         return false;
     }
 
     if (m_att.topic.topicKind == NO_KEY)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Topic is NO_KEY, operation not permitted");
+        logError(PUBLISHER, "Topic is NO_KEY, operation not permitted");
         return false;
     }
 
@@ -308,7 +345,7 @@ bool PublisherImpl::unregister_instance(
 #if !defined(NDEBUG)
     if (c_InstanceHandle_Unknown != handle && ih != handle)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "handle differs from data's key.");
+        logError(PUBLISHER, "handle differs from data's key.");
         return false;
     }
 #endif // if !defined(NDEBUG)
@@ -350,7 +387,7 @@ bool PublisherImpl::updateAttributes(
         if (att.unicastLocatorList.size() != this->m_att.unicastLocatorList.size() ||
                 att.multicastLocatorList.size() != this->m_att.multicastLocatorList.size())
         {
-            EPROSIMA_LOG_WARNING(PUBLISHER, "Locator Lists cannot be changed or updated in this version");
+            logWarning(PUBLISHER, "Locator Lists cannot be changed or updated in this version");
             updated &= false;
         }
         else
@@ -370,8 +407,8 @@ bool PublisherImpl::updateAttributes(
                 }
                 if (missing)
                 {
-                    EPROSIMA_LOG_WARNING(PUBLISHER, "Locator: " << *lit1 << " not present in new list");
-                    EPROSIMA_LOG_WARNING(PUBLISHER, "Locator Lists cannot be changed or updated in this version");
+                    logWarning(PUBLISHER, "Locator: " << *lit1 << " not present in new list");
+                    logWarning(PUBLISHER, "Locator Lists cannot be changed or updated in this version");
                 }
             }
             for (LocatorListConstIterator lit1 = this->m_att.multicastLocatorList.begin();
@@ -389,8 +426,8 @@ bool PublisherImpl::updateAttributes(
                 }
                 if (missing)
                 {
-                    EPROSIMA_LOG_WARNING(PUBLISHER, "Locator: " << *lit1 << " not present in new list");
-                    EPROSIMA_LOG_WARNING(PUBLISHER, "Locator Lists cannot be changed or updated in this version");
+                    logWarning(PUBLISHER, "Locator: " << *lit1 << " not present in new list");
+                    logWarning(PUBLISHER, "Locator Lists cannot be changed or updated in this version");
                 }
             }
         }
@@ -399,7 +436,7 @@ bool PublisherImpl::updateAttributes(
     //TOPIC ATTRIBUTES
     if (this->m_att.topic != att.topic)
     {
-        EPROSIMA_LOG_WARNING(PUBLISHER, "Topic Attributes cannot be updated");
+        logWarning(PUBLISHER, "Topic Attributes cannot be updated");
         updated &= false;
     }
     //QOS:
@@ -507,7 +544,7 @@ bool PublisherImpl::deadline_timer_reschedule()
     steady_clock::time_point next_deadline_us;
     if (!m_history.get_next_deadline(timer_owner_, next_deadline_us))
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Could not get the next deadline from the history");
+        logError(PUBLISHER, "Could not get the next deadline from the history");
         return false;
     }
 
@@ -533,7 +570,7 @@ bool PublisherImpl::deadline_missed()
                 timer_owner_,
                 steady_clock::now() + duration_cast<system_clock::duration>(deadline_duration_us_)))
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Could not set the next deadline in the history");
+        logError(PUBLISHER, "Could not set the next deadline in the history");
         return false;
     }
 
@@ -608,7 +645,7 @@ void PublisherImpl::assert_liveliness()
                 mp_writer->get_liveliness_kind(),
                 mp_writer->get_liveliness_lease_duration()))
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Could not assert liveliness of writer " << mp_writer->getGuid());
+        logError(PUBLISHER, "Could not assert liveliness of writer " << mp_writer->getGuid());
     }
 
     if (m_att.qos.m_liveliness.kind == MANUAL_BY_TOPIC_LIVELINESS_QOS)
@@ -623,12 +660,6 @@ void PublisherImpl::assert_liveliness()
             stateful_writer->send_periodic_heartbeat(true, true);
         }
     }
-}
-
-void PublisherImpl::get_sending_locators(
-        rtps::LocatorList_t& locators) const
-{
-    mp_writer->getRTPSParticipant()->get_sending_locators(locators);
 }
 
 std::shared_ptr<rtps::IPayloadPool> PublisherImpl::payload_pool()

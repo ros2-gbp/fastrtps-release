@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/ChannelResource.h>
-
 #include <asio.hpp>
+#include <fastdds/rtps/transport/ChannelResource.h>
 
 namespace eprosima {
 namespace fastdds {
@@ -26,27 +25,25 @@ ChannelResource::ChannelResource()
     : message_buffer_(RTPSMESSAGE_DEFAULT_SIZE)
     , alive_(true)
 {
-    EPROSIMA_LOG_INFO(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
+    logInfo(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
 }
 
-ChannelResource::ChannelResource(
-        ChannelResource&& channelResource)
+ChannelResource::ChannelResource(ChannelResource&& channelResource)
     : message_buffer_(std::move(channelResource.message_buffer_))
     , thread_(std::move(channelResource.thread_))
 {
     bool b = channelResource.alive_;
     alive_.store(b);
-    //EPROSIMA_LOG_INFO(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
+    //logInfo(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
     //message_buffer_ = std::move(channelResource.message_buffer_);
 }
 
-ChannelResource::ChannelResource(
-        uint32_t rec_buffer_size)
+ChannelResource::ChannelResource(uint32_t rec_buffer_size)
     : message_buffer_(rec_buffer_size)
     , alive_(true)
 {
     memset(message_buffer_.buffer, 0, rec_buffer_size);
-    EPROSIMA_LOG_INFO(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
+    logInfo(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
 }
 
 ChannelResource::~ChannelResource()
@@ -60,13 +57,11 @@ void ChannelResource::clear()
     if (thread_.joinable())
     {
         if (thread_.get_id() != std::this_thread::get_id())
-        {
-            // wait for it to finish
+        {   // wait for it to finish
             thread_.join();
         }
         else
-        {
-            // killing my own thread
+        {   // killing my own thread
             thread_.detach();
         }
     }

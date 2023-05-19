@@ -21,57 +21,32 @@
 
 #include <gtest/gtest.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <fastrtps/transport/test_UDPv4Transport.h>
 #include <fastdds/rtps/common/CDRMessage_t.h>
-#include <rtps/transport/test_UDPv4Transport.h>
 
 using namespace eprosima::fastrtps;
-using test_UDPv4Transport = eprosima::fastdds::rtps::test_UDPv4Transport;
-using test_UDPv4TransportDescriptor = eprosima::fastdds::rtps::test_UDPv4TransportDescriptor;
 
-enum communication_type
-{
-    TRANSPORT,
-    INTRAPROCESS,
-    DATASHARING
-};
-
-class Volatile : public testing::TestWithParam<communication_type>
+class Volatile : public testing::TestWithParam<bool>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = true;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        switch (GetParam())
+        if (GetParam())
         {
-            case INTRAPROCESS:
-                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-                xmlparser::XMLProfileManager::library_settings(library_settings);
-                break;
-            case DATASHARING:
-                enable_datasharing = false;
-                break;
-            case TRANSPORT:
-            default:
-                break;
+            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+            xmlparser::XMLProfileManager::library_settings(library_settings);
         }
     }
 
@@ -80,7 +55,7 @@ public:
 // Test created to check bug #3020 (Github ros2/demos #238)
 TEST_P(Volatile, PubSubAsReliableVolatilePubRemoveWithoutSubs)
 {
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.history_depth(10).
             durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).init();
@@ -101,8 +76,8 @@ TEST_P(Volatile, PubSubAsReliableVolatilePubRemoveWithoutSubs)
 // Test created to check bug #3087 (Github #230)
 TEST_P(Volatile, AsyncPubSubAsNonReliableVolatileHelloworld)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     reader.init();
 
@@ -133,8 +108,8 @@ TEST_P(Volatile, AsyncPubSubAsNonReliableVolatileHelloworld)
 // Test created to check bug #3290 (ROS2 #539)
 TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
 {
-    PubSubReader<Data1mbPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<Data1mbPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -153,8 +128,7 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
             resource_limits_allocated_samples(9).
             resource_limits_max_samples(9).
             asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).
-            add_throughput_controller_descriptor_to_pparams(
-        eprosima::fastdds::rtps::FlowControllerSchedulerPolicy::FIFO, bytesPerPeriod, periodInMs).
+            add_throughput_controller_descriptor_to_pparams(bytesPerPeriod, periodInMs).
             init();
 
     ASSERT_TRUE(writer.isInitialized());
@@ -177,8 +151,8 @@ TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliable300Kb)
 // Test created to check bug #3290 (ROS2 #539)
 TEST_P(Volatile, VolatileKeepAllPubReliableSubNonReliableHelloWorld)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -213,8 +187,8 @@ TEST_P(Volatile, VolatileKeepAllPubReliableSubNonReliableHelloWorld)
 // Test created to check bug #3290 (ROS2 #539)
 TEST_P(Volatile, AsyncVolatileKeepAllPubReliableSubNonReliableHelloWorld)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -262,8 +236,8 @@ TEST_P(Volatile, ReqRepVolatileHelloworldRequesterCheckWriteParams)
 // Test created to check bug #5423, github ros2/ros2 #703
 TEST_P(Volatile, AsyncVolatileSubBetweenPubs)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
@@ -304,8 +278,8 @@ TEST_P(Volatile, AsyncVolatileSubBetweenPubs)
 
 TEST_P(Volatile, VolatileSubBetweenPubs)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
             reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
@@ -346,8 +320,8 @@ TEST_P(Volatile, VolatileSubBetweenPubs)
 
 TEST_P(Volatile, AsyncVolatileSubBetweenTransientPubs)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer
             .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
@@ -389,8 +363,8 @@ TEST_P(Volatile, AsyncVolatileSubBetweenTransientPubs)
 
 TEST_P(Volatile, VolatileSubBetweenTransientPubs)
 {
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     writer
             .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
@@ -432,9 +406,9 @@ TEST_P(Volatile, VolatileSubBetweenTransientPubs)
 
 TEST_P(Volatile, VolatileLateJoinerSubGapLost)
 {
-    PubSubReader<HelloWorldPubSubType> reader1(TEST_TOPIC_NAME);
-    PubSubReader<HelloWorldPubSubType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader1(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
 
     reader1.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
@@ -447,7 +421,7 @@ TEST_P(Volatile, VolatileLateJoinerSubGapLost)
 
     // To simulate lossy conditions
     int gaps_to_drop = 2;
-    auto testTransport = std::make_shared<test_UDPv4TransportDescriptor>();
+    auto testTransport = std::make_shared<rtps::test_UDPv4TransportDescriptor>();
     testTransport->drop_gap_messages_filter_ = [&gaps_to_drop](rtps::CDRMessage_t& )
             {
                 if (gaps_to_drop > 0)
@@ -503,66 +477,6 @@ TEST_P(Volatile, VolatileLateJoinerSubGapLost)
     reader2.block_for_all();
 }
 
-// Regression test for redmine bug #11306
-TEST_P(Volatile, VolatileWithLostAcks)
-{
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
-
-    writer.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            resource_limits_allocated_samples(10).
-            resource_limits_max_samples(10).
-            init();
-
-    ASSERT_TRUE(writer.isInitialized());
-
-    // To simulate lossy conditions
-    size_t acks_to_drop = 0;
-    auto testTransport = std::make_shared<test_UDPv4TransportDescriptor>();
-    testTransport->drop_ack_nack_messages_filter_ = [&acks_to_drop](rtps::CDRMessage_t&)
-            {
-                if (acks_to_drop > 0)
-                {
-                    --acks_to_drop;
-                    return true;
-                }
-                return false;
-            };
-
-    reader.history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS).
-            resource_limits_allocated_samples(10).
-            resource_limits_max_samples(10).
-            disable_builtin_transport().
-            add_user_transport_to_pparams(testTransport).
-            init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
-    // Volatile durability. Endpoints should know each other before communicating.
-    reader.wait_discovery();
-    writer.wait_discovery();
-
-    // Drop half the acks and perform communication
-    acks_to_drop = 5;
-    auto data = default_helloworld_data_generator();
-    reader.startReception(data);
-    writer.send(data);
-    ASSERT_TRUE(data.empty());
-    reader.block_for_all();
-
-    // Wait for history to be completely acknowledged
-    EXPECT_TRUE(writer.waitForAllAcked(std::chrono::minutes(10)));
-
-    // History should be empty, so remove_all_changes should do nothing
-    size_t number_of_changes_removed = 0;
-    EXPECT_FALSE(writer.remove_all_changes(&number_of_changes_removed));
-    EXPECT_EQ(0u, number_of_changes_removed);
-}
-
 #ifdef INSTANTIATE_TEST_SUITE_P
 #define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
 #else
@@ -571,20 +485,12 @@ TEST_P(Volatile, VolatileWithLostAcks)
 
 GTEST_INSTANTIATE_TEST_MACRO(Volatile,
         Volatile,
-        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
+        testing::Values(false, true),
         [](const testing::TestParamInfo<Volatile::ParamType>& info)
         {
-            switch (info.param)
+            if (info.param)
             {
-                case INTRAPROCESS:
-                    return "Intraprocess";
-                    break;
-                case DATASHARING:
-                    return "Datasharing";
-                    break;
-                case TRANSPORT:
-                default:
-                    return "Transport";
+                return "Intraprocess";
             }
-
+            return "NonIntraprocess";
         });

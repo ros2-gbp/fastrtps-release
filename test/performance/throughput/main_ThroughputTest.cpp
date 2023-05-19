@@ -16,8 +16,9 @@
 #include "ThroughputPublisher.hpp"
 #include "ThroughputSubscriber.hpp"
 
-#include "../optionarg.hpp"
+#include "../optionparser.h"
 
+#include <stdio.h>
 #include <string>
 #include <iostream>
 #include <iomanip>
@@ -42,6 +43,84 @@ using namespace eprosima::fastrtps::rtps;
 #define COPYSTR strcpy
 #endif // if defined(_WIN32)
 
+
+struct Arg : public option::Arg
+{
+
+    static void print_error(
+            const char* msg1,
+            const option::Option& opt,
+            const char* msg2)
+    {
+        fprintf(stderr, "%s", msg1);
+        fwrite(opt.name, opt.namelen, 1, stderr);
+        fprintf(stderr, "%s", msg2);
+    }
+
+    static option::ArgStatus Unknown(
+            const option::Option& option,
+            bool msg)
+    {
+        if (msg)
+        {
+            print_error("Unknown option '", option, "'\n");
+        }
+        return option::ARG_ILLEGAL;
+    }
+
+    static option::ArgStatus Required(
+            const option::Option& option,
+            bool msg)
+    {
+        if (option.arg != 0 && option.arg[0] != 0)
+        {
+            return option::ARG_OK;
+        }
+
+        if (msg)
+        {
+            print_error("Option '", option, "' requires an argument\n");
+        }
+        return option::ARG_ILLEGAL;
+    }
+
+    static option::ArgStatus Numeric(
+            const option::Option& option,
+            bool msg)
+    {
+        char* endptr = 0;
+        if (option.arg != 0 && strtol(option.arg, &endptr, 10))
+        {
+        }
+        if (endptr != option.arg && *endptr == 0)
+        {
+            return option::ARG_OK;
+        }
+
+        if (msg)
+        {
+            print_error("Option '", option, "' requires a numeric argument\n");
+        }
+        return option::ARG_ILLEGAL;
+    }
+
+    static option::ArgStatus String(
+            const option::Option& option,
+            bool msg)
+    {
+        if (option.arg != 0)
+        {
+            return option::ARG_OK;
+        }
+        if (msg)
+        {
+            print_error("Option '", option, "' requires a numeric argument\n");
+        }
+        return option::ARG_ILLEGAL;
+    }
+
+};
+
 enum  optionIndex
 {
     UNKNOWN_OPT,
@@ -61,10 +140,7 @@ enum  optionIndex
     XML_FILE,
     DYNAMIC_TYPES,
     FORCED_DOMAIN,
-    SUBSCRIBERS,
-    DATA_SHARING,
-    DATA_LOAN,
-    SHARED_MEMORY
+    SUBSCRIBERS
 };
 
 enum TestAgent
@@ -91,16 +167,10 @@ const option::Descriptor usage[] = {
       "             --dynamic_types          Use dynamic types." },
     { FORCED_DOMAIN, 0, "",  "domain",          Arg::Numeric,
       "             --domain                 Set the domain to connect." },
-    { DATA_SHARING,  0, "d", "data_sharing", Arg::Enabler,
-      "               --data_sharing=[on|off]             Explicitly enable/disable data sharing feature." },
-    { DATA_LOAN,        0, "l", "data_loans",            Arg::None,
-      "               --data_loans          Use loan sample API." },
-    { SHARED_MEMORY,    0, "", "shared_memory", Arg::Enabler,
-      "               --shared_memory=[on|off]             Explicitly enable/disable shared memory transport." },
 #if HAVE_SECURITY
     {
         USE_SECURITY,  0, "",  "security",        Arg::Required,
-        "             --security <arg>         Enable/disable DDS security (\"true\"/\"false\")."
+        "             --security <arg>         Echo mode (\"true\"/\"false\")."
     },
     { CERTS_PATH,    0, "",  "certs",           Arg::Required,
       "             --certs <arg>            Path where located certificates." },
@@ -111,15 +181,15 @@ const option::Descriptor usage[] = {
     { SUBSCRIBERS,     0, "n", "subscribers",     Arg::Numeric,
       "  -n <num>,    --subscribers=<arg>   Number of subscribers." },
     { TIME,          0, "t", "time",            Arg::Numeric,
-      "  -t <seconds>,  --time=<seconds>             Time of the test in seconds." },
+      "  -t <num>,  --time=<num>             Time of the test in seconds." },
     { RECOVERY_TIME, 0, "",  "recovery_time",   Arg::Numeric,
-      "             --recovery_time=<milliseconds>    If a demand takes shorter to send than <recovery_time>, sleep the rest" },
+      "             --recovery_time=<num>    If a demand takes shorter to send than <recovery_time>, sleep the rest" },
     { RECOVERIES,    0, "",  "recoveries_file", Arg::String,
       "             --recoveries_file=<num>  A CSV file with recovery times" },
     { DEMAND,        0, "d", "demand",          Arg::Numeric,
       "  -d <num>,  --demand=<num>           Number of samples sent in block (Defaults: 10000)." },
     { MSG_SIZE,      0, "s", "msg_size",        Arg::Numeric,
-      "  -s <num>,  --msg_size=<num>         Size of the message in bytes (Defaults: 1024)." },
+      "  -s <num>,  --msg_size=<num>         Size of the message in bits (Defaults: 1024)." },
     { FILE_R,        0, "f", "file",            Arg::Required,
       "  -f <arg>,  --file=<arg>             File to read the payload demands from." },
     { EXPORT_CSV,    0, "",  "export_csv",      Arg::String,
@@ -171,9 +241,6 @@ int main(
     bool use_security = false;
     std::string certs_path;
 #endif // if HAVE_SECURITY
-    Arg::EnablerValue data_sharing = Arg::EnablerValue::NO_SET;
-    bool data_loans = false;
-    Arg::EnablerValue shared_memory = Arg::EnablerValue::NO_SET;
 
     argc -= (argc > 0); argv += (argc > 0); // skip program name argv[0] if present
     if (argc)
@@ -330,54 +397,12 @@ int main(
                 certs_path = opt.arg;
                 break;
 #endif // if HAVE_SECURITY
-            case DATA_SHARING:
-                if (0 == strncasecmp(opt.arg, "on", 2))
-                {
-                    data_sharing = Arg::EnablerValue::ON;
-                }
-                else
-                {
-                    data_sharing = Arg::EnablerValue::OFF;
-                }
-                break;
-            case DATA_LOAN:
-                data_loans = true;
-                break;
-            case SHARED_MEMORY:
-                if (0 == strncasecmp(opt.arg, "on", 2))
-                {
-                    shared_memory = Arg::EnablerValue::ON;
-                }
-                else
-                {
-                    shared_memory = Arg::EnablerValue::OFF;
-                }
-                break;
+
             case UNKNOWN_OPT:
                 option::printUsage(fwrite, stdout, usage, columns);
                 return 0;
                 break;
         }
-    }
-
-#if HAVE_SECURITY
-    // Check parameters validity
-    if (use_security && test_agent == TestAgent::BOTH)
-    {
-        EPROSIMA_LOG_ERROR(ThroughputTest, "Intra-process delivery NOT supported with security");
-        return 1;
-    }
-    else if ( Arg::EnablerValue::ON == data_sharing && use_security )
-    {
-        EPROSIMA_LOG_ERROR(ThroughputTest, "Sharing sample APIs NOT supported with RTPS encryption");
-        return 1;
-    }
-#endif // if HAVE_SECURITY
-
-    if ((Arg::EnablerValue::ON == data_sharing || data_loans) && dynamic_types)
-    {
-        EPROSIMA_LOG_ERROR(ThroughputTest, "Sharing sample APIs NOT supported with dynamic types");
-        return 1;
     }
 
     PropertyPolicy pub_part_property_policy;
@@ -465,25 +490,10 @@ int main(
     if (test_agent == TestAgent::PUBLISHER)
     {
         std::cout << "Starting throughput test publisher agent" << std::endl;
+        ThroughputPublisher throughput_publisher(reliable, seed, hostname, export_csv, pub_part_property_policy,
+                pub_property_policy, xml_config_file, file_name, recoveries_file, dynamic_types, forced_domain);
 
-        ThroughputPublisher throughput_publisher;
-
-        if (throughput_publisher.init(
-                    reliable,
-                    seed,
-                    hostname,
-                    export_csv,
-                    pub_part_property_policy,
-                    pub_property_policy,
-                    xml_config_file,
-                    file_name,
-                    recoveries_file,
-                    dynamic_types,
-                    data_sharing,
-                    data_loans,
-                    shared_memory,
-                    forced_domain)
-                )
+        if (throughput_publisher.ready())
         {
             throughput_publisher.run(test_time_sec, recovery_time_ms, demand, msg_size, subscribers);
         }
@@ -491,24 +501,15 @@ int main(
         {
             return_code = 1;
         }
+
     }
     else if (test_agent == TestAgent::SUBSCRIBER)
     {
         std::cout << "Starting throughput test subscriber agent" << std::endl;
-        ThroughputSubscriber throughput_subscriber;
+        ThroughputSubscriber throughput_subscriber(reliable, seed, hostname, sub_part_property_policy,
+                sub_property_policy, xml_config_file, dynamic_types, forced_domain);
 
-        if (throughput_subscriber.init(
-                    reliable,
-                    seed,
-                    hostname,
-                    sub_part_property_policy,
-                    sub_property_policy,
-                    xml_config_file,
-                    dynamic_types,
-                    data_sharing,
-                    data_loans,
-                    shared_memory,
-                    forced_domain))
+        if (throughput_subscriber.ready())
         {
             throughput_subscriber.run();
         }
@@ -523,52 +524,24 @@ int main(
         std::cout << "Starting throughput test shared process mode" << std::endl;
 
         // Initialize publisher
-        ThroughputPublisher throughput_publisher;
-
-        if (!throughput_publisher.init(
-                    reliable,
-                    seed,
-                    hostname,
-                    export_csv,
-                    pub_part_property_policy,
-                    pub_property_policy,
-                    xml_config_file,
-                    file_name,
-                    recoveries_file,
-                    dynamic_types,
-                    data_sharing,
-                    data_loans,
-                    shared_memory,
-                    forced_domain))
-        {
-            return_code = 1;
-            return return_code;
-        }
+        ThroughputPublisher throughput_publisher(reliable, seed, hostname, export_csv, pub_part_property_policy,
+                pub_property_policy, xml_config_file, file_name, recoveries_file, dynamic_types, forced_domain);
 
         // Initialize subscribers
-        std::vector<std::shared_ptr<ThroughputSubscriber>> throughput_subscribers;
+        std::vector<std::shared_ptr<ThroughputSubscriber> > throughput_subscribers;
 
         bool are_subscribers_ready = true;
         for (uint32_t i = 0; i < subscribers; i++)
         {
-            throughput_subscribers.emplace_back(std::make_shared<ThroughputSubscriber>());
+            throughput_subscribers.push_back(std::make_shared<ThroughputSubscriber>(reliable,
+                    seed, hostname, sub_part_property_policy, sub_property_policy,
+                    xml_config_file, dynamic_types, forced_domain));
 
-            are_subscribers_ready &= throughput_subscribers.back()->init(
-                reliable,
-                seed,
-                hostname,
-                sub_part_property_policy,
-                sub_property_policy,
-                xml_config_file,
-                dynamic_types,
-                data_sharing,
-                data_loans,
-                shared_memory,
-                forced_domain);
+            are_subscribers_ready &= throughput_subscribers.back()->ready();
         }
 
         // Spawn run threads
-        if (are_subscribers_ready)
+        if (throughput_publisher.ready() && are_subscribers_ready)
         {
             std::thread pub_thread(&ThroughputPublisher::run, &throughput_publisher, test_time_sec, recovery_time_ms,
                     demand, msg_size, subscribers);
@@ -593,6 +566,7 @@ int main(
         }
     }
 
+    Domain::stopAll();
     if (return_code == 0)
     {
         std::cout << C_GREEN << "EVERYTHING STOPPED FINE" << C_DEF << std::endl;

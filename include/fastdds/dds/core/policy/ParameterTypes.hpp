@@ -56,116 +56,79 @@ namespace dds {
  */
 enum ParameterId_t : uint16_t
 {
-    /* From Table 9.18 of DDS-RTPS 2.5 */
-    PID_PAD                                 = 0x0000,
-    PID_SENTINEL                            = 0x0001,
-    PID_USER_DATA                           = 0x002c,
-    PID_TOPIC_NAME                          = 0x0005,
-    PID_TYPE_NAME                           = 0x0007,
-    PID_GROUP_DATA                          = 0x002d,
-    PID_TOPIC_DATA                          = 0x002e,
-    PID_DURABILITY                          = 0x001d,
-    PID_DURABILITY_SERVICE                  = 0x001e,
-    PID_DEADLINE                            = 0x0023,
-    PID_LATENCY_BUDGET                      = 0x0027,
-    PID_LIVELINESS                          = 0x001b,
-    PID_RELIABILITY                         = 0x001a,
-    PID_LIFESPAN                            = 0x002b,
-    PID_DESTINATION_ORDER                   = 0x0025,
-    PID_HISTORY                             = 0x0040,
-    PID_RESOURCE_LIMITS                     = 0x0041,
-    PID_OWNERSHIP                           = 0x001f,
-    PID_OWNERSHIP_STRENGTH                  = 0x0006,
-    PID_PRESENTATION                        = 0x0021,
-    PID_PARTITION                           = 0x0029,
-    PID_TIME_BASED_FILTER                   = 0x0004,
-    PID_TRANSPORT_PRIORITY                  = 0x0049,
-    PID_DOMAIN_ID                           = 0x000f,
-    PID_DOMAIN_TAG                          = 0x4014,
-    PID_PROTOCOL_VERSION                    = 0x0015,
-    PID_VENDORID                            = 0x0016,
-    PID_UNICAST_LOCATOR                     = 0x002f,
-    PID_MULTICAST_LOCATOR                   = 0x0030,
-    PID_DEFAULT_UNICAST_LOCATOR             = 0x0031,
-    PID_DEFAULT_MULTICAST_LOCATOR           = 0x0048,
-    PID_METATRAFFIC_UNICAST_LOCATOR         = 0x0032,
-    PID_METATRAFFIC_MULTICAST_LOCATOR       = 0x0033,
-    PID_EXPECTS_INLINE_QOS                  = 0x0043,
-    PID_PARTICIPANT_MANUAL_LIVELINESS_COUNT = 0x0034,
-    PID_PARTICIPANT_LEASE_DURATION          = 0x0002,
-    PID_CONTENT_FILTER_PROPERTY             = 0x0035,
-    PID_PARTICIPANT_GUID                    = 0x0050,
-    PID_GROUP_GUID                          = 0x0052,
-    PID_GROUP_ENTITYID                      = 0x0053,
-    PID_BUILTIN_ENDPOINT_SET                = 0x0058,
-    PID_BUILTIN_ENDPOINT_QOS                = 0x0077,
-    PID_PROPERTY_LIST                       = 0x0059,
-    PID_TYPE_MAX_SIZE_SERIALIZED            = 0x0060,
-    PID_ENTITY_NAME                         = 0x0062,
-    PID_ENDPOINT_GUID                       = 0x005a,
-
-    /* From table 9.20 of DDS-RTPS 2.5 - inline QoS only */
-    PID_CONTENT_FILTER_INFO                 = 0x0055,
-    PID_COHERENT_SET                        = 0x0056,
-    PID_DIRECTED_WRITE                      = 0x0057,
-    PID_ORIGINAL_WRITER_INFO                = 0x0061,
-    PID_GROUP_COHERENT_SET                  = 0x0063,
-    PID_GROUP_SEQ_NUM                       = 0x0064,
-    PID_WRITER_GROUP_INFO                   = 0x0065,
-    PID_SECURE_WRITER_GROUP_INFO            = 0x0066,
-    PID_KEY_HASH                            = 0x0070,
-    PID_STATUS_INFO                         = 0x0071,
-
-    /* Deprecated */
-    // PID_MULTICAST_IPADDRESS             = 0x0011,
-    // PID_DEFAULT_UNICAST_IPADDRESS       = 0x000c,
-    // PID_DEFAULT_UNICAST_PORT            = 0x000e,
-    // PID_METATRAFFIC_UNICAST_IPADDRESS   = 0x0045,
-    // PID_METATRAFFIC_UNICAST_PORT        = 0x000d,
-    // PID_METATRAFFIC_MULTICAST_IPADDRESS = 0x000b,
-    // PID_METATRAFFIC_MULTICAST_PORT      = 0x0046,
-    // PID_PARTICIPANT_BUILTIN_ENDPOINTS   = 0x0044,
-    // PID_PARTICIPANT_ENTITYID            = 0x0051,
-
-    /* From DDS-XTYPES 1.3 */
-    PID_TYPE_IDV1                           = 0x0069,
-    PID_TYPE_OBJECTV1                       = 0x0072,
-    PID_DATA_REPRESENTATION                 = 0x0073,
-    PID_TYPE_CONSISTENCY_ENFORCEMENT        = 0x0074,
-    PID_TYPE_INFORMATION                    = 0x0075,
-
-    /* From table 10 of DDS-SEC 1.1 */
-    PID_IDENTITY_TOKEN                      = 0x1001,
-    PID_PERMISSIONS_TOKEN                   = 0x1002,
-    PID_PARTICIPANT_SECURITY_INFO           = 0x1005,
-
-    /* From table 12 of DDS-SEC 1.1 */
-    PID_ENDPOINT_SECURITY_INFO              = 0x1004,
-
-    /* From table 13 of DDS-SEC 1.1 */
-    PID_IDENTITY_STATUS_TOKEN               = 0x1006,
-
-    /* From table 14 of DDS-SEC 1.1 */
-    PID_DATA_TAGS                           = 0x1003,
-
-    /* From Remote Procedure Call over DDS, document "ptc/2016-03-19" V1.0 */
-    PID_SERVICE_INSTANCE_NAME               = 0x0080,
-    PID_RELATED_ENTITY_GUID                 = 0x0081,
-    PID_TOPIC_ALIASES                       = 0x0082,
-    PID_RELATED_SAMPLE_IDENTITY             = 0x0083,
-
-    /* eProsima Fast DDS extensions */
-    PID_PERSISTENCE_GUID                    = 0x8002,
-    PID_CUSTOM_RELATED_SAMPLE_IDENTITY      = 0x800f,
-    PID_DISABLE_POSITIVE_ACKS               = 0x8005,
-    PID_DATASHARING                         = 0x8006,
+    PID_PAD = 0x0000,
+    PID_SENTINEL = 0x0001,
+    PID_USER_DATA = 0x002c,
+    PID_TOPIC_NAME = 0x0005,
+    PID_TYPE_NAME = 0x0007,
+    PID_GROUP_DATA =0x002d,
+    PID_TOPIC_DATA =0x002e,
+    PID_DURABILITY =0x001d,
+    PID_DURABILITY_SERVICE =0x001e,
+    PID_DEADLINE =0x0023,
+    PID_LATENCY_BUDGET =0x0027,
+    PID_LIVELINESS =0x001b,
+    PID_RELIABILITY =0x001A,
+    PID_LIFESPAN =0x002b,
+    PID_DESTINATION_ORDER =0x0025,
+    PID_HISTORY =0x0040,
+    PID_RESOURCE_LIMITS =0x0041,
+    PID_OWNERSHIP =0x001f,
+    PID_OWNERSHIP_STRENGTH =0x0006,
+    PID_PRESENTATION =0x0021,
+    PID_PARTITION =0x0029,
+    PID_TIME_BASED_FILTER =0x0004,
+    PID_TRANSPORT_PRIORITY =0x0049,
+    PID_PROTOCOL_VERSION = 0x0015,
+    PID_VENDORID = 0x0016,
+    PID_UNICAST_LOCATOR = 0x002f,
+    PID_MULTICAST_LOCATOR = 0x0030,
+    PID_MULTICAST_IPADDRESS =0x0011,
+    PID_DEFAULT_UNICAST_LOCATOR = 0x0031,
+    PID_DEFAULT_MULTICAST_LOCATOR = 0x0048,
+    PID_METATRAFFIC_UNICAST_LOCATOR = 0x0032,
+    PID_METATRAFFIC_MULTICAST_LOCATOR = 0x0033,
+    PID_DEFAULT_UNICAST_IPADDRESS =0x000c,
+    PID_DEFAULT_UNICAST_PORT = 0x000e,
+    PID_METATRAFFIC_UNICAST_IPADDRESS =0x0045,
+    PID_METATRAFFIC_UNICAST_PORT = 0x000d,
+    PID_METATRAFFIC_MULTICAST_IPADDRESS =0x000b,
+    PID_METATRAFFIC_MULTICAST_PORT = 0x0046,
+    PID_EXPECTS_INLINE_QOS =0x0043,
+    PID_PARTICIPANT_MANUAL_LIVELINESS_COUNT =0x0034,
+    PID_PARTICIPANT_BUILTIN_ENDPOINTS = 0x0044,
+    PID_PARTICIPANT_LEASE_DURATION = 0x0002,
+    PID_CONTENT_FILTER_PROPERTY =0x0035,
+    PID_PARTICIPANT_GUID = 0x0050,
+    PID_PARTICIPANT_ENTITYID =0x0051,
+    PID_GROUP_GUID =0x0052,
+    PID_GROUP_ENTITYID =0x0053,
+    PID_BUILTIN_ENDPOINT_SET = 0x0058,
+    PID_PROPERTY_LIST = 0x0059,
+    PID_TYPE_MAX_SIZE_SERIALIZED =0x0060,
+    PID_ENTITY_NAME = 0x0062,
+    PID_TYPE_IDV1 = 0x0069,
+    PID_KEY_HASH = 0x0070,
+    PID_STATUS_INFO = 0x0071,
+    PID_TYPE_OBJECTV1 = 0x0072,
+    PID_ENDPOINT_GUID = 0x005a,
+    //PID_RELATED_SAMPLE_IDENTITY = 0x0083
+    PID_IDENTITY_TOKEN = 0x1001,
+    PID_PERMISSIONS_TOKEN = 0x1002,
+    PID_DATA_TAGS = 0x1003,
+    PID_ENDPOINT_SECURITY_INFO = 0x1004,
+    PID_PARTICIPANT_SECURITY_INFO = 0x1005,
+    PID_IDENTITY_STATUS_TOKEN = 0x1006,
+    PID_PERSISTENCE_GUID = 0x8002,
+    PID_RELATED_SAMPLE_IDENTITY = 0x800f,
+    PID_DATA_REPRESENTATION = 0x0073,
+    PID_TYPE_CONSISTENCY_ENFORCEMENT = 0x0074,
+    PID_TYPE_INFORMATION = 0x0075,
+    PID_DISABLE_POSITIVE_ACKS = 0x8005,
 };
 
-/*!
- * Base Parameter class with parameter PID and parameter length in bytes.
- *
- * @ingroup PARAMETER_MODULE
- */
+//!Base Parameter class with parameter PID and parameter length in bytes.
+//!@ingroup PARAMETER_MODULE
 class Parameter_t
 {
 public:
@@ -181,7 +144,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param length Its associated length
      */
@@ -233,7 +195,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -246,7 +207,6 @@ public:
 
     /**
      * @brief Constructor using a parameter PID, parameter length and Instance Handle
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      * @param ke Instance Handle to be set
@@ -272,7 +232,7 @@ class ParameterLocator_t : public Parameter_t
 public:
 
     //!Locator
-    rtps::Locator locator;
+    fastrtps::rtps::Locator_t locator;
 
     /**
      * @brief Constructor without parameters
@@ -283,7 +243,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -296,7 +255,6 @@ public:
 
     /**
      * @brief Constructor using a parameter PID, the parameter length and a Locator
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      * @param loc Locator to be set
@@ -304,7 +262,7 @@ public:
     ParameterLocator_t(
             ParameterId_t pid,
             uint16_t in_length,
-            const rtps::Locator& loc)
+            const fastrtps::rtps::Locator_t& loc)
         : Parameter_t(pid, in_length)
         , locator(loc)
     {
@@ -330,7 +288,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -343,7 +300,6 @@ public:
 
     /**
      * @brief Constructor using a parameter PID, the parameter length and a string
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      * @param strin Parameter name
@@ -359,7 +315,6 @@ public:
 
     /**
      * @brief Getter for the name
-     *
      * @return current name associated
      */
     inline const char* getName() const
@@ -369,7 +324,6 @@ public:
 
     /**
      * @brief Setter for the name
-     *
      * @param name String to be set
      */
     inline void setName(
@@ -380,7 +334,6 @@ public:
 
     /**
      * @brief Getter for the name size
-     *
      * @return size_t
      */
     inline size_t size() const
@@ -414,7 +367,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -428,7 +380,6 @@ public:
 
     /**
      * @brief Constructor using a parameter PID, the parameter length and a port
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      * @param po Port to be set
@@ -465,7 +416,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -478,7 +428,6 @@ public:
 
     /**
      * @brief Constructor using a parameter PID, the parameter length and a GUID
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      * @param guidin GUID to be set
@@ -494,7 +443,6 @@ public:
 
     /**
      * @brief Constructor using a parameter PID, the parameter length and a Instance Handle
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      * @param iH Instance Handle to be set as GUID
@@ -505,7 +453,17 @@ public:
             const fastrtps::rtps::InstanceHandle_t& iH)
         : Parameter_t(pid, in_length)
     {
-        fastrtps::rtps::iHandle2GUID(guid, iH);
+        for (uint8_t i = 0; i < 16; ++i)
+        {
+            if (i < 12)
+            {
+                guid.guidPrefix.value[i] = iH.value[i];
+            }
+            else
+            {
+                guid.entityId.value[i - 12] = iH.value[i];
+            }
+        }
     }
 
 };
@@ -532,7 +490,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -568,7 +525,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -604,7 +560,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -618,7 +573,6 @@ public:
 
     /**
      * @brief Setter for the address
-     *
      * @param o1 First octet
      * @param o2 Second octet
      * @param o3 Third octet
@@ -660,7 +614,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -674,7 +627,6 @@ public:
 
     /**
      * @brief Constructor using a parameter PID, the parameter length and a boolean
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      * @param inbool Boolean to be set
@@ -712,7 +664,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -726,7 +677,6 @@ public:
 
     /**
      * @brief Constructor using a parameter PID, the parameter length and status value
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      * @param instatus uint8_t to be set as status
@@ -764,7 +714,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -800,7 +749,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -835,7 +783,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -870,7 +817,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -912,7 +858,6 @@ public:
 
     /**
      * @brief Constructor using a pointer
-     *
      * @param ptr Pointer to be set as data
      */
     explicit ParameterProperty_t(
@@ -923,7 +868,6 @@ public:
 
     /**
      * @brief Getter for the first element in data
-     *
      * @return string with the data
      */
     std::string first() const
@@ -934,7 +878,6 @@ public:
 
     /**
      * @brief Getter for the second element in data
-     *
      * @return string with the data
      */
     std::string second() const
@@ -948,7 +891,6 @@ public:
 
     /**
      * @brief Setter using a pair of strings
-     *
      * @param new_value Pair of strings with the new values
      * @return true if the modification is done correctly and false if the size of the new_value is not valid
      */
@@ -983,7 +925,6 @@ public:
 
     /**
      * @brief Getter that returns a pair of the first and second elements in data
-     *
      * @return Pair of strings with the first and second elements data
      */
     std::pair<const std::string, const std::string> pair() const
@@ -993,7 +934,6 @@ public:
 
     /**
      * @brief Getter for data size
-     *
      * @return uint32_t with the size
      */
     uint32_t size() const
@@ -1023,7 +963,6 @@ private:
 
     /**
      * @brief Getter for the size of a specific octet pointer
-     *
      * @param ptr Octet pointer to measure
      * @return Size of the pointer data
      */
@@ -1039,52 +978,27 @@ private:
 
 /**
  * Parameter property ID for persistence GUID
- *
  * @ingroup PARAMETER_MODULE
  */
 const std::string parameter_property_persistence_guid = "PID_PERSISTENCE_GUID";
 
 /**
  * Parameter property ID for participant type
- *
  * @ingroup PARAMETER_MODULE
  */
 const std::string parameter_property_participant_type = "PARTICIPANT_TYPE";
 
 /**
  * Parameter property ID for Discovery Server version
- *
  * @ingroup PARAMETER_MODULE
  */
 const std::string parameter_property_ds_version = "DS_VERSION";
 
 /**
  * Parameter property value for Discovery Server version
- *
  * @ingroup PARAMETER_MODULE
  */
 const std::string parameter_property_current_ds_version = "2.0";
-
-/**
- * Parameter property value for Host physical data
- *
- * @ingroup PARAMETER_MODULE
- */
-const char* const parameter_policy_physical_data_host = "fastdds.physical_data.host";
-
-/**
- * Parameter property value for User physical data
- *
- * @ingroup PARAMETER_MODULE
- */
-const char* const parameter_policy_physical_data_user = "fastdds.physical_data.user";
-
-/**
- * Parameter property value for Process physical data
- *
- * @ingroup PARAMETER_MODULE
- */
-const char* const parameter_policy_physical_data_process = "fastdds.physical_data.process";
 
 /**
  * @ingroup PARAMETER_MODULE
@@ -1115,7 +1029,6 @@ public:
 
         /**
          * @brief Constructor using an octet pointer
-         *
          * @param ptr Octet pointer to be set
          */
         iterator(
@@ -1150,13 +1063,13 @@ public:
         }
 
         bool operator ==(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ == rhs.ptr_;
         }
 
         bool operator !=(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ != rhs.ptr_;
         }
@@ -1174,7 +1087,6 @@ public:
 
         /**
          * @brief Getter for the pointer
-         *
          * @return the pointer
          */
         fastrtps::rtps::octet* address() const
@@ -1203,7 +1115,6 @@ public:
 
         /**
          * @brief Constructor using a pointer
-         *
          * @param ptr Pointer to be set
          */
         const_iterator(
@@ -1238,13 +1149,13 @@ public:
         }
 
         bool operator ==(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ == rhs.ptr_;
         }
 
         bool operator !=(
-                const self_type& rhs) const
+                const self_type& rhs)
         {
             return ptr_ != rhs.ptr_;
         }
@@ -1262,7 +1173,6 @@ public:
 
         /**
          * @brief Getter for the pointer
-         *
          * @return the pointer
          */
         const fastrtps::rtps::octet* address() const
@@ -1293,7 +1203,6 @@ public:
 
     /**
      * Constructor with a defined maximum size
-     *
      * @param size Size to be set as maximum
      */
     ParameterPropertyList_t(
@@ -1307,23 +1216,19 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
-     * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
     ParameterPropertyList_t(
-            ParameterId_t pid,
+            ParameterId_t /*pid*/,
             uint16_t in_length)
         : Parameter_t(PID_PROPERTY_LIST, in_length)
         , Nproperties_ (0)
         , limit_size_ (false)
     {
-        static_cast<void>(pid);
     }
 
     /**
      * @brief Constructor using a Parameter Property List
-     *
      * @param parameter_properties Properties to be set
      */
     ParameterPropertyList_t(
@@ -1353,7 +1258,6 @@ public:
 
     /**
      * @brief Getter for the first position of the ParameterPropertyList
-     *
      * @return iterator
      */
     iterator begin()
@@ -1363,7 +1267,6 @@ public:
 
     /**
      * @brief Getter for the end of the ParameterPropertyList
-     *
      * @return iterator
      */
     iterator end()
@@ -1373,7 +1276,6 @@ public:
 
     /**
      * @brief Getter for the first position of the ParameterPropertyList
-     *
      * @return const_iterator
      */
     const_iterator begin() const
@@ -1383,7 +1285,6 @@ public:
 
     /**
      * @brief Getter for the end of the ParameterPropertyList
-     *
      * @return const_iterator
      */
     const_iterator end() const
@@ -1393,38 +1294,37 @@ public:
 
     /**
      * @brief Introduce a new property in the ParameterPropertyList
-     *
      * @param p Pair with the values of the new property
      * @return true if it is introduced, false if not.
      */
     bool push_back(
             std::pair<std::string, std::string> p)
     {
-        return push_back(p.first, p.second);
+        //Realloc if needed;
+        uint32_t size1 = (uint32_t) p.first.length() + 1;
+        uint32_t alignment1 = ((size1 + 3u) & ~3u) - size1;
+
+        uint32_t size2 = (uint32_t) p.second.length() + 1;
+        uint32_t alignment2 = ((size2 + 3u) & ~3u) - size2;
+
+        if (limit_size_ && (properties_.max_size < properties_.length +
+                size1 + alignment1 + 4 +
+                size2 + alignment2 + 4))
+        {
+            return false;
+        }
+        properties_.reserve(properties_.length +
+                size1 + alignment1 + 4 +
+                size2 + alignment2 + 4);
+
+        push_back_helper((fastrtps::rtps::octet*)p.first.c_str(), size1, alignment1);
+        push_back_helper((fastrtps::rtps::octet*)p.second.c_str(), size2, alignment2);
+        ++Nproperties_;
+        return true;
     }
 
     /**
      * @brief Introduce a new property in the ParameterPropertyList
-     *
-     * @param key Key part of the new property
-     * @param value Value part of the new property
-     * @return true if it is introduced, false if not.
-     */
-    bool push_back(
-            const std::string& key,
-            const std::string& value)
-    {
-        auto str1 = reinterpret_cast<const unsigned char*>(key.c_str());
-        uint32_t size1 = (uint32_t) key.length() + 1;
-        auto str2 = reinterpret_cast<const unsigned char*>(value.c_str());
-        uint32_t size2 = (uint32_t) value.length() + 1;
-
-        return push_back(str1, size1, str2, size2);
-    }
-
-    /**
-     * @brief Introduce a new property in the ParameterPropertyList
-     *
      * @param str1 Name of the property
      * @param str1_size Size of the first string
      * @param str2 Value of the property
@@ -1459,7 +1359,6 @@ public:
 
     /**
      * @brief Setter of a new property value on a specific position
-     *
      * @param pos Iterator with the position of the property to be changed
      * @param new_value Value to be set
      * @return true if changed, false if not
@@ -1482,7 +1381,6 @@ public:
 
     /**
      * @brief Getter for the size of the ParameterPropertyList
-     *
      * @return uint32_t with the size
      */
     uint32_t size() const
@@ -1502,7 +1400,6 @@ public:
 
     /**
      * @brief Getter for the maximum size of the ParameterPropertyList
-     *
      * @return uint32_t with the size
      */
     uint32_t max_size ()
@@ -1554,7 +1451,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -1568,7 +1464,6 @@ public:
 
     /**
      * Add the parameter to a CDRMessage_t message.
-     *
      * @param[in,out] msg Pointer to the message where the parameter should be added.
      * @return True if the parameter was correctly added.
      */
@@ -1577,7 +1472,6 @@ public:
 
     /**
      * Read the parameter from a CDRMessage_t message.
-     *
      * @param[in,out] msg Pointer to the message from where the parameter should be taken.
      * @param size Size of the parameter field to read
      * @return True if the parameter was correctly taken.
@@ -1612,7 +1506,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -1652,7 +1545,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -1690,7 +1582,6 @@ public:
 
     /**
      * Constructor using a parameter PID and the parameter length
-     *
      * @param pid Pid of the parameter
      * @param in_length Its associated length
      */
@@ -1744,7 +1635,7 @@ void set_proxy_property(
     else
     {
         // if not exists add
-        properties.push_back(pair.first, pair.second);
+        properties.push_back(pair);
     }
 }
 

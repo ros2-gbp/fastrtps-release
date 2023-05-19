@@ -13,9 +13,9 @@
 # limitations under the License.
 
 """
-Sub-Command Clean implementation.
+    Sub-Command Clean implementation.
 
-This sub-command finds and remove unused shared-memory files.
+    This sub-command finds and remove unused shared-memory files.
 
 """
 
@@ -80,7 +80,7 @@ class Clean:
         """Return a list of files in the default SHM dir."""
         try:
             return os.listdir(self.__shm_dir())
-        except FileNotFoundError:
+        except BaseException:
             return []
 
     def __clean_zombie_segments(self):
@@ -111,7 +111,7 @@ class Clean:
                 f = [segment_file, lock_file]
                 zombie_files += f
             else:
-                self.__segments_in_use += 1
+                self.segments_in_use += 1
 
         return zombie_files
 
@@ -146,7 +146,7 @@ class Clean:
                 zombie_files += [
                     port_lock_file, port_segment_file, port_mutex_file]
             else:
-                self.__ports_in_use += 1
+                self.ports_in_use += 1
 
         return [self.__shm_dir() / file_name for file_name in zombie_files]
 
@@ -172,13 +172,13 @@ class Clean:
 
         Always return void, even if the function fails.
 
-        param file str:
+        param file str: 
             The complete file_path
 
         """
         try:
             os.remove(file)
-        except OSError:
+        except BaseException:
             pass
 
     def __is_file_locked(self, file):
@@ -201,5 +201,5 @@ class Clean:
                     overlapped = pywintypes.OVERLAPPED()
                     win32file.LockFileEx(h_file, mode, 0, -0x10000, overlapped)
             return False
-        except OSError:
+        except BaseException:
             return True

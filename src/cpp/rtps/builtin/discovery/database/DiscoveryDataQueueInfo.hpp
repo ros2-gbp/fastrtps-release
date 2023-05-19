@@ -21,7 +21,7 @@
 #include <fastrtps/utils/fixed_size_string.hpp>
 #include <fastdds/rtps/common/Guid.h>
 
-#include <rtps/builtin/discovery/database/DiscoveryParticipantChangeData.hpp>
+#include "./DiscoveryParticipantChangeData.hpp"
 
 
 namespace eprosima {
@@ -60,7 +60,7 @@ public:
 
     DiscoveryPDPDataQueueInfo(
             eprosima::fastrtps::rtps::CacheChange_t* change,
-            const DiscoveryParticipantChangeData& participant_change_data)
+            DiscoveryParticipantChangeData participant_change_data)
         : DiscoveryDataQueueInfo(change)
         , participant_change_data_(participant_change_data)
     {
@@ -77,7 +77,7 @@ public:
 
 private:
 
-    const DiscoveryParticipantChangeData participant_change_data_;
+    DiscoveryParticipantChangeData participant_change_data_;
 
 };
 
@@ -87,7 +87,7 @@ public:
 
     DiscoveryEDPDataQueueInfo(
             eprosima::fastrtps::rtps::CacheChange_t* change,
-            const eprosima::fastrtps::string_255& topic)
+            eprosima::fastrtps::string_255 topic)
         : DiscoveryDataQueueInfo(change)
         , topic_(topic)
     {
@@ -104,7 +104,7 @@ public:
 
 private:
 
-    const eprosima::fastrtps::string_255 topic_;
+    eprosima::fastrtps::string_255 topic_;
 
 };
 

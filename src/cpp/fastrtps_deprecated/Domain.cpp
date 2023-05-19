@@ -18,29 +18,28 @@
  */
 
 #include <fastrtps/Domain.h>
-
-#include <chrono>
-#include <thread>
-
-#include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/RTPSDomain.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 
 #include <fastrtps/participant/Participant.h>
-#include <fastrtps/publisher/Publisher.h>
-#include <fastrtps/subscriber/Subscriber.h>
-#include <fastrtps/types/DynamicDataFactory.h>
-#include <fastrtps/types/DynamicPubSubType.h>
-#include <fastrtps/types/DynamicType.h>
-#include <fastrtps/types/DynamicTypeBuilderFactory.h>
-#include <fastrtps/types/DynamicTypeMember.h>
-#include <fastrtps/types/TypeObjectFactory.h>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-
 #include <fastrtps_deprecated/participant/ParticipantImpl.h>
 
-#include <rtps/RTPSDomainImpl.hpp>
-#include <utils/SystemInfo.hpp>
+#include <fastrtps/publisher/Publisher.h>
+#include <fastrtps/subscriber/Subscriber.h>
+
+#include <fastdds/dds/log/Log.hpp>
+
+#include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include <fastrtps/types/DynamicPubSubType.h>
+#include <fastrtps/types/DynamicType.h>
+#include <fastrtps/types/DynamicTypeMember.h>
+#include <fastrtps/types/DynamicTypeBuilderFactory.h>
+#include <fastrtps/types/DynamicDataFactory.h>
+#include <fastrtps/types/TypeObjectFactory.h>
+
+#include <chrono>
+#include <thread>
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::xmlparser;
@@ -150,7 +149,6 @@ Participant* Domain::createParticipant(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -158,7 +156,7 @@ Participant* Domain::createParticipant(
     ParticipantAttributes participant_att;
     if ( XMLP_ret::XML_ERROR == XMLProfileManager::fillParticipantAttributes(participant_profile, participant_att))
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Problem loading profile '" << participant_profile << "'");
+        logError(PARTICIPANT, "Problem loading profile '" << participant_profile << "'");
         return nullptr;
     }
 
@@ -169,18 +167,12 @@ Participant* Domain::createParticipant(
         const eprosima::fastrtps::ParticipantAttributes& att,
         ParticipantListener* listen)
 {
-    // If the user is not using XML and the environment variable is not set, this is going to be called always
-    if (!default_xml_profiles_loaded && SystemInfo::get_environment_file().empty())
-    {
-        SystemInfo::set_environment_file();
-    }
-
     Participant* pubsubpar = new Participant();
     ParticipantImpl* pspartimpl = new ParticipantImpl(att, pubsubpar, listen);
 
     // If DEFAULT_ROS2_MASTER_URI is specified then try to create default client if
     // that already exists.
-    RTPSParticipant* part = RTPSDomainImpl::clientServerEnvironmentCreationOverride(
+    RTPSParticipant* part = RTPSDomain::clientServerEnvironmentCreationOverride(
         att.domainId,
         false,
         att.rtps,
@@ -194,7 +186,7 @@ Participant* Domain::createParticipant(
 
     if (part == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PARTICIPANT, "Problem creating RTPSParticipant");
+        logError(PARTICIPANT, "Problem creating RTPSParticipant");
         delete pspartimpl;
         return nullptr;
     }
@@ -220,7 +212,6 @@ void Domain::getDefaultParticipantAttributes(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -236,7 +227,7 @@ Publisher* Domain::createPublisher(
     PublisherAttributes publisher_att;
     if ( XMLP_ret::XML_ERROR == XMLProfileManager::fillPublisherAttributes(publisher_profile, publisher_att))
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Problem loading profile '" << publisher_profile << "'");
+        logError(PUBLISHER, "Problem loading profile '" << publisher_profile << "'");
         return nullptr;
     }
 
@@ -265,7 +256,6 @@ void Domain::getDefaultPublisherAttributes(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -278,7 +268,6 @@ void Domain::getDefaultSubscriberAttributes(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
@@ -294,7 +283,7 @@ Subscriber* Domain::createSubscriber(
     SubscriberAttributes subscriber_att;
     if ( XMLP_ret::XML_ERROR == XMLProfileManager::fillSubscriberAttributes(subscriber_profile, subscriber_att))
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Problem loading profile '" << subscriber_profile << "'");
+        logError(PUBLISHER, "Problem loading profile '" << subscriber_profile << "'");
         return nullptr;
     }
 
@@ -377,7 +366,7 @@ bool Domain::registerDynamicType(
         const TypeObject* type_obj = typeFactory->get_type_object(type->getName());
         if (type_id2 == nullptr)
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES, "Cannot register dynamic type " << type->getName());
+            logError(DYN_TYPES, "Cannot register dynamic type " << type->getName());
         }
         else
         {
@@ -414,32 +403,13 @@ bool Domain::loadXMLProfilesFile(
 {
     if (false == default_xml_profiles_loaded)
     {
-        SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
         default_xml_profiles_loaded = true;
     }
 
     if ( XMLP_ret::XML_ERROR == XMLProfileManager::loadXMLFile(xml_profile_file))
     {
-        EPROSIMA_LOG_ERROR(DOMAIN, "Problem loading XML file '" << xml_profile_file << "'");
-        return false;
-    }
-    return true;
-}
-
-bool Domain::loadXMLProfilesString(
-        const char* data,
-        size_t length)
-{
-    if (false == default_xml_profiles_loaded)
-    {
-        XMLProfileManager::loadDefaultXMLFile();
-        default_xml_profiles_loaded = true;
-    }
-
-    if ( XMLP_ret::XML_ERROR == XMLProfileManager::loadXMLString(data, length))
-    {
-        EPROSIMA_LOG_ERROR(DOMAIN, "Problem loading XML string");
+        logError(DOMAIN, "Problem loading XML file '" << xml_profile_file << "'");
         return false;
     }
     return true;

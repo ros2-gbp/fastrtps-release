@@ -22,12 +22,10 @@
 #include <gtest/gtest.h>
 
 #include <fastrtps/utils/TimeConversion.h>
-#include <rtps/transport/test_UDPv4Transport.h>
+#include <fastrtps/transport/test_UDPv4Transport.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
-using test_UDPv4Transport = eprosima::fastdds::rtps::test_UDPv4Transport;
-using test_UDPv4TransportDescriptor = eprosima::fastdds::rtps::test_UDPv4TransportDescriptor;
 
 TEST(AcknackQos, RecoverAfterLosingCommunicationWithDisablePositiveAck)
 {
@@ -36,8 +34,8 @@ TEST(AcknackQos, RecoverAfterLosingCommunicationWithDisablePositiveAck)
     // Then disconnects the communication and sends some more samples.
     // Reconnects and checks that the reader receives only the lost samples by the disconnection.
 
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Number of samples written by writer
     uint32_t writer_samples = 15;
@@ -102,8 +100,8 @@ TEST(AcknackQos, NotRecoverAfterLosingCommunicationWithDisablePositiveAck)
     // Then disconnects the communication and sends some more samples.
     // Reconnects and checks that the reader receives only the lost samples by the disconnection.
 
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
     // Number of samples written by writer
     uint32_t writer_samples = 15;
@@ -159,38 +157,4 @@ TEST(AcknackQos, NotRecoverAfterLosingCommunicationWithDisablePositiveAck)
 
     // Block reader until reception finished or timeout.
     ASSERT_EQ(reader.block_for_all(std::chrono::seconds(1)), 0u);
-}
-
-/*!
- * @test Regresion test for Github #3323.
- */
-TEST(AcknackQos, DisablePositiveAcksWithBestEffortReader)
-{
-    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
-
-    writer.keep_duration({2, 0});
-    writer.reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS);
-    writer.durability_kind(eprosima::fastrtps::VOLATILE_DURABILITY_QOS);
-    writer.init();
-
-    reader.keep_duration({1, 0});
-    reader.reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS);
-    reader.init();
-
-    ASSERT_TRUE(reader.isInitialized());
-    ASSERT_TRUE(writer.isInitialized());
-
-    // Wait for discovery.
-    writer.wait_discovery();
-    reader.wait_discovery();
-
-    std::list<HelloWorld> data = default_helloworld_data_generator();
-    reader.startReception(data);
-    // Send data
-    writer.send(data);
-    // In this test all data should be sent.
-    ASSERT_TRUE(data.empty());
-    // Block reader until reception finished or timeout.
-    reader.block_for_all();
 }

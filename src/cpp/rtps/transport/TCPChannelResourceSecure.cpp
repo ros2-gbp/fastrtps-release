@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/TCPChannelResourceSecure.h>
+#include <fastdds/rtps/transport/TCPChannelResourceSecure.h>
+#include <fastdds/rtps/transport/TCPTransportInterface.h>
+#include <fastrtps/utils/IPLocator.h>
 
 #include <future>
 #include <chrono>
-
-#include <fastrtps/utils/IPLocator.h>
-#include <rtps/transport/TCPTransportInterface.h>
 
 namespace eprosima {
 namespace fastdds {
@@ -59,7 +58,6 @@ TCPChannelResourceSecure::TCPChannelResourceSecure(
     , secure_socket_(socket)
 {
     set_tls_verify_mode(parent->configuration());
-    set_tls_sni(parent->configuration());
 }
 
 TCPChannelResourceSecure::~TCPChannelResourceSecure()
@@ -81,77 +79,75 @@ void TCPChannelResourceSecure::connect(
             ip::tcp::resolver resolver(service_);
 
             auto endpoints = resolver.resolve({
-                            IPLocator::hasWan(locator_) ? IPLocator::toWanstring(locator_) : IPLocator::ip_to_string(
-                                locator_),
-                            std::to_string(IPLocator::getPhysicalPort(locator_))});
+                IPLocator::hasWan(locator_) ? IPLocator::toWanstring(locator_) : IPLocator::ip_to_string(locator_),
+                std::to_string(IPLocator::getPhysicalPort(locator_))});
 
             TCPTransportInterface* parent = parent_;
             secure_socket_ = std::make_shared<asio::ssl::stream<asio::ip::tcp::socket>>(service_, ssl_context_);
             set_tls_verify_mode(parent->configuration());
-            set_tls_sni(parent->configuration());
             std::weak_ptr<TCPChannelResource> channel_weak_ptr = myself;
             const auto secure_socket = secure_socket_;
 
             asio::async_connect(secure_socket_->lowest_layer(), endpoints,
-                    [secure_socket, channel_weak_ptr, parent](const std::error_code& error
+                [secure_socket, channel_weak_ptr, parent](const std::error_code& error
 #if ASIO_VERSION >= 101200
                     , ip::tcp::endpoint
 #else
                     , const tcp::resolver::iterator& /*endpoint*/
-#endif // if ASIO_VERSION >= 101200
+#endif
                     )
+            {
+                if (!error)
+                {
+                    ssl::stream_base::handshake_type role = ssl::stream_base::client;
+                    if (parent->configuration()->tls_config.handshake_role == TLSHSRole::SERVER)
+                    {
+                        role = ssl::stream_base::server;
+                    }
+
+                    secure_socket->async_handshake(role,
+                        [channel_weak_ptr, parent](const std::error_code& error)
                     {
                         if (!error)
                         {
-                            ssl::stream_base::handshake_type role = ssl::stream_base::client;
-                            if (parent->configuration()->tls_config.handshake_role == TLSHSRole::SERVER)
-                            {
-                                role = ssl::stream_base::server;
-                            }
-
-                            secure_socket->async_handshake(role,
-                            [channel_weak_ptr, parent](const std::error_code& error)
-                            {
-                                if (!error)
-                                {
-                                    parent->SocketConnected(channel_weak_ptr, error);
-                                }
-                                else
-                                {
-                                    EPROSIMA_LOG_ERROR(RTCP_TLS, "Handshake failed: " << error.message());
-                                    std::this_thread::sleep_for(std::chrono::seconds(5)); // Retry, but after a big while
-                                    parent->SocketConnected(channel_weak_ptr, error);
-                                }
-                            });
+                            parent->SocketConnected(channel_weak_ptr, error);
                         }
                         else
                         {
-                            //EPROSIMA_LOG_ERROR(RTCP_TLS, "Connect failed: " << error.message());
-                            parent->SocketConnected(channel_weak_ptr, error); // Manages errors and retries
+                            logError(RTCP_TLS, "Handshake failed: " << error.message());
+                            std::this_thread::sleep_for(std::chrono::seconds(5)); // Retry, but after a big while
+                            parent->SocketConnected(channel_weak_ptr, error);
                         }
                     });
+                }
+                else
+                {
+                    //logError(RTCP_TLS, "Connect failed: " << error.message());
+                    parent->SocketConnected(channel_weak_ptr, error); // Manages errors and retries
+                }
+            });
         }
-        catch (const std::system_error& error)
+        catch(const std::system_error &error)
         {
-            EPROSIMA_LOG_ERROR(RTCP, "Openning socket " << error.what());
+            logError(RTCP, "Openning socket " << error.what());
         }
     }
 }
 
 void TCPChannelResourceSecure::disconnect()
 {
-    if (eConnecting < change_status(eConnectionStatus::eDisconnected) && alive())
+    if (eConnecting < change_status(eConnectionStatus::eDisconnected) && alive() )
     {
         auto socket = secure_socket_;
 
         service_.post([&, socket]()
-                {
-                    std::error_code ec;
-                    socket->lowest_layer().close(ec);
-                    socket->async_shutdown([&, socket](const std::error_code&)
-                    {
-                    });
-                });
+        {
+            std::error_code ec;
+            socket->lowest_layer().close(ec);
+            socket->async_shutdown([&, socket](const std::error_code&)
+            {
+            });
+        });
     }
 }
 
@@ -169,29 +165,29 @@ uint32_t TCPChannelResourceSecure::read(
         auto socket = secure_socket_;
 
         strand_read_.post([&, socket]()
-                {
-                    if (socket->lowest_layer().is_open())
+        {
+            if(socket->lowest_layer().is_open())
+            {
+                asio::async_read(*socket, asio::buffer(buffer, size), asio::transfer_exactly(size),
+                    [&, socket](const std::error_code& error, const size_t bytes_transferred)
                     {
-                        asio::async_read(*socket, asio::buffer(buffer, size), asio::transfer_exactly(size),
-                        [&, socket](const std::error_code& error, const size_t bytes_transferred)
-                        {
-                            ec = error;
+                        ec = error;
 
-                            if (!error)
-                            {
-                                read_bytes_promise.set_value(bytes_transferred);
-                            }
-                            else
-                            {
-                                read_bytes_promise.set_value(0);
-                            }
-                        });
-                    }
-                    else
-                    {
-                        read_bytes_promise.set_value(0);
-                    }
-                });
+                        if (!error)
+                        {
+                            read_bytes_promise.set_value(bytes_transferred);
+                        }
+                        else
+                        {
+                            read_bytes_promise.set_value(0);
+                        }
+                    });
+            }
+            else
+            {
+                read_bytes_promise.set_value(0);
+            }
+        });
         bytes_read = bytes_future.get();
     }
 
@@ -210,7 +206,7 @@ size_t TCPChannelResourceSecure::send(
     if (eConnecting < connection_status_)
     {
         std::vector<asio::const_buffer> buffers;
-        if (header_size > 0)
+        if(header_size > 0)
         {
             buffers.push_back(asio::buffer(header, header_size));
         }
@@ -222,11 +218,15 @@ size_t TCPChannelResourceSecure::send(
         auto socket = secure_socket_;
 
         strand_write_.post([&, socket]()
-                {
-                    if (socket->lowest_layer().is_open())
+        {
+            if(socket->lowest_layer().is_open())
+            {
+                asio::async_write(*socket, buffers,
+                    [&, socket](const std::error_code& error, const size_t& bytes_transferred)
                     {
-                        size_t bytes_transferred = asio::write(*socket, buffers, ec);
-                        if (!ec)
+                        ec = error;
+
+                        if (!error)
                         {
                             write_bytes_promise.set_value(bytes_transferred);
                         }
@@ -234,13 +234,14 @@ size_t TCPChannelResourceSecure::send(
                         {
                             write_bytes_promise.set_value(0);
                         }
-                    }
-                    else
-                    {
-                        write_bytes_promise.set_value(0);
-                    }
+                    });
+            }
+            else
+            {
+                write_bytes_promise.set_value(0);
+            }
 
-                });
+        });
         bytes_sent = bytes_future.get();
     }
 
@@ -257,16 +258,14 @@ asio::ip::tcp::endpoint TCPChannelResourceSecure::local_endpoint() const
     return secure_socket_->lowest_layer().local_endpoint();
 }
 
-void TCPChannelResourceSecure::set_options(
-        const TCPTransportDescriptor* options)
+void TCPChannelResourceSecure::set_options(const TCPTransportDescriptor* options)
 {
     secure_socket_->lowest_layer().set_option(socket_base::receive_buffer_size(options->receiveBufferSize));
     secure_socket_->lowest_layer().set_option(socket_base::send_buffer_size(options->sendBufferSize));
     secure_socket_->lowest_layer().set_option(ip::tcp::no_delay(options->enable_tcp_nodelay));
 }
 
-void TCPChannelResourceSecure::set_tls_verify_mode(
-        const TCPTransportDescriptor* options)
+void TCPChannelResourceSecure::set_tls_verify_mode(const TCPTransportDescriptor* options)
 {
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
 
@@ -293,20 +292,6 @@ void TCPChannelResourceSecure::set_tls_verify_mode(
             }
             secure_socket_->set_verify_mode(vm);
         }
-
-    }
-}
-
-void TCPChannelResourceSecure::set_tls_sni(
-        const TCPTransportDescriptor* options)
-{
-    if (options->apply_security)
-    {
-        if (!options->tls_config.server_name.empty())
-        {
-            // This is not done through asio because it seems it is not supported, so call directly to OpenSSL
-            SSL_set_tlsext_host_name(secure_socket_->native_handle(), options->tls_config.server_name.c_str());
-        }
     }
 }
 
@@ -320,8 +305,7 @@ void TCPChannelResourceSecure::close()
     secure_socket_->lowest_layer().close();
 }
 
-void TCPChannelResourceSecure::shutdown(
-        asio::socket_base::shutdown_type)
+void TCPChannelResourceSecure::shutdown(asio::socket_base::shutdown_type)
 {
     secure_socket_->shutdown();
 }

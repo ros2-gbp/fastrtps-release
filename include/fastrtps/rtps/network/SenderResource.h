@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _FASTRTPS_RTPS_NETWORK_SENDERRESOURCE_H_
-#define _FASTRTPS_RTPS_NETWORK_SENDERRESOURCE_H_
+#ifndef SENDER_RESOURCE_H
+#define SENDER_RESOURCE_H
 
-#include <fastdds/rtps/transport/SenderResource.h>
+#include <fastdds/rtps/network/SenderResource.h>
 
-#endif /* _FASTRTPS_RTPS_NETWORK_SENDERRESOURCE_H_*/
+#endif

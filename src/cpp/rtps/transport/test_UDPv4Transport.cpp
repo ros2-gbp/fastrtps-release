@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/test_UDPv4Transport.h>
-
+#include <asio.hpp>
+#include <fastdds/rtps/transport/test_UDPv4Transport.h>
 #include <cstdlib>
 #include <functional>
-
-#include <asio.hpp>
-#include <fastrtps/utils/IPLocator.h>
 
 using namespace std;
 
@@ -27,20 +24,17 @@ namespace fastdds {
 namespace rtps {
 
 using octet = fastrtps::rtps::octet;
+using Locator_t = fastrtps::rtps::Locator_t;
 using CDRMessage_t = fastrtps::rtps::CDRMessage_t;
 using SubmessageHeader_t = fastrtps::rtps::SubmessageHeader_t;
 using SequenceNumber_t = fastrtps::rtps::SequenceNumber_t;
 using EntityId_t = fastrtps::rtps::EntityId_t;
 
 std::vector<std::vector<octet>> test_UDPv4Transport::test_UDPv4Transport_DropLog;
-std::atomic<uint32_t> test_UDPv4Transport::test_UDPv4Transport_DropLogLength(0);
-std::atomic<bool> test_UDPv4Transport::test_UDPv4Transport_ShutdownAllNetwork(false);
-std::atomic<bool> test_UDPv4Transport::always_drop_participant_builtin_topic_data(false);
-std::atomic<bool> test_UDPv4Transport::simulate_no_interfaces(false);
-test_UDPv4TransportDescriptor::DestinationLocatorFilter test_UDPv4Transport::locator_filter([](const Locator&)
-        {
-            return false;
-        });
+uint32_t test_UDPv4Transport::test_UDPv4Transport_DropLogLength = 0;
+bool test_UDPv4Transport::test_UDPv4Transport_ShutdownAllNetwork = false;
+bool test_UDPv4Transport::always_drop_participant_builtin_topic_data = false;
+bool test_UDPv4Transport::simulate_no_interfaces = false;
 
 test_UDPv4Transport::test_UDPv4Transport(
         const test_UDPv4TransportDescriptor& descriptor)
@@ -60,7 +54,6 @@ test_UDPv4Transport::test_UDPv4Transport(
     , percentage_of_messages_to_drop_(descriptor.percentageOfMessagesToDrop)
     , messages_filter_(descriptor.messages_filter_)
     , sequence_number_data_messages_to_drop_(descriptor.sequenceNumberDataMessagesToDrop)
-    , locator_filter_(descriptor.locator_filter_)
 {
     test_UDPv4Transport_DropLogLength = 0;
     test_UDPv4Transport_ShutdownAllNetwork = false;
@@ -80,64 +73,43 @@ test_UDPv4TransportDescriptor::test_UDPv4TransportDescriptor()
     , drop_data_messages_filter_([](CDRMessage_t&)
             {
                 return false;
-            })
-    , dropParticipantBuiltinTopicData(false)
-    , dropPublicationBuiltinTopicData(false)
-    , dropSubscriptionBuiltinTopicData(false)
-    , dropDataFragMessagesPercentage(0)
-    , drop_data_frag_messages_filter_([](CDRMessage_t&)
+            }),
+    dropParticipantBuiltinTopicData(false),
+    dropPublicationBuiltinTopicData(false),
+    dropSubscriptionBuiltinTopicData(false),
+    dropDataFragMessagesPercentage(0),
+    drop_data_frag_messages_filter_([](CDRMessage_t&)
             {
                 return false;
-            })
-    , dropHeartbeatMessagesPercentage(0)
-    , drop_heartbeat_messages_filter_([](CDRMessage_t&)
+            }),
+    dropHeartbeatMessagesPercentage(0),
+    drop_heartbeat_messages_filter_([](CDRMessage_t&)
             {
                 return false;
-            })
-    , dropAckNackMessagesPercentage(0)
-    , drop_ack_nack_messages_filter_([](CDRMessage_t&)
+            }),
+    dropAckNackMessagesPercentage(0),
+    drop_ack_nack_messages_filter_([](CDRMessage_t&)
             {
                 return false;
-            })
-    , dropGapMessagesPercentage(0)
-    , drop_gap_messages_filter_([](CDRMessage_t&)
+            }),
+    dropGapMessagesPercentage(0),
+    drop_gap_messages_filter_([](CDRMessage_t&)
             {
                 return false;
-            })
-    , percentageOfMessagesToDrop(0)
-    , messages_filter_([](CDRMessage_t&)
+            }),
+    percentageOfMessagesToDrop(0),
+    messages_filter_([](CDRMessage_t&)
             {
                 return false;
-            })
-    , locator_filter_([](const Locator&)
-            {
-                return false;
-            })
-    , sequenceNumberDataMessagesToDrop()
-    , dropLogLength(0)
+            }),
+    sequenceNumberDataMessagesToDrop(),
+    dropLogLength(0)
 {
 }
 
 TransportInterface* test_UDPv4TransportDescriptor::create_transport() const
 {
     return new test_UDPv4Transport(*this);
-}
-
-bool test_UDPv4TransportDescriptor::operator ==(
-        const test_UDPv4TransportDescriptor& t) const
-{
-    return (this->dropDataMessagesPercentage == t.dropDataMessagesPercentage &&
-           this->dropParticipantBuiltinTopicData == t.dropParticipantBuiltinTopicData &&
-           this->dropPublicationBuiltinTopicData == t.dropPublicationBuiltinTopicData &&
-           this->dropSubscriptionBuiltinTopicData == t.dropSubscriptionBuiltinTopicData &&
-           this->dropDataFragMessagesPercentage == t.dropDataFragMessagesPercentage &&
-           this->dropHeartbeatMessagesPercentage == t.dropHeartbeatMessagesPercentage &&
-           this->dropAckNackMessagesPercentage == t.dropAckNackMessagesPercentage &&
-           this->dropGapMessagesPercentage == t.dropGapMessagesPercentage &&
-           this->percentageOfMessagesToDrop == t.percentageOfMessagesToDrop &&
-           this->sequenceNumberDataMessagesToDrop == t.sequenceNumberDataMessagesToDrop &&
-           this->dropLogLength == t.dropLogLength &&
-           SocketTransportDescriptor::operator ==(t));
 }
 
 void test_UDPv4Transport::get_ips(
@@ -163,28 +135,6 @@ void test_UDPv4Transport::get_ips(
     }
 }
 
-LocatorList test_UDPv4Transport::NormalizeLocator(
-        const Locator& locator)
-{
-    if (!simulate_no_interfaces)
-    {
-        return UDPv4Transport::NormalizeLocator(locator);
-    }
-
-    LocatorList list;
-    if (fastrtps::rtps::IPLocator::isAny(locator))
-    {
-        Locator newloc(locator);
-        fastrtps::rtps::IPLocator::setIPv4(newloc, "127.0.0.1");
-        list.push_back(newloc);
-    }
-    else
-    {
-        list.push_back(locator);
-    }
-    return list;
-}
-
 bool test_UDPv4Transport::send(
         const octet* send_buffer,
         uint32_t send_buffer_size,
@@ -192,7 +142,6 @@ bool test_UDPv4Transport::send(
         fastrtps::rtps::LocatorsIterator* destination_locators_begin,
         fastrtps::rtps::LocatorsIterator* destination_locators_end,
         bool only_multicast_purpose,
-        bool whitelisted,
         const std::chrono::steady_clock::time_point& max_blocking_time_point)
 {
     fastrtps::rtps::LocatorsIterator& it = *destination_locators_begin;
@@ -210,7 +159,6 @@ bool test_UDPv4Transport::send(
                             socket,
                             *it,
                             only_multicast_purpose,
-                            whitelisted,
                             std::chrono::duration_cast<std::chrono::microseconds>(now - max_blocking_time_point));
 
             ++it;
@@ -229,28 +177,20 @@ bool test_UDPv4Transport::send(
         const octet* send_buffer,
         uint32_t send_buffer_size,
         eProsimaUDPSocket& socket,
-        const Locator& remote_locator,
+        const Locator_t& remote_locator,
         bool only_multicast_purpose,
-        bool whitelisted,
         const std::chrono::microseconds& timeout)
 {
-    bool is_multicast_remote_address = fastrtps::rtps::IPLocator::IPLocator::isMulticast(remote_locator);
-    if (is_multicast_remote_address == only_multicast_purpose || whitelisted)
+    if (packet_should_drop(send_buffer, send_buffer_size))
     {
-        if (packet_should_drop(send_buffer, send_buffer_size) || should_drop_locator(remote_locator))
-        {
-            statistics_info_.set_statistics_message_data(remote_locator, send_buffer, send_buffer_size);
-            log_drop(send_buffer, send_buffer_size);
-            return true;
-        }
-        else
-        {
-            return UDPv4Transport::send(send_buffer, send_buffer_size, socket, remote_locator, only_multicast_purpose,
-                           whitelisted, timeout);
-        }
+        log_drop(send_buffer, send_buffer_size);
+        return true;
     }
-
-    return false;
+    else
+    {
+        return UDPv4Transport::send(send_buffer, send_buffer_size, socket, remote_locator, only_multicast_purpose,
+                       timeout);
+    }
 }
 
 static bool ReadSubmessageHeader(
@@ -287,17 +227,6 @@ static bool ReadSubmessageHeader(
     return true;
 }
 
-bool test_UDPv4Transport::should_drop_locator(
-        const Locator& remote_locator)
-{
-    return locator_filter(remote_locator) ||
-           locator_filter_(remote_locator) ||
-           // If there are no interfaces (simulate_no_interfaces), only multicast and localhost traffic is sent
-           (simulate_no_interfaces &&
-           !fastrtps::rtps::IPLocator::isMulticast(remote_locator) &&
-           !fastrtps::rtps::IPLocator::isLocal(remote_locator));
-}
-
 bool test_UDPv4Transport::packet_should_drop(
         const octet* send_buffer,
         uint32_t send_buffer_size)
@@ -307,8 +236,8 @@ bool test_UDPv4Transport::packet_should_drop(
         return true;
     }
 
-    CDRMessage_t cdrMessage(0);
-    cdrMessage.init(const_cast<octet*>(send_buffer), send_buffer_size);
+    CDRMessage_t cdrMessage(send_buffer_size);
+    memcpy(cdrMessage.buffer, send_buffer, send_buffer_size);
     cdrMessage.length = send_buffer_size;
 
     if (cdrMessage.length < RTPSMESSAGE_HEADER_SIZE)
@@ -355,35 +284,26 @@ bool test_UDPv4Transport::packet_should_drop(
                     {
                         return true;
                     }
-                    else if (drop_participant_builtin_topic_data_)
+                    else if (!drop_participant_builtin_topic_data_)
                     {
-                        return true;
+                        return false;
                     }
                 }
-                else if (writer_id == fastrtps::rtps::c_EntityId_SEDPPubWriter)
+                else if ((!drop_publication_builtin_topic_data_ &&
+                        writer_id == fastrtps::rtps::c_EntityId_SEDPPubWriter) ||
+                        (!drop_subscription_builtin_topic_data_ &&
+                        writer_id == fastrtps::rtps::c_EntityId_SEDPSubWriter))
                 {
-                    if (drop_publication_builtin_topic_data_)
-                    {
-                        return true;
-                    }
+                    return false;
                 }
-                else if (writer_id == fastrtps::rtps::c_EntityId_SEDPSubWriter)
+
+                if (should_be_dropped(&drop_data_messages_percentage_))
                 {
-                    if (drop_subscription_builtin_topic_data_)
-                    {
-                        return true;
-                    }
+                    return true;
                 }
-                else
+                if (drop_data_messages_filter_(cdrMessage))
                 {
-                    if (should_be_dropped(&drop_data_messages_percentage_))
-                    {
-                        return true;
-                    }
-                    if (drop_data_messages_filter_(cdrMessage))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
 
                 break;

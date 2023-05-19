@@ -20,6 +20,8 @@
 #include <fastrtps/types/DynamicTypeMember.h>
 #include <fastdds/dds/log/Log.hpp>
 
+#include <dds/core/LengthUnlimited.hpp>
+
 namespace eprosima {
 namespace fastrtps {
 namespace types {
@@ -87,7 +89,7 @@ ReturnCode_t DynamicType::apply_annotation(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation. The input descriptor isn't consistent.");
+        logError(DYN_TYPES, "Error applying annotation. The input descriptor isn't consistent.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -128,13 +130,13 @@ ReturnCode_t DynamicType::apply_annotation_to_member(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation to member. MemberId not found.");
+            logError(DYN_TYPES, "Error applying annotation to member. MemberId not found.");
             return ReturnCode_t::RETCODE_BAD_PARAMETER;
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation to member. The input descriptor isn't consistent.");
+        logError(DYN_TYPES, "Error applying annotation to member. The input descriptor isn't consistent.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -153,7 +155,7 @@ ReturnCode_t DynamicType::apply_annotation_to_member(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation to member. MemberId not found.");
+        logError(DYN_TYPES, "Error applying annotation to member. MemberId not found.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -200,7 +202,7 @@ ReturnCode_t DynamicType::copy_from_builder(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error copying DynamicType, invalid input type");
+        logError(DYN_TYPES, "Error copying DynamicType, invalid input type");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -228,7 +230,7 @@ ReturnCode_t DynamicType::get_descriptor(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error getting TypeDescriptor, invalid input descriptor");
+        logError(DYN_TYPES, "Error getting TypeDescriptor, invalid input descriptor");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -338,7 +340,7 @@ ReturnCode_t DynamicType::get_member_by_name(
     }
     else
     {
-        EPROSIMA_LOG_WARNING(DYN_TYPES, "Error getting member by name, member not found.");
+        logWarning(DYN_TYPES, "Error getting member by name, member not found.");
         return ReturnCode_t::RETCODE_ERROR;
     }
 }
@@ -362,7 +364,7 @@ ReturnCode_t DynamicType::get_member(
     }
     else
     {
-        EPROSIMA_LOG_WARNING(DYN_TYPES, "Error getting member, member not found.");
+        logWarning(DYN_TYPES, "Error getting member, member not found.");
         return ReturnCode_t::RETCODE_ERROR;
     }
 }
@@ -390,7 +392,7 @@ ReturnCode_t DynamicType::get_annotation(
     }
     else
     {
-        EPROSIMA_LOG_WARNING(DYN_TYPES, "Error getting annotation, annotation not found.");
+        logWarning(DYN_TYPES, "Error getting annotation, annotation not found.");
         return ReturnCode_t::RETCODE_ERROR;
     }
 }
@@ -411,7 +413,7 @@ uint32_t DynamicType::get_bounds(
     {
         return descriptor_->get_bounds(index);
     }
-    return BOUND_UNLIMITED;
+    return ::dds::core::LENGTH_UNLIMITED;
 }
 
 uint32_t DynamicType::get_bounds_size() const
@@ -456,7 +458,7 @@ uint32_t DynamicType::get_total_bounds() const
     {
         return descriptor_->get_total_bounds();
     }
-    return BOUND_UNLIMITED;
+    return ::dds::core::LENGTH_UNLIMITED;
 }
 
 bool DynamicType::has_children() const
@@ -522,7 +524,7 @@ size_t DynamicType::get_size() const
             }
         }
     }
-    EPROSIMA_LOG_ERROR(DYN_TYPES, "Called get_size() within a non primitive type! This is a program's logic error.");
+    logError(DYN_TYPES, "Called get_size() within a non primitive type! This is a program's logic error.");
     return 0;
 }
 

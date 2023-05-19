@@ -61,8 +61,7 @@ public:
                (this->m_groupData == b.m_groupData) &&
                (this->m_publishMode == b.m_publishMode) &&
                (this->m_disablePositiveACKs == b.m_disablePositiveACKs) &&
-               (this->representation == b.representation) &&
-               (this->data_sharing == b.data_sharing);
+               (this->representation == b.representation);
     }
 
     //!Durability Qos, implemented in the library.
@@ -92,10 +91,10 @@ public:
     //!Time Based Filter Qos, NOT implemented in the library.
     TimeBasedFilterQosPolicy m_timeBasedFilter;
 
-    //!Ownership Qos, implemented in the library.
+    //!Ownership Qos, NOT implemented in the library.
     OwnershipQosPolicy m_ownership;
 
-    //!Owenership Strength Qos, implemented in the library.
+    //!Owenership Strength Qos, NOT implemented in the library.
     OwnershipStrengthQosPolicy m_ownershipStrength;
 
     //!Destination Order Qos, NOT implemented in the library.
@@ -121,12 +120,6 @@ public:
 
     //!Disable positive acks QoS, implemented in the library.
     DisablePositiveACKsQosPolicy m_disablePositiveACKs;
-
-    //!Information for data sharing compatibility check.
-    DataSharingQosPolicy data_sharing;
-
-    //! Disable heartbeat piggyback mechanism.
-    bool disable_heartbeat_piggyback = false;
 
     /**
      * Set Qos from another class

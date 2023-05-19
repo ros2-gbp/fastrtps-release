@@ -121,6 +121,7 @@ struct RTPS_DllAPI GUID_t
     {
         return *reinterpret_cast<const InstanceHandle_t*>(this);
     }
+
 };
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
@@ -169,19 +170,29 @@ inline bool operator <(
         const GUID_t& g1,
         const GUID_t& g2)
 {
-    auto prefix_cmp = GuidPrefix_t::cmp(g1.guidPrefix, g2.guidPrefix);
-    if (prefix_cmp < 0)
+    for (uint8_t i = 0; i < 12; ++i)
     {
-        return true;
+        if (g1.guidPrefix.value[i] < g2.guidPrefix.value[i])
+        {
+            return true;
+        }
+        else if (g1.guidPrefix.value[i] > g2.guidPrefix.value[i])
+        {
+            return false;
+        }
     }
-    else if (prefix_cmp > 0)
+    for (uint8_t i = 0; i < 4; ++i)
     {
-        return false;
+        if (g1.entityId.value[i] < g2.entityId.value[i])
+        {
+            return true;
+        }
+        else if (g1.entityId.value[i] > g2.entityId.value[i])
+        {
+            return false;
+        }
     }
-    else
-    {
-        return g1.entityId < g2.entityId;
-    }
+    return false;
 }
 
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC

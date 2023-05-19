@@ -86,32 +86,6 @@ public:
         return true;
     }
 
-#ifdef FASTDDS_STATISTICS
-
-    template<typename T>
-    bool add_statistics_listener(
-            T /*listener*/,
-            uint32_t /*kind*/)
-    {
-        return true;
-    }
-
-    template<typename T>
-    bool remove_statistics_listener(
-            T /*listener*/,
-            uint32_t /*kind*/)
-    {
-        return true;
-    }
-
-    void set_enabled_statistics_writers_mask(
-            uint32_t /*enabled_writers*/)
-    {
-    }
-
-#endif // FASTDDS_STATISTICS
-
-
     const GUID_t& getGuid() const
     {
         return m_guid;
@@ -136,7 +110,7 @@ public:
                 const GUID_t& pguid,
                 int16_t userDefinedId));
 
-    ResourceEvent& get_resource_event() const
+    ResourceEvent& get_resource_event()
     {
         return mp_event_thr;
     }
@@ -158,51 +132,19 @@ public:
                 const TopicAttributes& topicAtt,
                 const ReaderQos& rqos));
 
-    MOCK_METHOD4(registerReader, bool(
-                RTPSReader * Reader,
-                const TopicAttributes& topicAtt,
-                const ReaderQos& rqos,
-                const fastdds::rtps::ContentFilterProperty* content_filter));
-
     MOCK_METHOD3(updateReader, bool(
                 RTPSReader * Reader,
                 const TopicAttributes& topicAtt,
                 const ReaderQos& rqos));
-
-    MOCK_METHOD1(ignore_participant, bool(
-                const GuidPrefix_t& participant_guid));
-
-    MOCK_METHOD4(updateReader, bool(
-                RTPSReader * Reader,
-                const TopicAttributes& topicAtt,
-                const ReaderQos& rqos,
-                const fastdds::rtps::ContentFilterProperty* content_filter));
 
     const RTPSParticipantAttributes& getRTPSParticipantAttributes()
     {
         return attributes_;
     }
 
-    bool update_attributes(
-            const RTPSParticipantAttributes& patt)
-    {
-        static_cast<void>(patt);
-        return true;
-    }
-
-#if HAVE_SECURITY
-
-    MOCK_METHOD1(is_security_enabled_for_writer, bool(
-                const WriterAttributes& writer_attributes));
-
-    MOCK_METHOD1(is_security_enabled_for_reader, bool(
-                const ReaderAttributes& reader_attributes));
-
-#endif // if HAVE_SECURITY
-
     RTPSParticipantListener* listener_;
     const GUID_t m_guid;
-    mutable ResourceEvent mp_event_thr;
+    ResourceEvent mp_event_thr;
     RTPSParticipantAttributes attributes_;
 };
 

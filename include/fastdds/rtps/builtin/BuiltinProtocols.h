@@ -24,9 +24,7 @@
 #include <list>
 
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
-
-#include <fastrtps/utils/shared_mutex.hpp>
+#include <fastdds/rtps/network/NetworkFactory.h>
 
 namespace eprosima {
 
@@ -54,7 +52,6 @@ class WLP;
 class RTPSParticipantImpl;
 class RTPSWriter;
 class RTPSReader;
-class NetworkFactory;
 
 /**
  * Class BuiltinProtocols that contains builtin endpoints implementing the discovery and liveliness protocols.
@@ -69,12 +66,6 @@ private:
     BuiltinProtocols();
     virtual ~BuiltinProtocols();
 
-    /*
-     * Mutex to protect the m_DiscoveryServers collection. Element access is not protected by this mutex, the PDP mutex
-     * needs to be used when querying or modifying mutable members of the collection.
-     */
-    mutable eprosima::shared_mutex discovery_mutex_;
-
 public:
 
     /**
@@ -86,11 +77,6 @@ public:
     bool initBuiltinProtocols(
             RTPSParticipantImpl* p_part,
             BuiltinAttributes& attributes);
-
-    /**
-     * Enable the builtin protocols
-     */
-    void enable();
 
     /**
      * Update the metatraffic locatorlist after it was created. Because when you create
@@ -141,18 +127,15 @@ public:
             const fastdds::dds::WriterQos& wqos);
     /**
      * Add a local Reader to the BuiltinProtocols.
-     * @param R               Pointer to the RTPSReader.
-     * @param topicAtt        Attributes of the associated topic
-     * @param rqos            QoS policies dictated by the subscriber
-     * @param content_filter  Optional content filtering information.
+     * @param R Pointer to the RTPSReader.
+     * @param topicAtt Attributes of the associated topic
+     * @param rqos QoS policies dictated by the subscriber
      * @return True if correct.
      */
     bool addLocalReader(
             RTPSReader* R,
             const TopicAttributes& topicAtt,
-            const fastdds::dds::ReaderQos& rqos,
-            const fastdds::rtps::ContentFilterProperty* content_filter = nullptr);
-
+            const fastdds::dds::ReaderQos& rqos);
     /**
      * Update a local Writer QOS
      * @param W Writer to update
@@ -166,17 +149,15 @@ public:
             const fastdds::dds::WriterQos& wqos);
     /**
      * Update a local Reader QOS
-     * @param R               Reader to update
-     * @param topicAtt        Attributes of the associated topic
-     * @param qos             New Reader QoS
-     * @param content_filter  Optional content filtering information.
+     * @param R Reader to update
+     * @param topicAtt Attributes of the associated topic
+     * @param qos New Reader QoS
      * @return
      */
     bool updateLocalReader(
             RTPSReader* R,
             const TopicAttributes& topicAtt,
-            const fastdds::dds::ReaderQos& qos,
-            const fastdds::rtps::ContentFilterProperty* content_filter = nullptr);
+            const fastdds::dds::ReaderQos& qos);
     /**
      * Remove a local Writer from the builtinProtocols.
      * @param W Pointer to the writer.
@@ -198,15 +179,6 @@ public:
     void stopRTPSParticipantAnnouncement();
     //!Reset to timer to make periodic RTPSParticipant Announcements.
     void resetRTPSParticipantAnnouncement();
-
-    /**
-     * Get Discovery mutex
-     * @return Associated Mutex
-     */
-    inline eprosima::shared_mutex& getDiscoveryMutex() const
-    {
-        return discovery_mutex_;
-    }
 
 };
 

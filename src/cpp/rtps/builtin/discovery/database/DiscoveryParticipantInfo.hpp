@@ -25,10 +25,10 @@
 #include <fastdds/rtps/common/CacheChange.h>
 #include <fastdds/rtps/common/GuidPrefix_t.hpp>
 
-#include <rtps/builtin/discovery/database/DiscoverySharedInfo.hpp>
-#include <rtps/builtin/discovery/database/DiscoveryParticipantChangeData.hpp>
+#include "./DiscoverySharedInfo.hpp"
+#include "./DiscoveryParticipantChangeData.hpp"
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 namespace eprosima {
 namespace fastdds {

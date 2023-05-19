@@ -112,7 +112,7 @@ public:
     void removeRemoteEndpoints(
             ParticipantProxyData* pdata) override;
 
-    //! Verify whether the given participant EDP endpoints are matched with us
+    //! Verify if the given participant EDP enpoints are matched with us
     bool areRemoteEndpointsMatched(
             const ParticipantProxyData* pdata) override;
 
@@ -223,23 +223,6 @@ protected:
             t_p_StatefulWriter& writer,
             key_list& demises);
 
-    /**
-     * Get a pointer pair of the corresponding writer builtin endpoint for the entity_id
-     * @param [in] entity_id The entity_id to obtain the pair from.
-     * @return A pair of nullptrs if operation was unsuccessful
-     */
-    t_p_StatefulWriter get_builtin_writer_history_pair_by_entity(
-            const EntityId_t& entity_id);
-
-    /**
-     * Get a pointer pair of the corresponding reader builtin endpoint for the entity_id.
-     * If a builtin writer Entity is passed, the equivalent reader entity builtin is returned.
-     * @param [in] entity_id The entity_id to obtain the pair from.
-     * @return A pair of nullptrs if operation was unsuccessful
-     */
-    t_p_StatefulReader get_builtin_reader_history_pair_by_entity(
-            const EntityId_t& entity_id);
-
     std::shared_ptr<ITopicPayloadPool> pub_writer_payload_pool_;
     std::shared_ptr<ITopicPayloadPool> pub_reader_payload_pool_;
     std::shared_ptr<ITopicPayloadPool> sub_writer_payload_pool_;
@@ -280,6 +263,12 @@ private:
             const GUID_t& local_writer,
             const ReaderProxyData& remote_reader_data) override;
 #endif // if HAVE_SECURITY
+
+protected:
+
+    std::mutex temp_data_lock_;
+    ReaderProxyData temp_reader_proxy_data_;
+    WriterProxyData temp_writer_proxy_data_;
 };
 
 } /* namespace rtps */

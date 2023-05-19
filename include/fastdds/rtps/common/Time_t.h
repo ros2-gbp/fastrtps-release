@@ -18,12 +18,14 @@
 
 #ifndef _FASTDDS_RTPS_TIME_T_H_
 #define _FASTDDS_RTPS_TIME_T_H_
-
 #include <fastrtps/fastrtps_dll.h>
-
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+
+// defines to avoid the "static initialization order fiasco"
+#define TIME_T_INFINITE_SECONDS 0x7fffffff
+#define TIME_T_INFINITE_NANOSECONDS 0xffffffff
 
 namespace eprosima {
 namespace fastrtps {
@@ -34,9 +36,6 @@ namespace fastrtps {
  */
 struct RTPS_DllAPI Time_t
 {
-    static constexpr int32_t INFINITE_SECONDS = 0x7fffffff;
-    static constexpr uint32_t INFINITE_NANOSECONDS = 0xffffffffu;
-
     int32_t seconds;
     uint32_t nanosec;
 
@@ -67,11 +66,6 @@ struct RTPS_DllAPI Time_t
      */
     int64_t to_ns() const;
 
-    inline bool is_infinite() const noexcept
-    {
-        return is_infinite(*this);
-    }
-
     /**
      * Fills a Time_t struct with a representation of the current time.
      *
@@ -79,13 +73,6 @@ struct RTPS_DllAPI Time_t
      */
     static void now(
             Time_t& ret);
-
-    static inline constexpr bool is_infinite(
-            const Time_t& t) noexcept
-    {
-        return (INFINITE_SECONDS == t.seconds) || (INFINITE_NANOSECONDS == t.nanosec);
-    }
-
 };
 
 using Duration_t = Time_t;
@@ -101,7 +88,7 @@ class RTPS_DllAPI Time_t
 public:
 
     //! Default constructor. Sets values to zero.
-    Time_t() = default;
+    Time_t();
 
     /**
      * @param sec Seconds
@@ -127,12 +114,6 @@ public:
      *  Returns stored time as nanoseconds (including seconds)
      */
     int64_t to_ns() const;
-
-    /**
-     *  @param nanosecs Stores given time as nanoseconds (including seconds)
-     */
-    void from_ns(
-            int64_t nanosecs);
 
     /**
      * Retrieve the seconds field.
@@ -167,11 +148,6 @@ public:
     uint32_t fraction() const;
 
     /**
-     * Retrieve the fraction field by ref.
-     */
-    uint32_t& fraction();
-
-    /**
      * Sets fraction field and updates the nanoseconds.
      */
     void fraction(
@@ -193,13 +169,13 @@ public:
 private:
 
     //!Seconds
-    int32_t seconds_ = 0;
+    int32_t seconds_;
 
     //!Fraction of second (1 fraction = 1/(2^32) seconds)
-    uint32_t fraction_ = 0;
+    uint32_t fraction_;
 
     //!Nanoseconds
-    uint32_t nanosec_ = 0;
+    uint32_t nanosec_;
 
     void set_fraction(
             uint32_t frac);
@@ -284,10 +260,10 @@ static inline bool operator <(
 }
 
 /**
- * Checks if a Time_t is greater than other.
+ * Checks if a Time_t is greather than other.
  * @param t1 First Time_t to compare
  * @param t2 Second Time_t to compare
- * @return True if the first Time_t is greater than the second
+ * @return True if the first Time_t is greather than the second
  */
 static inline bool operator >(
         const Time_t& t1,
@@ -346,10 +322,10 @@ static inline bool operator <=(
 }
 
 /**
- * Checks if a Time_t is greater or equal than other.
+ * Checks if a Time_t is greather or equal than other.
  * @param t1 First Time_t to compare
  * @param t2 Second Time_t to compare
- * @return True if the first Time_t is greater or equal than the second
+ * @return True if the first Time_t is greather or equal than the second
  */
 static inline bool operator >=(
         const Time_t& t1,
@@ -402,8 +378,8 @@ inline std::istream& operator >>(
 
             input >> sec;
             input >> point >> nano;
-            // nano could not be bigger or equal than 1 sec
-            if ( point != '.' || nano >= 1000000000 )
+            // nano could not be bigger than 1 sec
+            if ( point != '.' || nano > 1000000000 )
             {
                 input.setstate(std::ios_base::failbit);
                 nano = 0;
@@ -441,9 +417,9 @@ static inline Time_t operator +(
 }
 
 /**
- * Subtracts two Time_t.
- * @param ta First Time_t to subtract
- * @param tb Second Time_t to subtract
+ * Substracts two Time_t.
+ * @param ta First Time_t to substract
+ * @param tb Second Time_t to substract
  * @return A new Time_t with the result.
  */
 static inline Time_t operator -(
@@ -460,9 +436,9 @@ static inline Time_t operator -(
 
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-const Time_t c_RTPSTimeInfinite{0x7fffffff, 0xffffffff};
-const Time_t c_RTPSTimeZero{0, 0};
-const Time_t c_RTPSTimeInvalid{-1, 0xffffffff};
+const Time_t c_RTPSTimeInfinite(0x7fffffff, 0xffffffff);
+const Time_t c_RTPSTimeZero(0, 0);
+const Time_t c_RTPSTimeInvalid(-1, 0xffffffff);
 
 } // namespace rtps
 
@@ -542,10 +518,10 @@ static inline bool operator <(
 }
 
 /**
- * Checks if a Time_t is greater than other.
+ * Checks if a Time_t is greather than other.
  * @param t1 First Time_t to compare
  * @param t2 Second Time_t to compare
- * @return True if the first Time_t is greater than the second
+ * @return True if the first Time_t is greather than the second
  */
 static inline bool operator >(
         const Time_t& t1,
@@ -604,10 +580,10 @@ static inline bool operator <=(
 }
 
 /**
- * Checks if a Time_t is greater or equal than other.
+ * Checks if a Time_t is greather or equal than other.
  * @param t1 First Time_t to compare
  * @param t2 Second Time_t to compare
- * @return True if the first Time_t is greater or equal than the second
+ * @return True if the first Time_t is greather or equal than the second
  */
 static inline bool operator >=(
         const Time_t& t1,
@@ -661,9 +637,9 @@ static inline Time_t operator +(
 }
 
 /**
- * Subtracts two Time_t.
- * @param ta First Time_t to subtract
- * @param tb Second Time_t to subtract
+ * Substracts two Time_t.
+ * @param ta First Time_t to substract
+ * @param tb Second Time_t to substract
  * @return A new Time_t with the result.
  */
 static inline Time_t operator -(
@@ -681,17 +657,13 @@ static inline Time_t operator -(
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 //! Time_t (Duration_t) representing an infinite time. DONT USE IT IN CONSTRUCTORS
-const Time_t c_TimeInfinite{Time_t::INFINITE_SECONDS, Time_t::INFINITE_NANOSECONDS};
+const Time_t c_TimeInfinite(TIME_T_INFINITE_SECONDS, TIME_T_INFINITE_NANOSECONDS);
 //! Time_t (Duration_t) representing a zero time. DONT USE IT IN CONSTRUCTORS
-const Time_t c_TimeZero{0, 0};
+const Time_t c_TimeZero(0, 0);
 //! Time_t (Duration_t) representing an invalid time. DONT USE IT IN CONSTRUCTORS
-const Time_t c_TimeInvalid{-1, Time_t::INFINITE_NANOSECONDS};
+const Time_t c_TimeInvalid(-1, TIME_T_INFINITE_NANOSECONDS);
 
 } // namespace fastrtps
 } // namespace eprosima
-
-// defines to avoid the "static initialization order fiasco"
-#define TIME_T_INFINITE_SECONDS (eprosima::fastrtps::Time_t::INFINITE_SECONDS)
-#define TIME_T_INFINITE_NANOSECONDS (eprosima::fastrtps::Time_t::INFINITE_NANOSECONDS)
 
 #endif /* _FASTDDS_RTPS_TIME_T_H_ */

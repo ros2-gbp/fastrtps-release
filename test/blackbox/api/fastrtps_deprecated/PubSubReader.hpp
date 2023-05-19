@@ -20,33 +20,29 @@
 #ifndef _TEST_BLACKBOX_PUBSUBREADER_HPP_
 #define _TEST_BLACKBOX_PUBSUBREADER_HPP_
 
-#include <atomic>
-#include <condition_variable>
-#include <list>
-#include <string>
-
-#include <asio.hpp>
-#include <gtest/gtest.h>
-#include <fastrtps/attributes/ParticipantAttributes.h>
-#include <fastrtps/attributes/SubscriberAttributes.h>
-#include <fastrtps/Domain.h>
 #include <fastrtps/fastrtps_fwd.h>
+#include <fastrtps/Domain.h>
 #include <fastrtps/participant/Participant.h>
 #include <fastrtps/participant/ParticipantListener.h>
-#include <fastrtps/subscriber/SampleInfo.h>
+#include <fastrtps/attributes/ParticipantAttributes.h>
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/subscriber/SubscriberListener.h>
-#include <fastrtps/transport/UDPTransportDescriptor.h>
-#include <fastrtps/transport/UDPv4TransportDescriptor.h>
-#include <fastrtps/transport/UDPv6TransportDescriptor.h>
-#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/attributes/SubscriberAttributes.h>
+#include <fastrtps/subscriber/SampleInfo.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
+#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/transport/UDPv4TransportDescriptor.h>
+
+#include <string>
+#include <list>
+#include <atomic>
+#include <condition_variable>
+#include <asio.hpp>
+#include <gtest/gtest.h>
 
 using eprosima::fastrtps::rtps::IPLocator;
-using eprosima::fastrtps::rtps::UDPTransportDescriptor;
 using eprosima::fastrtps::rtps::UDPv4TransportDescriptor;
-using eprosima::fastrtps::rtps::UDPv6TransportDescriptor;
 
 template<class TypeSupport>
 class PubSubReader
@@ -152,8 +148,6 @@ private:
                 eprosima::fastrtps::Subscriber* sub) override
         {
             ASSERT_NE(sub, nullptr);
-            reader_.message_receive_count_.fetch_add(1);
-            reader_.message_receive_cv_.notify_one();
 
             if (reader_.receiving_.load())
             {
@@ -244,7 +238,7 @@ public:
         , matched_(0)
         , participant_matched_(0)
         , receiving_(false)
-        , current_processed_count_(0)
+        , current_received_count_(0)
         , number_samples_expected_(0)
         , discovery_result_(false)
         , onDiscovery_(nullptr)
@@ -258,7 +252,6 @@ public:
         , liveliness_cv_()
         , times_liveliness_lost_(0)
         , times_liveliness_recovered_(0)
-        , message_receive_count_(0)
     {
         subscriber_attr_.topic.topicDataType = type_.getName();
         // Generate topic name
@@ -268,8 +261,8 @@ public:
         subscriber_attr_.topic.topicKind =
                 type_.m_isGetKeyDefined ? ::eprosima::fastrtps::rtps::WITH_KEY : ::eprosima::fastrtps::rtps::NO_KEY;
 
-        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        // By default, memory mode is preallocated (the most restritive)
+        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 
         // By default, heartbeat period delay is 100 milliseconds.
         subscriber_attr_.times.heartbeatResponseDelay.seconds = 0;
@@ -284,11 +277,6 @@ public:
         }
     }
 
-    eprosima::fastrtps::Subscriber& get_native_reader() const
-    {
-        return *subscriber_;
-    }
-
     void init()
     {
         participant_attr_.domainId = (uint32_t)GET_PID() % 230;
@@ -301,23 +289,22 @@ public:
 
         participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
 
-        if (participant_ != nullptr)
+        ASSERT_NE(participant_, nullptr);
+
+        participant_guid_ = participant_->getGuid();
+
+        // Register type
+        ASSERT_EQ(eprosima::fastrtps::Domain::registerType(participant_, &type_), true);
+
+        //Create subscribe r
+        subscriber_ = eprosima::fastrtps::Domain::createSubscriber(participant_, subscriber_attr, &listener_);
+
+        if (subscriber_ != nullptr)
         {
-            participant_guid_ = participant_->getGuid();
+            std::cout << "Created subscriber " << subscriber_->getGuid() << " for topic " <<
+                subscriber_attr_.topic.topicName << std::endl;
 
-            // Register type
-            ASSERT_EQ(eprosima::fastrtps::Domain::registerType(participant_, &type_), true);
-
-            //Create subscribe r
-            subscriber_ = eprosima::fastrtps::Domain::createSubscriber(participant_, subscriber_attr, &listener_);
-
-            if (subscriber_ != nullptr)
-            {
-                std::cout << "Created subscriber " << subscriber_->getGuid() << " for topic " <<
-                    subscriber_attr_.topic.topicName << std::endl;
-
-                initialized_ = true;
-            }
+            initialized_ = true;
         }
     }
 
@@ -342,13 +329,13 @@ public:
     }
 
     void startReception(
-            const std::list<type>& msgs)
+            std::list<type>& msgs)
     {
         mutex_.lock();
         total_msgs_ = msgs;
         number_samples_expected_ = total_msgs_.size();
-        current_processed_count_ = 0;
-        last_seq.clear();
+        current_received_count_ = 0;
+        last_seq = eprosima::fastrtps::rtps::SequenceNumber_t();
         mutex_.unlock();
 
         bool ret = false;
@@ -366,29 +353,11 @@ public:
         receiving_.store(false);
     }
 
-    template<class _Rep,
-            class _Period
-            >
-    bool wait_for_all_received(
-            const std::chrono::duration<_Rep, _Period>& max_wait,
-            size_t num_messages = 0)
-    {
-        if (num_messages == 0)
-        {
-            num_messages = number_samples_expected_;
-        }
-        std::unique_lock<std::mutex> lock(message_receive_mutex_);
-        return message_receive_cv_.wait_for(lock, max_wait, [this, num_messages]() -> bool
-                       {
-                           return num_messages == message_receive_count_;
-                       });
-    }
-
     void block_for_all()
     {
         block([this]() -> bool
                 {
-                    return number_samples_expected_ == current_processed_count_;
+                    return number_samples_expected_ == current_received_count_;
                 });
     }
 
@@ -397,20 +366,18 @@ public:
     {
         block([this, seq]() -> bool
                 {
-                    return get_last_sequence_received() == seq;
+                    return last_seq == seq;
                 });
     }
 
     size_t block_for_at_least(
             size_t at_least)
     {
-        size_t read_count_locked; // solves TSan data race
-        block([this, &read_count_locked, at_least]() -> bool
+        block([this, at_least]() -> bool
                 {
-                    read_count_locked = current_processed_count_;
-                    return current_processed_count_ >= at_least;
+                    return current_received_count_ >= at_least;
                 });
-        return read_count_locked;
+        return current_received_count_;
     }
 
     void block(
@@ -429,15 +396,14 @@ public:
         std::unique_lock<std::mutex> lock(mutex_);
         cv_.wait_for(lock, max_wait, [this]() -> bool
                 {
-                    return number_samples_expected_ == current_processed_count_;
+                    return number_samples_expected_ == current_received_count_;
                 });
 
-        return current_processed_count_;
+        return current_received_count_;
     }
 
     void wait_discovery(
-            std::chrono::seconds timeout = std::chrono::seconds::zero(),
-            unsigned int min_writers = 1)
+            std::chrono::seconds timeout = std::chrono::seconds::zero())
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
@@ -447,57 +413,18 @@ public:
         {
             cvDiscovery_.wait(lock, [&]()
                     {
-                        return matched_ >= min_writers;
+                        return matched_ != 0;
                     });
         }
         else
         {
             cvDiscovery_.wait_for(lock, timeout, [&]()
                     {
-                        return matched_ >= min_writers;
+                        return matched_ != 0;
                     });
         }
 
         std::cout << "Reader discovery finished..." << std::endl;
-    }
-
-    bool wait_participant_discovery(
-            unsigned int min_participants = 1,
-            std::chrono::seconds timeout = std::chrono::seconds::zero())
-    {
-        bool ret_value = true;
-        std::unique_lock<std::mutex> lock(mutexDiscovery_);
-
-        std::cout << "Reader is waiting discovery of at least " << min_participants << " participants..." << std::endl;
-
-        if (timeout == std::chrono::seconds::zero())
-        {
-            cvDiscovery_.wait(lock, [&]()
-                    {
-                        return participant_matched_ >= min_participants;
-                    });
-        }
-        else
-        {
-            if (!cvDiscovery_.wait_for(lock, timeout, [&]()
-                    {
-                        return participant_matched_ >= min_participants;
-                    }))
-            {
-                ret_value = false;
-            }
-        }
-
-        if (ret_value)
-        {
-            std::cout << "Reader participant discovery finished successfully..." << std::endl;
-        }
-        else
-        {
-            std::cout << "Reader participant discovery finished unsuccessfully..." << std::endl;
-        }
-
-        return ret_value;
     }
 
     bool wait_participant_undiscovery(
@@ -538,8 +465,7 @@ public:
         return ret_value;
     }
 
-    void wait_writer_undiscovery(
-            unsigned int matched = 0)
+    void wait_writer_undiscovery()
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
@@ -547,7 +473,7 @@ public:
 
         cvDiscovery_.wait(lock, [&]()
                 {
-                    return matched_ <= matched;
+                    return matched_ == 0;
                 });
 
         std::cout << "Reader removal finished..." << std::endl;
@@ -608,22 +534,12 @@ public:
 
     size_t getReceivedCount() const
     {
-        return current_processed_count_;
+        return current_received_count_;
     }
 
     eprosima::fastrtps::rtps::SequenceNumber_t get_last_sequence_received()
     {
-        if (last_seq.empty())
-        {
-            return eprosima::fastrtps::rtps::SequenceNumber_t();
-        }
-
-        using pair_type = typename decltype(last_seq)::value_type;
-        auto seq_comp = [](const pair_type& v1, const pair_type& v2) -> bool
-                {
-                    return v1.second < v2.second;
-                };
-        return std::max_element(last_seq.cbegin(), last_seq.cend(), seq_comp)->second;
+        return last_seq;
     }
 
     /*** Function to change QoS ***/
@@ -790,15 +706,7 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
+        IPLocator::setIPv4(loc, ip);
         loc.port = port;
         subscriber_attr_.unicastLocatorList.push_back(loc);
 
@@ -817,15 +725,7 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
+        IPLocator::setIPv4(loc, ip);
         loc.port = port;
         subscriber_attr_.multicastLocatorList.push_back(loc);
 
@@ -844,15 +744,7 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
+        IPLocator::setIPv4(loc, ip);
         loc.port = port;
         participant_attr_.rtps.builtin.metatrafficUnicastLocatorList.push_back(loc);
 
@@ -871,71 +763,9 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
+        IPLocator::setIPv4(loc, ip);
         loc.port = port;
         participant_attr_.rtps.builtin.metatrafficMulticastLocatorList.push_back(loc);
-
-        return *this;
-    }
-
-    PubSubReader& set_default_unicast_locators(
-            const eprosima::fastrtps::rtps::LocatorList_t& locators)
-    {
-        participant_attr_.rtps.defaultUnicastLocatorList = locators;
-        return *this;
-    }
-
-    PubSubReader& add_to_default_unicast_locator_list(
-            const std::string& ip,
-            uint32_t port)
-    {
-        eprosima::fastrtps::rtps::Locator_t loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
-        loc.port = port;
-        participant_attr_.rtps.defaultUnicastLocatorList.push_back(loc);
-
-        return *this;
-    }
-
-    PubSubReader& set_default_multicast_locators(
-            const eprosima::fastrtps::rtps::LocatorList_t& locators)
-    {
-        participant_attr_.rtps.defaultMulticastLocatorList = locators;
-        return *this;
-    }
-
-    PubSubReader& add_to_default_multicast_locator_list(
-            const std::string& ip,
-            uint32_t port)
-    {
-        eprosima::fastrtps::rtps::Locator_t loc;
-        if (!IPLocator::setIPv4(loc, ip))
-        {
-            loc.kind = LOCATOR_KIND_UDPv6;
-            if (!IPLocator::setIPv6(loc, ip))
-            {
-                return *this;
-            }
-        }
-
-        loc.port = port;
-        participant_attr_.rtps.defaultMulticastLocatorList.push_back(loc);
 
         return *this;
     }
@@ -973,14 +803,7 @@ public:
     {
         participant_attr_.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
         participant_attr_.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_attr_.rtps.builtin.discovery_config.static_edp_xml_config(filename);
-        return *this;
-    }
-
-    PubSubReader& use_writer_liveliness_protocol(
-            bool use_wlp)
-    {
-        participant_attr_.rtps.builtin.use_WriterLivelinessProtocol = use_wlp;
+        participant_attr_.rtps.builtin.discovery_config.setStaticEndpointXMLFilename(filename);
         return *this;
     }
 
@@ -1008,20 +831,12 @@ public:
 
         eprosima::fastrtps::rtps::LocatorList_t default_unicast_locators;
         eprosima::fastrtps::rtps::Locator_t default_unicast_locator;
-        eprosima::fastrtps::rtps::Locator_t loopback_locator;
-        if (!use_udpv4)
-        {
-            default_unicast_locator.kind = LOCATOR_KIND_UDPv6;
-            loopback_locator.kind = LOCATOR_KIND_UDPv6;
-        }
 
         default_unicast_locators.push_back(default_unicast_locator);
         participant_attr_.rtps.builtin.metatrafficUnicastLocatorList = default_unicast_locators;
 
-        if (!IPLocator::setIPv4(loopback_locator, 127, 0, 0, 1))
-        {
-            IPLocator::setIPv6(loopback_locator, "::1");
-        }
+        eprosima::fastrtps::rtps::Locator_t loopback_locator;
+        IPLocator::setIPv4(loopback_locator, 127, 0, 0, 1);
         participant_attr_.rtps.builtin.initialPeersList.push_back(loopback_locator);
         return *this;
     }
@@ -1060,21 +875,6 @@ public:
     {
         participant_attr_.rtps.builtin.discovery_config.leaseDuration = lease_duration;
         participant_attr_.rtps.builtin.discovery_config.leaseDuration_announcementperiod = announce_period;
-        return *this;
-    }
-
-    PubSubReader& initial_announcements(
-            uint32_t count,
-            const eprosima::fastrtps::Duration_t& period)
-    {
-        participant_attr_.rtps.builtin.discovery_config.initial_announcements.count = count;
-        participant_attr_.rtps.builtin.discovery_config.initial_announcements.period = period;
-        return *this;
-    }
-
-    PubSubReader& ownership_exclusive()
-    {
-        subscriber_attr_.qos.m_ownership.kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
         return *this;
     }
 
@@ -1124,15 +924,7 @@ public:
             uint32_t maxInitialPeerRange)
     {
         participant_attr_.rtps.useBuiltinTransports = false;
-        std::shared_ptr<UDPTransportDescriptor> descriptor;
-        if (use_udpv4)
-        {
-            descriptor = std::make_shared<UDPv4TransportDescriptor>();
-        }
-        else
-        {
-            descriptor = std::make_shared<UDPv6TransportDescriptor>();
-        }
+        std::shared_ptr<UDPv4TransportDescriptor> descriptor = std::make_shared<UDPv4TransportDescriptor>();
         descriptor->maxInitialPeersRange = maxInitialPeerRange;
         participant_attr_.rtps.userTransports.push_back(descriptor);
         return *this;
@@ -1208,19 +1000,13 @@ public:
         onEndpointDiscovery_ = f;
     }
 
-    bool take_first_data(
-            void* data)
-    {
-        return takeNextData(data);
-    }
-
     bool takeNextData(
             void* data)
     {
         eprosima::fastrtps::SampleInfo_t info;
         if (subscriber_->takeNextData(data, &info))
         {
-            current_processed_count_++;
+            current_received_count_++;
             return true;
         }
         return false;
@@ -1279,11 +1065,6 @@ public:
         return matched_ > 0;
     }
 
-    unsigned int get_matched() const
-    {
-        return matched_;
-    }
-
 private:
 
     const eprosima::fastrtps::rtps::GUID_t& participant_guid() const
@@ -1311,15 +1092,15 @@ private:
             std::unique_lock<std::mutex> lock(mutex_);
 
             // Check order of changes.
-            ASSERT_LT(last_seq[info.iHandle], info.sample_identity.sequence_number());
-            last_seq[info.iHandle] = info.sample_identity.sequence_number();
+            ASSERT_LT(last_seq, info.sample_identity.sequence_number());
+            last_seq = info.sample_identity.sequence_number();
 
             if (info.sampleKind == eprosima::fastrtps::rtps::ALIVE)
             {
                 auto it = std::find(total_msgs_.begin(), total_msgs_.end(), data);
                 ASSERT_NE(it, total_msgs_.end());
                 total_msgs_.erase(it);
-                ++current_processed_count_;
+                ++current_received_count_;
                 default_receive_print<type>(data);
                 cv_.notify_one();
             }
@@ -1392,9 +1173,9 @@ private:
     unsigned int participant_matched_;
     std::atomic<bool> receiving_;
     type_support type_;
-    std::map<eprosima::fastrtps::rtps::InstanceHandle_t, eprosima::fastrtps::rtps::SequenceNumber_t> last_seq;
-    std::atomic<size_t> current_processed_count_;
-    std::atomic<size_t> number_samples_expected_;
+    eprosima::fastrtps::rtps::SequenceNumber_t last_seq;
+    size_t current_received_count_;
+    size_t number_samples_expected_;
     bool discovery_result_;
 
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
@@ -1420,13 +1201,6 @@ private:
     unsigned int times_liveliness_recovered_;
     //! The liveliness changed status
     eprosima::fastrtps::LivelinessChangedStatus liveliness_changed_status_;
-
-    //! A mutex for messages received but not yet processed by the application
-    std::mutex message_receive_mutex_;
-    //! A condition variable for messages received but not yet processed by the application
-    std::condition_variable message_receive_cv_;
-    //! Number of messages received but not yet processed by the application
-    std::atomic<size_t> message_receive_count_;
 };
 
 #endif // _TEST_BLACKBOX_PUBSUBREADER_HPP_

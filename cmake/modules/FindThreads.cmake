@@ -104,9 +104,7 @@ macro(_check_pthreads_flag)
 
     if(THREADS_HAVE_PTHREAD_ARG)
       set(Threads_FOUND TRUE)
-      if(NOT QNX)
-        set(CMAKE_THREAD_LIBS_INIT "-pthread")
-      endif()
+      set(CMAKE_THREAD_LIBS_INIT "-pthread")
     endif()
   endif()
 endmacro()
@@ -209,7 +207,7 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(Threads DEFAULT_MSG Threads_FOUND)
 if(THREADS_FOUND AND NOT TARGET Threads::Threads)
   add_library(Threads::Threads INTERFACE IMPORTED)
 
-  if(THREADS_HAVE_PTHREAD_ARG AND NOT QNX)
+  if(THREADS_HAVE_PTHREAD_ARG)
     set_property(TARGET Threads::Threads
                  PROPERTY INTERFACE_COMPILE_OPTIONS "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler -pthread>"
                                                     "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-pthread>")

@@ -26,132 +26,100 @@ namespace fastrtps {
 namespace rtps {
 namespace security {
 
-class Handle : public std::enable_shared_from_this<Handle>
+class Handle
 {
-public:
+    public:
 
-    const std::string& get_class_id() const
-    {
-        return class_id_;
-    }
+        const std::string& get_class_id() const
+        {
+            return class_id_;
+        }
 
-    virtual bool nil() const = 0;
+        virtual bool nil() const = 0;
 
-protected:
+    protected:
 
-    Handle(
-            const std::string& class_id)
-        : class_id_(class_id)
-    {
-    }
+        Handle(const std::string& class_id) : class_id_(class_id) {};
 
-    virtual ~Handle()
-    {
-    }
+        virtual ~Handle(){}
 
-private:
+    private:
 
-    std::string class_id_;
+        std::string class_id_;
 };
 
-template<typename T, typename F>
+template<typename T>
 class HandleImpl : public Handle
 {
-    friend F;
+    public:
 
-protected:
+        typedef T type;
 
-    HandleImpl()
-        : Handle(T::class_id_)
-        , impl_(new T)
-    {
-    }
+        HandleImpl() : Handle(T::class_id_), impl_(new T) {}
 
-    virtual ~HandleImpl() = default;
+        virtual ~HandleImpl() = default;
 
-public:
-
-    typedef T type;
-
-    static HandleImpl<T, F>& narrow(
-            Handle& handle)
-    {
-        if (handle.get_class_id().compare(T::class_id_) == 0)
+        static HandleImpl<T>& narrow(Handle& handle)
         {
-            return reinterpret_cast<HandleImpl<T, F>&>(handle);
+            if(handle.get_class_id().compare(T::class_id_) == 0)
+                return reinterpret_cast<HandleImpl<T>&>(handle);
+
+            return HandleImpl<T>::nil_handle;
         }
 
-        return HandleImpl<T, F>::nil_handle;
-    }
-
-    static const HandleImpl<T, F>& narrow(
-            const Handle& handle)
-    {
-        if (handle.get_class_id().compare(T::class_id_) == 0)
+        static const HandleImpl<T>& narrow(const Handle& handle)
         {
-            return reinterpret_cast<const HandleImpl<T, F>&>(handle);
+            if(handle.get_class_id().compare(T::class_id_) == 0)
+                return reinterpret_cast<const HandleImpl<T>&>(handle);
+
+            return HandleImpl<T>::nil_handle;
         }
 
-        return HandleImpl<T, F>::nil_handle;
-    }
+        bool nil() const override
+        {
+            return impl_ ? false : true;
+        }
 
-    bool nil() const override
-    {
-        return impl_ ? false : true;
-    }
+        T* operator*()
+        {
+            return impl_.get();
+        }
 
-    T* operator *()
-    {
-        return impl_.get();
-    }
+        const T* operator*() const
+        {
+            return impl_.get();
+        }
 
-    const T* operator *() const
-    {
-        return impl_.get();
-    }
+        T* operator->()
+        {
+            return impl_.get();
+        }
 
-    T* operator ->()
-    {
-        return impl_.get();
-    }
+        const T* operator->() const
+        {
+            return impl_.get();
+        }
 
-    const T* operator ->() const
-    {
-        return impl_.get();
-    }
+        static HandleImpl<T> nil_handle;
 
-    static HandleImpl<T, F> nil_handle;
+    private:
 
-private:
+        explicit HandleImpl(bool) : Handle(T::class_id_) {}
 
-    explicit HandleImpl(
-            bool)
-        : Handle(T::class_id_)
-    {
-    }
-
-    std::unique_ptr<T> impl_;
+        std::unique_ptr<T> impl_;
 };
-
-template<typename T, typename F>
-HandleImpl<T, F> HandleImpl<T, F>::nil_handle(true);
+template<typename T>
+HandleImpl<T> HandleImpl<T>::nil_handle(true);
 
 class NilHandle : public Handle
 {
-public:
+    public:
 
-    NilHandle()
-        : Handle("nil_handle")
-    {
-    }
+        NilHandle() : Handle("nil_handle") {}
 
-    virtual ~NilHandle() = default;
+        virtual ~NilHandle() = default;
 
-    bool nil() const override
-    {
-        return true;
-    }
-
+        bool nil() const override { return true; }
 };
 
 
@@ -159,8 +127,6 @@ public:
 typedef Handle IdentityHandle;
 
 typedef Handle PermissionsHandle;
-
-typedef Handle SecretHandle;
 
 typedef Handle ParticipantCryptoHandle;
 typedef Handle EntityCryptoHandle;

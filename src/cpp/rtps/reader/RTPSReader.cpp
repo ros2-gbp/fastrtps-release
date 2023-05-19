@@ -17,30 +17,24 @@
  *
  */
 
-#include <typeinfo>
-#include <algorithm>
-#include <chrono>
-
-#include <rtps/history/BasicPayloadPool.hpp>
-#include <rtps/history/CacheChangePool.h>
-
-#include <rtps/DataSharing/DataSharingListener.hpp>
-
-#include <rtps/participant/RTPSParticipantImpl.h>
-
-#include <rtps/reader/ReaderHistoryState.hpp>
+#include <fastdds/rtps/reader/RTPSReader.h>
 
 #include <fastdds/dds/log/Log.hpp>
 
-#include <fastdds/rtps/reader/RTPSReader.h>
 #include <fastdds/rtps/history/ReaderHistory.h>
 #include <fastdds/rtps/reader/ReaderListener.h>
 #include <fastdds/rtps/resources/ResourceEvent.h>
 
+#include <rtps/history/BasicPayloadPool.hpp>
+#include <rtps/history/CacheChangePool.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/reader/ReaderHistoryState.hpp>
+
 #include <foonathan/memory/namespace_alias.hpp>
 
-#include <statistics/rtps/StatisticsBase.hpp>
-
+#include <typeinfo>
+#include <algorithm>
+#include <chrono>
 
 namespace eprosima {
 namespace fastrtps {
@@ -67,7 +61,7 @@ RTPSReader::RTPSReader(
     std::shared_ptr<IPayloadPool> payload_pool;
     payload_pool = BasicPayloadPool::get(cfg, change_pool);
 
-    init(payload_pool, change_pool, att);
+    init(payload_pool, change_pool);
 }
 
 RTPSReader::RTPSReader(
@@ -102,13 +96,12 @@ RTPSReader::RTPSReader(
     , liveliness_kind_(att.liveliness_kind_)
     , liveliness_lease_duration_(att.liveliness_lease_duration)
 {
-    init(payload_pool, change_pool, att);
+    init(payload_pool, change_pool);
 }
 
 void RTPSReader::init(
         const std::shared_ptr<IPayloadPool>& payload_pool,
-        const std::shared_ptr<IChangePool>& change_pool,
-        const ReaderAttributes& att)
+        const std::shared_ptr<IChangePool>& change_pool)
 {
     payload_pool_ = payload_pool;
     change_pool_ = change_pool;
@@ -118,37 +111,15 @@ void RTPSReader::init(
         fixed_payload_size_ = mp_history->m_att.payloadMaxSize;
     }
 
-    if (att.endpoint.data_sharing_configuration().kind() != OFF)
-    {
-        using std::placeholders::_1;
-        std::shared_ptr<DataSharingNotification> notification =
-                DataSharingNotification::create_notification(
-            getGuid(), att.endpoint.data_sharing_configuration().shm_directory());
-        if (notification)
-        {
-            is_datasharing_compatible_ = true;
-            datasharing_listener_.reset(new DataSharingListener(
-                        notification,
-                        att.endpoint.data_sharing_configuration().shm_directory(),
-                        att.matched_writers_allocation,
-                        this));
-
-            // We can start the listener here, as no writer can be matched already,
-            // so no notification will occur until the non-virtual instance is constructed.
-            // But we need to stop the listener in the non-virtual instance destructor.
-            datasharing_listener_->start();
-        }
-    }
-
     mp_history->mp_reader = this;
     mp_history->mp_mutex = &mp_mutex;
 
-    EPROSIMA_LOG_INFO(RTPS_READER, "RTPSReader created correctly");
+    logInfo(RTPS_READER, "RTPSReader created correctly");
 }
 
 RTPSReader::~RTPSReader()
 {
-    EPROSIMA_LOG_INFO(RTPS_READER, "Removing reader " << this->getGuid().entityId; );
+    logInfo(RTPS_READER, "Removing reader " << this->getGuid().entityId; );
 
     for (auto it = mp_history->changesBegin(); it != mp_history->changesEnd(); ++it)
     {
@@ -171,7 +142,7 @@ bool RTPSReader::reserveCache(
     CacheChange_t* reserved_change = nullptr;
     if (!change_pool_->reserve_cache(reserved_change))
     {
-        EPROSIMA_LOG_WARNING(RTPS_READER, "Problem reserving cache from pool");
+        logWarning(RTPS_READER, "Problem reserving cache from pool");
         return false;
     }
 
@@ -179,7 +150,7 @@ bool RTPSReader::reserveCache(
     if (!payload_pool_->get_payload(payload_size, *reserved_change))
     {
         change_pool_->release_cache(reserved_change);
-        EPROSIMA_LOG_WARNING(RTPS_READER, "Problem reserving payload from pool");
+        logWarning(RTPS_READER, "Problem reserving payload from pool");
         return false;
     }
 
@@ -208,7 +179,6 @@ ReaderListener* RTPSReader::getListener() const
 bool RTPSReader::setListener(
         ReaderListener* target)
 {
-    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
     mp_listener = target;
     return true;
 }
@@ -251,7 +221,7 @@ void RTPSReader::add_persistence_guid(
         auto spourious_record = history_state_->history_record.find(guid);
         if (spourious_record != history_state_->history_record.end())
         {
-            EPROSIMA_LOG_INFO(RTPS_READER, "Sporious record found, changing guid "
+            logInfo(RTPS_READER, "Sporious record found, changing guid "
                     << guid << " for persistence guid " << persistence_guid);
             update_last_notified(guid, spourious_record->second);
             history_state_->history_record.erase(spourious_record);
@@ -369,92 +339,6 @@ uint64_t RTPSReader::get_unread_count() const
     std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
     return total_unread_;
 }
-
-uint64_t RTPSReader::get_unread_count(
-        bool mark_as_read)
-{
-    std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
-    uint64_t ret_val = total_unread_;
-
-    if (mark_as_read)
-    {
-        for (auto it = mp_history->changesBegin(); 0 < total_unread_ && it != mp_history->changesEnd(); ++it)
-        {
-            CacheChange_t* change = *it;
-            if (!change->isRead && get_last_notified(change->writerGUID) >= change->sequenceNumber)
-            {
-                change->isRead = true;
-                assert(0 < total_unread_);
-                --total_unread_;
-            }
-        }
-        assert(0 == total_unread_);
-    }
-    return ret_val;
-}
-
-bool RTPSReader::is_datasharing_compatible_with(
-        const WriterProxyData& wdata)
-{
-    if (!is_datasharing_compatible_ ||
-            wdata.m_qos.data_sharing.kind() == fastdds::dds::OFF)
-    {
-        return false;
-    }
-
-    for (auto id : wdata.m_qos.data_sharing.domain_ids())
-    {
-        if (std::find(m_att.data_sharing_configuration().domain_ids().begin(),
-                m_att.data_sharing_configuration().domain_ids().end(), id)
-                != m_att.data_sharing_configuration().domain_ids().end())
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool RTPSReader::is_sample_valid(
-        const void* data,
-        const GUID_t& writer,
-        const SequenceNumber_t& sn) const
-{
-    if (is_datasharing_compatible_ && datasharing_listener_->writer_is_matched(writer))
-    {
-        // Check if the payload is dirty
-        // Note the Payloads used in loans include a mandatory RTPS 2.3 extra header
-        if (!DataSharingPayloadPool::check_sequence_number(
-                    static_cast<const octet*>(data) - SerializedPayload_t::representation_header_size,
-                    sn))
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-#ifdef FASTDDS_STATISTICS
-
-bool RTPSReader::add_statistics_listener(
-        std::shared_ptr<fastdds::statistics::IListener> listener)
-{
-    return add_statistics_listener_impl(listener);
-}
-
-bool RTPSReader::remove_statistics_listener(
-        std::shared_ptr<fastdds::statistics::IListener> listener)
-{
-    return remove_statistics_listener_impl(listener);
-}
-
-void RTPSReader::set_enabled_statistics_writers_mask(
-        uint32_t enabled_writers)
-{
-    set_enabled_statistics_writers_mask_impl(enabled_writers);
-}
-
-#endif // FASTDDS_STATISTICS
 
 } /* namespace rtps */
 } /* namespace fastrtps */

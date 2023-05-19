@@ -23,10 +23,7 @@
 #include <fastrtps/rtps/writer/WriterListener.h>
 #include <fastrtps/rtps/Endpoint.h>
 #include <fastrtps/rtps/common/CacheChange.h>
-#include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
 #include <fastdds/rtps/messages/RTPSMessageGroup.h>
-#include <fastdds/rtps/writer/DeliveryRetCode.hpp>
-#include <fastdds/rtps/writer/LocatorSelectorSender.hpp>
 
 #include <condition_variable>
 #include <gmock/gmock.h>
@@ -42,34 +39,16 @@ class RTPSWriter : public Endpoint
 {
 public:
 
-    RTPSWriter()
-        : general_locator_selector_(*this, ResourceLimitedContainerConfig())
-        , async_locator_selector_(*this, ResourceLimitedContainerConfig())
-    {
-        static uint8_t entity_id = 0;
-        // Generate a guid.
-        m_guid.entityId.value[3] = ++entity_id;
-    }
-
     virtual ~RTPSWriter() = default;
 
     virtual bool matched_reader_add(
-            const ReaderProxyData&)
-    {
-        return false;
-    }
+            const ReaderProxyData& ratt) = 0;
 
     virtual bool matched_reader_remove(
-            const GUID_t&)
-    {
-        return false;
-    }
+            const GUID_t& ratt) = 0;
 
     virtual bool matched_reader_is_matched(
-            const GUID_t&)
-    {
-        return false;
-    }
+            const GUID_t& rguid) = 0;
 
     WriterListener* getListener() const
     {
@@ -83,42 +62,11 @@ public:
         return true;
     }
 
-    virtual bool get_disable_positive_acks() const
-    {
-        return false;
-    }
-
-    virtual bool has_been_fully_delivered(
-            const SequenceNumber_t& /*seq_num*/) const
-    {
-        return false;
-    }
-
-#ifdef FASTDDS_STATISTICS
-
-    template<typename T>
-    bool add_statistics_listener(
-            T /*listener*/)
-    {
-        return true;
-    }
-
-    template<typename T>
-    bool remove_statistics_listener(
-            T /*listener*/)
-    {
-        return true;
-    }
-
-#endif // FASTDDS_STATISTICS
-
     // *INDENT-OFF* Uncrustify makes a mess with MOCK_METHOD macros
+    MOCK_CONST_METHOD0(getGuid, const GUID_t& ());
+
     MOCK_METHOD3(new_change, CacheChange_t* (
             const std::function<uint32_t()>&,
-            ChangeKind_t,
-            InstanceHandle_t));
-
-    MOCK_METHOD2(new_change, CacheChange_t* (
             ChangeKind_t,
             InstanceHandle_t));
 
@@ -141,37 +89,7 @@ public:
     MOCK_CONST_METHOD0(get_liveliness_kind, const LivelinessQosPolicyKind& ());
 
     MOCK_CONST_METHOD0(get_liveliness_lease_duration, const Duration_t& ());
-
-    MOCK_METHOD4(deliver_sample_nts, DeliveryRetCode(
-            CacheChange_t*,
-            RTPSMessageGroup&,
-            LocatorSelectorSender&,
-            const std::chrono::time_point<std::chrono::steady_clock>&));
-
-    MOCK_METHOD3(send_nts, bool(
-            CDRMessage_t*,
-            const LocatorSelectorSender&,
-            std::chrono::steady_clock::time_point&));
-
-    MOCK_CONST_METHOD0(is_datasharing_compatible, bool());
-
-    MOCK_CONST_METHOD1(is_datasharing_compatible_with, bool(
-            const ReaderProxyData& rdata));
-
-    MOCK_METHOD1(reader_data_filter, void(
-            fastdds::rtps::IReaderDataFilter* filter));
-
     // *INDENT-ON*
-
-    const GUID_t& getGuid() const
-    {
-        return m_guid;
-    }
-
-    EndpointAttributes& getAttributes()
-    {
-        return m_att.endpoint;
-    }
 
     virtual void updateAttributes(
             const WriterAttributes&)
@@ -183,14 +101,6 @@ public:
     }
 
     virtual bool try_remove_change(
-            const std::chrono::steady_clock::time_point&,
-            std::unique_lock<RecursiveTimedMutex>&)
-    {
-        return true;
-    }
-
-    virtual bool wait_for_acknowledgement(
-            const SequenceNumber_t&,
             const std::chrono::steady_clock::time_point&,
             std::unique_lock<RecursiveTimedMutex>&)
     {
@@ -249,29 +159,14 @@ public:
         return writer_guid == m_guid;
     }
 
-    LocatorSelectorSender& get_general_locator_selector()
-    {
-        return general_locator_selector_;
-    }
-
-    LocatorSelectorSender& get_async_locator_selector()
-    {
-        return async_locator_selector_;
-    }
-
     WriterHistory* history_;
 
     WriterListener* listener_;
 
-    GUID_t m_guid;
-
-    WriterAttributes m_att;
+    const GUID_t m_guid;
 
     LivelinessLostStatus liveliness_lost_status_;
 
-    LocatorSelectorSender general_locator_selector_;
-
-    LocatorSelectorSender async_locator_selector_;
 };
 
 } // namespace rtps

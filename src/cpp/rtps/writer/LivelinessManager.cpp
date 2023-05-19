@@ -19,7 +19,6 @@ LivelinessManager::LivelinessManager(
     , manage_automatic_(manage_automatic)
     , writers_()
     , mutex_()
-    , col_mutex_()
     , timer_owner_(nullptr)
     , timer_(
         service,
@@ -33,7 +32,7 @@ LivelinessManager::LivelinessManager(
 
 LivelinessManager::~LivelinessManager()
 {
-    std::lock_guard<std::mutex> _(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     timer_owner_ = nullptr;
     timer_.cancel_timer();
 }
@@ -43,48 +42,37 @@ bool LivelinessManager::add_writer(
         LivelinessQosPolicyKind kind,
         Duration_t lease_duration)
 {
+    std::unique_lock<std::mutex> lock(mutex_);
+
     if (!manage_automatic_ && kind == LivelinessQosPolicyKind::AUTOMATIC_LIVELINESS_QOS)
     {
-        EPROSIMA_LOG_WARNING(RTPS_WRITER, "Liveliness manager not managing automatic writers, writer not added");
+        logWarning(RTPS_WRITER, "Liveliness manager not managing automatic writers, writer not added");
         return false;
     }
 
+    for (LivelinessData& writer : writers_)
     {
-        // collection guard
-        std::lock_guard<shared_mutex> _(col_mutex_);
-        // writers_ elements guard
-        std::lock_guard<std::mutex> __(mutex_);
-
-        for (LivelinessData& writer : writers_)
+        if (writer.guid == guid &&
+                writer.kind == kind &&
+                writer.lease_duration == lease_duration)
         {
-            if (writer.guid == guid &&
-                    writer.kind == kind &&
-                    writer.lease_duration == lease_duration)
-            {
-                writer.count++;
-                return true;
-            }
+            writer.count++;
+            return true;
         }
-        writers_.emplace_back(guid, kind, lease_duration);
     }
+    writers_.emplace_back(guid, kind, lease_duration);
 
     if (!calculate_next())
     {
-        // TimedEvent is thread safe
         timer_.cancel_timer();
         return true;
     }
 
-    std::lock_guard<std::mutex> _(mutex_);
-
-    if (timer_owner_ != nullptr)
-    {
-        // Some times the interval could be negative if a writer expired during the call to this function
-        // Once in this situation there is not much we can do but let asio timers expire immediately
-        auto interval = timer_owner_->time - steady_clock::now();
-        timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
-        timer_.restart_timer();
-    }
+    // Some times the interval could be negative if a writer expired during the call to this function
+    // Once in this situation there is not much we can do but let asio timers expire immediately
+    auto interval = timer_owner_->time - steady_clock::now();
+    timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
+    timer_.restart_timer();
 
     return true;
 }
@@ -94,67 +82,52 @@ bool LivelinessManager::remove_writer(
         LivelinessQosPolicyKind kind,
         Duration_t lease_duration)
 {
-    bool removed = false;
-    LivelinessData::WriterStatus status;
-
-    {
-        // collection guard
-        std::lock_guard<shared_mutex> _(col_mutex_);
-        // writers_ elements guard
-        std::lock_guard<std::mutex> __(mutex_);
-
-        removed = writers_.remove_if([guid, kind, lease_duration, &status](LivelinessData& writer)
-                        {
-                            status = writer.status;
-                            return writer.guid == guid &&
-                            writer.kind == kind &&
-                            writer.lease_duration == lease_duration &&
-                            --writer.count == 0;
-                        });
-    }
-
-    if (!removed)
-    {
-        return false;
-    }
-
-    if (callback_ != nullptr)
-    {
-        if (status == LivelinessData::WriterStatus::ALIVE)
-        {
-            callback_(guid, kind, lease_duration, -1, 0);
-        }
-        else if (status == LivelinessData::WriterStatus::NOT_ALIVE)
-        {
-            callback_(guid, kind, lease_duration, 0, -1);
-        }
-    }
-
     std::unique_lock<std::mutex> lock(mutex_);
 
-    if (timer_owner_ != nullptr)
+    for (LivelinessData& writer: writers_)
     {
-        lock.unlock();
-
-        if (!calculate_next())
+        if (writer.guid == guid &&
+                writer.kind == kind &&
+                writer.lease_duration == lease_duration)
         {
-            timer_.cancel_timer();
-            return true;
-        }
+            if (--writer.count == 0)
+            {
+                LivelinessData::WriterStatus status = writer.status;
 
-        lock.lock();
+                writers_.remove(writer);
 
-        if (timer_owner_ != nullptr)
-        {
-            // Some times the interval could be negative if a writer expired during the call to this function
-            // Once in this situation there is not much we can do but let asio timers expire inmediately
-            auto interval = timer_owner_->time - steady_clock::now();
-            timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
-            timer_.restart_timer();
+                if (callback_ != nullptr)
+                {
+                    if (status == LivelinessData::WriterStatus::ALIVE)
+                    {
+                        callback_(guid, kind, lease_duration, -1, 0);
+                    }
+                    else if (status == LivelinessData::WriterStatus::NOT_ALIVE)
+                    {
+                        callback_(guid, kind, lease_duration, 0, -1);
+                    }
+                }
+
+                if (timer_owner_ != nullptr)
+                {
+                    if (!calculate_next())
+                    {
+                        timer_.cancel_timer();
+                        return true;
+                    }
+
+                    // Some times the interval could be negative if a writer expired during the call to this function
+                    // Once in this situation there is not much we can do but let asio timers expire inmediately
+                    auto interval = timer_owner_->time - steady_clock::now();
+                    timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
+                    timer_.restart_timer();
+                }
+                return true;
+            }
         }
     }
 
-    return true;
+    return false;
 }
 
 bool LivelinessManager::assert_liveliness(
@@ -162,71 +135,48 @@ bool LivelinessManager::assert_liveliness(
         LivelinessQosPolicyKind kind,
         Duration_t lease_duration)
 {
-    bool found = false;
+    std::unique_lock<std::mutex> lock(mutex_);
 
-    {
-        // collection guard
-        shared_lock<shared_mutex> _(col_mutex_);
-
-        for (LivelinessData& writer : writers_)
-        {
-            // writers_ elements guard
-            std::unique_lock<std::mutex> lock(mutex_);
-
-            if (writer.guid == guid &&
-                    writer.kind == kind &&
-                    writer.lease_duration == lease_duration)
-            {
-                lock.unlock();
-
-                found = true;
-
-                // Execute the callbacks
-                if (writer.kind == LivelinessQosPolicyKind::MANUAL_BY_PARTICIPANT_LIVELINESS_QOS ||
-                        writer.kind == LivelinessQosPolicyKind::AUTOMATIC_LIVELINESS_QOS)
-                {
-                    for (LivelinessData& w: writers_)
-                    {
-                        if (w.kind == writer.kind)
-                        {
-                            assert_writer_liveliness(w);
-                        }
-                    }
-                }
-                else if (writer.kind == LivelinessQosPolicyKind::MANUAL_BY_TOPIC_LIVELINESS_QOS)
-                {
-                    assert_writer_liveliness(writer);
-                }
-
-                break;
-            }
-        }
-    }
-
-    if (!found)
+    ResourceLimitedVector<LivelinessData>::iterator wit;
+    if (!find_writer(
+                guid,
+                kind,
+                lease_duration,
+                &wit))
     {
         return false;
     }
 
     timer_.cancel_timer();
 
+    if (wit->kind == LivelinessQosPolicyKind::MANUAL_BY_PARTICIPANT_LIVELINESS_QOS ||
+            wit->kind == LivelinessQosPolicyKind::AUTOMATIC_LIVELINESS_QOS)
+    {
+        for (LivelinessData& w: writers_)
+        {
+            if (w.kind == wit->kind)
+            {
+                assert_writer_liveliness(w);
+            }
+        }
+    }
+    else if (wit->kind == LivelinessQosPolicyKind::MANUAL_BY_TOPIC_LIVELINESS_QOS)
+    {
+        assert_writer_liveliness(*wit);
+    }
+
     // Updates the timer owner
     if (!calculate_next())
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error when restarting liveliness timer");
+        logError(RTPS_WRITER, "Error when restarting liveliness timer");
         return false;
     }
 
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (timer_owner_ != nullptr)
-    {
-        // Some times the interval could be negative if a writer expired during the call to this function
-        // Once in this situation there is not much we can do but let asio timers expire inmediately
-        auto interval = timer_owner_->time - steady_clock::now();
-        timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
-        timer_.restart_timer();
-    }
+    // Some times the interval could be negative if a writer expired during the call to this function
+    // Once in this situation there is not much we can do but let asio timers expire inmediately
+    auto interval = timer_owner_->time - steady_clock::now();
+    timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
+    timer_.restart_timer();
 
     return true;
 }
@@ -234,82 +184,68 @@ bool LivelinessManager::assert_liveliness(
 bool LivelinessManager::assert_liveliness(
         LivelinessQosPolicyKind kind)
 {
+    std::unique_lock<std::mutex> lock(mutex_);
 
     if (!manage_automatic_ && kind == LivelinessQosPolicyKind::AUTOMATIC_LIVELINESS_QOS)
     {
-        EPROSIMA_LOG_WARNING(RTPS_WRITER, "Liveliness manager not managing automatic writers, writer not added");
+        logWarning(RTPS_WRITER, "Liveliness manager not managing automatic writers, writer not added");
         return false;
     }
 
+    if (writers_.empty())
     {
-        // collection guard
-        shared_lock<shared_mutex> _(col_mutex_);
-
-        if (writers_.empty())
-        {
-            return true;
-        }
-
-
-        for (LivelinessData& writer: writers_)
-        {
-            if (writer.kind == kind)
-            {
-                assert_writer_liveliness(writer);
-            }
-        }
+        return true;
     }
 
     timer_.cancel_timer();
 
+    for (LivelinessData& writer: writers_)
+    {
+        if (writer.kind == kind)
+        {
+            assert_writer_liveliness(writer);
+        }
+    }
+
     // Updates the timer owner
     if (!calculate_next())
     {
-        EPROSIMA_LOG_INFO(RTPS_WRITER,
+        logInfo(RTPS_WRITER,
                 "Error when restarting liveliness timer: " << writers_.size() << " writers, liveliness " <<
                 kind);
         return false;
     }
 
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (timer_owner_ != nullptr)
-    {
-        // Some times the interval could be negative if a writer expired during the call to this function
-        // Once in this situation there is not much we can do but let asio timers expire inmediately
-        auto interval = timer_owner_->time - steady_clock::now();
-        timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
-        timer_.restart_timer();
-    }
+    // Some times the interval could be negative if a writer expired during the call to this function
+    // Once in this situation there is not much we can do but let asio timers expire inmediately
+    auto interval = timer_owner_->time - steady_clock::now();
+    timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
+    timer_.restart_timer();
 
     return true;
 }
 
 bool LivelinessManager::calculate_next()
 {
-    // Keep this lock order to prevent ABBA deadlocks
-    shared_lock<shared_mutex> _(col_mutex_);
-    std::lock_guard<std::mutex> __(mutex_);
-
-    bool any_alive = false;
-    steady_clock::time_point min_time = steady_clock::now() + nanoseconds(c_TimeInfinite.to_ns());
 
     timer_owner_ = nullptr;
 
-    // collection guard
-    for (LivelinessData& writer : writers_)
+    steady_clock::time_point min_time = steady_clock::now() + nanoseconds(c_TimeInfinite.to_ns());
+
+    bool any_alive = false;
+
+    for (LivelinessDataIterator it = writers_.begin(); it != writers_.end(); ++it)
     {
-        if (writer.status == LivelinessData::WriterStatus::ALIVE)
+        if (it->status == LivelinessData::WriterStatus::ALIVE)
         {
-            if (writer.time < min_time)
+            if (it->time < min_time)
             {
-                min_time = writer.time;
-                timer_owner_ = &writer;
+                min_time = it->time;
+                timer_owner_ = &*it;
             }
             any_alive = true;
         }
     }
-
     return any_alive;
 }
 
@@ -319,49 +255,55 @@ bool LivelinessManager::timer_expired()
 
     if (timer_owner_ == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Liveliness timer expired but there is no writer");
+        logError(RTPS_WRITER, "Liveliness timer expired but there is no writer");
         return false;
     }
-    else
-    {
-        timer_owner_->status = LivelinessData::WriterStatus::NOT_ALIVE;
-    }
-
-    auto guid = timer_owner_->guid;
-    auto kind = timer_owner_->kind;
-    auto lease_duration = timer_owner_->lease_duration;
-
-    lock.unlock();
 
     if (callback_ != nullptr)
     {
-        callback_(guid, kind, lease_duration, -1, 1);
+        callback_(timer_owner_->guid,
+                timer_owner_->kind,
+                timer_owner_->lease_duration,
+                -1,
+                1);
     }
+    timer_owner_->status = LivelinessData::WriterStatus::NOT_ALIVE;
 
     if (calculate_next())
     {
-        lock.lock();
+        // Some times the interval could be negative if a writer expired during the call to this function
+        // Once in this situation there is not much we can do but let asio timers expire inmediately
+        auto interval = timer_owner_->time - steady_clock::now();
+        timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
+        return true;
+    }
 
-        if ( timer_owner_ != nullptr)
+    return false;
+}
+
+bool LivelinessManager::find_writer(
+        const GUID_t& guid,
+        const LivelinessQosPolicyKind& kind,
+        const Duration_t& lease_duration,
+        ResourceLimitedVector<LivelinessData>::iterator* wit_out)
+{
+    for (LivelinessDataIterator it = writers_.begin(); it != writers_.end(); ++it)
+    {
+        if (it->guid == guid &&
+                it->kind == kind &&
+                it->lease_duration == lease_duration)
         {
-            // Some times the interval could be negative if a writer expired during the call to this function
-            // Once in this situation there is not much we can do but let asio timers expire inmediately
-            auto interval = timer_owner_->time - steady_clock::now();
-            timer_.update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
-
+            *wit_out = it;
             return true;
         }
     }
-
     return false;
 }
 
 bool LivelinessManager::is_any_alive(
         LivelinessQosPolicyKind kind)
 {
-    // Keep this lock order to prevent ABBA deadlocks
-    shared_lock<shared_mutex> _(col_mutex_);
-    std::lock_guard<std::mutex> __(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
 
     for (const auto& writer : writers_)
     {
@@ -370,37 +312,34 @@ bool LivelinessManager::is_any_alive(
             return true;
         }
     }
-
     return false;
 }
 
 void LivelinessManager::assert_writer_liveliness(
         LivelinessData& writer)
 {
-    // The shared_mutex is taken, that is, the writer referenced will not be destroyed during this call
-    std::unique_lock<std::mutex> lock(mutex_);
-
-    auto status = writer.status;
-    auto guid = writer.guid;
-    auto kind = writer.kind;
-    auto lease_duration = writer.lease_duration;
+    if (callback_ != nullptr)
+    {
+        if (writer.status == LivelinessData::WriterStatus::NOT_ASSERTED)
+        {
+            callback_(writer.guid,
+                    writer.kind,
+                    writer.lease_duration,
+                    1,
+                    0);
+        }
+        else if (writer.status == LivelinessData::WriterStatus::NOT_ALIVE)
+        {
+            callback_(writer.guid,
+                    writer.kind,
+                    writer.lease_duration,
+                    1,
+                    -1);
+        }
+    }
 
     writer.status = LivelinessData::WriterStatus::ALIVE;
     writer.time = steady_clock::now() + nanoseconds(writer.lease_duration.to_ns());
-
-    lock.unlock();
-
-    if (callback_ != nullptr)
-    {
-        if (status == LivelinessData::WriterStatus::NOT_ASSERTED)
-        {
-            callback_(guid, kind, lease_duration, 1, 0);
-        }
-        else if (status == LivelinessData::WriterStatus::NOT_ALIVE)
-        {
-            callback_(guid, kind, lease_duration, 1, -1);
-        }
-    }
 }
 
 const ResourceLimitedVector<LivelinessData>& LivelinessManager::get_liveliness_data() const

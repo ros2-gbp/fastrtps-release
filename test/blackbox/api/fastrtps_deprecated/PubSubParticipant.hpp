@@ -20,23 +20,22 @@
 #ifndef _TEST_BLACKBOX_PUBSUBPARTICIPANT_HPP_
 #define _TEST_BLACKBOX_PUBSUBPARTICIPANT_HPP_
 
-#include <condition_variable>
-#include <thread>
-#include <vector>
-
-#include <asio.hpp>
-#include <gtest/gtest.h>
-#include <fastrtps/Domain.h>
 #include <fastrtps/fastrtps_fwd.h>
-#include <fastrtps/attributes/ParticipantAttributes.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
+#include <fastrtps/Domain.h>
 #include <fastrtps/participant/Participant.h>
 #include <fastrtps/participant/ParticipantListener.h>
+#include <fastrtps/attributes/ParticipantAttributes.h>
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/publisher/PublisherListener.h>
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/subscriber/SubscriberListener.h>
-#include <fastrtps/transport/TransportDescriptorInterface.h>
+#include <fastrtps/attributes/PublisherAttributes.h>
+
+#include <asio.hpp>
+#include <condition_variable>
+#include <gtest/gtest.h>
+#include <thread>
+#include <vector>
 
 namespace eprosima {
 namespace fastrtps {
@@ -158,12 +157,12 @@ public:
         , sub_times_liveliness_recovered_(0)
     {
 
-#if defined(PREALLOCATED_MEMORY_MODE_TEST)
-        publisher_attr_.historyMemoryPolicy = rtps::PREALLOCATED_MEMORY_MODE;
+#if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
+        publisher_attr_.historyMemoryPolicy = rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 #elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
         publisher_attr_.historyMemoryPolicy = rtps::DYNAMIC_RESERVE_MEMORY_MODE;
 #else
-        publisher_attr_.historyMemoryPolicy = rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        publisher_attr_.historyMemoryPolicy = rtps::PREALLOCATED_MEMORY_MODE;
 #endif // if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
@@ -237,18 +236,6 @@ public:
             return true;
         }
         return false;
-    }
-
-    eprosima::fastrtps::Publisher& get_native_writer(
-            unsigned int index)
-    {
-        return *(publishers_[index]);
-    }
-
-    eprosima::fastrtps::Subscriber& get_native_reader(
-            unsigned int index)
-    {
-        return *(subscribers_[index]);
     }
 
     bool send_sample(
@@ -405,33 +392,6 @@ public:
             const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
     {
         participant_attr_.rtps.properties = property_policy;
-        return *this;
-    }
-
-    PubSubParticipant& disable_builtin_transport()
-    {
-        participant_attr_.rtps.useBuiltinTransports = false;
-        return *this;
-    }
-
-    PubSubParticipant& add_user_transport_to_pparams(
-            std::shared_ptr<eprosima::fastrtps::rtps::TransportDescriptorInterface> userTransportDescriptor)
-    {
-        participant_attr_.rtps.userTransports.push_back(userTransportDescriptor);
-        return *this;
-    }
-
-    PubSubParticipant& pub_property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
-    {
-        publisher_attr_.properties = property_policy;
-        return *this;
-    }
-
-    PubSubParticipant& sub_property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
-    {
-        subscriber_attr_.properties = property_policy;
         return *this;
     }
 

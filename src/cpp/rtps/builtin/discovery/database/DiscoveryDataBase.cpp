@@ -18,18 +18,16 @@
  */
 
 #include <mutex>
-#include <set>
 
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/common/EntityId_t.hpp>
 #include <fastdds/rtps/common/GuidPrefix_t.hpp>
 #include <fastdds/rtps/common/RemoteLocators.hpp>
-#include <statistics/rtps/GuidUtils.hpp>
 
-#include <rtps/builtin/discovery/database/DiscoveryDataBase.hpp>
+#include "./DiscoveryDataBase.hpp"
 
-#include <nlohmann/json.hpp>
-#include <rtps/builtin/discovery/database/backup/SharedBackupFunctions.hpp>
+#include <json.hpp>
+#include "backup/SharedBackupFunctions.hpp"
 
 namespace eprosima {
 namespace fastdds {
@@ -38,7 +36,7 @@ namespace ddb {
 
 DiscoveryDataBase::DiscoveryDataBase(
         fastrtps::rtps::GuidPrefix_t server_guid_prefix,
-        std::set<fastrtps::rtps::GuidPrefix_t> servers)
+        std::vector<fastrtps::rtps::GuidPrefix_t> servers)
     : server_guid_prefix_(server_guid_prefix)
     , server_acked_by_all_(servers.size() == 0)
     , servers_(servers)
@@ -53,7 +51,7 @@ DiscoveryDataBase::~DiscoveryDataBase()
 {
     if (!clear().empty())
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Destroying a NOT cleared database");
+        logError(DISCOVERY_DATABASE, "Destroying a NOT cleared database");
     }
 
     if (is_persistent_)
@@ -62,57 +60,33 @@ DiscoveryDataBase::~DiscoveryDataBase()
     }
 }
 
-void DiscoveryDataBase::add_server(
-        fastrtps::rtps::GuidPrefix_t server)
-{
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Server " << server << " added");
-    servers_.insert(server);
-}
-
-void DiscoveryDataBase::remove_related_alive_from_history_nts(
-        fastrtps::rtps::WriterHistory* writer_history,
-        const fastrtps::rtps::GuidPrefix_t& entity_guid_prefix)
-{
-    // Iterate over changes in writer_history
-    for (auto chit = writer_history->changesBegin(); chit != writer_history->changesEnd();)
-    {
-        // Remove all DATA whose original sender was entity_guid_prefix from writer_history
-        if (entity_guid_prefix == guid_from_change(*chit).guidPrefix)
-        {
-            chit = writer_history->remove_change(chit, false);
-            continue;
-        }
-        chit++;
-    }
-}
-
 std::vector<fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::clear()
 {
     // Cannot clear an enabled database, since there could be inconsistencies after the process
     if (enabled_)
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Cannot clear an enabled database");
+        logError(DISCOVERY_DATABASE, "Cannot clear an enabled database");
         return std::vector<fastrtps::rtps::CacheChange_t*>({});
     }
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Clearing DiscoveryDataBase");
+    logInfo(DISCOVERY_DATABASE, "Clearing DiscoveryDataBase");
 
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
 
     /* Clear receive queues. Set changes inside to release */
     while (!pdp_data_queue_.Empty())
     {
-        // This moves the value, do not copy it
-        DiscoveryPDPDataQueueInfo data_queue_info = pdp_data_queue_.FrontAndPop();
+        DiscoveryPDPDataQueueInfo data_queue_info = pdp_data_queue_.Front();
         changes_to_release_.push_back(data_queue_info.change());
+        pdp_data_queue_.Pop();
     }
     pdp_data_queue_.Clear(
 
         );
     while (!edp_data_queue_.Empty())
     {
-        // This moves the value, do not copy it
-        DiscoveryEDPDataQueueInfo data_queue_info = edp_data_queue_.FrontAndPop();
+        DiscoveryEDPDataQueueInfo data_queue_info = edp_data_queue_.Front();
         changes_to_release_.push_back(data_queue_info.change());
+        edp_data_queue_.Pop();
     }
     edp_data_queue_.Clear();
 
@@ -178,9 +152,9 @@ bool DiscoveryDataBase::pdp_is_relevant(
     }
 
     // Lock(shared mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
 
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "PDP is " << change.instanceHandle << " relevant to " << reader_guid);
+    logInfo(DISCOVERY_DATABASE, "PDP is " << change.instanceHandle << " relevant to " << reader_guid);
 
     auto it = participants_.find(change_guid_prefix);
     if (it != participants_.end())
@@ -202,7 +176,7 @@ bool DiscoveryDataBase::edp_publications_is_relevant(
     fastrtps::rtps::GUID_t change_guid = guid_from_change(&change);
 
     // Lock(shared mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
 
     auto itp = participants_.find(change_guid.guidPrefix);
     if (itp == participants_.end())
@@ -235,7 +209,7 @@ bool DiscoveryDataBase::edp_subscriptions_is_relevant(
     fastrtps::rtps::GUID_t change_guid = guid_from_change(&change);
 
     // Lock(shared mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
 
     auto itp = participants_.find(change_guid.guidPrefix);
     if (itp == participants_.end())
@@ -277,13 +251,13 @@ void DiscoveryDataBase::add_ack_(
 {
     if (!enabled_)
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Discovery Database is disabled");
+        logInfo(DISCOVERY_DATABASE, "Discovery Database is disabled");
         return;
     }
 
     if (is_participant(change))
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE,
+        logInfo(DISCOVERY_DATABASE,
                 "Adding DATA(p) ACK for change " << change->instanceHandle << " to " << acked_entity);
         auto it = participants_.find(guid_from_change(change).guidPrefix);
         if (it != participants_.end())
@@ -298,7 +272,7 @@ void DiscoveryDataBase::add_ack_(
     }
     else if (is_writer(change))
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE,
+        logInfo(DISCOVERY_DATABASE,
                 "Adding DATA(w) ACK for change " << change->instanceHandle << " to " << acked_entity);
         auto it = writers_.find(guid_from_change(change));
         if (it != writers_.end())
@@ -313,7 +287,7 @@ void DiscoveryDataBase::add_ack_(
     }
     else if (is_reader(change))
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE,
+        logInfo(DISCOVERY_DATABASE,
                 "Adding DATA(r) ACK for change " << change->instanceHandle << " to " << acked_entity);
         auto it = readers_.find(guid_from_change(change));
         if (it != readers_.end())
@@ -337,7 +311,7 @@ bool DiscoveryDataBase::update(
     if (is_persistent_ && guid_from_change(change).guidPrefix != server_guid_prefix_)
     {
         // Does not allow to the server to erase the ddb before this message has been processed
-        std::lock_guard<std::recursive_mutex> guard(data_queues_mutex_);
+        std::unique_lock<std::recursive_mutex> lock(data_queues_mutex_);
         nlohmann::json j;
         ddb::to_json(j, *change);
         backup_file_ << j;
@@ -346,17 +320,17 @@ bool DiscoveryDataBase::update(
 
     if (!enabled_)
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Discovery Database is disabled");
+        logInfo(DISCOVERY_DATABASE, "Discovery Database is disabled");
         return false;
     }
 
     if (!is_participant(change))
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Change is not a DATA(p|Up): " << change->instanceHandle);
+        logError(DISCOVERY_DATABASE, "Change is not a DATA(p|Up): " << change->instanceHandle);
         return false;
     }
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Adding DATA(p|Up) to the queue: " << change->instanceHandle);
-    // Add the DATA(p|Up) to the PDP queue to process
+    logInfo(DISCOVERY_DATABASE, "Adding DATA(p|Up) to the queue: " << change->instanceHandle);
+    //  Add the DATA(p|Up) to the PDP queue to process
     pdp_data_queue_.Push(eprosima::fastdds::rtps::ddb::DiscoveryPDPDataQueueInfo(change, participant_change_data));
     return true;
 }
@@ -369,7 +343,7 @@ bool DiscoveryDataBase::update(
     if (is_persistent_ && guid_from_change(change).guidPrefix != server_guid_prefix_)
     {
         // Does not allow to the server to erase the ddb before this message has been process
-        std::lock_guard<std::recursive_mutex> guard(data_queues_mutex_);
+        std::unique_lock<std::recursive_mutex> lock(data_queues_mutex_);
         nlohmann::json j;
         ddb::to_json(j, *change);
         backup_file_ << j;
@@ -378,17 +352,17 @@ bool DiscoveryDataBase::update(
 
     if (!enabled_)
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Discovery Database is disabled");
+        logInfo(DISCOVERY_DATABASE, "Discovery Database is disabled");
         return false;
     }
 
     if (!is_writer(change) && !is_reader(change))
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Change is not a DATA(w|Uw|r|Ur): " << change->instanceHandle);
+        logError(DISCOVERY_DATABASE, "Change is not a DATA(w|Uw|r|Ur): " << change->instanceHandle);
         return false;
     }
 
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Adding DATA(w|Uw|r|Ur) to the queue: " << change->instanceHandle);
+    logInfo(DISCOVERY_DATABASE, "Adding DATA(w|Uw|r|Ur) to the queue: " << change->instanceHandle);
     //  add the DATA(w|Uw|r|Ur) to the EDP queue to process
     edp_data_queue_.Push(eprosima::fastdds::rtps::ddb::DiscoveryEDPDataQueueInfo(change, topic_name));
     return true;
@@ -397,14 +371,14 @@ bool DiscoveryDataBase::update(
 const std::vector<eprosima::fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::changes_to_dispose()
 {
     // lock(sharing mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     return disposals_;
 }
 
 void DiscoveryDataBase::clear_changes_to_dispose()
 {
     // lock(exclusive mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     disposals_.clear();
 }
 
@@ -413,56 +387,56 @@ void DiscoveryDataBase::clear_changes_to_dispose()
 const std::vector<eprosima::fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::pdp_to_send()
 {
     // lock(sharing mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     return pdp_to_send_;
 }
 
 void DiscoveryDataBase::clear_pdp_to_send()
 {
     // lock(exclusive mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     pdp_to_send_.clear();
 }
 
 const std::vector<eprosima::fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::edp_publications_to_send()
 {
     // lock(sharing mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     return edp_publications_to_send_;
 }
 
 void DiscoveryDataBase::clear_edp_publications_to_send()
 {
     // lock(exclusive mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     edp_publications_to_send_.clear();
 }
 
 const std::vector<eprosima::fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::edp_subscriptions_to_send()
 {
     // lock(sharing mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     return edp_subscriptions_to_send_;
 }
 
 void DiscoveryDataBase::clear_edp_subscriptions_to_send()
 {
     // lock(exclusive mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     edp_subscriptions_to_send_.clear();
 }
 
 const std::vector<eprosima::fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::changes_to_release()
 {
     // lock(sharing mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     return changes_to_release_;
 }
 
 void DiscoveryDataBase::clear_changes_to_release()
 {
     // lock(exclusive mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
     changes_to_release_.clear();
 }
 
@@ -472,12 +446,12 @@ void DiscoveryDataBase::process_pdp_data_queue()
 {
     if (!enabled_)
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Discovery Database is disabled");
+        logInfo(DISCOVERY_DATABASE, "Discovery Database is disabled");
         return;
     }
 
     // Lock(exclusive mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
 
     // Swap DATA queues
     pdp_data_queue_.Swap();
@@ -485,24 +459,27 @@ void DiscoveryDataBase::process_pdp_data_queue()
     // Process all messages in the queque
     while (!pdp_data_queue_.Empty())
     {
-        // Process each message with FrontAndPop(). Move it, do not copy it
-        DiscoveryPDPDataQueueInfo data_queue_info = pdp_data_queue_.FrontAndPop();
+        // Process each message with Front()
+        DiscoveryPDPDataQueueInfo data_queue_info = pdp_data_queue_.Front();
 
         // If the change is a DATA(p)
         if (data_queue_info.change()->kind == eprosima::fastrtps::rtps::ALIVE)
         {
             // Update participants map
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "DATA(p) of entity " << data_queue_info.change()->instanceHandle <<
+            logInfo(DISCOVERY_DATABASE, "DATA(p) of entity " << data_queue_info.change()->instanceHandle <<
                     " received from: " << data_queue_info.change()->writerGUID);
             create_participant_from_change_(data_queue_info.change(), data_queue_info.participant_change_data());
         }
         // If the change is a DATA(Up)
         else
         {
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "DATA(Up) of entity " << data_queue_info.change()->instanceHandle <<
+            logInfo(DISCOVERY_DATABASE, "DATA(Up) of entity " << data_queue_info.change()->instanceHandle <<
                     " received from: " << data_queue_info.change()->writerGUID);
             process_dispose_participant_(data_queue_info.change());
         }
+
+        // Pop the message from the queue
+        pdp_data_queue_.Pop();
     }
 }
 
@@ -510,14 +487,14 @@ bool DiscoveryDataBase::process_edp_data_queue()
 {
     if (!enabled_)
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Discovery Database is disabled");
+        logInfo(DISCOVERY_DATABASE, "Discovery Database is disabled");
         return false;
     }
 
     bool is_dirty_topic = false;
 
     // Lock(exclusive mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
 
     // Swap DATA queues
     edp_data_queue_.Swap();
@@ -528,27 +505,27 @@ bool DiscoveryDataBase::process_edp_data_queue()
     // Process all messages in the queque
     while (!edp_data_queue_.Empty())
     {
-        // Process each message with FrontAndPop(). Move it, do not copy it
-        DiscoveryEDPDataQueueInfo data_queue_info = edp_data_queue_.FrontAndPop();
+        // Process each message with Front()
+        DiscoveryEDPDataQueueInfo data_queue_info = edp_data_queue_.Front();
         change = data_queue_info.change();
         topic_name = data_queue_info.topic();
 
         // If the change is a DATA(w|r)
         if (change->kind == eprosima::fastrtps::rtps::ALIVE)
         {
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "ALIVE change received from: " << change->instanceHandle);
+            logInfo(DISCOVERY_DATABASE, "ALIVE change received from: " << change->instanceHandle);
             // DATA(w) case
             if (is_writer(change))
             {
-                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "DATA(w) in topic " << topic_name << " received from: "
-                                                                          << change->instanceHandle);
+                logInfo(DISCOVERY_DATABASE, "DATA(w) in topic " << topic_name << " received from: "
+                                                                << change->instanceHandle);
                 create_writers_from_change_(change, topic_name);
             }
             // DATA(r) case
             else if (is_reader(change))
             {
-                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "DATA(r) in topic " << topic_name << " received from: "
-                                                                          << change->instanceHandle);
+                logInfo(DISCOVERY_DATABASE, "DATA(r) in topic " << topic_name << " received from: "
+                                                                << change->instanceHandle);
                 create_readers_from_change_(change, topic_name);
             }
         }
@@ -558,16 +535,19 @@ bool DiscoveryDataBase::process_edp_data_queue()
             // DATA(Uw) case
             if (is_writer(change))
             {
-                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "DATA(Uw) received from: " << change->instanceHandle);
+                logInfo(DISCOVERY_DATABASE, "DATA(Uw) received from: " << change->instanceHandle);
                 process_dispose_writer_(change);
             }
             // DATA(Ur) case
             else if (is_reader(change))
             {
-                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "DATA(Ur) received from: " << change->instanceHandle);
+                logInfo(DISCOVERY_DATABASE, "DATA(Ur) received from: " << change->instanceHandle);
                 process_dispose_reader_(change);
             }
         }
+
+        // Pop the message from the queue
+        edp_data_queue_.Pop();
     }
 
     return is_dirty_topic;
@@ -596,9 +576,9 @@ void DiscoveryDataBase::create_participant_from_change_(
 void DiscoveryDataBase::match_new_server_(
         eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix)
 {
-    // Send Our DATA(p) to the new participant
+    // Send our DATA(p) to the new participant
     // If this is not done, our data could be skip afterwards because a gap sent in newer DATA(p)s
-    //  so the new participant could never receive out data
+    // so the new participant could never receive out data
     auto our_data_it = participants_.find(server_guid_prefix_);
     assert(our_data_it != participants_.end());
     add_pdp_to_send_(our_data_it->second.change());
@@ -610,7 +590,7 @@ void DiscoveryDataBase::match_new_server_(
 void DiscoveryDataBase::create_virtual_endpoints_(
         eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Creating virtual entities for " << participant_prefix);
+    logInfo(DISCOVERY_DATABASE, "Creating virtual entities for " << participant_prefix);
     /* Create virtual writer */
     // Create a GUID for the virtual writer from the local server GUID prefix and the virtual writer entity
     // ID.
@@ -631,9 +611,6 @@ void DiscoveryDataBase::create_virtual_endpoints_(
     virtual_writer_writer_params.sample_identity(virtual_writer_sample_id);
     virtual_writer_writer_params.related_sample_identity(virtual_writer_sample_id);
     virtual_writer_change->write_params = std::move(virtual_writer_writer_params);
-    virtual_writer_change->writer_info.previous = nullptr;
-    virtual_writer_change->writer_info.next = nullptr;
-    virtual_writer_change->writer_info.num_sent_submessages = 0;
     // Create the virtual writer
     create_writers_from_change_(virtual_writer_change, virtual_topic_);
 
@@ -657,9 +634,6 @@ void DiscoveryDataBase::create_virtual_endpoints_(
     virtual_reader_writer_params.sample_identity(virtual_reader_sample_id);
     virtual_reader_writer_params.related_sample_identity(virtual_reader_sample_id);
     virtual_reader_change->write_params = std::move(virtual_reader_writer_params);
-    virtual_reader_change->writer_info.previous = nullptr;
-    virtual_reader_change->writer_info.next = nullptr;
-    virtual_reader_change->writer_info.num_sent_submessages = 0;
     // Create the virtual reader
     create_readers_from_change_(virtual_reader_change, virtual_topic_);
 }
@@ -678,19 +652,16 @@ void DiscoveryDataBase::create_new_participant_from_change_(
 {
     fastrtps::rtps::GUID_t change_guid = guid_from_change(ch);
 
+    DiscoveryParticipantInfo part(ch, server_guid_prefix_, change_data);
     std::pair<std::map<eprosima::fastrtps::rtps::GuidPrefix_t, DiscoveryParticipantInfo>::iterator, bool> ret =
-            participants_.insert(
-        std::make_pair(
-            change_guid.guidPrefix,
-            DiscoveryParticipantInfo(ch, server_guid_prefix_, change_data)));
-
+            participants_.insert(std::make_pair(change_guid.guidPrefix, part));
     // If insert was successful
     if (ret.second)
     {
         // New participant found
         new_updates_++;
 
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "New participant added: " << change_guid.guidPrefix);
+        logInfo(DISCOVERY_DATABASE, "New participant added: " << change_guid.guidPrefix);
 
         // Manually set to 1 the relevant participants ACK status of the participant that sent the change. This way,
         // we avoid backprogation of the data.
@@ -701,9 +672,9 @@ void DiscoveryDataBase::create_new_participant_from_change_(
         {
             // If the participant is a new participant, mark that not everyone has ACKed this server's DATA(p)
             // TODO if the new participant is a server it may be that our DATA(p) is already acked because he is
-            //  our server and we have pinged it. But also if we are its server it could be the case that
-            //  our DATA(p) is not acked even when it is our server. Solution: see in PDPServer how the change has
-            //  arrived, if because our ping or because their DATA(p). MINOR PROBLEM
+            // our server and we have pinged it. But also if we are its server it could be the case that
+            // our DATA(p) is not acked even when it is our server. Solution: see in PDPServer how the change has
+            // arrived. if because our ping or because their DATA(p). MINOR PROBLEM
             server_acked_by_all(false);
         }
 
@@ -717,7 +688,7 @@ void DiscoveryDataBase::create_new_participant_from_change_(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Failed adding new participant " << change_guid.guidPrefix);
+        logError(DISCOVERY_DATABASE, "Failed adding new participant " << change_guid.guidPrefix);
     }
 }
 
@@ -753,7 +724,7 @@ void DiscoveryDataBase::update_participant_from_change_(
         server_acked_by_all(false);
 
         // It is possible that this Data(P) is in our history if it has not been acked by all
-        // In this case we have to resent it with the new update
+        // In this case we have to resend it with the new update
         if (!participant_info.is_acked_by_all())
         {
             add_pdp_to_send_(ch);
@@ -764,7 +735,7 @@ void DiscoveryDataBase::update_participant_from_change_(
     else if (ch->write_params.sample_identity().sequence_number() >
             participant_info.change()->write_params.sample_identity().sequence_number())
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Participant already known with newer sequence number");
+        logInfo(DISCOVERY_DATABASE, "Participant already known with newer sequence number");
 
         // The change could be newer and at the same time not being an update.
         // This happens with DATAs coming from servers, since they take their own DATAs in and out frequently,
@@ -772,7 +743,7 @@ void DiscoveryDataBase::update_participant_from_change_(
         // To account for that, we discard the DATA if the payload is exactly the same as what we have.
         if (!(ch->serializedPayload == participant_info.change()->serializedPayload))
         {
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Participant updating. Marking old change to release");
+            logInfo(DISCOVERY_DATABASE, "Participant updating. Marking old change to release");
             // Update participant's change in the database, set all relevant participants ACK status to 0, and add
             // old change to changes_to_release_.
             update_change_and_unmatch_(ch, participant_info);
@@ -821,7 +792,7 @@ void DiscoveryDataBase::create_writers_from_change_(
             // The change could be newer and at the same time not being an update.
             // This happens with DATAs coming from servers, since they take their own DATAs in and out frequently,
             // so the sequence number in `write_params` changes.
-            // To account for that, we discard the DATA if the payload is exactly the same as what wee have.
+            // To account for that, we discard the DATA if the payload is exactly the same as what we have.
             if (!(ch->serializedPayload == writer_it->second.change()->serializedPayload))
             {
                 // Update the change related to the writer and return the old change to the pool
@@ -867,7 +838,7 @@ void DiscoveryDataBase::create_writers_from_change_(
                 writers_.insert(std::make_pair(writer_guid, tmp_writer));
         if (!ret.second)
         {
-            EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Error inserting writer " << writer_guid);
+            logError(DISCOVERY_DATABASE, "Error inserting writer " << writer_guid);
             return;
         }
         writer_it = ret.first;
@@ -884,8 +855,7 @@ void DiscoveryDataBase::create_writers_from_change_(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE,
-                    "Writer " << writer_guid << " has no associated participant. Skipping");
+            logError(DISCOVERY_DATABASE, "Writer " << writer_guid << " has no associated participant. Skipping");
             return;
         }
 
@@ -909,7 +879,7 @@ void DiscoveryDataBase::create_writers_from_change_(
             auto readers_it = readers_by_topic_.find(topic_name);
             if (readers_it == readers_by_topic_.end())
             {
-                EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Topic error: " << topic_name << ". Must exist.");
+                logError(DISCOVERY_DATABASE, "Topic error: " << topic_name << ". Must exist.");
                 return;
             }
             for (auto reader : readers_it->second)
@@ -939,7 +909,7 @@ void DiscoveryDataBase::create_readers_from_change_(
             // The change could be newer and at the same time not being an update.
             // This happens with DATAs coming from servers, since they take their own DATAs in and out frequently,
             // so the sequence number in `write_params` changes.
-            // To account for that, we discard the DATA if the payload is exactly the same as what wee have.
+            // To account for that, we discard the DATA if the payload is exactly the same as what we have.
             if (!(ch->serializedPayload == reader_it->second.change()->serializedPayload))
             {
                 // Update the change related to the reader and return the old change to the pool
@@ -985,7 +955,7 @@ void DiscoveryDataBase::create_readers_from_change_(
                 readers_.insert(std::make_pair(reader_guid, tmp_reader));
         if (!ret.second)
         {
-            EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Error inserting reader " << reader_guid);
+            logError(DISCOVERY_DATABASE, "Error inserting reader " << reader_guid);
             return;
         }
         reader_it = ret.first;
@@ -1002,8 +972,7 @@ void DiscoveryDataBase::create_readers_from_change_(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE,
-                    "Reader " << reader_guid << " has no associated participant. Skipping");
+            logError(DISCOVERY_DATABASE, "Reader " << reader_guid << " has no associated participant. Skipping");
             return;
         }
 
@@ -1027,7 +996,7 @@ void DiscoveryDataBase::create_readers_from_change_(
             auto writers_it = writers_by_topic_.find(topic_name);
             if (writers_it == writers_by_topic_.end())
             {
-                EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Topic error: " << topic_name << ". Must exist.");
+                logError(DISCOVERY_DATABASE, "Topic error: " << topic_name << ". Must exist.");
                 return;
             }
             for (auto writer : writers_it->second)
@@ -1044,13 +1013,13 @@ void DiscoveryDataBase::match_writer_reader_(
         const eprosima::fastrtps::rtps::GUID_t& writer_guid,
         const eprosima::fastrtps::rtps::GUID_t& reader_guid)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Matching writer " << writer_guid << " with reader " << reader_guid);
+    logInfo(DISCOVERY_DATABASE, "Matching writer " << writer_guid << " with reader " << reader_guid);
 
     // writer entity
     auto wit = writers_.find(writer_guid);
     if (wit == writers_.end())
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Matching unexisting writer " << writer_guid);
+        logError(DISCOVERY_DATABASE, "Matching unexisting writer " << writer_guid);
         return;
     }
     DiscoveryEndpointInfo& writer_info = wit->second;
@@ -1059,7 +1028,7 @@ void DiscoveryDataBase::match_writer_reader_(
     auto p_wit = participants_.find(writer_guid.guidPrefix);
     if (p_wit == participants_.end())
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Matching unexisting participant from writer " << writer_guid);
+        logError(DISCOVERY_DATABASE, "Matching unexisting participant from writer " << writer_guid);
         return;
     }
     DiscoveryParticipantInfo& writer_participant_info = p_wit->second;
@@ -1068,7 +1037,7 @@ void DiscoveryDataBase::match_writer_reader_(
     auto rit = readers_.find(reader_guid);
     if (rit == readers_.end())
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Matching unexisting reader " << reader_guid);
+        logError(DISCOVERY_DATABASE, "Matching unexisting reader " << reader_guid);
         return;
     }
     DiscoveryEndpointInfo& reader_info = rit->second;
@@ -1077,7 +1046,7 @@ void DiscoveryDataBase::match_writer_reader_(
     auto p_rit = participants_.find(reader_guid.guidPrefix);
     if (p_rit == participants_.end())
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Matching unexisting participant from reader " << reader_guid);
+        logError(DISCOVERY_DATABASE, "Matching unexisting participant from reader " << reader_guid);
         return;
     }
     DiscoveryParticipantInfo& reader_participant_info = p_rit->second;
@@ -1194,7 +1163,7 @@ void DiscoveryDataBase::match_writer_reader_(
 bool DiscoveryDataBase::set_dirty_topic_(
         std::string topic)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Setting topic " << topic << " as dirty");
+    logInfo(DISCOVERY_DATABASE, "Setting topic " << topic << " as dirty");
 
     // If topic is virtual, we need to set as dirty all the other (non-virtual) topics
     if (topic == virtual_topic_)
@@ -1241,7 +1210,7 @@ void DiscoveryDataBase::process_dispose_participant_(
         // Due to the way of announce a server, it is common to receive two DATA(Up) from the same server
         if (pit->second.change()->kind != fastrtps::rtps::ChangeKind_t::ALIVE)
         {
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Ignoring second DATA(Up)"
+            logInfo(DISCOVERY_DATABASE, "Ignoring second DATA(Up)"
                     << participant_guid.guidPrefix);
             return;
         }
@@ -1256,7 +1225,7 @@ void DiscoveryDataBase::process_dispose_participant_(
     {
         // This is not an error. It could be because we have already receive and process the DATA(Up)
         // from this participant and it is no longer in the database
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Processing disposal from an unexisting Participant"
+        logInfo(DISCOVERY_DATABASE, "Processing disposal from an unexisting Participant"
                 << participant_guid.guidPrefix);
         return;
     }
@@ -1360,13 +1329,13 @@ bool DiscoveryDataBase::process_dirty_topics()
 {
     if (!enabled_)
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Discovery Database is disabled");
+        logInfo(DISCOVERY_DATABASE, "Discovery Database is disabled");
         return false;
     }
 
-    // EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "process_dirty_topics start");
+    // logInfo(DISCOVERY_DATABASE, "process_dirty_topics start");
     // Get shared lock
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
 
     // Iterator objects are declared here because they are reused in each iteration of the loops
     std::map<eprosima::fastrtps::rtps::GuidPrefix_t, DiscoveryParticipantInfo>::iterator parts_reader_it;
@@ -1377,7 +1346,7 @@ bool DiscoveryDataBase::process_dirty_topics()
     // Iterate over dirty_topics_
     for (auto topic_it = dirty_topics_.begin(); topic_it != dirty_topics_.end();)
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Processing topic: " << *topic_it);
+        logInfo(DISCOVERY_DATABASE, "Processing topic: " << *topic_it);
         // Flag to store whether a topic can be cleared.
         bool is_clearable = true;
 
@@ -1399,11 +1368,11 @@ bool DiscoveryDataBase::process_dirty_topics()
         for (fastrtps::rtps::GUID_t writer: writers)
         // Iterate over writers in the topic:
         {
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "[" << *topic_it << "]" << " Processing writer: " << writer);
+            logInfo(DISCOVERY_DATABASE, "[" << *topic_it << "]" << " Processing writer: " << writer);
             // Iterate over readers in the topic:
             for (fastrtps::rtps::GUID_t reader : readers)
             {
-                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "[" << *topic_it << "]" << " Processing reader: " << reader);
+                logInfo(DISCOVERY_DATABASE, "[" << *topic_it << "]" << " Processing reader: " << reader);
                 // Find participants with writer info and participant with reader info in participants_
                 parts_reader_it = participants_.find(reader.guidPrefix);
                 parts_writer_it = participants_.find(writer.guidPrefix);
@@ -1426,7 +1395,7 @@ bool DiscoveryDataBase::process_dirty_topics()
                             // If the status is 0, add DATA(r) to a `edp_publications_to_send_` (if it's not there).
                             if (add_edp_subscriptions_to_send_(readers_it->second.change()))
                             {
-                                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Addind DATA(r) to send: "
+                                logInfo(DISCOVERY_DATABASE, "Addind DATA(r) to send: "
                                         << readers_it->second.change()->instanceHandle);
                             }
                         }
@@ -1436,7 +1405,7 @@ bool DiscoveryDataBase::process_dirty_topics()
                         // Add DATA(p) of the client with the writer to `pdp_to_send_` (if it's not there).
                         if (add_pdp_to_send_(parts_reader_it->second.change()))
                         {
-                            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Addind readers' DATA(p) to send: "
+                            logInfo(DISCOVERY_DATABASE, "Addind readers' DATA(p) to send: "
                                     << parts_reader_it->second.change()->instanceHandle);
                         }
                         // Set topic as not-clearable.
@@ -1458,7 +1427,7 @@ bool DiscoveryDataBase::process_dirty_topics()
                             // If the status is 0, add DATA(w) to a `edp_subscriptions_to_send_` (if it's not there).
                             if (add_edp_publications_to_send_(writers_it->second.change()))
                             {
-                                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Addind DATA(w) to send: "
+                                logInfo(DISCOVERY_DATABASE, "Addind DATA(w) to send: "
                                         << writers_it->second.change()->instanceHandle);
                             }
                         }
@@ -1468,7 +1437,7 @@ bool DiscoveryDataBase::process_dirty_topics()
                         // Add DATA(p) of the client with the reader to `pdp_to_send_` (if it's not there).
                         if (add_pdp_to_send_(parts_writer_it->second.change()))
                         {
-                            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Addind writers' DATA(p) to send: "
+                            logInfo(DISCOVERY_DATABASE, "Addind writers' DATA(p) to send: "
                                     << parts_writer_it->second.change()->instanceHandle);
                         }
                         // Set topic as not-clearable.
@@ -1482,19 +1451,19 @@ bool DiscoveryDataBase::process_dirty_topics()
         if (is_clearable)
         {
             // Delete topic from dirty_topics_
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Topic " << *topic_it << " has been cleaned");
+            logInfo(DISCOVERY_DATABASE, "Topic " << *topic_it << " has been cleaned");
             topic_it = dirty_topics_.erase(topic_it);
         }
         else
         {
             // Proceed with next topic
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Topic " << *topic_it << " is still dirty");
+            logInfo(DISCOVERY_DATABASE, "Topic " << *topic_it << " is still dirty");
             ++topic_it;
         }
     }
 
     // Return whether there still are dirty topics
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Are there dirty topics? " << !dirty_topics_.empty());
+    logInfo(DISCOVERY_DATABASE, "Are there dirty topics? " << !dirty_topics_.empty());
 
     return !dirty_topics_.empty();
 }
@@ -1504,16 +1473,16 @@ bool DiscoveryDataBase::delete_entity_of_change(
 {
     if (!enabled_)
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Discovery Database is disabled");
+        logInfo(DISCOVERY_DATABASE, "Discovery Database is disabled");
         return false;
     }
 
     // Lock(exclusive mode) mutex locally
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
 
     if (change->kind == fastrtps::rtps::ChangeKind_t::ALIVE)
     {
-        EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+        logWarning(DISCOVERY_DATABASE,
                 "Attempting to delete information of an ALIVE entity: " << guid_from_change(change));
         return false;
     }
@@ -1552,15 +1521,13 @@ bool DiscoveryDataBase::is_writer(
         const eprosima::fastrtps::rtps::GUID_t& guid)
 {
     // RTPS Specification v2.3
-    //    - For writers: NO_KEY = 0x03, WITH_KEY = 0x02
-    //    - For built-in writers: NO_KEY = 0xc3, WITH_KEY = 0xc2
-    // Furthermore, the Fast DDS Statistics Module defines an Entity ID for Statistics DataWriters
+    // For writers: NO_KEY = 0x03, WITH_KEY = 0x02
+    // For built-in writers: NO_KEY = 0xc3, WITH_KEY = 0xc2
     const eprosima::fastrtps::rtps::octet identifier = guid.entityId.value[3];
     return ((identifier == 0x02) ||
            (identifier == 0xc2) ||
            (identifier == 0x03) ||
-           (identifier == 0xc3) ||
-           eprosima::fastdds::statistics::is_statistics_builtin(guid.entityId));
+           (identifier == 0xc3));
 }
 
 bool DiscoveryDataBase::is_reader(
@@ -1612,8 +1579,6 @@ fastrtps::rtps::CacheChange_t* DiscoveryDataBase::cache_change_own_participant()
 
 const std::vector<fastrtps::rtps::GuidPrefix_t> DiscoveryDataBase::direct_clients_and_servers()
 {
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
-
     std::vector<fastrtps::rtps::GuidPrefix_t> direct_clients_and_servers;
     // Iterate over participants to add the remote ones that are direct clients or servers
     for (auto participant: participants_)
@@ -1633,8 +1598,6 @@ const std::vector<fastrtps::rtps::GuidPrefix_t> DiscoveryDataBase::direct_client
 
 bool DiscoveryDataBase::server_acked_by_my_servers()
 {
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
-
     if (servers_.size() == 0)
     {
         return true;
@@ -1642,10 +1605,6 @@ bool DiscoveryDataBase::server_acked_by_my_servers()
 
     // Find the server's participant and check whether all its servers have ACKed the server's DATA(p)
     auto this_server = participants_.find(server_guid_prefix_);
-    // check it is always there
-
-    assert(this_server != participants_.end());
-
     for (auto prefix : servers_)
     {
         if (!this_server->second.is_matched(prefix))
@@ -1658,8 +1617,6 @@ bool DiscoveryDataBase::server_acked_by_my_servers()
 
 std::vector<fastrtps::rtps::GuidPrefix_t> DiscoveryDataBase::ack_pending_servers()
 {
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
-
     std::vector<fastrtps::rtps::GuidPrefix_t> ack_pending_servers;
     // Find the server's participant and check whether all its servers have ACKed the server's DATA(p)
     auto this_server = participants_.find(server_guid_prefix_);
@@ -1673,10 +1630,10 @@ std::vector<fastrtps::rtps::GuidPrefix_t> DiscoveryDataBase::ack_pending_servers
     return ack_pending_servers;
 }
 
-LocatorList DiscoveryDataBase::participant_metatraffic_locators(
+fastrtps::rtps::LocatorList_t DiscoveryDataBase::participant_metatraffic_locators(
         fastrtps::rtps::GuidPrefix_t participant_guid_prefix)
 {
-    LocatorList locators;
+    fastrtps::rtps::LocatorList_t locators;
     auto part_it = participants_.find(participant_guid_prefix);
     if (part_it != participants_.end())
     {
@@ -1728,14 +1685,12 @@ DiscoveryDataBase::AckedFunctor::~AckedFunctor()
 void DiscoveryDataBase::AckedFunctor::operator () (
         const eprosima::fastrtps::rtps::ReaderProxy* reader_proxy)
 {
-    std::lock_guard<std::recursive_mutex> guard(db_->mutex_);
-
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "functor operator in change: " << change_->instanceHandle);
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "for reader proxy: " << reader_proxy->guid());
+    logInfo(DISCOVERY_DATABASE, "functor operator in change: " << change_->instanceHandle);
+    logInfo(DISCOVERY_DATABASE, "for reader proxy: " << reader_proxy->guid());
     // Check whether the change has been acknowledged by a given reader
     if (reader_proxy->rtps_is_relevant(change_))
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "is relevant, sequence number " << change_->sequenceNumber);
+        logInfo(DISCOVERY_DATABASE, "is relevant, sequence number " << change_->sequenceNumber);
         if (reader_proxy->change_is_acked(change_->sequenceNumber))
         {
             // In the discovery database, mark the change as acknowledged by the reader
@@ -1745,7 +1700,7 @@ void DiscoveryDataBase::AckedFunctor::operator () (
         {
             // If the reader proxy is from a server that we are pinging, we may not want to wait
             // for it to be acked as the routine will not stop
-            for (auto it = db_->servers_.begin(); it != db_->servers_.end(); ++it)
+            for (auto it = db_->servers_.begin(); it < db_->servers_.end(); ++it)
             {
                 if (reader_proxy->guid().guidPrefix == *it)
                 {
@@ -1761,7 +1716,7 @@ void DiscoveryDataBase::AckedFunctor::operator () (
                     auto remote_server_it = db_->participants_.find(*it);
                     if (remote_server_it == db_->participants_.end())
                     {
-                        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Change " << change_->instanceHandle <<
+                        logInfo(DISCOVERY_DATABASE, "Change " << change_->instanceHandle <<
                                 "check as acked for " << reader_proxy->guid() << " as it has not answered pinging yet");
                         return;
                     }
@@ -1772,7 +1727,7 @@ void DiscoveryDataBase::AckedFunctor::operator () (
 
             // This change is relevant and has not been acked, and does not belongs to the reader proxy
             // of a server that has not been paired yet, so there are pending acknowledgements
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Change " << change_->instanceHandle << " not acked yet");
+            logInfo(DISCOVERY_DATABASE, "Change " << change_->instanceHandle << " not acked yet");
             external_pending_ = true;
         }
     }
@@ -1781,7 +1736,7 @@ void DiscoveryDataBase::AckedFunctor::operator () (
 void DiscoveryDataBase::unmatch_participant_(
         const eprosima::fastrtps::rtps::GuidPrefix_t& guid_prefix)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "unmatching participant: " << guid_prefix);
+    logInfo(DISCOVERY_DATABASE, "unmatching participant: " << guid_prefix);
 
     // For each participant remove it
     // IMPORTANT: This is not for every relevant participant, as participant A could be in other participant's B info
@@ -1803,12 +1758,12 @@ void DiscoveryDataBase::unmatch_participant_(
 void DiscoveryDataBase::unmatch_writer_(
         const eprosima::fastrtps::rtps::GUID_t& guid)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "unmatching writer: " << guid);
+    logInfo(DISCOVERY_DATABASE, "unmatching writer: " << guid);
 
     auto wit = writers_.find(guid);
     if (wit == writers_.end())
     {
-        EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+        logWarning(DISCOVERY_DATABASE,
                 "Attempting to unmatch an unexisting writer: " << guid);
         return;
     }
@@ -1831,7 +1786,7 @@ void DiscoveryDataBase::unmatch_writer_(
                 auto rit = readers_.find(reader);
                 if (rit == readers_.end())
                 {
-                    EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+                    logWarning(DISCOVERY_DATABASE,
                             "Unexisting reader " << reader << " in topic: " << topic);
                 }
                 else
@@ -1848,12 +1803,12 @@ void DiscoveryDataBase::unmatch_writer_(
 void DiscoveryDataBase::unmatch_reader_(
         const eprosima::fastrtps::rtps::GUID_t& guid)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "unmatching reader: " << guid);
+    logInfo(DISCOVERY_DATABASE, "unmatching reader: " << guid);
 
     auto rit = readers_.find(guid);
     if (rit == readers_.end())
     {
-        EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+        logWarning(DISCOVERY_DATABASE,
                 "Attempting to unmatch an unexisting reader: " << guid);
         return;
     }
@@ -1876,7 +1831,7 @@ void DiscoveryDataBase::unmatch_reader_(
                 auto wit = writers_.find(writer);
                 if (wit == writers_.end())
                 {
-                    EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+                    logWarning(DISCOVERY_DATABASE,
                             "Unexisting writer " << writer << " in topic: " << topic);
                 }
                 else
@@ -1897,7 +1852,7 @@ bool DiscoveryDataBase::repeated_writer_topic_(
     auto pit = participants_.find(participant);
     if (pit == participants_.end())
     {
-        EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+        logWarning(DISCOVERY_DATABASE,
                 "Checking repeated writer topics in an unexisting participant: " << participant);
         return false;
     }
@@ -1907,7 +1862,7 @@ bool DiscoveryDataBase::repeated_writer_topic_(
         auto wit = writers_.find(writer_guid);
         if (wit == writers_.end())
         {
-            EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+            logWarning(DISCOVERY_DATABASE,
                     "writer missing: " << writer_guid);
         }
 
@@ -1934,7 +1889,7 @@ bool DiscoveryDataBase::repeated_reader_topic_(
     auto pit = participants_.find(participant);
     if (pit == participants_.end())
     {
-        EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+        logWarning(DISCOVERY_DATABASE,
                 "Checking repeated reader topics in an unexisting participant: " << participant);
         return false;
     }
@@ -1944,7 +1899,7 @@ bool DiscoveryDataBase::repeated_reader_topic_(
         auto rit = readers_.find(reader_guid);
         if (rit == readers_.end())
         {
-            EPROSIMA_LOG_WARNING(DISCOVERY_DATABASE,
+            logWarning(DISCOVERY_DATABASE,
                     "reader missing: " << reader_guid);
             return false;
         }
@@ -2013,7 +1968,7 @@ void DiscoveryDataBase::remove_reader_from_topic_(
         const eprosima::fastrtps::rtps::GUID_t& reader_guid,
         const std::string& topic_name)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "removing: " << reader_guid << " from topic " << topic_name);
+    logInfo(DISCOVERY_DATABASE, "removing: " << reader_guid << " from topic " << topic_name);
 
     if (topic_name == virtual_topic_)
     {
@@ -2097,7 +2052,7 @@ void DiscoveryDataBase::create_topic_(
         }
     } // Else topic already existed
 
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "New topic " << topic_name << " created");
+    logInfo(DISCOVERY_DATABASE, "New topic " << topic_name << " created");
 }
 
 void DiscoveryDataBase::add_writer_to_topic_(
@@ -2126,7 +2081,7 @@ void DiscoveryDataBase::add_writer_to_topic_(
                     std::find(it_topics->second.begin(), it_topics->second.end(), writer_guid);
             if (writer_by_topic_it == it_topics->second.end())
             {
-                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE,
+                logInfo(DISCOVERY_DATABASE,
                         "New virtual writer " << writer_guid << " in writers_by_topic: " << it_topics->first);
                 it_topics->second.push_back(writer_guid);
             }
@@ -2140,7 +2095,7 @@ void DiscoveryDataBase::add_writer_to_topic_(
             std::find(it->second.begin(), it->second.end(), writer_guid);
     if (writer_by_topic_it == it->second.end())
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "New writer " << writer_guid << " in writers_by_topic: " << topic_name);
+        logInfo(DISCOVERY_DATABASE, "New writer " << writer_guid << " in writers_by_topic: " << topic_name);
         it->second.push_back(writer_guid);
     }
 }
@@ -2171,7 +2126,7 @@ void DiscoveryDataBase::add_reader_to_topic_(
                     std::find(it_topics->second.begin(), it_topics->second.end(), reader_guid);
             if (reader_by_topic_it == it_topics->second.end())
             {
-                EPROSIMA_LOG_INFO(DISCOVERY_DATABASE,
+                logInfo(DISCOVERY_DATABASE,
                         "New virtual reader " << reader_guid << " in readers_by_topic: " << it_topics->first);
                 it_topics->second.push_back(reader_guid);
             }
@@ -2185,7 +2140,7 @@ void DiscoveryDataBase::add_reader_to_topic_(
             std::find(it->second.begin(), it->second.end(), reader_guid);
     if (reader_by_topic_it == it->second.end())
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "New reader " << reader_guid << " in readers_by_topic: " << topic_name);
+        logInfo(DISCOVERY_DATABASE, "New reader " << reader_guid << " in readers_by_topic: " << topic_name);
         it->second.push_back(reader_guid);
     }
 }
@@ -2207,7 +2162,7 @@ std::map<eprosima::fastrtps::rtps::GuidPrefix_t, DiscoveryParticipantInfo>::iter
 DiscoveryDataBase::delete_participant_entity_(
         std::map<eprosima::fastrtps::rtps::GuidPrefix_t, DiscoveryParticipantInfo>::iterator it)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Deleting participant: " << it->first);
+    logInfo(DISCOVERY_DATABASE, "Deleting participant: " << it->first);
     if (it == participants_.end())
     {
         return participants_.end();
@@ -2233,7 +2188,7 @@ bool DiscoveryDataBase::delete_reader_entity_(
 std::map<eprosima::fastrtps::rtps::GUID_t, DiscoveryEndpointInfo>::iterator DiscoveryDataBase::delete_reader_entity_(
         std::map<eprosima::fastrtps::rtps::GUID_t, DiscoveryEndpointInfo>::iterator it)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Deleting reader: " << it->first.guidPrefix);
+    logInfo(DISCOVERY_DATABASE, "Deleting reader: " << it->first.guidPrefix);
     if (it == readers_.end())
     {
         return readers_.end();
@@ -2242,7 +2197,7 @@ std::map<eprosima::fastrtps::rtps::GUID_t, DiscoveryEndpointInfo>::iterator Disc
     auto pit = participants_.find(it->first.guidPrefix);
     if (pit == participants_.end())
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Attempting to delete and orphan reader");
+        logError(DISCOVERY_DATABASE, "Attempting to delete and orphan reader");
         // Returning error here could lead to an infinite loop
     }
     else
@@ -2282,7 +2237,7 @@ bool DiscoveryDataBase::delete_writer_entity_(
 std::map<eprosima::fastrtps::rtps::GUID_t, DiscoveryEndpointInfo>::iterator DiscoveryDataBase::delete_writer_entity_(
         std::map<eprosima::fastrtps::rtps::GUID_t, DiscoveryEndpointInfo>::iterator it)
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Deleting writer: " << it->first.guidPrefix);
+    logInfo(DISCOVERY_DATABASE, "Deleting writer: " << it->first.guidPrefix);
     if (it == writers_.end())
     {
         return writers_.end();
@@ -2291,7 +2246,7 @@ std::map<eprosima::fastrtps::rtps::GUID_t, DiscoveryEndpointInfo>::iterator Disc
     auto pit = participants_.find(it->first.guidPrefix);
     if (pit == participants_.end())
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Attempting to delete and orphan writer");
+        logError(DISCOVERY_DATABASE, "Attempting to delete and orphan writer");
         // Returning error here could lead to an infinite loop
     }
     else
@@ -2323,7 +2278,7 @@ bool DiscoveryDataBase::add_pdp_to_send_(
                 pdp_to_send_.end(),
                 change) == pdp_to_send_.end())
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Addind DATA(p) to send: "
+        logInfo(DISCOVERY_DATABASE, "Addind DATA(p) to send: "
                 << change->instanceHandle);
         pdp_to_send_.push_back(change);
         return true;
@@ -2340,7 +2295,7 @@ bool DiscoveryDataBase::add_edp_publications_to_send_(
                 edp_publications_to_send_.end(),
                 change) == edp_publications_to_send_.end())
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Addind DATA(w) to send: "
+        logInfo(DISCOVERY_DATABASE, "Addind DATA(w) to send: "
                 << change->instanceHandle);
         edp_publications_to_send_.push_back(change);
         return true;
@@ -2357,7 +2312,7 @@ bool DiscoveryDataBase::add_edp_subscriptions_to_send_(
                 edp_subscriptions_to_send_.end(),
                 change) == edp_subscriptions_to_send_.end())
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Addind DATA(r) to send: "
+        logInfo(DISCOVERY_DATABASE, "Addind DATA(r) to send: "
                 << change->instanceHandle);
         edp_subscriptions_to_send_.push_back(change);
         return true;
@@ -2429,7 +2384,7 @@ bool DiscoveryDataBase::from_json(
     fastrtps::rtps::GuidPrefix_t prefix_aux_ack;
     fastrtps::rtps::GUID_t guid_aux;
 
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Raising DDB from json Backup");
+    logInfo(DISCOVERY_DATABASE, "Raising DDB from json Backup");
 
     try
     {
@@ -2469,7 +2424,7 @@ bool DiscoveryDataBase::from_json(
             // Add Participant
             participants_.insert(std::make_pair(prefix_aux, dpi));
 
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Participant " << prefix_aux << " created");
+            logInfo(DISCOVERY_DATABASE, "Participant " << prefix_aux << " created");
 
             // In case the change is NOT ALIVE it must be set as dispose so it can be communicate to others and erased
             if (change->kind != fastrtps::rtps::ALIVE)
@@ -2523,12 +2478,12 @@ bool DiscoveryDataBase::from_json(
             else
             {
                 // Endpoint without participant, corrupted DDB
-                EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "Writer " << guid_aux << " without participant");
+                logError(DISCOVERY_DATABASE, "Writer " << guid_aux << " without participant");
                 // TODO handle error
                 return false;
             }
 
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE,
+            logInfo(DISCOVERY_DATABASE,
                     "Writer " << guid_aux << " created with instance handle " <<
                     wit.first->second.change()->instanceHandle);
 
@@ -2584,7 +2539,7 @@ bool DiscoveryDataBase::from_json(
                 // TODO handle error
                 return false;
             }
-            EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Reader " << guid_aux << " created");
+            logInfo(DISCOVERY_DATABASE, "Reader " << guid_aux << " created");
 
             if (change->kind != fastrtps::rtps::ALIVE)
             {
@@ -2594,7 +2549,7 @@ bool DiscoveryDataBase::from_json(
     }
     catch (std::ios_base::failure&)
     {
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "BACKUP CORRUPTED");
+        logError(DISCOVERY_DATABASE, "BACKUP CORRUPTED");
     }
 
     // Set dirty topics to all, so next iteration every message pending is sent
@@ -2608,7 +2563,7 @@ bool DiscoveryDataBase::from_json(
 
 void DiscoveryDataBase::clean_backup()
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Restoring queue DDB in json backup");
+    logInfo(DISCOVERY_DATABASE, "Restoring queue DDB in json backup");
 
     // This will erase the last backup stored
     backup_file_.close();
@@ -2627,8 +2582,6 @@ void DiscoveryDataBase::persistence_enable(
 bool DiscoveryDataBase::is_participant_local(
         const eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix)
 {
-    std::lock_guard<std::recursive_mutex> guard(mutex_);
-
     auto pit = participants_.find(participant_prefix);
     if (pit != participants_.end())
     {

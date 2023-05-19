@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/transport/TCPChannelResourceBasic.h>
+#include <asio.hpp>
+#include <fastdds/rtps/transport/TCPChannelResource.h>
+#include <fastdds/rtps/transport/TCPTransportInterface.h>
+#include <fastrtps/utils/IPLocator.h>
 
 #include <future>
 #include <array>
-
-#include <asio.hpp>
-#include <fastrtps/utils/IPLocator.h>
-#include <rtps/transport/TCPTransportInterface.h>
 
 using namespace asio;
 
@@ -27,6 +26,7 @@ namespace eprosima {
 namespace fastdds {
 namespace rtps {
 
+using Locator_t = fastrtps::rtps::Locator_t;
 using octet = fastrtps::rtps::octet;
 using IPLocator = fastrtps::rtps::IPLocator;
 using Log = fastdds::dds::Log;
@@ -34,7 +34,7 @@ using Log = fastdds::dds::Log;
 TCPChannelResourceBasic::TCPChannelResourceBasic(
         TCPTransportInterface* parent,
         asio::io_service& service,
-        const Locator& locator,
+        const Locator_t& locator,
         uint32_t maxMsgSize)
     : TCPChannelResource(parent, locator, maxMsgSize)
     , service_(service)
@@ -96,7 +96,7 @@ void TCPChannelResourceBasic::connect(
         }
         catch (const std::system_error& error)
         {
-            EPROSIMA_LOG_ERROR(RTCP, "Openning socket " << error.what());
+            logError(RTCP, "Openning socket " << error.what());
         }
     }
 }

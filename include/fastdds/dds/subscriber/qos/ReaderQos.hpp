@@ -65,8 +65,7 @@ public:
                (m_lifespan == b.m_lifespan) &&
                (m_disablePositiveACKs == b.m_disablePositiveACKs) &&
                (type_consistency == b.type_consistency) &&
-               (representation == b.representation) &&
-               (data_sharing == b.data_sharing);
+               (representation == b.representation);
     }
 
     //!Durability Qos, implemented in the library.
@@ -84,7 +83,7 @@ public:
     //!ReliabilityQos, implemented in the library.
     ReliabilityQosPolicy m_reliability;
 
-    //!Ownership Qos, implemented in the library.
+    //!Ownership Qos, NOT implemented in the library.
     OwnershipQosPolicy m_ownership;
 
     //!Destinatio Order Qos, NOT implemented in the library.
@@ -122,9 +121,6 @@ public:
 
     //!Disable positive ACKs QoS
     DisablePositiveACKsQosPolicy m_disablePositiveACKs;
-
-    //!Information for data sharing compatibility check.
-    DataSharingQosPolicy data_sharing;
 
     /**
      * Set Qos from another class

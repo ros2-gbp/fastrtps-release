@@ -20,25 +20,23 @@
 #ifndef _FASTDDS_RTPS_DISCOVERY_DATABASE_H_
 #define _FASTDDS_RTPS_DISCOVERY_DATABASE_H_
 
-#include <fstream>
-#include <iostream>
+#include <vector>
 #include <map>
 #include <mutex>
-#include <set>
-#include <vector>
+#include <iostream>
+#include <fstream>
 
 #include <fastrtps/utils/fixed_size_string.hpp>
-#include <fastdds/rtps/history/WriterHistory.h>
 #include <fastdds/rtps/writer/ReaderProxy.h>
 #include <fastdds/rtps/common/CacheChange.h>
 #include <fastrtps/utils/DBQueue.h>
 
-#include <rtps/builtin/discovery/database/DiscoveryDataFilter.hpp>
-#include <rtps/builtin/discovery/database/DiscoveryParticipantInfo.hpp>
-#include <rtps/builtin/discovery/database/DiscoveryEndpointInfo.hpp>
-#include <rtps/builtin/discovery/database/DiscoveryDataQueueInfo.hpp>
+#include "./DiscoveryDataFilter.hpp"
+#include "./DiscoveryParticipantInfo.hpp"
+#include "./DiscoveryEndpointInfo.hpp"
+#include "./DiscoveryDataQueueInfo.hpp"
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -119,7 +117,7 @@ public:
 
     DiscoveryDataBase(
             fastrtps::rtps::GuidPrefix_t server_guid_prefix,
-            std::set<fastrtps::rtps::GuidPrefix_t> servers);
+            std::vector<fastrtps::rtps::GuidPrefix_t> servers);
 
     ~DiscoveryDataBase();
 
@@ -151,7 +149,7 @@ public:
     //! Disable the possibility to add new entries to the database
     void disable()
     {
-        EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "DISCOVERY DATA BASE DISABLED");
+        logInfo(DISCOVERY_DATABASE, "DISCOVERY DATA BASE DISABLED");
         enabled_ = false;
     }
 
@@ -272,7 +270,7 @@ public:
 
     const std::vector<fastrtps::rtps::GuidPrefix_t> direct_clients_and_servers();
 
-    LocatorList participant_metatraffic_locators(
+    fastrtps::rtps::LocatorList_t participant_metatraffic_locators(
             fastrtps::rtps::GuidPrefix_t participant_guid_prefix);
 
     // return a list of participants that are not the server one
@@ -343,15 +341,6 @@ public:
     // Check if an participant is stored as local. If the participant does not exist, it returns false
     bool is_participant_local(
             const eprosima::fastrtps::rtps::GuidPrefix_t& participant_prefix);
-
-    //! Add a server to the list of remote servers
-    void add_server(
-            fastrtps::rtps::GuidPrefix_t server);
-
-    // Removes all the changes whose original sender was entity_guid_prefix from writer_history
-    void remove_related_alive_from_history_nts(
-            fastrtps::rtps::WriterHistory* writer_history,
-            const fastrtps::rtps::GuidPrefix_t& entity_guid_prefix);
 
 protected:
 
@@ -569,7 +558,7 @@ protected:
     std::atomic<bool> server_acked_by_all_;
 
     //! List of GUID prefixes of the remote servers
-    std::set<fastrtps::rtps::GuidPrefix_t> servers_;
+    std::vector<fastrtps::rtps::GuidPrefix_t> servers_;
 
     // The virtual topic associated with virtual writers and readers
     const std::string virtual_topic_ = "eprosima_server_virtual_topic";
@@ -580,10 +569,10 @@ protected:
     // Whether it has been a new entity discovered or updated in this subroutine loop
     std::atomic<int> new_updates_;
 
-    // Whether the database is restoring a backup
+    // Wheter the database is restoring a backup
     std::atomic<bool> processing_backup_;
 
-    // Whether the database is persistent, so it must store every cache it arrives
+    // Wheter the database is persistent, so it must store every cache it arrives
     bool is_persistent_;
 
     // File to save every cacheChange that is updated to the ddb queues

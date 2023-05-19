@@ -76,29 +76,12 @@ struct RTPS_DllAPI GuidPrefix_t
     /**
      * Guid prefix minor operator
      * @param prefix Second guid prefix to compare
-     * @return True if prefix is higher than this
+     * @return True if prefix is higher
      */
     bool operator <(
             const GuidPrefix_t& prefix) const
     {
         return std::memcmp(value, prefix.value, size) < 0;
-    }
-
-    /**
-     * Guid Prefix compare static method.
-     *
-     * @param prefix1 First guid prefix to compare
-     * @param prefix2 Second guid prefix to compare
-     *
-     * @return 0 if \c prefix1 is equal to \c prefix2 .
-     * @return < 0 if \c prefix1 is lower than \c prefix2 .
-     * @return > 0 if \c prefix1 is higher than \c prefix2 .
-     */
-    static int cmp(
-            const GuidPrefix_t& prefix1,
-            const GuidPrefix_t& prefix2)
-    {
-        return std::memcmp(prefix1.value, prefix2.value, size);
     }
 
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
@@ -110,17 +93,15 @@ inline std::ostream& operator <<(
         std::ostream& output,
         const GuidPrefix_t& guiP)
 {
-    std::stringstream ss;
-    ss << std::hex;
-    char old_fill = ss.fill('0');
+    output << std::hex;
+    char old_fill = output.fill('0');
     for (uint8_t i = 0; i < 11; ++i)
     {
-        ss << std::setw(2) << (int)guiP.value[i] << ".";
+        output << std::setw(2) << (int)guiP.value[i] << ".";
     }
-    ss << std::setw(2) << (int)guiP.value[11];
-    ss.fill(old_fill);
-    ss << std::dec;
-    return output << ss.str();
+    output << std::setw(2) << (int)guiP.value[11];
+    output.fill(old_fill);
+    return output << std::dec;
 }
 
 inline std::istream& operator >>(
@@ -161,7 +142,6 @@ inline std::istream& operator >>(
         }
         catch (std::ios_base::failure& )
         {
-            guiP = GuidPrefix_t::unknown();
         }
 
         input.exceptions(excp_mask);

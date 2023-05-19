@@ -17,76 +17,21 @@
  *
  */
 
-#include <algorithm>
+#include <fastdds/rtps/messages/RTPSMessageGroup.h>
+#include <fastdds/rtps/messages/RTPSMessageCreator.h>
+#include <fastdds/rtps/writer/RTPSWriter.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/flowcontrol/FlowController.h>
+#include "RTPSGapBuilder.hpp"
+#include "RTPSMessageGroup_t.hpp"
 
 #include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/messages/RTPSMessageCreator.h>
-#include <fastdds/rtps/messages/RTPSMessageGroup.h>
-#include <fastdds/rtps/reader/RTPSReader.h>
-#include <fastdds/rtps/writer/RTPSWriter.h>
 
-#include <rtps/messages/RTPSGapBuilder.hpp>
-#include <rtps/messages/RTPSMessageGroup_t.hpp>
-#include <rtps/participant/RTPSParticipantImpl.h>
-
-#include <statistics/rtps/messages/RTPSStatisticsMessages.hpp>
+#include <algorithm>
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
-
-/**
- * An InlineQosWriter that puts the inline_qos of a CacheChange_t into a CDRMessage_t.
- */
-class CacheChangeInlineQoSWriter final : public InlineQosWriter
-{
-    const CacheChange_t& change_;
-
-public:
-
-    explicit CacheChangeInlineQoSWriter(
-            const CacheChange_t& change)
-        : change_(change)
-    {
-    }
-
-    bool writeQosToCDRMessage(
-            CDRMessage_t* msg) final
-    {
-        return CDRMessage::addData(msg, change_.inline_qos.data, change_.inline_qos.length);
-    }
-
-};
-
-static bool data_exceeds_limitation(
-        uint32_t size_to_add,
-        uint32_t limitation,
-        uint32_t total_sent,
-        uint32_t pending_to_send)
-{
-    return
-        // Limitation has been set and
-        (0 < limitation) &&
-        //   either limitation has already been reached
-        ((limitation <= (total_sent + pending_to_send)) ||
-        //   or adding size_to_add will exceed limitation
-        (size_to_add > (limitation - (total_sent + pending_to_send))));
-}
-
-static bool append_message(
-        CDRMessage_t* full_msg,
-        CDRMessage_t* submsg)
-{
-#ifndef FASTDDS_STATISTICS
-    return CDRMessage::appendMsg(full_msg, submsg);
-#else
-    // Keep room for the statistics submessage by reducing max_size while appending submessage
-    full_msg->max_size -= eprosima::fastdds::statistics::rtps::statistics_submessage_length;
-    bool ret_val = CDRMessage::appendMsg(full_msg, submsg);
-    full_msg->max_size += eprosima::fastdds::statistics::rtps::statistics_submessage_length;
-    return ret_val;
-#endif // FASTDDS_STATISTICS
-}
 
 bool sort_changes_group (
         CacheChange_t* c1,
@@ -173,30 +118,26 @@ const EntityId_t& get_entity_id(
 
 RTPSMessageGroup::RTPSMessageGroup(
         RTPSParticipantImpl* participant,
-        bool internal_buffer)
-    : participant_(participant)
-    , send_buffer_(!internal_buffer ? participant->get_send_buffer() : nullptr)
-    , internal_buffer_(internal_buffer)
+        Endpoint* endpoint,
+        const RTPSMessageSenderInterface& msg_sender,
+        std::chrono::steady_clock::time_point max_blocking_time_point)
+    : sender_(msg_sender)
+    , endpoint_(endpoint)
+    , full_msg_(nullptr)
+    , submessage_msg_(nullptr)
+    , currentBytesSent_(0)
+    , participant_(participant)
+#if HAVE_SECURITY
+    , encrypt_msg_(nullptr)
+#endif // if HAVE_SECURITY
+    , max_blocking_time_point_(max_blocking_time_point)
+    , send_buffer_(participant->get_send_buffer())
 {
     // Avoid warning when neither SECURITY nor DEBUG is used
     (void)participant;
 
     assert(participant);
-
-    if (internal_buffer)
-    {
-        const GuidPrefix_t& guid_prefix = participant->getGuid().guidPrefix;
-        constexpr size_t align_size = sizeof(octet*) - 1;
-        uint32_t payload_size = participant->getMaxMessageSize();
-        assert(payload_size > 0u);
-        payload_size = (payload_size + align_size) & ~align_size;
-        send_buffer_.reset(new RTPSMessageGroup_t(
-#if HAVE_SECURITY
-                    participant->is_secure(),
-#endif // if HAVE_SECURITY
-                    payload_size, guid_prefix
-                    ));
-    }
+    assert(endpoint);
 
     full_msg_ = &(send_buffer_->rtpsmsg_fullmsg_);
     submessage_msg_ = &(send_buffer_->rtpsmsg_submessage_);
@@ -215,21 +156,6 @@ RTPSMessageGroup::RTPSMessageGroup(
 #endif // if HAVE_SECURITY
 }
 
-RTPSMessageGroup::RTPSMessageGroup(
-        RTPSParticipantImpl* participant,
-        Endpoint* endpoint,
-        RTPSMessageSenderInterface* msg_sender,
-        std::chrono::steady_clock::time_point max_blocking_time_point)
-    : RTPSMessageGroup(participant)
-{
-    assert(endpoint);
-
-    endpoint_ = endpoint;
-    sender_ = msg_sender;
-    max_blocking_time_point_ = max_blocking_time_point;
-    max_blocking_time_is_set_ = true;
-}
-
 RTPSMessageGroup::~RTPSMessageGroup() noexcept(false)
 {
     try
@@ -238,17 +164,11 @@ RTPSMessageGroup::~RTPSMessageGroup() noexcept(false)
     }
     catch (...)
     {
-        if (!internal_buffer_)
-        {
-            participant_->return_send_buffer(std::move(send_buffer_));
-        }
+        participant_->return_send_buffer(std::move(send_buffer_));
         throw;
     }
 
-    if (!internal_buffer_)
-    {
-        participant_->return_send_buffer(std::move(send_buffer_));
-    }
+    participant_->return_send_buffer(std::move(send_buffer_));
 }
 
 void RTPSMessageGroup::reset_to_header()
@@ -267,46 +187,36 @@ void RTPSMessageGroup::flush()
 
 void RTPSMessageGroup::send()
 {
-    if (endpoint_ && sender_)
+    CDRMessage_t* msgToSend = full_msg_;
+
+    if (full_msg_->length > RTPSMESSAGE_HEADER_SIZE)
     {
-
-        CDRMessage_t* msgToSend = full_msg_;
-
-        if (full_msg_->length > RTPSMESSAGE_HEADER_SIZE)
-        {
-            std::lock_guard<RTPSMessageSenderInterface> lock(*sender_);
-
 #if HAVE_SECURITY
-            // TODO(Ricardo) Control message size if it will be encrypted.
-            if (participant_->security_attributes().is_rtps_protected && endpoint_->supports_rtps_protection())
+        // TODO(Ricardo) Control message size if it will be encrypted.
+        if (participant_->security_attributes().is_rtps_protected && endpoint_->supports_rtps_protection())
+        {
+            CDRMessage::initCDRMsg(encrypt_msg_);
+            full_msg_->pos = RTPSMESSAGE_HEADER_SIZE;
+            encrypt_msg_->pos = RTPSMESSAGE_HEADER_SIZE;
+            encrypt_msg_->length = RTPSMESSAGE_HEADER_SIZE;
+            memcpy(encrypt_msg_->buffer, full_msg_->buffer, RTPSMESSAGE_HEADER_SIZE);
+
+            if (!participant_->security_manager().encode_rtps_message(*full_msg_, *encrypt_msg_,
+                    sender_.remote_participants()))
             {
-                CDRMessage::initCDRMsg(encrypt_msg_);
-                full_msg_->pos = RTPSMESSAGE_HEADER_SIZE;
-                encrypt_msg_->pos = RTPSMESSAGE_HEADER_SIZE;
-                encrypt_msg_->length = RTPSMESSAGE_HEADER_SIZE;
-                memcpy(encrypt_msg_->buffer, full_msg_->buffer, RTPSMESSAGE_HEADER_SIZE);
-
-                if (!participant_->security_manager().encode_rtps_message(*full_msg_, *encrypt_msg_,
-                        sender_->remote_participants()))
-                {
-                    EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error encoding rtps message.");
-                    return;
-                }
-
-                msgToSend = encrypt_msg_;
+                logError(RTPS_WRITER, "Error encoding rtps message.");
+                return;
             }
+
+            msgToSend = encrypt_msg_;
+        }
 #endif // if HAVE_SECURITY
 
-            eprosima::fastdds::statistics::rtps::add_statistics_submessage(msgToSend);
-
-            if (!sender_->send(msgToSend,
-                    max_blocking_time_is_set_ ? max_blocking_time_point_ : (std::chrono::steady_clock::now() +
-                    std::chrono::hours(24))))
-            {
-                throw timeout();
-            }
-            current_sent_bytes_ += msgToSend->length;
+        if (!sender_.send(msgToSend, max_blocking_time_point_))
+        {
+            throw timeout();
         }
+        currentBytesSent_ += msgToSend->length;
     }
 }
 
@@ -321,11 +231,9 @@ void RTPSMessageGroup::flush_and_reset()
 void RTPSMessageGroup::check_and_maybe_flush(
         const GuidPrefix_t& destination_guid_prefix)
 {
-    assert(nullptr != sender_);
-
     CDRMessage::initCDRMsg(submessage_msg_);
 
-    if (sender_->destinations_have_changed())
+    if (sender_.destinations_have_changed())
     {
         flush_and_reset();
     }
@@ -337,15 +245,22 @@ bool RTPSMessageGroup::insert_submessage(
         const GuidPrefix_t& destination_guid_prefix,
         bool is_big_submessage)
 {
-    if (!append_message(full_msg_, submessage_msg_))
+    if (!CDRMessage::appendMsg(full_msg_, submessage_msg_))
     {
         // Retry
-        flush_and_reset();
-        add_info_dst_in_buffer(full_msg_, destination_guid_prefix);
+        flush();
 
-        if (!append_message(full_msg_, submessage_msg_))
+        current_dst_ = c_GuidPrefix_Unknown;
+
+        if (!add_info_dst_in_buffer(full_msg_, destination_guid_prefix))
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot add RTPS submesage to the CDRMessage. Buffer too small");
+            logError(RTPS_WRITER, "Cannot add INFO_DST submessage to the CDRMessage. Buffer too small");
+            return false;
+        }
+
+        if (!CDRMessage::appendMsg(full_msg_, submessage_msg_))
+        {
+            logError(RTPS_WRITER, "Cannot add RTPS submesage to the CDRMessage. Buffer too small");
             return false;
         }
     }
@@ -365,7 +280,7 @@ bool RTPSMessageGroup::add_info_dst_in_buffer(
 {
 #if HAVE_SECURITY
     // Add INFO_SRC when we are at the beginning of the message and RTPS protection is enabled
-    if ((full_msg_->length == RTPSMESSAGE_HEADER_SIZE) &&
+    if ( (full_msg_->length == RTPSMESSAGE_HEADER_SIZE) &&
             participant_->security_attributes().is_rtps_protected && endpoint_->supports_rtps_protection())
     {
         RTPSMessageCreator::addSubmessageInfoSRC(buffer, c_ProtocolVersion, c_VendorId_eProsima,
@@ -385,9 +300,7 @@ bool RTPSMessageGroup::add_info_dst_in_buffer(
 bool RTPSMessageGroup::add_info_ts_in_buffer(
         const Time_t& timestamp)
 {
-    assert(nullptr != sender_);
-
-    EPROSIMA_LOG_INFO(RTPS_WRITER, "Sending INFO_TS message");
+    logInfo(RTPS_WRITER, "Sending INFO_TS message");
 
 #if HAVE_SECURITY
     uint32_t from_buffer_position = submessage_msg_->pos;
@@ -395,7 +308,7 @@ bool RTPSMessageGroup::add_info_ts_in_buffer(
 
     if (!RTPSMessageCreator::addSubmessageInfoTS(submessage_msg_, timestamp, false))
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot add INFO_TS submsg to the CDRMessage. Buffer too small");
+        logError(RTPS_WRITER, "Cannot add INFO_TS submsg to the CDRMessage. Buffer too small");
         return false;
     }
 
@@ -405,9 +318,9 @@ bool RTPSMessageGroup::add_info_ts_in_buffer(
         submessage_msg_->pos = from_buffer_position;
         CDRMessage::initCDRMsg(encrypt_msg_);
         if (!participant_->security_manager().encode_writer_submessage(*submessage_msg_, *encrypt_msg_,
-                endpoint_->getGuid(), sender_->remote_guids()))
+                endpoint_->getGuid(), sender_.remote_guids()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
+            logError(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
             return false;
         }
 
@@ -419,7 +332,7 @@ bool RTPSMessageGroup::add_info_ts_in_buffer(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
+            logError(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
             return false;
         }
     }
@@ -432,36 +345,28 @@ bool RTPSMessageGroup::add_data(
         const CacheChange_t& change,
         bool expectsInlineQos)
 {
-    assert(nullptr != sender_);
-
-    EPROSIMA_LOG_INFO(RTPS_WRITER, "Sending relevant changes as DATA/DATA_FRAG messages");
-
-    // Check limitation
-    uint32_t data_size = change.serializedPayload.length;
-    if (data_exceeds_limitation(data_size, sent_bytes_limitation_, current_sent_bytes_, full_msg_->length))
-    {
-        flush_and_reset();
-        throw limit_exceeded();
-    }
+    logInfo(RTPS_WRITER, "Sending relevant changes as DATA/DATA_FRAG messages");
 
     // Check preconditions. If fail flush and reset.
     check_and_maybe_flush();
     add_info_ts_in_buffer(change.sourceTimestamp);
 
-    CacheChangeInlineQoSWriter qos_writer(change);
-    InlineQosWriter* inline_qos;
-    inline_qos = (change.inline_qos.length > 0 && nullptr != change.inline_qos.data) ? &qos_writer : nullptr;
+    InlineQosWriter* inlineQos = nullptr;
+    if (expectsInlineQos)
+    {
+        //TODOG INLINEQOS
+        //inlineQos = W->getInlineQos();
+    }
 
 #if HAVE_SECURITY
     uint32_t from_buffer_position = submessage_msg_->pos;
 #endif // if HAVE_SECURITY
-    const EntityId_t& readerId = get_entity_id(sender_->remote_guids());
+    const EntityId_t& readerId = get_entity_id(sender_.remote_guids());
 
     CacheChange_t change_to_add;
     change_to_add.copy_not_memcpy(&change);
     change_to_add.serializedPayload.data = change.serializedPayload.data;
     change_to_add.serializedPayload.length = change.serializedPayload.length;
-    change_to_add.writerGUID = endpoint_->getGuid();
 
 #if HAVE_SECURITY
     if (endpoint_->getAttributes().security_attributes().is_payload_protected)
@@ -474,7 +379,7 @@ bool RTPSMessageGroup::add_data(
         if (!participant_->security_manager().encode_serialized_payload(change_to_add.serializedPayload,
                 encrypt_payload, endpoint_->getGuid()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error encoding change " << change.sequenceNumber);
+            logError(RTPS_WRITER, "Error encoding change " << change.sequenceNumber);
             change_to_add.serializedPayload.data = nullptr;
             encrypt_payload.data = nullptr;
             return false;
@@ -489,9 +394,9 @@ bool RTPSMessageGroup::add_data(
     // TODO (Ricardo). Check to create special wrapper.
     bool is_big_submessage;
     if (!RTPSMessageCreator::addSubmessageData(submessage_msg_, &change_to_add, endpoint_->getAttributes().topicKind,
-            readerId, expectsInlineQos, inline_qos, &is_big_submessage))
+            readerId, expectsInlineQos, inlineQos, &is_big_submessage))
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot add DATA submsg to the CDRMessage. Buffer too small");
+        logError(RTPS_WRITER, "Cannot add DATA submsg to the CDRMessage. Buffer too small");
         change_to_add.serializedPayload.data = nullptr;
         return false;
     }
@@ -503,9 +408,9 @@ bool RTPSMessageGroup::add_data(
         submessage_msg_->pos = from_buffer_position;
         CDRMessage::initCDRMsg(encrypt_msg_);
         if (!participant_->security_manager().encode_writer_submessage(*submessage_msg_, *encrypt_msg_,
-                endpoint_->getGuid(), sender_->remote_guids()))
+                endpoint_->getGuid(), sender_.remote_guids()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
+            logError(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
             return false;
         }
 
@@ -517,7 +422,7 @@ bool RTPSMessageGroup::add_data(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
+            logError(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
             return false;
         }
     }
@@ -531,41 +436,35 @@ bool RTPSMessageGroup::add_data_frag(
         const uint32_t fragment_number,
         bool expectsInlineQos)
 {
-    assert(nullptr != sender_);
+    logInfo(RTPS_WRITER, "Sending relevant changes as DATA/DATA_FRAG messages");
 
-    EPROSIMA_LOG_INFO(RTPS_WRITER, "Sending relevant changes as DATA/DATA_FRAG messages");
+    // Check preconditions. If fail flush and reset.
+    check_and_maybe_flush();
+    add_info_ts_in_buffer(change.sourceTimestamp);
+
+    InlineQosWriter* inlineQos = nullptr;
+    if (expectsInlineQos)
+    {
+        //TODOG INLINEQOS
+        //inlineQos = W->getInlineQos();
+    }
+
+#if HAVE_SECURITY
+    uint32_t from_buffer_position = submessage_msg_->pos;
+#endif // if HAVE_SECURITY
+    const EntityId_t& readerId = get_entity_id(sender_.remote_guids());
 
     // Calculate fragment start
     uint32_t fragment_start = change.getFragmentSize() * (fragment_number - 1);
     // Calculate fragment size. If last fragment, size may be smaller
     uint32_t fragment_size = fragment_number < change.getFragmentCount() ? change.getFragmentSize() :
             change.serializedPayload.length - fragment_start;
-    // Check limitation
-    if (data_exceeds_limitation(fragment_size, sent_bytes_limitation_, current_sent_bytes_, full_msg_->length))
-    {
-        flush_and_reset();
-        throw limit_exceeded();
-    }
-
-    // Check preconditions. If fail flush and reset.
-    check_and_maybe_flush();
-    add_info_ts_in_buffer(change.sourceTimestamp);
-
-    CacheChangeInlineQoSWriter qos_writer(change);
-    InlineQosWriter* inline_qos;
-    inline_qos = (change.inline_qos.length > 0 && nullptr != change.inline_qos.data) ? &qos_writer : nullptr;
-
-#if HAVE_SECURITY
-    uint32_t from_buffer_position = submessage_msg_->pos;
-#endif // if HAVE_SECURITY
-    const EntityId_t& readerId = get_entity_id(sender_->remote_guids());
 
     // TODO (Ricardo). Check to create special wrapper.
     CacheChange_t change_to_add;
     change_to_add.copy_not_memcpy(&change);
     change_to_add.serializedPayload.data = change.serializedPayload.data + fragment_start;
     change_to_add.serializedPayload.length = fragment_size;
-    change_to_add.writerGUID = endpoint_->getGuid();
 
 #if HAVE_SECURITY
     if (endpoint_->getAttributes().security_attributes().is_payload_protected)
@@ -578,7 +477,7 @@ bool RTPSMessageGroup::add_data_frag(
         if (!participant_->security_manager().encode_serialized_payload(change_to_add.serializedPayload,
                 encrypt_payload, endpoint_->getGuid()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error encoding change " << change.sequenceNumber);
+            logError(RTPS_WRITER, "Error encoding change " << change.sequenceNumber);
             change_to_add.serializedPayload.data = nullptr;
             encrypt_payload.data = nullptr;
             return false;
@@ -592,9 +491,9 @@ bool RTPSMessageGroup::add_data_frag(
 
     if (!RTPSMessageCreator::addSubmessageDataFrag(submessage_msg_, &change, fragment_number,
             change_to_add.serializedPayload, endpoint_->getAttributes().topicKind, readerId,
-            expectsInlineQos, inline_qos))
+            expectsInlineQos, inlineQos))
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot add DATA_FRAG submsg to the CDRMessage. Buffer too small");
+        logError(RTPS_WRITER, "Cannot add DATA_FRAG submsg to the CDRMessage. Buffer too small");
         change_to_add.serializedPayload.data = nullptr;
         return false;
     }
@@ -606,9 +505,9 @@ bool RTPSMessageGroup::add_data_frag(
         submessage_msg_->pos = from_buffer_position;
         CDRMessage::initCDRMsg(encrypt_msg_);
         if (!participant_->security_manager().encode_writer_submessage(*submessage_msg_, *encrypt_msg_,
-                endpoint_->getGuid(), sender_->remote_guids()))
+                endpoint_->getGuid(), sender_.remote_guids()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
+            logError(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
             return false;
         }
 
@@ -620,7 +519,7 @@ bool RTPSMessageGroup::add_data_frag(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
+            logError(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
             return false;
         }
     }
@@ -636,20 +535,18 @@ bool RTPSMessageGroup::add_heartbeat(
         bool isFinal,
         bool livelinessFlag)
 {
-    assert(nullptr != sender_);
-
     check_and_maybe_flush();
 
 #if HAVE_SECURITY
     uint32_t from_buffer_position = submessage_msg_->pos;
 #endif // if HAVE_SECURITY
 
-    const EntityId_t& readerId = get_entity_id(sender_->remote_guids());
+    const EntityId_t& readerId = get_entity_id(sender_.remote_guids());
 
     if (!RTPSMessageCreator::addSubmessageHeartbeat(submessage_msg_, readerId, endpoint_->getGuid().entityId,
             firstSN, lastSN, count, isFinal, livelinessFlag))
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot add HEARTBEAT submsg to the CDRMessage. Buffer too small");
+        logError(RTPS_WRITER, "Cannot add HEARTBEAT submsg to the CDRMessage. Buffer too small");
         return false;
     }
 
@@ -659,9 +556,9 @@ bool RTPSMessageGroup::add_heartbeat(
         submessage_msg_->pos = from_buffer_position;
         CDRMessage::initCDRMsg(encrypt_msg_);
         if (!participant_->security_manager().encode_writer_submessage(*submessage_msg_, *encrypt_msg_,
-                endpoint_->getGuid(), sender_->remote_guids()))
+                endpoint_->getGuid(), sender_.remote_guids()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot encrypt HEARTBEAT submessage for writer " << endpoint_->getGuid());
+            logError(RTPS_WRITER, "Cannot encrypt HEARTBEAT submessage for writer " << endpoint_->getGuid());
             return false;
         }
 
@@ -673,7 +570,7 @@ bool RTPSMessageGroup::add_heartbeat(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
+            logError(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
             return false;
         }
     }
@@ -702,12 +599,10 @@ bool RTPSMessageGroup::add_gap(
         const SequenceNumber_t& gap_initial_sequence,
         const SequenceNumberSet_t& gap_bitmap)
 {
-    assert(nullptr != sender_);
-
     // Check preconditions. If fail flush and reset.
     check_and_maybe_flush();
 
-    const EntityId_t& readerId = get_entity_id(sender_->remote_guids());
+    const EntityId_t& readerId = get_entity_id(sender_.remote_guids());
 
     if (!create_gap_submessage(gap_initial_sequence, gap_bitmap, readerId))
     {
@@ -740,8 +635,6 @@ bool RTPSMessageGroup::create_gap_submessage(
         const SequenceNumberSet_t& gap_bitmap,
         const EntityId_t& reader_id)
 {
-    assert(nullptr != sender_);
-
 #if HAVE_SECURITY
     uint32_t from_buffer_position = submessage_msg_->pos;
 #endif // if HAVE_SECURITY
@@ -749,7 +642,7 @@ bool RTPSMessageGroup::create_gap_submessage(
     if (!RTPSMessageCreator::addSubmessageGap(submessage_msg_, gap_initial_sequence, gap_bitmap,
             reader_id, endpoint_->getGuid().entityId))
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot add GAP submsg to the CDRMessage. Buffer too small");
+        logError(RTPS_WRITER, "Cannot add GAP submsg to the CDRMessage. Buffer too small");
         return false;
     }
 
@@ -759,9 +652,9 @@ bool RTPSMessageGroup::create_gap_submessage(
         submessage_msg_->pos = from_buffer_position;
         CDRMessage::initCDRMsg(encrypt_msg_);
         if (!participant_->security_manager().encode_writer_submessage(*submessage_msg_, *encrypt_msg_,
-                endpoint_->getGuid(), sender_->remote_guids()))
+                endpoint_->getGuid(), sender_.remote_guids()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
+            logError(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
             return false;
         }
 
@@ -773,15 +666,11 @@ bool RTPSMessageGroup::create_gap_submessage(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
+            logError(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
             return false;
         }
     }
 #endif // if HAVE_SECURITY
-
-    // Notify the statistics module, note that only writers add gaps
-    assert(nullptr != dynamic_cast<RTPSWriter*>(endpoint_));
-    static_cast<RTPSWriter*>(endpoint_)->on_gap();
 
     return true;
 }
@@ -791,10 +680,8 @@ bool RTPSMessageGroup::add_acknack(
         int32_t count,
         bool finalFlag)
 {
-    assert(nullptr != sender_);
-
     // A vector is used to avoid dynamic allocations, but only first item is used
-    size_t n_guids = sender_->remote_guids().size();
+    size_t n_guids = sender_.remote_guids().size();
     if (n_guids == 0)
     {
         return false;
@@ -808,9 +695,9 @@ bool RTPSMessageGroup::add_acknack(
 #endif // if HAVE_SECURITY
 
     if (!RTPSMessageCreator::addSubmessageAcknack(submessage_msg_, endpoint_->getGuid().entityId,
-            sender_->remote_guids().front().entityId, SNSet, count, finalFlag))
+            sender_.remote_guids().front().entityId, SNSet, count, finalFlag))
     {
-        EPROSIMA_LOG_ERROR(RTPS_READER, "Cannot add ACKNACK submsg to the CDRMessage. Buffer too small");
+        logError(RTPS_READER, "Cannot add ACKNACK submsg to the CDRMessage. Buffer too small");
         return false;
     }
 
@@ -820,9 +707,9 @@ bool RTPSMessageGroup::add_acknack(
         submessage_msg_->pos = from_buffer_position;
         CDRMessage::initCDRMsg(encrypt_msg_);
         if (!participant_->security_manager().encode_reader_submessage(*submessage_msg_, *encrypt_msg_,
-                endpoint_->getGuid(), sender_->remote_guids()))
+                endpoint_->getGuid(), sender_.remote_guids()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_READER, "Cannot encrypt ACKNACK submessage for writer " << endpoint_->getGuid());
+            logError(RTPS_READER, "Cannot encrypt ACKNACK submessage for writer " << endpoint_->getGuid());
             return false;
         }
 
@@ -834,15 +721,11 @@ bool RTPSMessageGroup::add_acknack(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
+            logError(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
             return false;
         }
     }
 #endif // if HAVE_SECURITY
-
-    // Notify the statistics module, note that only readers add acknacks
-    assert(nullptr != dynamic_cast<RTPSReader*>(endpoint_));
-    static_cast<fastdds::statistics::StatisticsReaderImpl*>(static_cast<RTPSReader*>(endpoint_))->on_acknack(count);
 
     return insert_submessage(false);
 }
@@ -852,10 +735,8 @@ bool RTPSMessageGroup::add_nackfrag(
         FragmentNumberSet_t fnState,
         int32_t count)
 {
-    assert(nullptr != sender_);
-
     // A vector is used to avoid dynamic allocations, but only first item is used
-    assert(sender_->remote_guids().size() == 1);
+    assert(sender_.remote_guids().size() == 1);
 
     check_and_maybe_flush();
 
@@ -864,9 +745,9 @@ bool RTPSMessageGroup::add_nackfrag(
 #endif // if HAVE_SECURITY
 
     if (!RTPSMessageCreator::addSubmessageNackFrag(submessage_msg_, endpoint_->getGuid().entityId,
-            sender_->remote_guids().front().entityId, writerSN, fnState, count))
+            sender_.remote_guids().front().entityId, writerSN, fnState, count))
     {
-        EPROSIMA_LOG_ERROR(RTPS_READER, "Cannot add ACKNACK submsg to the CDRMessage. Buffer too small");
+        logError(RTPS_READER, "Cannot add ACKNACK submsg to the CDRMessage. Buffer too small");
         return false;
     }
 
@@ -876,9 +757,9 @@ bool RTPSMessageGroup::add_nackfrag(
         submessage_msg_->pos = from_buffer_position;
         CDRMessage::initCDRMsg(encrypt_msg_);
         if (!participant_->security_manager().encode_reader_submessage(*submessage_msg_, *encrypt_msg_,
-                endpoint_->getGuid(), sender_->remote_guids()))
+                endpoint_->getGuid(), sender_.remote_guids()))
         {
-            EPROSIMA_LOG_ERROR(RTPS_READER, "Cannot encrypt ACKNACK submessage for writer " << endpoint_->getGuid());
+            logError(RTPS_READER, "Cannot encrypt ACKNACK submessage for writer " << endpoint_->getGuid());
             return false;
         }
 
@@ -890,15 +771,11 @@ bool RTPSMessageGroup::add_nackfrag(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
+            logError(RTPS_OUT, "Not enough memory to copy encrypted data for " << endpoint_->getGuid());
             return false;
         }
     }
 #endif // if HAVE_SECURITY
-
-    // Notify the statistics module, note that only readers add NACKFRAGs
-    assert(nullptr != dynamic_cast<RTPSReader*>(endpoint_));
-    static_cast<RTPSReader*>(endpoint_)->on_nackfrag(count);
 
     return insert_submessage(false);
 }

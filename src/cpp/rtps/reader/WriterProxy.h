@@ -81,17 +81,6 @@ public:
             const SequenceNumber_t& initial_sequence);
 
     /**
-     * Activate this proxy associating it to a remote writer.
-     * @param attributes WriterProxyData of the writer for which to keep state.
-     * @param initial_sequence Sequence number of last acknowledged change.
-     * @param is_datasharing Whether the writer is datasharing with us or not.
-     */
-    void start(
-            const WriterProxyData& attributes,
-            const SequenceNumber_t& initial_sequence,
-            bool is_datasharing);
-
-    /**
      * Update information on the remote writer.
      * @param attributes WriterProxyData with updated information of the writer.
      */
@@ -122,7 +111,7 @@ public:
      * All changes with status UNKNOWN or MISSING with seq_num < input seq_num are marked LOST.
      * @param[in] seq_num Pointer to the SequenceNumber.
      */
-    int32_t lost_changes_update(
+    void lost_changes_update(
             const SequenceNumber_t& seq_num);
 
     /**
@@ -139,6 +128,13 @@ public:
      * @return true on success
      */
     bool irrelevant_change_set(
+            const SequenceNumber_t& seq_num);
+
+    /**
+     * Called when a change has been removed from the reader's history.
+     * @param seq_num Sequence number of the removed change.
+     */
+    void change_removed_from_history(
             const SequenceNumber_t& seq_num);
 
     /**
@@ -239,7 +235,7 @@ public:
     /**
      * Sends the necessary acknac and nackfrag messages to answer the last received heartbeat message.
      */
-    void perform_heartbeat_response();
+    void perform_heartbeat_response() const;
 
     /**
      * Process an incoming heartbeat from the writer represented by this proxy.
@@ -259,8 +255,7 @@ public:
             bool final_flag,
             bool liveliness_flag,
             bool disable_positive,
-            bool& assert_liveliness,
-            int32_t& current_sample_lost);
+            bool& assert_liveliness);
 
     /**
      * Set a new value for the interval of the heartbeat response event.
@@ -319,42 +314,14 @@ public:
      */
     virtual bool send(
             CDRMessage_t* message,
-            std::chrono::steady_clock::time_point max_blocking_time_point) const override;
+            std::chrono::steady_clock::time_point& max_blocking_time_point) const override;
 
     bool is_on_same_process() const
     {
         return is_on_same_process_;
     }
 
-    bool is_datasharing_writer() const
-    {
-        return is_datasharing_writer_;
-    }
-
-    /*
-     * Do nothing.
-     * This object always is protected by reader's mutex.
-     */
-    void lock() override
-    {
-    }
-
-    /*
-     * Do nothing.
-     * This object always is protected by reader's mutex.
-     */
-    void unlock() override
-    {
-    }
-
 private:
-
-    enum StateCode
-    {
-        IDLE = 0, //! Writer Proxy is not performing any critical operations.
-        BUSY, //! Writer Proxy is performing a critical operation. Some actions (e.g. stop) should wait for its completion.
-        STOPPED, //! Writer Proxy has been requested to \c stop.
-    };
 
     /**
      * Set initial value for last acked sequence number.
@@ -378,7 +345,7 @@ private:
     //! Timed event to send initial acknack.
     TimedEvent* initial_acknack_;
     //! Last Heartbeatcount.
-    std::atomic<uint32_t> last_heartbeat_count_;
+    uint32_t last_heartbeat_count_;
     //!Indicates if the heartbeat has the final flag set.
     std::atomic<bool> heartbeat_final_flag_;
     //!Is the writer alive
@@ -411,20 +378,14 @@ private:
     GUID_t persistence_guid_;
     //! Taken from proxy data
     LocatorSelectorEntry locators_entry_;
-    //! Is the writer datasharing
-    bool is_datasharing_writer_;
-    //! Wether at least one heartbeat was recevied.
-    bool received_at_least_one_heartbeat_;
-    //! Current state of this Writer Proxy
-    std::atomic<StateCode> state_;
 
     using ChangeIterator = decltype(changes_received_)::iterator;
 
-#if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__unix__)
+#if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__linux__)
     int get_mutex_owner() const;
 
     int get_thread_id() const;
-#endif // if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__unix__)
+#endif // if !defined(NDEBUG) && defined(FASTRTPS_SOURCE) && defined(__linux__)
 };
 
 } /* namespace rtps */

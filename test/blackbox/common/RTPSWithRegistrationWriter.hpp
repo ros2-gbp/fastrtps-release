@@ -20,27 +20,26 @@
 #ifndef _TEST_BLACKBOX_RTPSWITHREGISTRATIONWRITER_HPP_
 #define _TEST_BLACKBOX_RTPSWITHREGISTRATIONWRITER_HPP_
 
-#include <condition_variable>
-#include <list>
-#include <string>
-
-#include <asio.hpp>
-#include <fastcdr/Cdr.h>
-#include <fastcdr/FastBuffer.h>
-#include <gtest/gtest.h>
-
-#include <fastdds/dds/publisher/qos/WriterQos.hpp>
-#include <fastdds/rtps/attributes/HistoryAttributes.h>
-#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastdds/rtps/attributes/WriterAttributes.h>
-#include <fastdds/rtps/history/WriterHistory.h>
-#include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
-#include <fastdds/rtps/participant/RTPSParticipant.h>
-#include <fastdds/rtps/RTPSDomain.h>
-#include <fastdds/rtps/transport/TransportDescriptorInterface.h>
-#include <fastdds/rtps/writer/RTPSWriter.h>
-#include <fastdds/rtps/writer/WriterListener.h>
+#include <fastrtps/rtps/RTPSDomain.h>
+#include <fastrtps/rtps/participant/RTPSParticipant.h>
+#include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
+#include <fastrtps/rtps/attributes/WriterAttributes.h>
+#include <fastrtps/rtps/writer/WriterListener.h>
+#include <fastrtps/qos/WriterQos.h>
 #include <fastrtps/attributes/TopicAttributes.h>
+#include <fastrtps/rtps/writer/RTPSWriter.h>
+#include <fastrtps/rtps/attributes/HistoryAttributes.h>
+#include <fastrtps/rtps/history/WriterHistory.h>
+#include <fastrtps/transport/TransportDescriptorInterface.h>
+
+#include <fastcdr/FastBuffer.h>
+#include <fastcdr/Cdr.h>
+
+#include <string>
+#include <list>
+#include <asio.hpp>
+#include <condition_variable>
+#include <gtest/gtest.h>
 
 template<class TypeSupport>
 class RTPSWithRegistrationWriter
@@ -49,12 +48,6 @@ public:
 
     typedef TypeSupport type_support;
     typedef typename type_support::type type;
-
-    using OnReaderDiscoveryFunctor = std::function <void (
-                        eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS,
-                        const eprosima::fastrtps::rtps::GUID_t&,
-                        const eprosima::fastrtps::rtps::ReaderProxyData*
-                        )>;
 
 private:
 
@@ -84,15 +77,6 @@ private:
             {
                 writer_.unmatched();
             }
-        }
-
-        void on_reader_discovery(
-                eprosima::fastrtps::rtps::RTPSWriter* writer,
-                eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS reason,
-                const eprosima::fastrtps::rtps::GUID_t& reader_guid,
-                const eprosima::fastrtps::rtps::ReaderProxyData* reader_info) override
-        {
-            writer_.on_reader_discovery(writer, reason, reader_guid, reader_info);
         }
 
     private:
@@ -147,8 +131,6 @@ public:
 
     void init()
     {
-        matched_ = 0;
-
         //Create participant
         participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant(
             (uint32_t)GET_PID() % 230, participant_attr_);
@@ -178,16 +160,6 @@ public:
         ASSERT_EQ(participant_->registerWriter(writer_, topic_attr_, writer_qos_), true);
 
         initialized_ = true;
-    }
-
-    void update()
-    {
-        if (writer_ == nullptr)
-        {
-            return;
-        }
-
-        ASSERT_TRUE(participant_->updateWriter(writer_, topic_attr_, writer_qos_));
     }
 
     void destroy()
@@ -238,26 +210,6 @@ public:
         }
     }
 
-    eprosima::fastrtps::rtps::CacheChange_t* send_sample(
-            type& msg)
-    {
-        eprosima::fastrtps::rtps::CacheChange_t* ch = writer_->new_change(msg, eprosima::fastrtps::rtps::ALIVE);
-
-        eprosima::fastcdr::FastBuffer buffer((char*)ch->serializedPayload.data, ch->serializedPayload.max_size);
-        eprosima::fastcdr::Cdr cdr(buffer);
-
-        cdr << msg;
-
-        ch->serializedPayload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
-        if (ch->serializedPayload.length > 65000u)
-        {
-            ch->setFragmentSize(65000u);
-        }
-
-        history_->add_change(ch);
-        return ch;
-    }
-
     bool remove_change (
             const eprosima::fastrtps::rtps::SequenceNumber_t& sequence_number)
     {
@@ -278,26 +230,19 @@ public:
         cv_.notify_one();
     }
 
-    void wait_discovery(
-            std::chrono::seconds timeout = std::chrono::seconds::zero())
+    void wait_discovery()
     {
         std::unique_lock<std::mutex> lock(mutex_);
 
-        if (matched_ == 0 && timeout == std::chrono::seconds::zero())
+        if (matched_ == 0)
         {
             cv_.wait(lock, [this]() -> bool
                     {
                         return matched_ != 0;
                     });
-            ASSERT_NE(matched_, 0u);
         }
-        else
-        {
-            cv_.wait_for(lock, timeout, [&]()
-                    {
-                        return matched_ != 0;
-                    });
-        }
+
+        ASSERT_NE(matched_, 0u);
     }
 
     void wait_undiscovery()
@@ -321,20 +266,7 @@ public:
     bool waitForAllAcked(
             const std::chrono::duration<_Rep, _Period>& max_wait)
     {
-        eprosima::fastrtps::Duration_t timeout;
-        if (max_wait == std::chrono::seconds::zero())
-        {
-            timeout = eprosima::fastrtps::c_TimeInfinite;
-        }
-        else
-        {
-            auto nsecs = std::chrono::duration_cast<std::chrono::nanoseconds>(max_wait);
-            auto secs = std::chrono::duration_cast<std::chrono::seconds>(nsecs);
-            nsecs -= secs;
-            timeout.seconds = static_cast<int32_t>(secs.count());
-            timeout.nanosec = static_cast<uint32_t>(nsecs.count());
-        }
-        return writer_->wait_for_all_acked(timeout);
+        return writer_->wait_for_all_acked(eprosima::fastrtps::Time_t((int32_t)max_wait.count(), 0));
     }
 
     /*** Function to change QoS ***/
@@ -460,83 +392,10 @@ public:
     }
 
     RTPSWithRegistrationWriter& add_user_transport_to_pparams(
-            std::shared_ptr<eprosima::fastdds::rtps::TransportDescriptorInterface> userTransportDescriptor)
+            std::shared_ptr<eprosima::fastrtps::rtps::TransportDescriptorInterface> userTransportDescriptor)
     {
         participant_attr_.userTransports.push_back(userTransportDescriptor);
         return *this;
-    }
-
-    RTPSWithRegistrationWriter& add_flow_controller_descriptor_to_pparams(
-            eprosima::fastdds::rtps::FlowControllerSchedulerPolicy scheduler_policy,
-            uint32_t bytes_per_period,
-            uint32_t period_in_ms)
-    {
-        const char* flow_controller_name = "my_flow_controller";
-        auto flow_controller_descriptor = std::make_shared<eprosima::fastdds::rtps::FlowControllerDescriptor>();
-        flow_controller_descriptor->name = flow_controller_name;
-        flow_controller_descriptor->scheduler = scheduler_policy;
-        flow_controller_descriptor->max_bytes_per_period = bytes_per_period;
-        flow_controller_descriptor->period_ms = period_in_ms;
-        participant_attr_.flow_controllers.push_back(flow_controller_descriptor);
-        writer_attr_.flow_controller_name = flow_controller_name;
-        return *this;
-    }
-
-    /**
-     * @brief Add filter to RTPSWriter.
-     *
-     * IMPORTANT: RTPSWithRegistrationWriter must have been initialized previously.
-     *
-     * @param filter Filter interface implementation
-     */
-    void reader_data_filter(
-            eprosima::fastdds::rtps::IReaderDataFilter* filter)
-    {
-        ASSERT_TRUE(initialized_);
-        writer_->reader_data_filter(filter);
-    }
-
-    RTPSWithRegistrationWriter& user_data(
-            const std::vector<eprosima::fastrtps::rtps::octet>& user_data)
-    {
-        writer_qos_.m_userData = user_data;
-        return *this;
-    }
-
-    RTPSWithRegistrationWriter& set_on_reader_discovery(
-            const OnReaderDiscoveryFunctor& functor)
-    {
-        on_reader_discovery_functor = functor;
-        return *this;
-    }
-
-    RTPSWithRegistrationWriter& partitions(
-            std::vector<std::string>& partitions)
-    {
-        writer_qos_.m_partition.setNames(partitions);
-        return *this;
-    }
-
-    void set_separate_sending(
-            bool separate_sending)
-    {
-        writer_->set_separate_sending(separate_sending);
-    }
-
-    uint32_t get_matched() const
-    {
-        return matched_;
-    }
-
-    bool has_been_fully_delivered(
-            const eprosima::fastrtps::rtps::SequenceNumber_t& seq_num)
-    {
-        return writer_->has_been_fully_delivered(seq_num);
-    }
-
-    void participant_update_attributes()
-    {
-        participant_->update_attributes(participant_attr_);
     }
 
     const eprosima::fastrtps::rtps::GUID_t& guid() const
@@ -545,20 +404,6 @@ public:
     }
 
 private:
-
-    void on_reader_discovery(
-            eprosima::fastrtps::rtps::RTPSWriter* writer,
-            eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS reason,
-            const eprosima::fastrtps::rtps::GUID_t& reader_guid,
-            const eprosima::fastrtps::rtps::ReaderProxyData* reader_info)
-    {
-        ASSERT_EQ(writer_, writer);
-
-        if (on_reader_discovery_functor)
-        {
-            on_reader_discovery_functor(reason, reader_guid, reader_info);
-        }
-    }
 
     RTPSWithRegistrationWriter& operator =(
             const RTPSWithRegistrationWriter&) = delete;
@@ -574,11 +419,10 @@ private:
     bool initialized_;
     std::mutex mutex_;
     std::condition_variable cv_;
-    uint32_t matched_;
+    unsigned int matched_;
     type_support type_;
     std::shared_ptr<eprosima::fastrtps::rtps::IPayloadPool> payload_pool_;
     bool has_payload_pool_ = false;
-    OnReaderDiscoveryFunctor on_reader_discovery_functor;
 };
 
 #endif // _TEST_BLACKBOX_RTPSWITHREGISTRATIONWRITER_HPP_

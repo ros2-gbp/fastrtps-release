@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# empty LANGUAGES defaults to C in Ubuntu and breaks the build
-project(fastdds-tool LANGUAGES CXX)
+project(fastdds-tool)
 
 ###############################################################################
 # Installation
@@ -22,7 +21,7 @@ project(fastdds-tool LANGUAGES CXX)
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/
     DESTINATION ${CMAKE_INSTALL_PREFIX}/tools/fastdds
     USE_SOURCE_PERMISSIONS
-    FILES_MATCHING
+    FILES_MATCHING 
         PATTERN "*.py"
         PATTERN "__pycache__" EXCLUDE
 )

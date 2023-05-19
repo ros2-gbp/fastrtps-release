@@ -18,7 +18,6 @@
 #include <fastdds/rtps/common/Locator.h>
 #include <fastrtps/utils/DBQueue.h>
 #include <rtps/transport/shared_mem/SharedMemManager.hpp>
-#include <utils/SystemInfo.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -30,7 +29,7 @@ private:
 
     uint16_t dump_id_ = 0;
     FILE* f_;
-    deleted_unique_ptr<SharedMemSegment::named_mutex> f_mutex_;
+    std::unique_ptr<SharedMemSegment::named_mutex> f_mutex_;
 
 public:
 
@@ -44,7 +43,7 @@ public:
         f_ = _fsopen(filename.c_str(), "a", _SH_DENYNO);
 #else
         f_ = fopen(filename.c_str(), "a");
-#endif // if defined( _MSC_VER )
+#endif
 
         if (f_ != nullptr)
         {
@@ -63,8 +62,8 @@ public:
             }
             catch (const std::exception& e)
             {
-                EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to open/create interprocess mutex for packet_file_log: "
-                        << filename << " named: " << mutex_name << " with err: " << e.what());
+                logError(RTPS_TRANSPORT_SHM, "Failed to open/create interprocess mutex for packet_file_log: "
+                        << filename << " named: " << mutex_name << " with err: "<< e.what());
 
                 fclose(f_);
                 f_ = nullptr;
@@ -72,7 +71,7 @@ public:
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to open packet_file_log: " << filename);
+            logError(RTPS_TRANSPORT_SHM, "Failed to open packet_file_log: " << filename);
         }
     }
 
@@ -85,9 +84,9 @@ public:
     }
 
     void dump_packet(
-            const std::string& timestamp,
-            const Locator& from,
-            const Locator& to,
+            const std::string timestamp,
+            const fastrtps::rtps::Locator_t& from,
+            const fastrtps::rtps::Locator_t& to,
             const fastrtps::rtps::octet* buf,
             const uint32_t len)
     {
@@ -153,11 +152,10 @@ public:
         }
         catch (const std::exception&)
         {
-            EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to lock interprocess mutex packet_file_log");
+            logError(RTPS_TRANSPORT_SHM, "Failed to lock interprocess mutex packet_file_log");
             return;
         }
     }
-
 };
 
 class SHMPacketFileConsumer
@@ -167,8 +165,8 @@ public:
     struct Pkt
     {
         std::string timestamp;
-        Locator from;
-        Locator to;
+        fastrtps::rtps::Locator_t from;
+        fastrtps::rtps::Locator_t to;
         std::shared_ptr<SharedMemManager::Buffer> buffer;
     };
 
@@ -224,14 +222,14 @@ public:
         std::unique_lock<std::mutex> working(resources_.cv_mutex);
         resources_.cv.wait(working,
                 [&]()
-                {
-                    return resources_.logs.BothEmpty();
-                });
+                    {
+                        return resources_.logs.BothEmpty();
+                    });
         std::unique_lock<std::mutex> guard(resources_.config_mutex);
         resources_.consumers.clear();
     }
 
-    //! Waits until no more log info is available
+    //! Waits until no more log info is availabel
     void Flush()
     {
         std::unique_lock<std::mutex> guard(resources_.cv_mutex);
@@ -256,15 +254,15 @@ public:
         {
             resources_.cv.wait(guard,
                     [&]()
-                    {
-                        /* I must avoid:
-                         + the two calls be processed without an intermediate Run() loop (by using last_loop sequence number)
-                         + deadlock by absence of Run() loop activity (by using BothEmpty() call)
-                         */
-                        return !resources_.logging ||
-                        ( resources_.logs.Empty() &&
-                        ( last_loop != resources_.current_loop || resources_.logs.BothEmpty()));
-                    });
+                        {
+                            /* I must avoid:
+                             + the two calls be processed without an intermediate Run() loop (by using last_loop sequence number)
+                             + deadlock by absence of Run() loop activity (by using BothEmpty() call)
+                             */
+                            return !resources_.logging ||
+                            ( resources_.logs.Empty() &&
+                            ( last_loop != resources_.current_loop || resources_.logs.BothEmpty()) );
+                        });
 
             last_loop = resources_.current_loop;
 
@@ -288,7 +286,7 @@ public:
             // Each VS version deals with post-main deallocation of threads in a very different way.
     #if !defined(_WIN32) || defined(FASTRTPS_STATIC_LINK) || _MSC_VER >= 1800
             resources_.logging_thread->join();
-    #endif // if !defined(_WIN32) || defined(FASTRTPS_STATIC_LINK) || _MSC_VER >= 1800
+    #endif
             resources_.logging_thread.reset();
         }
     }
@@ -318,7 +316,24 @@ public:
 
     std::string now()
     {
-        return SystemInfo::get_timestamp("%T");
+        std::stringstream stream;
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+        std::chrono::system_clock::duration tp = now.time_since_epoch();
+        tp -= std::chrono::duration_cast<std::chrono::seconds>(tp);
+        auto ms = static_cast<unsigned>(tp / std::chrono::milliseconds(1));
+
+    #if defined(_WIN32)
+        struct tm timeinfo;
+        localtime_s(&timeinfo, &now_c);
+        stream << std::put_time(&timeinfo, "%T") << "." << std::setw(3) << std::setfill('0') << ms << " ";
+        //#elif defined(__clang__) && !defined(std::put_time) // TODO arm64 doesn't seem to support std::put_time
+        //    (void)now_c;
+        //    (void)ms;
+    #else
+        stream << std::put_time(localtime(&now_c), "%T") << "." << std::setw(3) << std::setfill('0') << ms << " ";
+    #endif
+        return stream.str();
     }
 
 private:
@@ -326,7 +341,7 @@ private:
     struct Resources
     {
         eprosima::fastrtps::DBQueue<typename TPacketConsumer::Pkt> logs;
-        std::vector<std::unique_ptr<SHMPacketFileConsumer>> consumers;
+        std::vector<std::unique_ptr<SHMPacketFileConsumer> > consumers;
         std::unique_ptr<std::thread> logging_thread;
 
         // Condition variable segment.
@@ -341,11 +356,10 @@ private:
 
         Resources()
             : logging(false)
-            , work(false)
-            , current_loop(0)
+            ,work(false)
+            ,current_loop(0)
         {
         }
-
     };
 
     Resources resources_;
@@ -358,9 +372,9 @@ private:
         {
             resources_.cv.wait(guard,
                     [&]()
-                    {
-                        return !resources_.logging || resources_.work;
-                    });
+                        {
+                            return !resources_.logging || resources_.work;
+                        });
 
             resources_.work = false;
 
@@ -370,13 +384,12 @@ private:
                 while (!resources_.logs.Empty())
                 {
                     std::unique_lock<std::mutex> configGuard(resources_.config_mutex);
-
-                    // This value is moved and not copied
-                    auto value_dequeue = resources_.logs.FrontAndPop();
                     for (auto& consumer : resources_.consumers)
                     {
-                        consumer->Consume(value_dequeue);
+                        consumer->Consume(resources_.logs.Front());
                     }
+
+                    resources_.logs.Pop();
                 }
             }
             guard.lock();
@@ -390,7 +403,6 @@ private:
             resources_.cv.notify_all();
         }
     }
-
 };
 
 } // eprosima

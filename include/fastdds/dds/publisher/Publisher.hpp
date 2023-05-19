@@ -20,14 +20,13 @@
 #ifndef _FASTDDS_PUBLISHER_HPP_
 #define _FASTDDS_PUBLISHER_HPP_
 
-#include <fastdds/dds/core/Entity.hpp>
-#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
-#include <fastdds/dds/publisher/qos/PublisherQos.hpp>
-#include <fastdds/dds/topic/TypeSupport.hpp>
-#include <fastdds/rtps/common/Time_t.h>
-
 #include <fastrtps/fastrtps_dll.h>
+#include <fastdds/rtps/common/Time_t.h>
+#include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/types/TypesBase.h>
+#include <fastdds/dds/core/Entity.hpp>
+#include <fastdds/dds/publisher/qos/PublisherQos.hpp>
+#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -56,7 +55,6 @@ class Topic;
 
 /**
  * Class Publisher, used to send data to associated subscribers.
- *
  * @ingroup FASTDDS_MODULE
  */
 class Publisher : public DomainEntity
@@ -70,11 +68,11 @@ protected:
      * Create a publisher, assigning its pointer to the associated implementation.
      * Don't use directly, create Publisher using create_publisher from DomainParticipant.
      */
-    Publisher(
+    RTPS_DllAPI Publisher(
             PublisherImpl* p,
             const StatusMask& mask = StatusMask::all());
 
-    Publisher(
+    RTPS_DllAPI Publisher(
             DomainParticipant* dp,
             const PublisherQos& qos = PUBLISHER_QOS_DEFAULT,
             PublisherListener* listener = nullptr,
@@ -85,11 +83,10 @@ public:
     /**
      * @brief Destructor
      */
-    virtual ~Publisher();
+    RTPS_DllAPI virtual ~Publisher();
 
     /**
      * @brief This operation enables the Publisher
-     *
      * @return RETCODE_OK is successfully enabled. RETCODE_PRECONDITION_NOT_MET if the participant creating this
      *         Publisher is not enabled.
      */
@@ -97,14 +94,12 @@ public:
 
     /**
      * Allows accessing the Publisher Qos.
-     *
      * @return PublisherQos reference
      */
     RTPS_DllAPI const PublisherQos& get_qos() const;
 
     /**
      * Retrieves the Publisher Qos.
-     *
      * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t get_qos(
@@ -113,7 +108,6 @@ public:
     /**
      * Allows modifying the Publisher Qos.
      * The given Qos must be supported by the PublisherQos.
-     *
      * @param qos PublisherQos to be set
      * @return RETCODE_IMMUTABLE_POLICY if any of the Qos cannot be changed, RETCODE_INCONSISTENT_POLICY if the Qos is not
      * self consistent and RETCODE_OK if the qos is changed correctly.
@@ -123,14 +117,12 @@ public:
 
     /**
      * Retrieves the attached PublisherListener.
-     *
      * @return PublisherListener pointer
      */
     RTPS_DllAPI const PublisherListener* get_listener() const;
 
     /**
      * Modifies the PublisherListener, sets the mask to StatusMask::all()
-     *
      * @param listener new value for the PublisherListener
      * @return RETCODE_OK
      */
@@ -139,7 +131,6 @@ public:
 
     /**
      * Modifies the PublisherListener.
-     *
      * @param listener new value for the PublisherListener
      * @param mask StatusMask that holds statuses the listener responds to
      * @return RETCODE_OK
@@ -150,7 +141,6 @@ public:
 
     /**
      * This operation creates a DataWriter. The returned DataWriter will be attached and belongs to the Publisher.
-     *
      * @param topic Topic the DataWriter will be listening
      * @param qos QoS of the DataWriter.
      * @param listener Pointer to the listener (default: nullptr).
@@ -165,7 +155,6 @@ public:
 
     /**
      * This operation creates a DataWriter. The returned DataWriter will be attached and belongs to the Publisher.
-     *
      * @param topic Topic the DataWriter will be listening
      * @param profile_name DataWriter profile name.
      * @param listener Pointer to the listener (default: nullptr).
@@ -188,13 +177,12 @@ public:
      * The deletion of the DataWriter will automatically unregister all instances.
      * Depending on the settings of the WRITER_DATA_LIFECYCLE QosPolicy, the deletion of the DataWriter
      * may also dispose all instances.
-     *
      * @param writer DataWriter to delete
      * @return RETCODE_PRECONDITION_NOT_MET if it does not belong to this Publisher, RETCODE_OK if it is correctly deleted and
      * RETCODE_ERROR otherwise.
      */
     RTPS_DllAPI ReturnCode_t delete_datawriter(
-            const DataWriter* writer);
+            DataWriter* writer);
 
     /**
      * This operation retrieves a previously created DataWriter belonging to the Publisher that is attached to a
@@ -202,7 +190,6 @@ public:
      *
      * If multiple DataWriter attached to the Publisher satisfy this condition, then the operation will return
      * one of them. It is not specified which one.
-     *
      * @param topic_name Name of the Topic
      * @return Pointer to a previously created DataWriter associated to a Topic with the requested topic_name
      */
@@ -210,36 +197,34 @@ public:
             const std::string& topic_name) const;
 
     /**
-     * @brief Indicates to FastDDS that the contained DataWriters are about to be modified
-     *
-     * @return RETCODE_OK if successful, an error code otherwise
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
+     * Fills the given vector with all the datawriters of this publisher.
+     * @param writers Vector where the DataWriters are returned
+     * @return true
      */
-    RTPS_DllAPI ReturnCode_t suspend_publications();
+    RTPS_DllAPI bool get_datawriters(
+            std::vector<DataWriter*>& writers) const;
 
     /**
-     * @brief Indicates to FastDDS that the modifications to the DataWriters are complete.
-     *
-     * @return RETCODE_OK if successful, an error code otherwise
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
+     * This operation checks if the publisher has DataWriters
+     * @return true if the publisher has one or several DataWriters, false otherwise
      */
-    RTPS_DllAPI ReturnCode_t resume_publications();
+    RTPS_DllAPI bool has_datawriters() const;
 
-    /**
-     * @brief Signals the beginning of a set of coherent cache changes using the Datawriters attached to the publisher
-     *
-     * @return RETCODE_OK if successful, an error code otherwise
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
+    /* TODO
+       bool suspend_publications();
      */
-    RTPS_DllAPI ReturnCode_t begin_coherent_changes();
 
-    /**
-     * @brief Signals the end of a set of coherent cache changes
-     *
-     * @return RETCODE_OK if successful, an error code otherwise
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
+    /* TODO
+       bool resume_publications();
      */
-    RTPS_DllAPI ReturnCode_t end_coherent_changes();
+
+    /* TODO
+       bool begin_coherent_changes();
+     */
+
+    /* TODO
+       bool end_coherent_changes();
+     */
 
     /**
      * This operation blocks the calling thread until either all data written by the reliable DataWriter entities
@@ -247,7 +232,6 @@ public:
      * parameter elapses, whichever happens first. A return value of true indicates that all the samples written
      * have been acknowledged by all reliable matched data readers; a return value of false indicates that max_wait
      * elapsed before all the data was acknowledged.
-     *
      * @param max_wait Maximum blocking time for this operation
      * @return RETCODE_TIMEOUT if the function takes more than the maximum blocking time established, RETCODE_OK if the
      * Publisher receives the acknowledgments and RETCODE_ERROR otherwise.
@@ -257,17 +241,13 @@ public:
 
     /**
      * This operation returns the DomainParticipant to which the Publisher belongs.
-     *
      * @return Pointer to the DomainParticipant
      */
     RTPS_DllAPI const DomainParticipant* get_participant() const;
 
-    /**
-     * @brief Deletes all contained DataWriters
-     *
-     * @return RETCODE_OK if successful, an error code otherwise
+    /* TODO
+       bool delete_contained_entities();
      */
-    RTPS_DllAPI ReturnCode_t delete_contained_entities();
 
     /**
      * This operation sets a default value of the DataWriter QoS policies which will be used for newly created
@@ -279,7 +259,6 @@ public:
      * The special value DATAWRITER_QOS_DEFAULT may be passed to this operation to indicate that the default QoS
      * should be reset back to the initial values the factory would use, that is the values that would be used
      * if the set_default_datawriter_qos operation had never been called.
-     *
      * @param qos DataWriterQos to be set
      * @return RETCODE_INCONSISTENT_POLICY if the Qos is not self consistent and RETCODE_OK if the qos is changed correctly.
      */
@@ -293,7 +272,6 @@ public:
      *
      * The values retrieved by get_default_datawriter_qos will match the set of values specified on the last
      * successful call to set_default_datawriter_qos, or else, if the call was never made, the default values.
-     *
      * @return Current default WriterQos
      */
     RTPS_DllAPI const DataWriterQos& get_default_datawriter_qos() const;
@@ -305,7 +283,6 @@ public:
      *
      * The values retrieved by get_default_datawriter_qos will match the set of values specified on the last
      * successful call to set_default_datawriter_qos, or else, if the call was never made, the default values.
-     *
      * @param qos Reference to the current default WriterQos.
      * @return RETCODE_OK
      */
@@ -313,20 +290,7 @@ public:
             DataWriterQos& qos) const;
 
     /**
-     * @brief Copies TopicQos into the corresponding DataWriterQos
-     *
-     * @param[out] writer_qos
-     * @param[in] topic_qos
-     * @return RETCODE_OK if successful, an error code otherwise
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
-     */
-    RTPS_DllAPI ReturnCode_t copy_from_topic_qos(
-            fastdds::dds::DataWriterQos& writer_qos,
-            const fastdds::dds::TopicQos& topic_qos) const;
-
-    /**
      * Fills the DataWriterQos with the values of the XML profile.
-     *
      * @param profile_name DataWriter profile name.
      * @param qos DataWriterQos object where the qos is returned.
      * @return RETCODE_OK if the profile exists. RETCODE_BAD_PARAMETER otherwise.
@@ -335,28 +299,17 @@ public:
             const std::string& profile_name,
             DataWriterQos& qos) const;
 
+    /* TODO
+       bool copy_from_topic_qos(
+            WriterQos& writer_qos,
+            const fastrtps::TopicAttributes& topic_qos) const;
+     */
+
     /**
      * Returns the Publisher's handle.
-     *
      * @return InstanceHandle of this Publisher.
      */
-    RTPS_DllAPI const InstanceHandle_t& get_instance_handle() const;
-
-    /**
-     * Fills the given vector with all the datawriters of this publisher.
-     *
-     * @param writers Vector where the DataWriters are returned
-     * @return true
-     */
-    RTPS_DllAPI bool get_datawriters(
-            std::vector<DataWriter*>& writers) const;
-
-    /**
-     * This operation checks if the publisher has DataWriters
-     *
-     * @return true if the publisher has one or several DataWriters, false otherwise
-     */
-    RTPS_DllAPI bool has_datawriters() const;
+    RTPS_DllAPI const fastrtps::rtps::InstanceHandle_t& get_instance_handle() const;
 
 protected:
 

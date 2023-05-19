@@ -17,7 +17,6 @@
  *
  */
 
-#include "BlackboxTests.hpp"
 #include "TCPReqRepHelloWorldRequester.hpp"
 
 #include <fastrtps/Domain.h>
@@ -30,7 +29,6 @@
 #include <fastrtps/publisher/Publisher.h>
 
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
-#include <fastrtps/transport/TCPv6TransportDescriptor.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/utils/IPFinder.h>
 
@@ -50,9 +48,9 @@ TCPReqRepHelloWorldRequester::TCPReqRepHelloWorldRequester()
     , initialized_(false)
     , matched_(0)
 {
-    // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-    sattr.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-    puattr.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+    // By default, memory mode is preallocated (the most restritive)
+    sattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
+    puattr.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
 }
 
 TCPReqRepHelloWorldRequester::~TCPReqRepHelloWorldRequester()
@@ -73,61 +71,27 @@ void TCPReqRepHelloWorldRequester::init(
 {
     ParticipantAttributes pattr;
 
-    int32_t kind;
+    int32_t kind = LOCATOR_KIND_TCPv4;
+
     eprosima::fastrtps::rtps::LocatorList_t loc;
-
-    if (use_ipv6)
-    {
-        kind = LOCATOR_KIND_TCPv6;
-        eprosima::fastrtps::rtps::IPFinder::getIP6Address(&loc);
-
-    }
-    else
-    {
-        kind = LOCATOR_KIND_TCPv4;
-        eprosima::fastrtps::rtps::IPFinder::getIP4Address(&loc);
-
-    }
-
+    eprosima::fastrtps::rtps::IPFinder::getIP4Address(&loc);
 
     Locator_t initial_peer_locator;
     initial_peer_locator.kind = kind;
     if (!force_localhost && loc.size() > 0)
     {
-        if (use_ipv6)
-        {
-            IPLocator::setIPv6(initial_peer_locator, *(loc.begin()));
-        }
-        else
-        {
-            IPLocator::setIPv4(initial_peer_locator, *(loc.begin()));
-        }
+        IPLocator::setIPv4(initial_peer_locator, *(loc.begin()));
     }
     else
     {
-        if (use_ipv6)
-        {
-            IPLocator::setIPv6(initial_peer_locator, "::1");
-        }
-        else
-        {
-            IPLocator::setIPv4(initial_peer_locator, "127.0.0.1");
-        }
+        IPLocator::setIPv4(initial_peer_locator, "127.0.0.1");
     }
     initial_peer_locator.port = listeningPort;
     pattr.rtps.builtin.initialPeersList.push_back(initial_peer_locator); // Publisher's meta channel
 
     pattr.rtps.useBuiltinTransports = false;
-    std::shared_ptr<TCPTransportDescriptor> descriptor;
-    if (use_ipv6)
-    {
-        descriptor = std::make_shared<TCPv6TransportDescriptor>();
-    }
-    else
-    {
-        descriptor = std::make_shared<TCPv4TransportDescriptor>();
-    }
-
+    std::shared_ptr<TCPv4TransportDescriptor> descriptor = std::make_shared<TCPv4TransportDescriptor>();
+    descriptor->wait_for_tcp_negotiation = false;
     if (maxInitialPeer > 0)
     {
         descriptor->maxInitialPeersRange = maxInitialPeer;
@@ -145,6 +109,7 @@ void TCPReqRepHelloWorldRequester::init(
         descriptor->tls_config.add_option(TLSOptions::SINGLE_DH_USE);
         descriptor->tls_config.add_option(TLSOptions::NO_COMPRESSION);
         descriptor->tls_config.add_option(TLSOptions::NO_SSLV2);
+        descriptor->tls_config.add_option(TLSOptions::NO_SSLV3);
     }
 
     pattr.rtps.userTransports.push_back(descriptor);
@@ -163,14 +128,14 @@ void TCPReqRepHelloWorldRequester::init(
 
     //Create subscriber
     sattr.topic.topicKind = NO_KEY;
-    sattr.topic.topicDataType = type_.getName();
+    sattr.topic.topicDataType = "HelloWorldType";
     configSubscriber("Reply");
     reply_subscriber_ = Domain::createSubscriber(participant_, sattr, &reply_listener_);
     ASSERT_NE(reply_subscriber_, nullptr);
 
     //Create publisher
     puattr.topic.topicKind = NO_KEY;
-    puattr.topic.topicDataType = type_.getName();
+    puattr.topic.topicDataType = "HelloWorldType";
     configPublisher("Request");
     request_publisher_ = Domain::createPublisher(participant_, puattr, &request_listener_);
     ASSERT_NE(request_publisher_, nullptr);
@@ -214,14 +179,14 @@ void TCPReqRepHelloWorldRequester::wait_discovery(
     {
         cvDiscovery_.wait(lock, [&]()
                 {
-                    return is_matched();
+                    return matched_ > 1;
                 });
     }
     else
     {
         cvDiscovery_.wait_for(lock, timeout, [&]()
                 {
-                    return is_matched();
+                    return matched_ > 1;
                 });
     }
 
@@ -232,7 +197,7 @@ void TCPReqRepHelloWorldRequester::matched()
 {
     std::unique_lock<std::mutex> lock(mutexDiscovery_);
     ++matched_;
-    if (is_matched())
+    if (matched_ > 1)
     {
         cvDiscovery_.notify_one();
     }

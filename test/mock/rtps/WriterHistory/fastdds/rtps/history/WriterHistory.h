@@ -95,27 +95,7 @@ public:
     MOCK_METHOD2(add_change_, bool(
             CacheChange_t* a_change,
             WriteParams &wparams));
-
-    MOCK_METHOD4(add_change_, bool(
-            CacheChange_t* a_change,
-            WriteParams &wparams,
-            void* pre_commit,
-            std::chrono::time_point<std::chrono::steady_clock> max_blocking_time));
-
     // *INDENT-ON*
-
-    template<typename PreCommitHook>
-    bool add_change_with_commit_hook(
-            CacheChange_t* a_change,
-            WriteParams& wparams,
-            PreCommitHook pre_commit,
-            std::chrono::time_point<std::chrono::steady_clock> max_blocking_time)
-    {
-        return add_change_(a_change, wparams, &pre_commit, max_blocking_time);
-    }
-
-    MOCK_METHOD1(set_fragments, void(
-                CacheChange_t * change));
 
     bool remove_change(
             CacheChange_t* change)
@@ -164,7 +144,7 @@ public:
         return m_changes.rend();
     }
 
-    RecursiveTimedMutex* getMutex() const
+    inline RecursiveTimedMutex* getMutex()
     {
         return mp_mutex;
     }
@@ -187,3 +167,4 @@ public:
 } // namespace eprosima
 
 #endif // _FASTDDS_RTPS_WRITERHISTORY_H_
+

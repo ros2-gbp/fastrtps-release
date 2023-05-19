@@ -37,8 +37,16 @@ namespace eprosima {
 namespace fastrtps {
 
 #if defined(_WIN32)
+
 class TimedMutex
 {
+    // On MSVC 19.36.32528.95 `xtime` was changed into `_timespec64`.
+    // See https://github.com/eProsima/Fast-DDS/issues/3451
+    // See https://github.com/microsoft/STL/pull/3594
+#if defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 193632528
+    using xtime = _timespec64;
+#endif  // _MSC_FULL_VER check
+
 public:
 
     TimedMutex()
@@ -137,11 +145,6 @@ public:
         _Mtx_unlock(mutex_);
     }
 
-    bool try_lock()
-    {
-        return (_Thrd_success == _Mtx_trylock(mutex_));
-    }
-
     template <class Rep, class Period>
     bool try_lock_for(
             const std::chrono::duration<Rep, Period>& rel_time)
@@ -182,7 +185,7 @@ private:
 
     _Mtx_t mutex_;
 };
-#elif _GTHREAD_USE_MUTEX_TIMEDLOCK || !defined(__unix__)
+#elif _GTHREAD_USE_MUTEX_TIMEDLOCK || !defined(__linux__)
 using TimedMutex = std::timed_mutex;
 using RecursiveTimedMutex = std::recursive_timed_mutex;
 #else
@@ -279,11 +282,6 @@ public:
     void unlock()
     {
         pthread_mutex_unlock(&mutex_);
-    }
-
-    bool try_lock()
-    {
-        return (0 == pthread_mutex_trylock(&mutex_));
     }
 
     template <class Rep, class Period>

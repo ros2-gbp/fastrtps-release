@@ -21,40 +21,41 @@
 #define _FASTDDS_RTPS_PDP_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <atomic>
-#include <functional>
-#include <memory>
 #include <mutex>
+#include <functional>
 
+#include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
-#include <fastdds/rtps/common/Guid.h>
-#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
-#include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
-#include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
 #include <fastrtps/qos/QosPolicies.h>
-#include <fastrtps/utils/ProxyPool.hpp>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
+#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
 
 namespace eprosima {
 
 namespace fastdds {
 namespace rtps {
 
-class PDPServerListener;
-class PDPEndpoints;
+class PDPServerListener2;
+
+/**
+ * Struct to define participant types to set participant type parameter property
+ *@ingroup DISCOVERY_MODULE
+ */
+struct ParticipantType
+{
+    static const char SIMPLE[];
+    static const char SERVER[];
+    static const char CLIENT[];
+    static const char BACKUP[];
+    static const char SUPER_CLIENT[];
+};
 
 } // namespace rtps
 } // namespace fastdds
 
 namespace fastrtps {
-namespace types {
-
-class TypeObject;
-class TypeIdentifier;
-
-} // namespace types
 namespace rtps {
 
 class RTPSWriter;
@@ -83,8 +84,7 @@ class PDP
 {
     friend class PDPListener;
     friend class PDPServerListener;
-    friend class fastdds::rtps::PDPServerListener;
-    friend class PDPSecurityInitiatorListener;
+    friend class fastdds::rtps::PDPServerListener2;
 
 public:
 
@@ -110,11 +110,6 @@ public:
     bool initPDP(
             RTPSParticipantImpl* part);
 
-    /**
-     * @brief Enable the Participant Discovery Protocol
-     *
-     * @return true if enabled correctly, or if already enabled; false otherwise
-     */
     bool enable();
 
     virtual bool init(
@@ -139,7 +134,7 @@ public:
     virtual void announceParticipantState(
             bool new_change,
             bool dispose = false,
-            WriteParams& wparams = WriteParams::WRITE_PARAM_DEFAULT) = 0;
+            WriteParams& wparams = WriteParams::WRITE_PARAM_DEFAULT);
 
     //!Stop the RTPSParticipantAnnouncement (only used in tests).
     virtual void stopParticipantAnnouncement();
@@ -225,43 +220,19 @@ public:
 
     /**
      * This method removes and deletes a ReaderProxyData object from its corresponding RTPSParticipant.
-     *
-     * @param[in] reader_guid GUID_t of the reader to remove.
+     * @param reader_guid GUID_t of the reader to remove.
      * @return true if found and deleted.
      */
     bool removeReaderProxyData(
             const GUID_t& reader_guid);
 
     /**
-     * This method removes and deletes a ReaderProxyData object from its corresponding RTPSParticipant.
-     *
-     * @param[in] reader_guid GUID_t of the reader to remove.
-     * @param[in] reason Why the reader is being removed (dropped, removed, or ignored)
-     * @return true if found and deleted.
-     */
-    bool removeReaderProxyData(
-            const GUID_t& reader_guid,
-            ReaderDiscoveryInfo::DISCOVERY_STATUS reason);
-
-    /**
      * This method removes and deletes a WriterProxyData object from its corresponding RTPSParticipant.
-     *
-     * @param[in] writer_guid GUID_t of the wtiter to remove.
+     * @param writer_guid GUID_t of the wtiter to remove.
      * @return true if found and deleted.
      */
     bool removeWriterProxyData(
             const GUID_t& writer_guid);
-
-    /**
-     * This method removes and deletes a WriterProxyData object from its corresponding RTPSParticipant.
-     *
-     * @param[in] writer_guid GUID_t of the wtiter to remove.
-     * @param[in] reason Why the writer is being removed (dropped, removed, or ignored)
-     * @return true if found and deleted.
-     */
-    bool removeWriterProxyData(
-            const GUID_t& writer_guid,
-            WriterDiscoveryInfo::DISCOVERY_STATUS reason);
 
     /**
      * Create the SPDP Writer and Reader
@@ -302,7 +273,7 @@ public:
     /**
      * This method removes a remote RTPSParticipant and all its writers and readers.
      * @param participant_guid GUID_t of the remote RTPSParticipant.
-     * @param reason Why the participant is being removed (dropped, removed, or ignored)
+     * @param reason Why the participant is being removed (dropped vs removed)
      * @return true if correct.
      */
     virtual bool remove_remote_participant(
@@ -393,34 +364,6 @@ public:
      */
     std::list<eprosima::fastdds::rtps::RemoteServerAttributes>& remote_server_attributes();
 
-    /**
-     * Access the temporary proxy pool for reader proxies
-     * @return pool reference
-     */
-    ProxyPool<ReaderProxyData>& get_temporary_reader_proxies_pool()
-    {
-        return temp_reader_proxies_;
-    }
-
-    /**
-     * Access the temporary proxy pool for writer proxies
-     * @return pool reference
-     */
-    ProxyPool<WriterProxyData>& get_temporary_writer_proxies_pool()
-    {
-        return temp_writer_proxies_;
-    }
-
-#if HAVE_SECURITY
-    virtual bool pairing_remote_writer_with_local_reader_after_security(
-            const GUID_t& local_reader,
-            const WriterProxyData& remote_writer_data);
-
-    virtual bool pairing_remote_reader_with_local_writer_after_security(
-            const GUID_t& local_writer,
-            const ReaderProxyData& remote_reader_data);
-#endif // HAVE_SECURITY
-
 protected:
 
     //!Pointer to the builtin protocols object.
@@ -429,8 +372,10 @@ protected:
     RTPSParticipantImpl* mp_RTPSParticipant;
     //!Discovery attributes.
     BuiltinAttributes m_discovery;
-    //!Builtin PDP endpoints
-    std::unique_ptr<fastdds::rtps::PDPEndpoints> builtin_endpoints_;
+    //!Pointer to the PDPWriter.
+    RTPSWriter* mp_PDPWriter;
+    //!Pointer to the PDPReader.
+    RTPSReader* mp_PDPReader;
     //!Pointer to the EDP object.
     EDP* mp_EDP;
     //!Number of participant proxy data objects created
@@ -451,16 +396,24 @@ protected:
     std::atomic_bool m_hasChangedLocalPDP;
     //!Listener for the SPDP messages.
     ReaderListener* mp_listener;
-    //! ProxyPool for temporary reader proxies
-    ProxyPool<ReaderProxyData> temp_reader_proxies_;
-    //! ProxyPool for temporary writer proxies
-    ProxyPool<WriterProxyData> temp_writer_proxies_;
+    //!WriterHistory
+    WriterHistory* mp_PDPWriterHistory;
+    //!Writer payload pool
+    std::shared_ptr<ITopicPayloadPool> writer_payload_pool_;
+    //!Reader History
+    ReaderHistory* mp_PDPReaderHistory;
+    //!Reader payload pool
+    std::shared_ptr<ITopicPayloadPool> reader_payload_pool_;
+    //!ReaderProxyData to allow preallocation of remote locators
+    ReaderProxyData temp_reader_data_;
+    //!WriterProxyData to allow preallocation of remote locators
+    WriterProxyData temp_writer_data_;
+    //!To protect temp_writer_data_ and temp_reader_data_
+    std::mutex temp_data_lock_;
     //!Participant data atomic access assurance
     std::recursive_mutex* mp_mutex;
     //!To protect callbacks (ParticipantProxyData&)
     std::mutex callback_mtx_;
-    //!Tell if object is enabled
-    std::atomic<bool> enabled_ {false};
 
     /**
      * Adds an entry to the collection of participant proxy information.
@@ -468,27 +421,12 @@ protected:
      *
      * @param participant_guid GUID of the participant for which to create the proxy object.
      * @param with_lease_duration indicates whether lease duration event should be created.
-     * @param participant_proxy_data The participant proxy data from which the copy is made (if provided)
      *
      * @return pointer to the currently inserted entry, nullptr if allocation limits were reached.
      */
     ParticipantProxyData* add_participant_proxy_data(
             const GUID_t& participant_guid,
-            bool with_lease_duration,
-            const ParticipantProxyData* participant_proxy_data = nullptr);
-
-    /**
-     * Checks whether two participant prefixes are equal by calculating the mangled
-     * GUID and comparing it with the remote participant prefix.
-     *
-     * @param guid_prefix the original desired guid_prefix to compare
-     * @param participant_data The participant proxy data to compare against
-     *
-     * @return true when prefixes are equivalent
-     */
-    bool data_matches_with_prefix(
-            const GuidPrefix_t& guid_prefix,
-            const ParticipantProxyData& participant_data);
+            bool with_lease_duration);
 
     /**
      * Gets the key of a participant proxy data.
@@ -501,26 +439,6 @@ protected:
     bool lookup_participant_key(
             const GUID_t& participant_guid,
             InstanceHandle_t& key);
-
-    /**
-     * Force the sending of our local DPD to all remote RTPSParticipants and multicast Locators.
-     * @param writer RTPSWriter to use for sending the announcement
-     * @param history history where the change should be added
-     * @param new_change If true a new change (with new seqNum) is created and sent;If false the last change is re-sent
-     * @param dispose sets change kind to NOT_ALIVE_DISPOSED_UNREGISTERED
-     * @param wparams allows to identify the change
-     */
-    void announceParticipantState(
-            RTPSWriter& writer,
-            WriterHistory& history,
-            bool new_change,
-            bool dispose = false,
-            WriteParams& wparams = WriteParams::WRITE_PARAM_DEFAULT);
-
-    /**
-     * Called after creating the builtin endpoints to update the metatraffic unicast locators of BuiltinProtocols
-     */
-    virtual void update_builtin_locators() = 0;
 
 private:
 
@@ -559,11 +477,6 @@ private:
      */
     void set_initial_announcement_interval();
 
-    /**
-     * Set to a Participant Proxy those properties from this participant that must be sent.
-     */
-    void set_external_participant_properties_(
-            ParticipantProxyData* participant_data);
 };
 
 

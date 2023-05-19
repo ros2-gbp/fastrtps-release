@@ -73,7 +73,7 @@ struct RTPS_DllAPI EntityId_t
 {
     static constexpr unsigned int size = 4;
     octet value[size];
-    //! Default constructor. Unknown entity.
+    //! Default constructor. Uknown entity.
     EntityId_t()
     {
         *this = ENTITYID_UNKNOWN;
@@ -154,67 +154,9 @@ struct RTPS_DllAPI EntityId_t
 
 #endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
 
-    /*!
-     * @brief conversion to uint32_t
-     * @return uint32_t representation
-     */
-    uint32_t to_uint32() const
-    {
-        uint32_t res = *reinterpret_cast<const uint32_t*>(value);
-
-#if !FASTDDS_IS_BIG_ENDIAN_TARGET
-        res = ( res >> 24 ) |
-                (0x0000ff00 & ( res >> 8)) |
-                (0x00ff0000 & ( res << 8)) |
-                ( res << 24 );
-#endif // if !FASTDDS_IS_BIG_ENDIAN_TARGET
-
-        return res;
-    }
-
     static EntityId_t unknown()
     {
         return EntityId_t();
-    }
-
-    bool is_reader() const
-    {
-        // RTPS Standard table 9.1
-        return 0x4u & to_uint32();
-    }
-
-    bool is_writer() const
-    {
-        // RTPS Standard table 9.1
-        return 0x2u & to_uint32() && !is_reader();
-    }
-
-    /**
-     * Entity Id minor operator
-     * @param other Second entity id to compare
-     * @return True if \c other is higher than this
-     */
-    bool operator <(
-            const EntityId_t& other) const
-    {
-        return std::memcmp(value, other.value, size) < 0;
-    }
-
-    /**
-     * Entity Id compare static method.
-     *
-     * @param entity1 First entity id to compare
-     * @param entity2 Second entity id to compare
-     *
-     * @return 0 if \c entity1 is equal to \c entity2 .
-     * @return < 0 if \c entity1 is lower than \c entity2 .
-     * @return > 0 if \c entity1 is higher than \c entity2 .
-     */
-    static int cmp(
-            const EntityId_t& entity1,
-            const EntityId_t& entity2)
-    {
-        return std::memcmp(entity1.value, entity2.value, size);
     }
 
 };
@@ -222,7 +164,7 @@ struct RTPS_DllAPI EntityId_t
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 /**
- * Entity Id comparison operator
+ * Guid prefix comparison operator
  * @param id1 EntityId to compare
  * @param id2 ID prefix to compare
  * @return True if equal
@@ -242,7 +184,7 @@ inline bool operator ==(
 }
 
 /**
- * Entity Id comparison operator
+ * Guid prefix comparison operator
  * @param id1 First EntityId to compare
  * @param id2 Second EntityId to compare
  * @return True if equal
@@ -251,7 +193,14 @@ inline bool operator ==(
         const EntityId_t& id1,
         const EntityId_t& id2)
 {
-    return EntityId_t::cmp(id1, id2) == 0;
+    for (uint8_t i = 0; i < 4; ++i)
+    {
+        if (id1.value[i] != id2.value[i])
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**
@@ -264,9 +213,14 @@ inline bool operator !=(
         const EntityId_t& id1,
         const EntityId_t& id2)
 {
-    // Use == operator as it is faster enough.
-    // NOTE: this could be done comparing the entities backwards (starting in [3]) as it would probably be faster.
-    return !(operator ==(id1, id2));
+    for (uint8_t i = 0; i < 4; ++i)
+    {
+        if (id1.value[i] != id2.value[i])
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 #endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
@@ -275,11 +229,9 @@ inline std::ostream& operator <<(
         std::ostream& output,
         const EntityId_t& enI)
 {
-    std::stringstream ss;
-    ss << std::hex;
-    ss << (int)enI.value[0] << "." << (int)enI.value[1] << "." << (int)enI.value[2] << "." << (int)enI.value[3];
-    ss << std::dec;
-    return output << ss.str();
+    output << std::hex;
+    output << (int)enI.value[0] << "." << (int)enI.value[1] << "." << (int)enI.value[2] << "." << (int)enI.value[3];
+    return output << std::dec;
 }
 
 inline std::istream& operator >>(
@@ -363,11 +315,6 @@ const EntityId_t participant_volatile_message_secure_reader_entity_id =
 
 const EntityId_t c_EntityId_WriterLivelinessSecure = ENTITYID_P2P_BUILTIN_PARTICIPANT_MESSAGE_SECURE_WRITER;
 const EntityId_t c_EntityId_ReaderLivelinessSecure = ENTITYID_P2P_BUILTIN_PARTICIPANT_MESSAGE_SECURE_READER;
-
-const EntityId_t c_EntityId_spdp_reliable_participant_secure_reader =
-        ENTITYID_SPDP_RELIABLE_BUILTIN_PARTICIPANT_SECURE_READER;
-const EntityId_t c_EntityId_spdp_reliable_participant_secure_writer =
-        ENTITYID_SPDP_RELIABLE_BUILTIN_PARTICIPANT_SECURE_WRITER;
 #endif // if HAVE_SECURITY
 
 const EntityId_t ds_server_virtual_writer = ENTITYID_DS_SERVER_VIRTUAL_WRITER;
@@ -384,9 +331,21 @@ struct hash<eprosima::fastrtps::rtps::EntityId_t>
     std::size_t operator ()(
             const eprosima::fastrtps::rtps::EntityId_t& k) const
     {
-        return (static_cast<size_t>(k.value[0]) << 16) |
-               (static_cast<size_t>(k.value[1]) << 8) |
-               static_cast<size_t>(k.value[2]);
+        // recover the participant entity counter
+        eprosima::fastrtps::rtps::octet value[4];
+
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
+        value[3] = k.value[2];
+        value[2] = k.value[1];
+        value[1] = k.value[0];
+        value[0] = 0;
+#else
+        value[3] = 0;
+        value[2] = k.value[0];
+        value[1] = k.value[1];
+        value[0] = k.value[2];
+#endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
+        return static_cast<std::size_t>(*reinterpret_cast<const uint32_t*>(&value));
     }
 
 };
