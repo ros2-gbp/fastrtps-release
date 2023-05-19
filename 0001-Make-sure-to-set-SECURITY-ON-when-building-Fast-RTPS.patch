@@ -1,4 +1,4 @@
-From 02152c8517c6f8fba093d98fa979668f5fa45411 Mon Sep 17 00:00:00 2001
+From 34288986c682d57d3f9d85ae2a34b2ddaecad95c Mon Sep 17 00:00:00 2001
 From: Chris Lalancette <clalancette@openrobotics.org>
 Date: Thu, 25 Feb 2021 15:09:35 -0500
 Subject: [PATCH] Make sure to set SECURITY=ON when building Fast-RTPS. (#12)
