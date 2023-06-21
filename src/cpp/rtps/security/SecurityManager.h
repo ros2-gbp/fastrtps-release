@@ -30,6 +30,7 @@
 #include <fastdds/rtps/resources/TimedEvent.h>
 #include <fastdds/rtps/security/authentication/Handshake.h>
 #include <fastdds/rtps/security/common/ParticipantGenericMessage.h>
+#include <fastrtps/utils/ProxyPool.hpp>
 #include <fastrtps/utils/shared_mutex.hpp>
 
 #include <map>
@@ -311,6 +312,24 @@ public:
         return (bool)ready_state_;
     }
 
+    /**
+     * Access the temporary proxy pool for reader proxies
+     * @return pool reference
+     */
+    ProxyPool<ReaderProxyData>& get_temporary_reader_proxies_pool()
+    {
+        return temp_reader_proxies_;
+    }
+
+    /**
+     * Access the temporary proxy pool for writer proxies
+     * @return pool reference
+     */
+    ProxyPool<WriterProxyData>& get_temporary_writer_proxies_pool()
+    {
+        return temp_writer_proxies_;
+    }
+
 private:
 
     enum AuthenticationStatus : uint32_t
@@ -321,7 +340,8 @@ private:
         AUTHENTICATION_REQUEST_NOT_SEND,
         AUTHENTICATION_WAITING_REQUEST,
         AUTHENTICATION_WAITING_REPLY,
-        AUTHENTICATION_WAITING_FINAL
+        AUTHENTICATION_WAITING_FINAL,
+        AUTHENTICATION_NOT_AVAILABLE
     };
 
     class DiscoveredParticipantInfo
@@ -339,6 +359,7 @@ private:
                 , auth_status_(auth_status)
                 , expected_sequence_number_(0)
                 , change_sequence_number_(SequenceNumber_t::unknown())
+                , handshake_requests_sent_(0)
             {
             }
 
@@ -365,6 +386,8 @@ private:
 
             EventUniquePtr event_;
 
+            uint32_t handshake_requests_sent_;
+
         private:
 
             AuthenticationInfo(
@@ -374,6 +397,9 @@ private:
     public:
 
         typedef std::unique_ptr<AuthenticationInfo> AuthUniquePtr;
+
+        static constexpr uint32_t INITIAL_RESEND_HANDSHAKE_MILLISECS = 125;
+        static constexpr uint32_t MAX_HANDSHAKE_REQUESTS = 5;
 
         DiscoveredParticipantInfo(
                 AuthenticationStatus auth_status,
@@ -457,6 +483,19 @@ private:
         {
             std::lock_guard<std::mutex> g(mtx_);
             return participant_data_;
+        }
+
+        AuthenticationStatus get_auth_status() const
+        {
+            std::lock_guard<std::mutex> g(mtx_);
+            if (auth_.get() != nullptr)
+            {
+                return auth_->auth_status_;
+            }
+            else
+            {
+                return AUTHENTICATION_NOT_AVAILABLE;
+            }
         }
 
     private:
@@ -685,6 +724,16 @@ private:
     void resend_handshake_message_token(
             const GUID_t& remote_participant_key) const;
 
+    /**
+     * Determines de action to do when validation process fails
+     * @param participant_data ParticipantProxyData& exchange partner
+     * @param exception Exception to generate (if any)
+     * @return true if this participant should be considered as authenticated
+     */
+    void on_validation_failed(
+            const ParticipantProxyData& participant_data,
+            const SecurityException& exception) const;
+
     RTPSParticipantImpl* participant_;
     StatelessWriter* participant_stateless_message_writer_;
     WriterHistory* participant_stateless_message_writer_history_;
@@ -817,12 +866,11 @@ private:
     std::list<std::tuple<ReaderProxyData, GUID_t, GUID_t>> remote_reader_pending_discovery_messages_;
     std::list<std::tuple<WriterProxyData, GUID_t, GUID_t>> remote_writer_pending_discovery_messages_;
 
-    // The temporary proxies are required to prevent dynamic allocations and enforce real time on execution
-    // They are protected by the corresponding builtin reader endpoints mutexes to avoid data races
-    ReaderProxyData temp_stateless_reader_proxy_data_;
-    WriterProxyData temp_stateless_writer_proxy_data_;
-    ReaderProxyData temp_volatile_reader_proxy_data_;
-    WriterProxyData temp_volatile_writer_proxy_data_;
+    //! ProxyPool for temporary reader proxies
+    ProxyPool<ReaderProxyData> temp_reader_proxies_;
+    //! ProxyPool for temporary writer proxies
+    ProxyPool<WriterProxyData> temp_writer_proxies_;
+
 
     HistoryAttributes participant_stateless_message_writer_hattr_;
     HistoryAttributes participant_stateless_message_reader_hattr_;
