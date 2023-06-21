@@ -18,32 +18,24 @@
  */
 
 #include <fastrtps_deprecated/participant/ParticipantImpl.h>
-#include <fastrtps/participant/Participant.h>
-#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
-#include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
-#include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
-#include <fastrtps/participant/ParticipantListener.h>
-
-#include <fastdds/dds/topic/TopicDataType.hpp>
-
-#include <fastdds/rtps/participant/RTPSParticipant.h>
-
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps_deprecated/publisher/PublisherImpl.h>
-#include <fastrtps/publisher/Publisher.h>
-
-#include <fastrtps/attributes/SubscriberAttributes.h>
-#include <fastrtps_deprecated/subscriber/SubscriberImpl.h>
-#include <fastrtps/subscriber/Subscriber.h>
-
-#include <fastdds/rtps/RTPSDomain.h>
-
-#include <fastdds/rtps/transport/UDPv4Transport.h>
-#include <fastdds/rtps/transport/UDPv6Transport.h>
-#include <fastdds/rtps/transport/test_UDPv4Transport.h>
-#include <fastdds/rtps/builtin/liveliness/WLP.h>
 
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/dds/topic/TopicDataType.hpp>
+#include <fastdds/rtps/RTPSDomain.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
+#include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
+#include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
+#include <fastdds/rtps/resources/TimedEvent.h>
+#include <fastrtps/attributes/PublisherAttributes.h>
+#include <fastrtps/attributes/SubscriberAttributes.h>
+#include <fastrtps/participant/ParticipantListener.h>
+#include <fastrtps/participant/Participant.h>
+#include <fastrtps/publisher/Publisher.h>
+#include <fastrtps/subscriber/Subscriber.h>
+#include <fastrtps_deprecated/publisher/PublisherImpl.h>
+#include <fastrtps_deprecated/subscriber/SubscriberImpl.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -187,6 +179,7 @@ Publisher* ParticipantImpl::createPublisher(
     watt.mode = att.qos.m_publishMode.kind ==
             eprosima::fastrtps::SYNCHRONOUS_PUBLISH_MODE ? SYNCHRONOUS_WRITER : ASYNCHRONOUS_WRITER;
     watt.endpoint.properties = att.properties;
+    watt.flow_controller_name = att.qos.m_publishMode.flow_controller_name;
     if (att.getEntityID() > 0)
     {
         watt.endpoint.setEntityID((uint8_t)att.getEntityID());
@@ -200,6 +193,7 @@ Publisher* ParticipantImpl::createPublisher(
     watt.liveliness_lease_duration = att.qos.m_liveliness.lease_duration;
     watt.liveliness_announcement_period = att.qos.m_liveliness.announcement_period;
     watt.matched_readers_allocation = att.matched_subscriber_allocation;
+    watt.disable_heartbeat_piggyback = att.qos.disable_heartbeat_piggyback;
 
     // TODO(Ricardo) Remove in future
     // Insert topic_name and partitions
@@ -242,6 +236,13 @@ Publisher* ParticipantImpl::createPublisher(
 
     // In case it has been loaded from the persistence DB, rebuild instances on history
     pubimpl->m_history.rebuild_instances();
+    if (att.qos.m_lifespan.duration != c_TimeInfinite)
+    {
+        if (pubimpl->lifespan_expired())
+        {
+            pubimpl->lifespan_timer_->restart_timer();
+        }
+    }
 
     //SAVE THE PUBLISHER PAIR
     t_p_PublisherPair pubpair;
@@ -264,7 +265,7 @@ Subscriber* ParticipantImpl::createSubscriber(
         const SubscriberAttributes& att,
         SubscriberListener* listen)
 {
-    logInfo(PARTICIPANT, "CREATING SUBSCRIBER IN TOPIC: " << att.topic.getTopicName())
+    logInfo(PARTICIPANT, "CREATING SUBSCRIBER IN TOPIC: " << att.topic.getTopicName());
     //Look for the correct type registration
 
     TopicDataType* p_type = nullptr;

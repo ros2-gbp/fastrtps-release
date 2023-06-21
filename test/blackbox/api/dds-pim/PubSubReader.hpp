@@ -20,37 +20,46 @@
 #ifndef _TEST_BLACKBOX_PUBSUBREADER_HPP_
 #define _TEST_BLACKBOX_PUBSUBREADER_HPP_
 
-#include <string>
-#include <list>
 #include <atomic>
 #include <condition_variable>
+#include <functional>
+#include <list>
+#include <string>
+
 #include <asio.hpp>
 #include <gtest/gtest.h>
-
 #if _MSC_VER
 #include <Windows.h>
 #endif // _MSC_VER
-
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/core/condition/StatusCondition.hpp>
+#include <fastdds/dds/core/condition/GuardCondition.hpp>
+#include <fastdds/dds/core/condition/WaitSet.hpp>
+#include <fastdds/dds/core/UserAllocatedSequence.hpp>
+#include <fastdds/dds/core/policy/QosPolicies.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
-#include <fastdds/dds/topic/Topic.hpp>
-#include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/subscriber/DataReaderListener.hpp>
-#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
-#include <fastdds/dds/core/policy/QosPolicies.hpp>
-#include <fastrtps/subscriber/SampleInfo.h>
 #include <fastdds/dds/subscriber/SampleInfo.hpp>
+#include <fastdds/dds/subscriber/Subscriber.hpp>
+#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
+#include <fastdds/dds/topic/Topic.hpp>
+#include <fastdds/rtps/transport/UDPTransportDescriptor.h>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
+#include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
 #include <fastrtps/utils/IPLocator.h>
-#include <fastrtps/transport/UDPv4TransportDescriptor.h>
 
 using DomainParticipantFactory = eprosima::fastdds::dds::DomainParticipantFactory;
 using eprosima::fastrtps::rtps::IPLocator;
-using eprosima::fastrtps::rtps::UDPv4TransportDescriptor;
+using eprosima::fastdds::rtps::UDPTransportDescriptor;
+using eprosima::fastdds::rtps::UDPv4TransportDescriptor;
+using eprosima::fastdds::rtps::UDPv6TransportDescriptor;
+
+using SampleLostStatusFunctor = std::function<void (const eprosima::fastdds::dds::SampleLostStatus&)>;
 
 template<class TypeSupport>
 class PubSubReader
@@ -60,7 +69,7 @@ public:
     typedef TypeSupport type_support;
     typedef typename type_support::type type;
 
-private:
+protected:
 
     class ParticipantListener : public eprosima::fastdds::dds::DomainParticipantListener
     {
@@ -156,13 +165,18 @@ private:
                 eprosima::fastdds::dds::DataReader* datareader) override
         {
             ASSERT_NE(datareader, nullptr);
+            {
+                std::lock_guard<std::mutex> guard(reader_.message_receive_mutex_);
+                reader_.message_receive_count_.fetch_add(1);
+            }
+            reader_.message_receive_cv_.notify_one();
 
             if (reader_.receiving_.load())
             {
                 bool ret = false;
                 do
                 {
-                    reader_.receive_one(datareader, ret);
+                    reader_.receive(datareader, ret);
                 } while (ret);
             }
         }
@@ -220,6 +234,15 @@ private:
             }
         }
 
+        void on_sample_lost(
+                eprosima::fastdds::dds::DataReader* datareader,
+                const eprosima::fastdds::dds::SampleLostStatus& status) override
+        {
+            (void)datareader;
+
+            reader_.set_sample_lost_status(status);
+        }
+
         unsigned int missed_deadlines() const
         {
             return times_deadline_missed_;
@@ -244,7 +267,9 @@ public:
 
     PubSubReader(
             const std::string& topic_name,
-            bool take = true)
+            bool take = true,
+            bool statistics = false,
+            bool read = true)
         : participant_listener_(*this)
         , listener_(*this)
         , participant_(nullptr)
@@ -257,12 +282,15 @@ public:
         , matched_(0)
         , participant_matched_(0)
         , receiving_(false)
-        , current_received_count_(0)
+        , current_processed_count_(0)
         , number_samples_expected_(0)
+        , current_unread_count_(0)
         , discovery_result_(false)
         , onDiscovery_(nullptr)
         , onEndpointDiscovery_(nullptr)
         , take_(take)
+        , read_(read)
+        , statistics_(statistics)
 #if HAVE_SECURITY
         , authorized_(0)
         , unauthorized_(0)
@@ -273,11 +301,28 @@ public:
         , times_liveliness_recovered_(0)
         , times_incompatible_qos_(0)
         , last_incompatible_qos_(eprosima::fastdds::dds::INVALID_QOS_POLICY_ID)
+        , message_receive_count_(0)
     {
+        // Load default QoS to permit testing with external XML profile files.
+        DomainParticipantFactory::get_instance()->load_profiles();
+        participant_qos_ = DomainParticipantFactory::get_instance()->get_default_participant_qos();
+
         // Generate topic name
-        std::ostringstream t;
-        t << topic_name_ << "_" << asio::ip::host_name() << "_" << GET_PID();
-        topic_name_ = t.str();
+        if (!statistics)
+        {
+            std::ostringstream t;
+            t << topic_name_ << "_" << asio::ip::host_name() << "_" << GET_PID();
+            topic_name_ = t.str();
+        }
+
+        if (enable_datasharing)
+        {
+            datareader_qos_.data_sharing().automatic();
+        }
+        else
+        {
+            datareader_qos_.data_sharing().off();
+        }
 
         // By default, memory mode is preallocated (the most restritive)
         datareader_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
@@ -285,15 +330,26 @@ public:
         // By default, heartbeat period delay is 100 milliseconds.
         datareader_qos_.reliable_reader_qos().times.heartbeatResponseDelay.seconds = 0;
         datareader_qos_.reliable_reader_qos().times.heartbeatResponseDelay.nanosec = 100000000;
+
+        // By default don't check for overlapping
+        loan_sample_validation(false);
     }
 
-    ~PubSubReader()
+    virtual ~PubSubReader()
     {
         destroy();
     }
 
+    eprosima::fastdds::dds::DataReader& get_native_reader() const
+    {
+        return *datareader_;
+    }
+
     void init()
     {
+        ASSERT_FALSE(initialized_);
+        matched_ = 0;
+
         if (!xml_file_.empty())
         {
             DomainParticipantFactory::get_instance()->load_XML_profiles_file(xml_file_);
@@ -315,48 +371,61 @@ public:
                 participant_qos_,
                 &participant_listener_,
                 eprosima::fastdds::dds::StatusMask::none());
-            ASSERT_NE(participant_, nullptr);
-            ASSERT_TRUE(participant_->is_enabled());
         }
 
-        participant_guid_ = participant_->guid();
-
-        type_.reset(new type_support());
-
-        // Register type
-        ASSERT_EQ(participant_->register_type(type_), ReturnCode_t::RETCODE_OK);
-
-        // Create subscriber
-        subscriber_ = participant_->create_subscriber(subscriber_qos_);
-        ASSERT_NE(subscriber_, nullptr);
-        ASSERT_TRUE(subscriber_->is_enabled());
-
-        // Create topic
-        topic_ = participant_->create_topic(topic_name_, type_->getName(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-        ASSERT_NE(topic_, nullptr);
-        ASSERT_TRUE(topic_->is_enabled());
-
-        if (!xml_file_.empty())
+        if (participant_ != nullptr)
         {
-            if (!datareader_profile_.empty())
+            participant_guid_ = participant_->guid();
+
+            type_.reset(new type_support());
+
+            // Register type
+            ASSERT_EQ(participant_->register_type(type_), ReturnCode_t::RETCODE_OK);
+
+            // Create topic
+            topic_ =
+                    participant_->create_topic(topic_name_, type_->getName(),
+                            eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+            ASSERT_NE(topic_, nullptr);
+            ASSERT_TRUE(topic_->is_enabled());
+
+            // Create publisher
+            createSubscriber();
+        }
+    }
+
+    virtual void createSubscriber()
+    {
+        if (participant_ != nullptr)
+        {
+            subscriber_ = participant_->create_subscriber(subscriber_qos_);
+            ASSERT_NE(subscriber_, nullptr);
+            ASSERT_TRUE(subscriber_->is_enabled());
+
+            if (!xml_file_.empty())
             {
-                datareader_ = subscriber_->create_datareader_with_profile(topic_, datareader_profile_, &listener_,
-                                status_mask_);
-                ASSERT_NE(datareader_, nullptr);
-                ASSERT_TRUE(datareader_->is_enabled());
+                if (!datareader_profile_.empty())
+                {
+                    datareader_ = subscriber_->create_datareader_with_profile(topic_, datareader_profile_, &listener_,
+                                    status_mask_);
+                    ASSERT_NE(datareader_, nullptr);
+                    ASSERT_TRUE(datareader_->is_enabled());
+                }
+            }
+            if (datareader_ == nullptr)
+            {
+                datareader_ = subscriber_->create_datareader(topic_, datareader_qos_, &listener_, status_mask_);
+            }
+
+            if (datareader_ != nullptr)
+            {
+                std::cout << "Created datareader " << datareader_->guid() << " for topic " <<
+                    topic_name_ << std::endl;
+                initialized_ = true;
+                datareader_guid_ = datareader_->guid();
             }
         }
-        if (datareader_ == nullptr)
-        {
-            datareader_ = subscriber_->create_datareader(topic_, datareader_qos_, &listener_, status_mask_);
-        }
 
-        if (datareader_ != nullptr)
-        {
-            std::cout << "Created datareader " << datareader_->guid() << " for topic " <<
-                topic_name_ << std::endl;
-            initialized_ = true;
-        }
     }
 
     bool isInitialized() const
@@ -364,7 +433,7 @@ public:
         return initialized_;
     }
 
-    void destroy()
+    virtual void destroy()
     {
         if (participant_ != nullptr)
         {
@@ -386,6 +455,8 @@ public:
             eprosima::fastdds::dds::DomainParticipantFactory::get_instance()->delete_participant(participant_);
             participant_ = nullptr;
         }
+
+        initialized_ = false;
     }
 
     std::list<type> data_not_received()
@@ -400,19 +471,19 @@ public:
         mutex_.lock();
         total_msgs_ = msgs;
         number_samples_expected_ = total_msgs_.size();
-        current_received_count_ = 0;
-        last_seq = eprosima::fastrtps::rtps::SequenceNumber_t();
+        current_processed_count_ = 0;
+        last_seq.clear();
         mutex_.unlock();
 
         bool ret = false;
         do
         {
-            receive_one(datareader_, ret);
+            receive(datareader_, ret);
         }
         while (ret);
 
         receiving_.store(true);
-        return last_seq;
+        return get_last_sequence_received();
     }
 
     void stopReception()
@@ -420,11 +491,29 @@ public:
         receiving_.store(false);
     }
 
+    template<class _Rep,
+            class _Period
+            >
+    bool wait_for_all_received(
+            const std::chrono::duration<_Rep, _Period>& max_wait,
+            size_t num_messages = 0)
+    {
+        if (num_messages == 0)
+        {
+            num_messages = number_samples_expected_;
+        }
+        std::unique_lock<std::mutex> lock(message_receive_mutex_);
+        return message_receive_cv_.wait_for(lock, max_wait, [this, num_messages]() -> bool
+                       {
+                           return num_messages == message_receive_count_;
+                       });
+    }
+
     void block_for_all()
     {
         block([this]() -> bool
                 {
-                    return number_samples_expected_ == current_received_count_;
+                    return number_samples_expected_ == current_processed_count_;
                 });
     }
 
@@ -433,7 +522,7 @@ public:
     {
         block([this, seq]() -> bool
                 {
-                    return last_seq == seq;
+                    return get_last_sequence_received() == seq;
                 });
     }
 
@@ -442,9 +531,19 @@ public:
     {
         block([this, at_least]() -> bool
                 {
-                    return current_received_count_ >= at_least;
+                    return current_processed_count_ >= at_least;
                 });
-        return current_received_count_;
+        return current_processed_count_;
+    }
+
+    size_t block_for_unread_count_of(
+            size_t n_unread)
+    {
+        block([this, n_unread]() -> bool
+                {
+                    return current_unread_count_ >= n_unread;
+                });
+        return current_unread_count_;
     }
 
     void block(
@@ -463,10 +562,40 @@ public:
         std::unique_lock<std::mutex> lock(mutex_);
         cv_.wait_for(lock, max_wait, [this]() -> bool
                 {
-                    return number_samples_expected_ == current_received_count_;
+                    return number_samples_expected_ == current_processed_count_;
                 });
 
-        return current_received_count_;
+        return current_processed_count_;
+    }
+
+    void check_history_content(
+            std::list<type>& expected_messages)
+    {
+        FASTDDS_SEQUENCE(DataSeq, type);
+        DataSeq data_seq;
+        eprosima::fastdds::dds::SampleInfoSeq info_seq;
+
+        ReturnCode_t success =
+                datareader_->read(data_seq, info_seq,
+                        eprosima::fastdds::dds::LENGTH_UNLIMITED,
+                        eprosima::fastdds::dds::ANY_SAMPLE_STATE,
+                        eprosima::fastdds::dds::ANY_VIEW_STATE,
+                        eprosima::fastdds::dds::ANY_INSTANCE_STATE);
+
+        if (ReturnCode_t::RETCODE_OK == success)
+        {
+            for (eprosima::fastdds::dds::LoanableCollection::size_type n = 0; n < info_seq.length(); ++n)
+            {
+                if (info_seq[n].valid_data)
+                {
+                    auto it = std::find(expected_messages.begin(), expected_messages.end(), data_seq[n]);
+                    ASSERT_NE(it, expected_messages.end());
+                    expected_messages.erase(it);
+                }
+            }
+            ASSERT_TRUE(expected_messages.empty());
+            datareader_->return_loan(data_seq, info_seq);
+        }
     }
 
     void wait_discovery(
@@ -572,7 +701,8 @@ public:
         return ret_value;
     }
 
-    void wait_writer_undiscovery()
+    void wait_writer_undiscovery(
+            unsigned int matched = 0)
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
@@ -580,7 +710,7 @@ public:
 
         cvDiscovery_.wait(lock, [&]()
                 {
-                    return matched_ == 0;
+                    return matched_ <= matched;
                 });
 
         std::cout << "Reader removal finished..." << std::endl;
@@ -620,10 +750,10 @@ public:
     }
 
     void incompatible_qos(
-            eprosima::fastdds::dds::OfferedIncompatibleQosStatus status)
+            eprosima::fastdds::dds::RequestedIncompatibleQosStatus status)
     {
         std::unique_lock<std::mutex> lock(incompatible_qos_mutex_);
-        times_incompatible_qos_++;
+        times_incompatible_qos_ += status.total_count_change;
         last_incompatible_qos_ = status.last_policy_id;
         incompatible_qos_cv_.notify_one();
     }
@@ -661,12 +791,22 @@ public:
 
     size_t getReceivedCount() const
     {
-        return current_received_count_;
+        return current_processed_count_;
     }
 
     eprosima::fastrtps::rtps::SequenceNumber_t get_last_sequence_received()
     {
-        return last_seq;
+        if (last_seq.empty())
+        {
+            return eprosima::fastrtps::rtps::SequenceNumber_t();
+        }
+
+        using pair_type = typename decltype(last_seq)::value_type;
+        auto seq_comp = [](const pair_type& v1, const pair_type& v2) -> bool
+                {
+                    return v1.second < v2.second;
+                };
+        return std::max_element(last_seq.cbegin(), last_seq.cend(), seq_comp)->second;
     }
 
     PubSubReader& deactivate_status_listener(
@@ -686,6 +826,18 @@ public:
     PubSubReader& reset_status_listener()
     {
         status_mask_ = eprosima::fastdds::dds::StatusMask::all();
+        return *this;
+    }
+
+    PubSubReader& loan_sample_validation(
+            bool validate = true)
+    {
+        receive_ = std::bind(
+            validate ? &PubSubReader::receive_samples : &PubSubReader::receive_one,
+            this,
+            std::placeholders::_1,
+            std::placeholders::_2);
+
         return *this;
     }
 
@@ -783,7 +935,7 @@ public:
     }
 
     PubSubReader& add_user_transport_to_pparams(
-            std::shared_ptr<eprosima::fastrtps::rtps::TransportDescriptorInterface> userTransportDescriptor)
+            std::shared_ptr<eprosima::fastdds::rtps::TransportDescriptorInterface> userTransportDescriptor)
     {
         participant_qos_.transport().user_transports.push_back(userTransportDescriptor);
         return *this;
@@ -842,9 +994,9 @@ public:
     }
 
     PubSubReader& unicastLocatorList(
-            eprosima::fastrtps::rtps::LocatorList_t unicastLocators)
+            const eprosima::fastdds::rtps::LocatorList& unicast_locators)
     {
-        datareader_qos_.endpoint().unicast_locator_list = unicastLocators;
+        datareader_qos_.endpoint().unicast_locator_list = unicast_locators;
         return *this;
     }
 
@@ -852,8 +1004,15 @@ public:
             const std::string& ip,
             uint32_t port)
     {
-        eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        eprosima::fastdds::rtps::Locator loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
         loc.port = port;
         datareader_qos_.endpoint().unicast_locator_list.push_back(loc);
 
@@ -861,9 +1020,9 @@ public:
     }
 
     PubSubReader& multicastLocatorList(
-            eprosima::fastrtps::rtps::LocatorList_t multicastLocators)
+            const eprosima::fastdds::rtps::LocatorList& multicast_locators)
     {
-        datareader_qos_.endpoint().multicast_locator_list = multicastLocators;
+        datareader_qos_.endpoint().multicast_locator_list = multicast_locators;
         return *this;
     }
 
@@ -871,8 +1030,16 @@ public:
             const std::string& ip,
             uint32_t port)
     {
-        eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        eprosima::fastdds::rtps::Locator loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         datareader_qos_.endpoint().multicast_locator_list.push_back(loc);
 
@@ -880,9 +1047,9 @@ public:
     }
 
     PubSubReader& metatraffic_unicast_locator_list(
-            eprosima::fastrtps::rtps::LocatorList_t unicastLocators)
+            const eprosima::fastdds::rtps::LocatorList& unicast_locators)
     {
-        participant_qos_.wire_protocol().builtin.metatrafficUnicastLocatorList = unicastLocators;
+        participant_qos_.wire_protocol().builtin.metatrafficUnicastLocatorList = unicast_locators;
         return *this;
     }
 
@@ -890,8 +1057,16 @@ public:
             const std::string& ip,
             uint32_t port)
     {
-        eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        eprosima::fastdds::rtps::Locator loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         participant_qos_.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(loc);
 
@@ -899,9 +1074,9 @@ public:
     }
 
     PubSubReader& metatraffic_multicast_locator_list(
-            eprosima::fastrtps::rtps::LocatorList_t unicastLocators)
+            const eprosima::fastdds::rtps::LocatorList& multicast_locators)
     {
-        participant_qos_.wire_protocol().builtin.metatrafficMulticastLocatorList = unicastLocators;
+        participant_qos_.wire_protocol().builtin.metatrafficMulticastLocatorList = multicast_locators;
         return *this;
     }
 
@@ -909,16 +1084,78 @@ public:
             const std::string& ip,
             uint32_t port)
     {
-        eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        eprosima::fastdds::rtps::Locator loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         participant_qos_.wire_protocol().builtin.metatrafficMulticastLocatorList.push_back(loc);
 
         return *this;
     }
 
+    PubSubReader& set_default_unicast_locators(
+            const eprosima::fastdds::rtps::LocatorList& locators)
+    {
+        participant_qos_.wire_protocol().default_unicast_locator_list = locators;
+        return *this;
+    }
+
+    PubSubReader& add_to_default_unicast_locator_list(
+            const std::string& ip,
+            uint32_t port)
+    {
+        eprosima::fastdds::rtps::Locator loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
+        loc.port = port;
+        participant_qos_.wire_protocol().default_unicast_locator_list.push_back(loc);
+
+        return *this;
+    }
+
+    PubSubReader& set_default_multicast_locators(
+            const eprosima::fastdds::rtps::LocatorList& locators)
+    {
+        participant_qos_.wire_protocol().default_multicast_locator_list = locators;
+        return *this;
+    }
+
+    PubSubReader& add_to_default_multicast_locator_list(
+            const std::string& ip,
+            uint32_t port)
+    {
+        eprosima::fastdds::rtps::Locator loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
+        loc.port = port;
+        participant_qos_.wire_protocol().default_multicast_locator_list.push_back(loc);
+
+        return *this;
+    }
+
     PubSubReader& initial_peers(
-            eprosima::fastrtps::rtps::LocatorList_t initial_peers)
+            const eprosima::fastdds::rtps::LocatorList& initial_peers)
     {
         participant_qos_.wire_protocol().builtin.initialPeersList = initial_peers;
         return *this;
@@ -950,7 +1187,7 @@ public:
     {
         participant_qos_.wire_protocol().builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
         participant_qos_.wire_protocol().builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_qos_.wire_protocol().builtin.discovery_config.setStaticEndpointXMLFilename(filename);
+        participant_qos_.wire_protocol().builtin.discovery_config.static_edp_xml_config(filename);
         return *this;
     }
 
@@ -976,27 +1213,35 @@ public:
     {
         participant_qos_.wire_protocol().participant_id = participantId;
 
-        eprosima::fastrtps::rtps::LocatorList_t default_unicast_locators;
-        eprosima::fastrtps::rtps::Locator_t default_unicast_locator;
+        eprosima::fastdds::rtps::LocatorList default_unicast_locators;
+        eprosima::fastdds::rtps::Locator default_unicast_locator;
+        eprosima::fastdds::rtps::Locator loopback_locator;
+        if (!use_udpv4)
+        {
+            default_unicast_locator.kind = LOCATOR_KIND_UDPv6;
+            loopback_locator.kind = LOCATOR_KIND_UDPv6;
+        }
 
         default_unicast_locators.push_back(default_unicast_locator);
         participant_qos_.wire_protocol().builtin.metatrafficUnicastLocatorList = default_unicast_locators;
 
-        eprosima::fastrtps::rtps::Locator_t loopback_locator;
-        IPLocator::setIPv4(loopback_locator, 127, 0, 0, 1);
+        if (!IPLocator::setIPv4(loopback_locator, 127, 0, 0, 1))
+        {
+            IPLocator::setIPv6(loopback_locator, "::1");
+        }
         participant_qos_.wire_protocol().builtin.initialPeersList.push_back(loopback_locator);
         return *this;
     }
 
     PubSubReader& property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
+            const eprosima::fastrtps::rtps::PropertyPolicy& property_policy)
     {
         participant_qos_.properties() = property_policy;
         return *this;
     }
 
     PubSubReader& entity_property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
+            const eprosima::fastrtps::rtps::PropertyPolicy& property_policy)
     {
         datareader_qos_.properties() = property_policy;
         return *this;
@@ -1043,6 +1288,15 @@ public:
     {
         participant_qos_.wire_protocol().builtin.discovery_config.leaseDuration = lease_duration;
         participant_qos_.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod = announce_period;
+        return *this;
+    }
+
+    PubSubReader& initial_announcements(
+            uint32_t count,
+            const eprosima::fastrtps::Duration_t& period)
+    {
+        participant_qos_.wire_protocol().builtin.discovery_config.initial_announcements.count = count;
+        participant_qos_.wire_protocol().builtin.discovery_config.initial_announcements.period = period;
         return *this;
     }
 
@@ -1096,9 +1350,24 @@ public:
             uint32_t maxInitialPeerRange)
     {
         participant_qos_.transport().use_builtin_transports = false;
-        std::shared_ptr<UDPv4TransportDescriptor> descriptor = std::make_shared<UDPv4TransportDescriptor>();
+        std::shared_ptr<UDPTransportDescriptor> descriptor;
+        if (use_udpv4)
+        {
+            descriptor = std::make_shared<UDPv4TransportDescriptor>();
+        }
+        else
+        {
+            descriptor = std::make_shared<UDPv6TransportDescriptor>();
+        }
         descriptor->maxInitialPeersRange = maxInitialPeerRange;
         participant_qos_.transport().user_transports.push_back(descriptor);
+        return *this;
+    }
+
+    PubSubReader& guid_prefix(
+            const eprosima::fastrtps::rtps::GuidPrefix_t& prefix)
+    {
+        participant_qos_.wire_protocol().prefix = prefix;
         return *this;
     }
 
@@ -1106,6 +1375,57 @@ public:
             int32_t participantId)
     {
         participant_qos_.wire_protocol().participant_id = participantId;
+        return *this;
+    }
+
+    PubSubReader& datasharing_off()
+    {
+        datareader_qos_.data_sharing().off();
+        return *this;
+    }
+
+    PubSubReader& datasharing_auto(
+            std::vector<uint16_t> domain_id = std::vector<uint16_t>())
+    {
+        datareader_qos_.data_sharing().automatic(domain_id);
+        return *this;
+    }
+
+    PubSubReader& datasharing_auto(
+            const std::string directory,
+            std::vector<uint16_t> domain_id = std::vector<uint16_t>())
+    {
+        datareader_qos_.data_sharing().automatic(directory, domain_id);
+        return *this;
+    }
+
+    PubSubReader& datasharing_on(
+            const std::string directory,
+            std::vector<uint16_t> domain_id = std::vector<uint16_t>())
+    {
+        datareader_qos_.data_sharing().on(directory, domain_id);
+        return *this;
+    }
+
+#if HAVE_SQLITE3
+    PubSubReader& make_persistent(
+            const std::string& filename,
+            const std::string& persistence_guid)
+    {
+        participant_qos_.properties().properties().emplace_back("dds.persistence.plugin", "builtin.SQLITE3");
+        participant_qos_.properties().properties().emplace_back("dds.persistence.sqlite3.filename", filename);
+        datareader_qos_.durability().kind = eprosima::fastrtps::TRANSIENT_DURABILITY_QOS;
+        datareader_qos_.properties().properties().emplace_back("dds.persistence.guid", persistence_guid);
+
+        return *this;
+    }
+
+#endif // if HAVE_SQLITE3
+
+    PubSubReader& use_writer_liveliness_protocol(
+            bool use_wlp)
+    {
+        participant_qos_.wire_protocol().builtin.use_WriterLivelinessProtocol = use_wlp;
         return *this;
     }
 
@@ -1151,13 +1471,31 @@ public:
         onEndpointDiscovery_ = f;
     }
 
+    bool take_first_data(
+            void* data)
+    {
+        using collection = eprosima::fastdds::dds::UserAllocatedSequence;
+        using info_seq_type = eprosima::fastdds::dds::SampleInfoSeq;
+
+        collection::element_type buf[1] = { data };
+        collection data_seq(buf, 1);
+        info_seq_type info_seq(1);
+
+        if (ReturnCode_t::RETCODE_OK == datareader_->take(data_seq, info_seq))
+        {
+            current_processed_count_++;
+            return true;
+        }
+        return false;
+    }
+
     bool takeNextData(
             void* data)
     {
         eprosima::fastdds::dds::SampleInfo dds_info;
         if (datareader_->take_next_sample(data, &dds_info) == ReturnCode_t::RETCODE_OK)
         {
-            current_received_count_++;
+            current_processed_count_++;
             return true;
         }
         return false;
@@ -1244,6 +1582,11 @@ public:
         return matched_ > 0;
     }
 
+    unsigned int get_matched() const
+    {
+        return matched_;
+    }
+
     void set_xml_filename(
             const std::string& name)
     {
@@ -1262,11 +1605,47 @@ public:
         datareader_profile_ = profile;
     }
 
-private:
+    eprosima::fastdds::dds::StatusCondition& get_statuscondition() const
+    {
+        return datareader_->get_statuscondition();
+    }
+
+    const eprosima::fastrtps::rtps::GUID_t& datareader_guid() const
+    {
+        return datareader_guid_;
+    }
+
+    eprosima::fastrtps::rtps::InstanceHandle_t datareader_ihandle()
+    {
+        return eprosima::fastrtps::rtps::InstanceHandle_t(datareader_guid());
+    }
+
+    void set_sample_lost_status(
+            const eprosima::fastdds::dds::SampleLostStatus& status)
+    {
+        if (sample_lost_status_functor_)
+        {
+            sample_lost_status_functor_(status);
+        }
+    }
+
+    PubSubReader& sample_lost_status_functor(
+            SampleLostStatusFunctor functor)
+    {
+        sample_lost_status_functor_ = functor;
+        return *this;
+    }
 
     const eprosima::fastrtps::rtps::GUID_t& participant_guid() const
     {
         return participant_guid_;
+    }
+
+    eprosima::fastdds::dds::SubscriptionMatchedStatus get_subscription_matched_status() const
+    {
+        eprosima::fastdds::dds::SubscriptionMatchedStatus status;
+        datareader_->get_subscription_matched_status(status);
+        return status;
     }
 
 private:
@@ -1279,6 +1658,14 @@ private:
         type data;
         eprosima::fastdds::dds::SampleInfo info;
 
+        if (!take_ && !read_)
+        {
+            current_unread_count_ = datareader->get_unread_count();
+            std::cout << "Total unread count " << current_unread_count_ << std::endl;
+            cv_.notify_one();
+            return;
+        }
+
         ReturnCode_t success = take_ ?
                 datareader->take_next_sample((void*)&data, &info) :
                 datareader->read_next_sample((void*)&data, &info);
@@ -1289,19 +1676,87 @@ private:
             std::unique_lock<std::mutex> lock(mutex_);
 
             // Check order of changes.
-            ASSERT_LT(last_seq, info.sample_identity.sequence_number());
-            last_seq = info.sample_identity.sequence_number();
+            LastSeqInfo seq_info{ info.instance_handle, info.sample_identity.writer_guid() };
+            ASSERT_LT(last_seq[seq_info], info.sample_identity.sequence_number());
+            last_seq[seq_info] = info.sample_identity.sequence_number();
 
-            if (info.instance_state == eprosima::fastdds::dds::ALIVE)
+            if (info.valid_data
+                    && info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
             {
                 auto it = std::find(total_msgs_.begin(), total_msgs_.end(), data);
                 ASSERT_NE(it, total_msgs_.end());
                 total_msgs_.erase(it);
-                ++current_received_count_;
+                ++current_processed_count_;
                 default_receive_print<type>(data);
                 cv_.notify_one();
             }
         }
+    }
+
+    void receive_samples(
+            eprosima::fastdds::dds::DataReader* datareader,
+            bool& returnedValue)
+    {
+        eprosima::fastdds::dds::LoanableSequence<type> datas;
+        eprosima::fastdds::dds::SampleInfoSeq infos;
+        returnedValue = true;
+
+        ReturnCode_t success = take_ ?
+                datareader->take(datas, infos) :
+                datareader->read(datas, infos);
+
+        if (!success)
+        {
+            returnedValue = false;
+            return;
+        }
+
+        // Traverse the collection
+        std::unique_lock<std::mutex> lock(mutex_);
+        for (int32_t i = 0; i < datas.length(); ++i)
+        {
+            type& data = datas[i];
+            eprosima::fastdds::dds::SampleInfo& info = infos[i];
+
+            // Check order of changes.
+            LastSeqInfo seq_info{ info.instance_handle, info.sample_identity.writer_guid() };
+            ASSERT_LT(last_seq[seq_info], info.sample_identity.sequence_number());
+            last_seq[seq_info] = info.sample_identity.sequence_number();
+
+            if (info.valid_data
+                    && info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
+            {
+                // Validate the sample
+                bool valid_sample = datareader->is_sample_valid(&data, &info);
+
+                EXPECT_TRUE(valid_sample) << "sample "
+                                          << info.sample_identity.sequence_number() << " was overlapped.";
+
+                if (valid_sample)
+                {
+                    auto it = std::find(total_msgs_.begin(), total_msgs_.end(), data);
+                    ASSERT_NE(it, total_msgs_.end());
+                    total_msgs_.erase(it);
+                    ++current_processed_count_;
+                    default_receive_print<type>(data);
+                    cv_.notify_one();
+                }
+            }
+        }
+
+        datareader->return_loan(datas, infos);
+    }
+
+    //! functor to check which API to retrieve samples
+    std::function<void (eprosima::fastdds::dds::DataReader* datareader, bool&)> receive_;
+
+protected:
+
+    void receive(
+            eprosima::fastdds::dds::DataReader* datareader,
+            bool& returnedValue)
+    {
+        receive_(datareader, std::ref(returnedValue));
     }
 
     void participant_matched()
@@ -1364,6 +1819,7 @@ private:
     eprosima::fastdds::dds::StatusMask status_mask_;
     std::string topic_name_;
     eprosima::fastrtps::rtps::GUID_t participant_guid_;
+    eprosima::fastrtps::rtps::GUID_t datareader_guid_;
     bool initialized_;
     std::list<type> total_msgs_;
     std::mutex mutex_;
@@ -1374,9 +1830,11 @@ private:
     unsigned int participant_matched_;
     std::atomic<bool> receiving_;
     eprosima::fastdds::dds::TypeSupport type_;
-    eprosima::fastrtps::rtps::SequenceNumber_t last_seq;
-    size_t current_received_count_;
-    size_t number_samples_expected_;
+    using LastSeqInfo = std::pair<eprosima::fastrtps::rtps::InstanceHandle_t, eprosima::fastrtps::rtps::GUID_t>;
+    std::map<LastSeqInfo, eprosima::fastrtps::rtps::SequenceNumber_t> last_seq;
+    std::atomic<size_t> current_processed_count_;
+    std::atomic<size_t> number_samples_expected_;
+    std::atomic<size_t> current_unread_count_;
     bool discovery_result_;
 
     std::string xml_file_ = "";
@@ -1386,8 +1844,14 @@ private:
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
     std::function<bool(const eprosima::fastrtps::rtps::WriterDiscoveryInfo& info)> onEndpointDiscovery_;
 
-    //! True to take data from history. False to read
+    //! True to take data from history. On False, read_ is checked.
     bool take_;
+
+    //! True to read data from history. False, do nothing on data reception.
+    bool read_;
+
+    //! True if the class is called from the statistics blackbox (specific topic name and domain id).
+    bool statistics_;
 
 #if HAVE_SECURITY
     std::mutex mutexAuthentication_;
@@ -1416,6 +1880,367 @@ private:
     //! Latest conflicting PolicyId
     eprosima::fastdds::dds::QosPolicyId_t last_incompatible_qos_;
 
+    //! A mutex for messages received but not yet processed by the application
+    std::mutex message_receive_mutex_;
+    //! A condition variable for messages received but not yet processed by the application
+    std::condition_variable message_receive_cv_;
+    //! Number of messages received but not yet processed by the application
+    std::atomic<size_t> message_receive_count_;
+
+    //! Functor called when called SampleLostStatus listener.
+    SampleLostStatusFunctor sample_lost_status_functor_;
+};
+
+template<class TypeSupport>
+class PubSubReaderWithWaitsets : public PubSubReader<TypeSupport>
+{
+public:
+
+    typedef TypeSupport type_support;
+    typedef typename type_support::type type;
+
+protected:
+
+    class WaitsetThread
+    {
+    public:
+
+        WaitsetThread(
+                PubSubReaderWithWaitsets& reader)
+            : reader_(reader)
+        {
+        }
+
+        ~WaitsetThread()
+        {
+            stop();
+        }
+
+        void start(
+                const eprosima::fastrtps::Duration_t& timeout)
+        {
+            waitset_.attach_condition(reader_.datareader_->get_statuscondition());
+            waitset_.attach_condition(reader_.subscriber_->get_statuscondition());
+            waitset_.attach_condition(guard_condition_);
+
+            std::unique_lock<std::mutex> lock(mutex_);
+            if (nullptr == thread_)
+            {
+                running_ = true;
+                guard_condition_.set_trigger_value(false);
+                timeout_ = timeout;
+                thread_ = new std::thread(&WaitsetThread::run, this);
+            }
+        }
+
+        void stop()
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            running_ = false;
+            if (nullptr != thread_)
+            {
+                lock.unlock();
+
+                // We need to trigger the wake up
+                guard_condition_.set_trigger_value(true);
+                thread_->join();
+                lock.lock();
+                delete thread_;
+                thread_ = nullptr;
+            }
+        }
+
+        void run()
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            while (running_)
+            {
+                lock.unlock();
+                auto wait_result = waitset_.wait(active_conditions_, timeout_);
+                if (wait_result == ReturnCode_t::RETCODE_TIMEOUT)
+                {
+                    reader_.on_waitset_timeout();
+                }
+                else
+                {
+                    if (!guard_condition_.get_trigger_value())
+                    {
+                        for (auto condition : active_conditions_)
+                        {
+                            process(dynamic_cast<eprosima::fastdds::dds::StatusCondition*>(condition));
+                        }
+                    }
+                }
+                lock.lock();
+            }
+        }
+
+        void process(
+                eprosima::fastdds::dds::StatusCondition* condition)
+        {
+            eprosima::fastdds::dds::StatusMask triggered_statuses = reader_.datareader_->get_status_changes();
+            triggered_statuses &= condition->get_enabled_statuses();
+
+            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::subscription_matched()))
+            {
+                eprosima::fastdds::dds::SubscriptionMatchedStatus status;
+                reader_.datareader_->get_subscription_matched_status(status);
+
+                if (0 < status.current_count_change)
+                {
+                    std::cout << "Subscriber matched publisher " << status.last_publication_handle << std::endl;
+                    reader_.matched();
+                }
+                else if (0 > status.current_count_change)
+                {
+                    std::cout << "Subscriber unmatched publisher " << status.last_publication_handle << std::endl;
+                    reader_.unmatched();
+                }
+            }
+
+            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::requested_deadline_missed()))
+            {
+                eprosima::fastdds::dds::RequestedDeadlineMissedStatus status;
+                reader_.datareader_->get_requested_deadline_missed_status(status);
+                times_deadline_missed_ = status.total_count;
+            }
+
+            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::requested_incompatible_qos()))
+            {
+                eprosima::fastdds::dds::RequestedIncompatibleQosStatus status;
+                reader_.datareader_->get_requested_incompatible_qos_status(status);
+                reader_.incompatible_qos(status);
+            }
+
+            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::liveliness_changed()))
+            {
+                eprosima::fastdds::dds::LivelinessChangedStatus status;
+                reader_.datareader_->get_liveliness_changed_status(status);
+
+                reader_.set_liveliness_changed_status(status);
+                if (status.alive_count_change == 1)
+                {
+                    reader_.liveliness_recovered();
+                }
+                else if (status.not_alive_count_change == 1)
+                {
+                    reader_.liveliness_lost();
+                }
+            }
+
+            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::data_available()))
+            {
+                {
+                    std::lock_guard<std::mutex> guard(reader_.message_receive_mutex_);
+                    reader_.message_receive_count_.fetch_add(1);
+                }
+                reader_.message_receive_cv_.notify_one();
+
+                if (reader_.receiving_.load())
+                {
+                    bool ret = false;
+                    do
+                    {
+                        reader_.receive(reader_.datareader_, ret);
+                    } while (ret);
+                }
+            }
+
+            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::sample_lost()))
+            {
+                eprosima::fastdds::dds::SampleLostStatus status;
+                ASSERT_EQ(ReturnCode_t::RETCODE_OK, reader_.datareader_->get_sample_lost_status(status));
+                reader_.set_sample_lost_status(status);
+            }
+
+            // We also have to process the subscriber
+            triggered_statuses = reader_.subscriber_->get_status_changes();
+            triggered_statuses &= condition->get_enabled_statuses();
+
+            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::data_on_readers()))
+            {
+                {
+                    std::lock_guard<std::mutex> guard(reader_.message_receive_mutex_);
+                    reader_.message_receive_count_.fetch_add(1);
+                }
+                reader_.message_receive_cv_.notify_one();
+
+                if (reader_.receiving_.load())
+                {
+                    bool ret = false;
+                    do
+                    {
+                        reader_.receive(reader_.datareader_, ret);
+                    } while (ret);
+                }
+            }
+        }
+
+        unsigned int missed_deadlines() const
+        {
+            return times_deadline_missed_;
+        }
+
+    protected:
+
+        // The reader this waitset thread serves
+        PubSubReaderWithWaitsets& reader_;
+
+        // The waitset where the thread will be blocked
+        eprosima::fastdds::dds::WaitSet waitset_;
+
+        // The active conditions that triggered the wake up
+        eprosima::fastdds::dds::ConditionSeq active_conditions_;
+
+        // The thread that does the job
+        std::thread* thread_ = nullptr;
+
+        // Whether the thread is running or not
+        bool running_ = false;
+
+        // A Mutex to guard the thread start/stop
+        std::mutex mutex_;
+
+        // A user-triggered condition used to signal the thread to stop
+        eprosima::fastdds::dds::GuardCondition guard_condition_;
+
+        //! Number of times deadline was missed
+        unsigned int times_deadline_missed_ = 0;
+
+        //! The timeout for the wait operation
+        eprosima::fastrtps::Duration_t timeout_;
+
+    }
+    waitset_thread_;
+
+    friend class WaitsetThread;
+
+public:
+
+    PubSubReaderWithWaitsets(
+            const std::string& topic_name,
+            bool take = true,
+            bool statistics = false)
+        : PubSubReader<TypeSupport>(topic_name, take, statistics)
+        , waitset_thread_(*this)
+        , timeout_(eprosima::fastrtps::c_TimeInfinite)
+        , times_waitset_timeout_(0)
+    {
+    }
+
+    ~PubSubReaderWithWaitsets() override
+    {
+    }
+
+    void createSubscriber() override
+    {
+        if (participant_ != nullptr)
+        {
+            // Create subscriber
+            subscriber_ = participant_->create_subscriber(subscriber_qos_);
+            ASSERT_NE(subscriber_, nullptr);
+            ASSERT_TRUE(subscriber_->is_enabled());
+
+            if (!xml_file_.empty())
+            {
+                if (!datareader_profile_.empty())
+                {
+                    datareader_ = subscriber_->create_datareader_with_profile(topic_, datareader_profile_, nullptr);
+                    ASSERT_NE(datareader_, nullptr);
+                    ASSERT_TRUE(datareader_->is_enabled());
+                }
+            }
+            if (datareader_ == nullptr)
+            {
+                datareader_ = subscriber_->create_datareader(topic_, datareader_qos_, nullptr);
+            }
+
+            if (datareader_ != nullptr)
+            {
+                initialized_ = datareader_->is_enabled();
+                if (initialized_)
+                {
+                    std::cout << "Created datareader " << datareader_->guid() << " for topic " <<
+                        topic_name_ << std::endl;
+                }
+
+                // Set the desired status condition mask and start the waitset thread
+                datareader_->get_statuscondition().set_enabled_statuses(status_mask_);
+                subscriber_->get_statuscondition().set_enabled_statuses(status_mask_);
+                waitset_thread_.start(timeout_);
+            }
+        }
+    }
+
+    void destroy() override
+    {
+        if (initialized_)
+        {
+            waitset_thread_.stop();
+        }
+
+        PubSubReader<TypeSupport>::destroy();
+    }
+
+    unsigned int missed_deadlines() const
+    {
+        return waitset_thread_.missed_deadlines();
+    }
+
+    void wait_waitset_timeout(
+            unsigned int times = 1)
+    {
+        std::unique_lock<std::mutex> lock(waitset_timeout_mutex_);
+
+        waitset_timeout_cv_.wait(lock, [&]()
+                {
+                    return times_waitset_timeout_ >= times;
+                });
+    }
+
+    unsigned int times_waitset_timeout()
+    {
+        std::unique_lock<std::mutex> lock(waitset_timeout_mutex_);
+        return times_waitset_timeout_;
+    }
+
+    PubSubReaderWithWaitsets& waitset_timeout(
+            const eprosima::fastrtps::Duration_t& timeout)
+    {
+        timeout_ = timeout;
+        return *this;
+    }
+
+protected:
+
+    void on_waitset_timeout()
+    {
+        std::unique_lock<std::mutex> lock(waitset_timeout_mutex_);
+        ++times_waitset_timeout_;
+        waitset_timeout_cv_.notify_one();
+    }
+
+    //! The timeout for the waitset
+    eprosima::fastrtps::Duration_t timeout_;
+
+    //! A mutex for waitset timeout
+    std::mutex waitset_timeout_mutex_;
+    //! A condition variable to notify when the waitset has timed out
+    std::condition_variable waitset_timeout_cv_;
+    //! Number of times the waitset has timed out
+    unsigned int times_waitset_timeout_;
+
+    using PubSubReader<TypeSupport>::xml_file_;
+    using PubSubReader<TypeSupport>::participant_;
+    using PubSubReader<TypeSupport>::topic_name_;
+    using PubSubReader<TypeSupport>::topic_;
+    using PubSubReader<TypeSupport>::subscriber_;
+    using PubSubReader<TypeSupport>::subscriber_qos_;
+    using PubSubReader<TypeSupport>::datareader_;
+    using PubSubReader<TypeSupport>::datareader_qos_;
+    using PubSubReader<TypeSupport>::datareader_profile_;
+    using PubSubReader<TypeSupport>::initialized_;
+    using PubSubReader<TypeSupport>::status_mask_;
 };
 
 #endif // _TEST_BLACKBOX_PUBSUBREADER_HPP_

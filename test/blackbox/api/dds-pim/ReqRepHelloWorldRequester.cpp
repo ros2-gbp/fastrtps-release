@@ -18,6 +18,7 @@
  */
 
 #include "ReqRepHelloWorldRequester.hpp"
+#include "../../common/BlackboxTests.hpp"
 
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
@@ -48,6 +49,9 @@ ReqRepHelloWorldRequester::ReqRepHelloWorldRequester()
     // By default, memory mode is preallocated (the most restritive)
     datareader_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
     datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+
+    datawriter_qos_.reliable_writer_qos().times.heartbeatPeriod.seconds = 1;
+    datawriter_qos_.reliable_writer_qos().times.heartbeatPeriod.nanosec = 0;
 }
 
 ReqRepHelloWorldRequester::~ReqRepHelloWorldRequester()
@@ -90,7 +94,7 @@ void ReqRepHelloWorldRequester::init()
     ASSERT_TRUE(participant_->is_enabled());
 
     // Register type
-    type_.reset(new HelloWorldType());
+    type_.reset(new HelloWorldPubSubType());
     ASSERT_EQ(participant_->register_type(type_), ReturnCode_t::RETCODE_OK);
 
     reply_subscriber_ = participant_->create_subscriber(eprosima::fastdds::dds::SUBSCRIBER_QOS_DEFAULT);
@@ -112,6 +116,22 @@ void ReqRepHelloWorldRequester::init()
                     type_->getName(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
     ASSERT_NE(request_topic_, nullptr);
     ASSERT_TRUE(request_topic_->is_enabled());
+
+    if (enable_datasharing)
+    {
+        datareader_qos_.data_sharing().automatic();
+        datawriter_qos_.data_sharing().automatic();
+    }
+    else
+    {
+        datareader_qos_.data_sharing().off();
+        datawriter_qos_.data_sharing().off();
+    }
+
+    if (use_pull_mode)
+    {
+        datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
+    }
 
     //Create DataReader
     reply_datareader_ = reply_subscriber_->create_datareader(reply_topic_, datareader_qos_, &reply_listener_);
@@ -156,9 +176,9 @@ void ReqRepHelloWorldRequester::block(
     std::unique_lock<std::mutex> lock(mutex_);
 
     bool timeout = cv_.wait_for(lock, seconds, [&]() -> bool
-    {
-        return current_number_ == number_received_;
-    });
+                    {
+                        return current_number_ == number_received_;
+                    });
 
     ASSERT_TRUE(timeout);
     ASSERT_EQ(current_number_, number_received_);
@@ -171,9 +191,10 @@ void ReqRepHelloWorldRequester::wait_discovery()
 
     std::cout << "Requester is waiting discovery..." << std::endl;
 
-    cvDiscovery_.wait(lock, [&](){
-        return matched_ > 1;
-    });
+    cvDiscovery_.wait(lock, [&]()
+            {
+                return matched_ > 1;
+            });
 
     std::cout << "Requester discovery finished..." << std::endl;
 }
@@ -198,7 +219,7 @@ void ReqRepHelloWorldRequester::ReplyListener::on_data_available(
 
     if (ReturnCode_t::RETCODE_OK == datareader->take_next_sample((void*)&hello, &info))
     {
-        if (info.instance_state == eprosima::fastdds::dds::InstanceStateKind::ALIVE)
+        if (info.valid_data)
         {
             ASSERT_EQ(hello.message().compare("GoodBye"), 0);
             requester_.newNumber(info.related_sample_identity, hello.index());

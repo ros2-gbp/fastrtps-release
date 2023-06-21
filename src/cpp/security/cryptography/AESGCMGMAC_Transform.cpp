@@ -128,9 +128,9 @@ bool AESGCMGMAC_Transform::encode_serialized_payload(
         serialize_SecureDataHeader(serializer, keyMat.transformation_kind,
                 keyMat.sender_key_id, session_id, initialization_vector_suffix);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataHeader");
         return false;
     }
 
@@ -145,24 +145,24 @@ bool AESGCMGMAC_Transform::encode_serialized_payload(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataBody");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataBody");
         return false;
     }
 
     try
     {
-        std::vector<DatareaderCryptoHandle*> receiving_datareader_crypto_list;
+        std::vector<std::shared_ptr<DatareaderCryptoHandle>> receiving_datareader_crypto_list;
         if (!serialize_SecureDataTag(serializer, keyMat.transformation_kind, session->session_id,
                 initialization_vector, receiving_datareader_crypto_list, false, tag, nKeys - 1))
         {
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataTag");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataTag");
         return false;
     }
 
@@ -176,7 +176,7 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
         CDRMessage_t& encoded_rtps_submessage,
         const CDRMessage_t& plain_rtps_submessage,
         DatawriterCryptoHandle& sending_datawriter_crypto,
-        std::vector<DatareaderCryptoHandle*>& receiving_datareader_crypto_list,
+        std::vector<std::shared_ptr<DatareaderCryptoHandle>>& receiving_datareader_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_WriterCryptoHandle& local_writer = AESGCMGMAC_WriterCryptoHandle::narrow(sending_datawriter_crypto);
@@ -257,7 +257,7 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
     }
     catch (eprosima::fastcdr::exception::NotEnoughMemoryException& )
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataHeader");
         return false;
     }
 
@@ -273,9 +273,9 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataBody");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataBody");
         return false;
     }
 
@@ -302,9 +302,9 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
         serializer << length;
         serializer.setState(current_state);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataTag");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataTag");
         return false;
     }
 
@@ -318,7 +318,7 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
         CDRMessage_t& encoded_rtps_submessage,
         const CDRMessage_t& plain_rtps_submessage,
         DatareaderCryptoHandle& sending_datareader_crypto,
-        std::vector<DatawriterCryptoHandle*>& receiving_datawriter_crypto_list,
+        std::vector<std::shared_ptr<DatawriterCryptoHandle>>& receiving_datawriter_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_ReaderCryptoHandle& local_reader = AESGCMGMAC_ReaderCryptoHandle::narrow(sending_datareader_crypto);
@@ -395,9 +395,9 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
         serializer << length;
         serializer.setState(current_state);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataHeader");
         return false;
     }
 
@@ -414,9 +414,9 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataBody");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataBody");
         return false;
     }
 
@@ -444,9 +444,9 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
         serializer << length;
         serializer.setState(current_state);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataTag");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataTag");
         return false;
     }
 
@@ -460,7 +460,7 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
         CDRMessage_t& encoded_rtps_message,
         const CDRMessage_t& plain_rtps_message,
         ParticipantCryptoHandle& sending_crypto,
-        std::vector<ParticipantCryptoHandle*>& receiving_crypto_list,
+        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
         SecurityException& /*exception*/)
 {
     AESGCMGMAC_ParticipantCryptoHandle& local_participant = AESGCMGMAC_ParticipantCryptoHandle::narrow(sending_crypto);
@@ -485,28 +485,28 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
 
     // If the maximum number of blocks have been processed, generate a new SessionKey
     bool update_specific_keys = false;
-    if (local_participant->session_block_counter >= local_participant->max_blocks_per_session)
+    if (local_participant->Session.session_block_counter >= local_participant->max_blocks_per_session)
     {
-        local_participant->session_id += 1;
+        local_participant->Session.session_id += 1;
         update_specific_keys = true;
-        compute_sessionkey(local_participant->SessionKey, local_participant->ParticipantKeyMaterial,
-                local_participant->session_id);
+        compute_sessionkey(local_participant->Session.SessionKey, local_participant->ParticipantKeyMaterial,
+                local_participant->Session.session_id);
 
         //ReceiverSpecific keys shall be computed specifically when needed
-        local_participant->session_block_counter = 0;
+        local_participant->Session.session_block_counter = 0;
         //Insert outdate session_id values in all RemoteParticipant trackers to trigger a SessionkeyUpdate
     }
 
-    local_participant->session_block_counter += 1;
+    local_participant->Session.session_block_counter += 1;
 
     //Build remaining NONCE elements
     std::array<uint8_t, initialization_vector_suffix_length> initialization_vector_suffix;  //iv suffix changes with every operation
     RAND_bytes(initialization_vector_suffix.data(), initialization_vector_suffix_length);
     std::array<uint8_t, 12> initialization_vector; //96 bytes, session_id + suffix
-    memcpy(initialization_vector.data(), &(local_participant->session_id), 4);
+    memcpy(initialization_vector.data(), &(local_participant->Session.session_id), 4);
     memcpy(initialization_vector.data() + 4, initialization_vector_suffix.data(), 8);
     std::array<uint8_t, 4> session_id;
-    memcpy(session_id.data(), &(local_participant->session_id), 4);
+    memcpy(session_id.data(), &(local_participant->Session.session_id), 4);
 
 #if FASTDDS_IS_BIG_ENDIAN_TARGET
     octet flags = 0x0;
@@ -536,9 +536,9 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
         serializer << length;
         serializer.setState(current_state);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataHeader");
         return false;
     }
 
@@ -548,16 +548,16 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
     try
     {
         if (!serialize_SecureDataBody(serializer, local_participant->ParticipantKeyMaterial.transformation_kind,
-                local_participant->SessionKey,
+                local_participant->Session.SessionKey,
                 initialization_vector, output_buffer, &plain_rtps_message.buffer[plain_rtps_message.pos],
                 plain_rtps_message.length - plain_rtps_message.pos, tag, true))
         {
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataBody");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataBody");
         return false;
     }
 
@@ -584,9 +584,9 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
         serializer << length;
         serializer.setState(current_state);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to serialize SecureDataTag");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to serialize SecureDataTag");
         return false;
     }
 
@@ -672,9 +672,9 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataHeader");
         return false;
     }
 
@@ -701,9 +701,9 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
     {
         is_encrypted = predeserialize_SecureDataBody(decoder, body_length, body_align);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataBody header");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataBody header");
         return false;
     }
 
@@ -784,9 +784,9 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataTag length");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataTag length");
         return false;
     }
 
@@ -873,9 +873,9 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataHeader");
         return false;
     }
 
@@ -885,10 +885,9 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
     //TODO(Ricardo) Deserializing header two times, here preprocessing and decoding submessage.
     //KeyId is present in Header->transform_identifier->transformation_key_id and contains the sender_key_id
 
-    for (std::vector<DatawriterCryptoHandle*>::iterator it = remote_participant->Writers.begin();
-            it != remote_participant->Writers.end(); ++it)
+    for (auto& wt_sp : remote_participant->Writers)
     {
-        AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(**it);
+        AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(*wt_sp);
         auto& wKeyMats = writer->Entity2RemoteKeyMaterial;
 
         if (wKeyMats.size() == 0)
@@ -901,7 +900,7 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         {
             // Remote writer found
             secure_submessage_category = DATAWRITER_SUBMESSAGE;
-            *datawriter_crypto = *it;
+            *datawriter_crypto = wt_sp.get();
 
             //We have the remote writer, now lets look for the local datareader
             bool found = lookup_reader(local_participant, datareader_crypto, key_id);
@@ -922,10 +921,9 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         } //Remote writer key found
     } //For each datawriter present in the remote participant
 
-    for (std::vector<DatareaderCryptoHandle*>::iterator it = remote_participant->Readers.begin();
-            it != remote_participant->Readers.end(); ++it)
+    for (auto& rd_sh : remote_participant->Readers)
     {
-        AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(**it);
+        AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(*rd_sh);
 
         auto& rKeyMats = reader->Entity2RemoteKeyMaterial;
 
@@ -939,7 +937,7 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
         {
             // Remote reader found
             secure_submessage_category = DATAREADER_SUBMESSAGE;
-            *datareader_crypto = *it;
+            *datareader_crypto = rd_sh.get();
 
             //We have the remote reader, now lets look for the local datawriter
             bool found = lookup_writer(local_participant, datawriter_crypto, key_id);
@@ -1035,9 +1033,9 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataHeader");
         return false;
     }
 
@@ -1068,9 +1066,9 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
     {
         is_encrypted = predeserialize_SecureDataBody(decoder, body_length, body_align);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataBody header");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataBody header");
         return false;
     }
 
@@ -1122,9 +1120,9 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataTag length");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataTag length");
         return false;
     }
 
@@ -1215,9 +1213,9 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataHeader");
         return false;
     }
 
@@ -1248,9 +1246,9 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
     {
         is_encrypted = predeserialize_SecureDataBody(decoder, body_length, body_align);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataBody header");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataBody header");
         return false;
     }
 
@@ -1302,9 +1300,9 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
             return false;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataTag length");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataTag length");
         return false;
     }
 
@@ -1370,9 +1368,9 @@ bool AESGCMGMAC_Transform::decode_serialized_payload(
     {
         header = deserialize_SecureDataHeader(decoder);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataHeader");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataHeader");
         return false;
     }
 
@@ -1417,9 +1415,9 @@ bool AESGCMGMAC_Transform::decode_serialized_payload(
             body_length -= sizeof(uint32_t) + 16;
         }
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataBody header");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataBody header");
         return false;
     }
 
@@ -1430,9 +1428,9 @@ bool AESGCMGMAC_Transform::decode_serialized_payload(
     {
         deserialize_SecureDataTag(decoder, tag, {}, {}, {}, {}, {}, 0, exception);
     }
-    catch (eprosima::fastcdr::exception::NotEnoughMemoryException&)
+    catch (eprosima::fastcdr::exception::Exception&)
     {
-        logError(SECURITY_CRYPTO, "Not enough memory to deserialize SecureDataTag length");
+        logError(SECURITY_CRYPTO, "Error in fastcdr trying to deserialize SecureDataTag length");
         return false;
     }
 
@@ -1577,7 +1575,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
         if ((output_buffer.getBufferSize() - (serializer.getCurrentPosition() - serializer.getBufferPointer())) <
                 plain_buffer_len)
         {
-            logError(SECURITY_CRYPTO, "Not enough memory to copy payload");
+            logError(SECURITY_CRYPTO, "Error in fastcdr trying to copy payload");
             EVP_CIPHER_CTX_free(e_ctx);
             return false;
         }
@@ -1637,7 +1635,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
         if ((output_buffer.getBufferSize() - (serializer.getCurrentPosition() - serializer.getBufferPointer())) <
                 (plain_buffer_len + (2 * cipher_block_size) - 1))
         {
-            logError(SECURITY_CRYPTO, "Not enough memory to cipher payload");
+            logError(SECURITY_CRYPTO, "Error in fastcdr trying to cipher payload");
             EVP_CIPHER_CTX_free(e_ctx);
             return false;
         }
@@ -1701,7 +1699,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
         const std::array<uint8_t, 4>& transformation_kind,
         const uint32_t session_id,
         const std::array<uint8_t, 12>& initialization_vector,
-        std::vector<EntityCryptoHandle*>& receiving_crypto_list,
+        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
         bool update_specific_keys,
         SecureDataTag& tag,
         size_t sessionIndex)
@@ -1819,7 +1817,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
         eprosima::fastcdr::Cdr& serializer,
         const AESGCMGMAC_ParticipantCryptoHandle& local_participant,
         const std::array<uint8_t, 12>& initialization_vector,
-        std::vector<ParticipantCryptoHandle*>& receiving_crypto_list,
+        std::vector<std::shared_ptr<ParticipantCryptoHandle>>& receiving_crypto_list,
         bool update_specific_keys,
         SecureDataTag& tag)
 {
@@ -1860,13 +1858,14 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
         int key_len = use_256_bits ? 32 : 16;
 
         //Update the key if needed
-        if ((update_specific_keys || remote_participant->session_id != local_participant->session_id) &&
+        if ((update_specific_keys || remote_participant->Session.session_id != local_participant->Session.session_id) &&
                 (*remote_participant != *local_participant))
         {
             //Update triggered!
-            remote_participant->session_id = local_participant->session_id;
-            compute_sessionkey(remote_participant->SessionKey, true,
-                    keyMat.master_receiver_specific_key, keyMat.master_salt, remote_participant->session_id, key_len);
+            remote_participant->Session.session_id = local_participant->Session.session_id;
+            compute_sessionkey(remote_participant->Session.SessionKey, true,
+                    keyMat.master_receiver_specific_key, keyMat.master_salt, remote_participant->Session.session_id,
+                    key_len);
         }
 
         //Obtain MAC using ReceiverSpecificKey and the same Initialization Vector as before
@@ -1877,7 +1876,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
                 trans_kind == c_transfrom_kind_aes128_gmac)
         {
             if (!EVP_EncryptInit(e_ctx, EVP_aes_128_gcm(),
-                    (const unsigned char*)(remote_participant->SessionKey.data()),
+                    (const unsigned char*)(remote_participant->Session.SessionKey.data()),
                     initialization_vector.data()))
             {
                 logError(SECURITY_CRYPTO, "Unable to encode the payload. EVP_EncryptInit function returns an error");
@@ -1889,7 +1888,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
                 trans_kind == c_transfrom_kind_aes256_gmac)
         {
             if (!EVP_EncryptInit(e_ctx, EVP_aes_256_gcm(),
-                    (const unsigned char*)(remote_participant->SessionKey.data()),
+                    (const unsigned char*)(remote_participant->Session.SessionKey.data()),
                     initialization_vector.data()))
             {
                 logError(SECURITY_CRYPTO, "Unable to encode the payload. EVP_EncryptInit function returns an error");
@@ -1993,7 +1992,7 @@ bool AESGCMGMAC_Transform::deserialize_SecureDataBody(
         // - EVP_DecryptUpdate needs at maximum: body_length + cipher_block_size.
         if (plain_buffer_len < (protected_len + cipher_block_size))
         {
-            logWarning(SECURITY_CRYPTO, "Not enough memory to decode payload");
+            logWarning(SECURITY_CRYPTO, "Error in fastcdr trying to decode payload");
             EVP_CIPHER_CTX_free(d_ctx);
             return false;
         }
@@ -2021,7 +2020,7 @@ bool AESGCMGMAC_Transform::deserialize_SecureDataBody(
     uint32_t cnt_len = do_encryption ? static_cast<uint32_t>(actual_size + final_size) : body_length;
     if (plain_buffer_len < cnt_len)
     {
-        logWarning(SECURITY_CRYPTO, "Not enough memory to decode payload");
+        logWarning(SECURITY_CRYPTO, "Error in fastcdr trying to decode payload");
         return false;
     }
 
@@ -2245,7 +2244,7 @@ bool AESGCMGMAC_Transform::lookup_reader(
         DatareaderCryptoHandle** datareader_crypto,
         CryptoTransformKeyId key_id)
 {
-    for (DatareaderCryptoHandle* readerHandle : participant->Readers)
+    for (auto& readerHandle : participant->Readers)
     {
         AESGCMGMAC_ReaderCryptoHandle& reader = AESGCMGMAC_ReaderCryptoHandle::narrow(*readerHandle);
 
@@ -2259,7 +2258,7 @@ bool AESGCMGMAC_Transform::lookup_reader(
         {
             if (elem.sender_key_id == key_id)
             {
-                *datareader_crypto = readerHandle;
+                *datareader_crypto = readerHandle.get();
                 return true;
             }
         }   //For each Reader2WriterKeyMaterial in the datareader
@@ -2273,7 +2272,7 @@ bool AESGCMGMAC_Transform::lookup_writer(
         DatawriterCryptoHandle** datawriter_crypto,
         CryptoTransformKeyId key_id)
 {
-    for (DatawriterCryptoHandle* writerHandle : participant->Writers)
+    for (auto& writerHandle : participant->Writers)
     {
         AESGCMGMAC_WriterCryptoHandle& writer = AESGCMGMAC_WriterCryptoHandle::narrow(*writerHandle);
 
@@ -2287,7 +2286,7 @@ bool AESGCMGMAC_Transform::lookup_writer(
         {
             if (elem.sender_key_id == key_id)
             {
-                *datawriter_crypto = writerHandle;
+                *datawriter_crypto = writerHandle.get();
                 return true;
             }
         }   //For each Writer2ReaderKeyMaterial in the datawriter

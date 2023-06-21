@@ -18,7 +18,7 @@
  */
 
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
-#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/core/policy/QosPolicyUtils.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -48,10 +48,17 @@ ReaderQos DataReaderQos::get_readerqos(
     qos.m_disablePositiveACKs = reliable_reader_qos().disable_positive_ACKs;
     qos.type_consistency = type_consistency().type_consistency;
     qos.representation = type_consistency().representation;
+    qos.data_sharing = data_sharing();
+
+    if (qos.data_sharing.kind() != OFF &&
+            qos.data_sharing.domain_ids().empty())
+    {
+        qos.data_sharing.add_domain_id(utils::default_domain_id());
+    }
+
     return qos;
 }
 
 } /* namespace dds */
 } /* namespace fastdds */
 } /* namespace eprosima */
-

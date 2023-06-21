@@ -21,8 +21,10 @@
 
 #include <fastrtps/publisher/PublisherListener.h>
 #include <fastrtps/participant/ParticipantListener.h>
+#include <fastrtps/TopicDataType.h>
 
-#include "types/HelloWorldType.h"
+#include "types/FixedSizedPubSubTypes.h"
+#include "types/HelloWorldPubSubTypes.h"
 
 #include <mutex>
 #include <condition_variable>
@@ -31,8 +33,8 @@ namespace eprosima {
 namespace fastrtps {
 class Participant;
 class Publisher;
-}
-}
+} // namespace fastrtps
+} // namespace eprosima
 
 class Publisher
     : public eprosima::fastrtps::PublisherListener
@@ -80,11 +82,12 @@ public:
     void onParticipantAuthentication(
             eprosima::fastrtps::Participant* participant,
             eprosima::fastrtps::rtps::ParticipantAuthenticationInfo&& info) override;
-#endif
+#endif // if HAVE_SECURITY
 
     bool init(
             uint32_t seed,
-            const std::string& magic);
+            const std::string& magic,
+            bool fixed_type = false);
 
     void wait_discovery(
             uint32_t how_many);
@@ -101,7 +104,7 @@ private:
     bool exit_on_lost_liveliness_ = false;
     bool run_ = true;
     eprosima::fastrtps::Participant* participant_ = nullptr;
-    HelloWorldType type_;
+    eprosima::fastrtps::TopicDataType* type_ = nullptr;
     eprosima::fastrtps::Publisher* publisher_ = nullptr;
 };
 

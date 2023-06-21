@@ -26,27 +26,43 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-class RTPSCustomPools : public testing::TestWithParam<bool>
+enum communication_type
+{
+    TRANSPORT,
+    INTRAPROCESS
+};
+
+class RTPSCustomPools : public testing::TestWithParam<communication_type>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
     }
 
@@ -233,6 +249,7 @@ void do_test(
     uint32_t num_samples = static_cast<uint32_t>(data.size());
     uint32_t num_endpoints = (uint32_t)pool_on_reader + (uint32_t)pool_on_writer;
     uint32_t payload_size = static_cast<uint32_t>(TData::getMaxCdrSerializedSize());
+    payload_size += static_cast<uint32_t>(eprosima::fastcdr::Cdr::alignment(payload_size, 4)); /* possible submessage alignment */
     payload_size += 4u; // encapsulation header
 
     std::shared_ptr<PoolForTest> pool = std::make_shared<PoolForTest>(payload_size, num_endpoints, num_samples);
@@ -286,8 +303,8 @@ void do_test(
 TEST_P(RTPSCustomPools, CreateFailsWithInvalidPool)
 {
     std::shared_ptr<IPayloadPool> no_pool;
-    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     reader.payload_pool(no_pool).init();
     EXPECT_FALSE(reader.isInitialized());
@@ -299,49 +316,49 @@ TEST_P(RTPSCustomPools, CreateFailsWithInvalidPool)
 TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationNoPools)
 {
     auto data = default_helloworld_data_generator();
-    do_test<HelloWorld, HelloWorldType>(TEST_TOPIC_NAME, data, false, false, false);
+    do_test<HelloWorld, HelloWorldPubSubType>(TEST_TOPIC_NAME, data, false, false, false);
 }
 
 TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationReaderPool)
 {
     auto data = default_helloworld_data_generator();
-    do_test<HelloWorld, HelloWorldType>(TEST_TOPIC_NAME, data, false, true, false);
+    do_test<HelloWorld, HelloWorldPubSubType>(TEST_TOPIC_NAME, data, false, true, false);
 }
 
 TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationWriterPool)
 {
     auto data = default_helloworld_data_generator();
-    do_test<HelloWorld, HelloWorldType>(TEST_TOPIC_NAME, data, true, false, false);
+    do_test<HelloWorld, HelloWorldPubSubType>(TEST_TOPIC_NAME, data, true, false, false);
 }
 
 TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationBothPools)
 {
     auto data = default_helloworld_data_generator();
-    do_test<HelloWorld, HelloWorldType>(TEST_TOPIC_NAME, data, true, true, GetParam());
+    do_test<HelloWorld, HelloWorldPubSubType>(TEST_TOPIC_NAME, data, true, true, GetParam() == INTRAPROCESS);
 }
 
 TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationNoPools300Kb)
 {
     auto data = default_data300kb_data_generator();
-    do_test<Data1mb, Data1mbType>(TEST_TOPIC_NAME, data, false, false, false);
+    do_test<Data1mb, Data1mbPubSubType>(TEST_TOPIC_NAME, data, false, false, false);
 }
 
 TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationReaderPool300Kb)
 {
     auto data = default_data300kb_data_generator();
-    do_test<Data1mb, Data1mbType>(TEST_TOPIC_NAME, data, false, true, false);
+    do_test<Data1mb, Data1mbPubSubType>(TEST_TOPIC_NAME, data, false, true, false);
 }
 
 TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationWriterPool300Kb)
 {
     auto data = default_data300kb_data_generator();
-    do_test<Data1mb, Data1mbType>(TEST_TOPIC_NAME, data, true, false, false);
+    do_test<Data1mb, Data1mbPubSubType>(TEST_TOPIC_NAME, data, true, false, false);
 }
 
 TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationBothPools300Kb)
 {
     auto data = default_data300kb_data_generator();
-    do_test<Data1mb, Data1mbType>(TEST_TOPIC_NAME, data, true, true, false);
+    do_test<Data1mb, Data1mbPubSubType>(TEST_TOPIC_NAME, data, true, true, false);
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P
@@ -352,12 +369,17 @@ TEST_P(RTPSCustomPools, RTPSAsReliableWithRegistrationBothPools300Kb)
 
 GTEST_INSTANTIATE_TEST_MACRO(RTPSCustomPools,
         RTPSCustomPools,
-        testing::Values(false, true),
+        testing::Values(TRANSPORT, INTRAPROCESS),
         [](const testing::TestParamInfo<RTPSCustomPools::ParamType>& info)
         {
-            if (info.param)
+            switch (info.param)
             {
-                return "Intraprocess";
+                case INTRAPROCESS:
+                    return "Intraprocess";
+                    break;
+                case TRANSPORT:
+                default:
+                    return "Transport";
             }
-            return "NonIntraprocess";
+
         });

@@ -23,20 +23,49 @@
 #include "RTPSWithRegistrationReader.hpp"
 
 #include <gtest/gtest.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-class PersistenceGuid : public ::testing::TestWithParam<bool>
+enum communication_type
+{
+    TRANSPORT,
+    INTRAPROCESS
+};
+
+class PersistenceGuid : public ::testing::TestWithParam<communication_type>
 {
 protected:
 
-    virtual void SetUp()
+    void SetUp() override
     {
+        LibrarySettingsAttributes library_settings;
+        switch (GetParam())
+        {
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case TRANSPORT:
+            default:
+                break;
+        }
     }
 
-    virtual void TearDown()
+    void TearDown() override
     {
+        LibrarySettingsAttributes library_settings;
+        switch (GetParam())
+        {
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case TRANSPORT:
+            default:
+                break;
+        }
         std::remove("persistence.db");
     }
 
@@ -57,7 +86,7 @@ protected:
 TEST_P(PersistenceGuid, SetPersistenceGuidThroughRTPSLayer)
 {
     // Create RTPSWriter and configure the durability and property list
-    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
     writer.durability(TRANSIENT);
     writer.reliability(RELIABLE);
     writer.add_property("dds.persistence.plugin", "builtin.SQLITE3");
@@ -68,7 +97,7 @@ TEST_P(PersistenceGuid, SetPersistenceGuidThroughRTPSLayer)
     ASSERT_TRUE(writer.isInitialized());
 
     // Create RTPSReader and configure the durability and property list
-    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
     reader.durability(TRANSIENT);
     reader.reliability(RELIABLE);
     reader.add_property("dds.persistence.plugin", "builtin.SQLITE3");
@@ -137,7 +166,7 @@ TEST_P(PersistenceGuid, CheckPrevalenceBetweenManualAndPropertyConfiguration)
     entityId.value[3] = 1;
 
     // Create RTPSWriter that use the already created attributes
-    RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
     writer.durability(TRANSIENT);
     writer.reliability(RELIABLE);
     writer.add_property("dds.persistence.plugin", "builtin.SQLITE3");
@@ -151,7 +180,7 @@ TEST_P(PersistenceGuid, CheckPrevalenceBetweenManualAndPropertyConfiguration)
     guidPrefix.value[11] = 2;
 
     // Create RTPSReader that use the already created attributes
-    RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
     reader.durability(TRANSIENT);
     reader.reliability(RELIABLE);
     reader.add_property("dds.persistence.plugin", "builtin.SQLITE3");
@@ -226,13 +255,17 @@ TEST_P(PersistenceGuid, CheckPrevalenceBetweenManualAndPropertyConfiguration)
 
 GTEST_INSTANTIATE_TEST_MACRO(PersistenceGuid,
         PersistenceGuid,
-        testing::Values(false, true),
+        testing::Values(TRANSPORT, INTRAPROCESS),
         [](const testing::TestParamInfo<PersistenceGuid::ParamType>& info)
         {
-            if (info.param)
+            switch (info.param)
             {
-                return "Intraprocess";
+                case INTRAPROCESS:
+                    return "Intraprocess";
+                    break;
+                case TRANSPORT:
+                default:
+                    return "Transport";
             }
-            return "NonIntraprocess";
         });
 #endif // if HAVE_SQLITE3

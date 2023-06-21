@@ -51,7 +51,7 @@ XMLP_ret XMLProfileManager::fillParticipantAttributes(
     {
         if (log_error)
         {
-            logError(XMLPARSER, "Profile '" << profile_name << "' not found '");
+            logError(XMLPARSER, "Profile '" << profile_name << "' not found");
         }
         return XMLP_ret::XML_ERROR;
     }
@@ -69,7 +69,7 @@ XMLP_ret XMLProfileManager::fillPublisherAttributes(
     {
         if (log_error)
         {
-            logError(XMLPARSER, "Profile '" << profile_name << "' not found '");
+            logError(XMLPARSER, "Profile '" << profile_name << "' not found");
         }
         return XMLP_ret::XML_ERROR;
     }
@@ -177,7 +177,7 @@ void XMLProfileManager::loadDefaultXMLFile()
     size = 2;
 
     // Try to load the default XML file if variable does not exist or is not set to '1'
-    if (!(getenv_s(&size, skip_xml, size, "SKIP_DEFAULT_XML_FILE") == 0 && skip_xml[0] == '1'))
+    if (!(getenv_s(&size, skip_xml, size, SKIP_DEFAULT_XML_FILE) == 0 && skip_xml[0] == '1'))
     {
         loadXMLFile(DEFAULT_FASTRTPS_PROFILES);
     }
@@ -188,7 +188,7 @@ void XMLProfileManager::loadDefaultXMLFile()
         loadXMLFile(file_path);
     }
 
-    const char* skip_xml = std::getenv("SKIP_DEFAULT_XML_FILE");
+    const char* skip_xml = std::getenv(SKIP_DEFAULT_XML_FILE);
 
     // Try to load the default XML file if variable does not exist or is not set to '1'
     if (!(skip_xml != nullptr && skip_xml[0] == '1'))
@@ -203,33 +203,22 @@ XMLP_ret XMLProfileManager::loadXMLProfiles(
         tinyxml2::XMLElement& profiles)
 {
     up_base_node_t root_node;
-    XMLParser::loadXMLProfiles(profiles, root_node);
-
-    if (!root_node)
+    if (strcmp(profiles.Name(), PROFILES) != 0)
     {
-        logError(XMLPARSER, "Error parsing node");
+        logError(XMLPARSER, "<profiles> element not found");
         return XMLP_ret::XML_ERROR;
     }
 
-    logInfo(XMLPARSER, "Node parsed successfully");
-
-    if (NodeType::PROFILES == root_node->getType())
+    if (XMLParser::loadXMLProfiles(profiles, root_node) == XMLP_ret::XML_OK)
     {
+        logInfo(XMLPARSER, "Node parsed successfully");
         return XMLProfileManager::extractProfiles(std::move(root_node), "-XML Node-");
     }
-
-    if (NodeType::ROOT == root_node->getType())
+    else
     {
-        for (auto&& child: root_node->getChildren())
-        {
-            if (NodeType::PROFILES == child.get()->getType())
-            {
-                return XMLProfileManager::extractProfiles(std::move(child), "-XML Node-");
-            }
-        }
+        logError(XMLPARSER, "Error parsing profiles");
+        return XMLP_ret::XML_ERROR;
     }
-
-    return XMLP_ret::XML_ERROR;
 }
 
 XMLP_ret XMLProfileManager::loadXMLDynamicTypes(
@@ -242,7 +231,8 @@ XMLP_ret XMLProfileManager::loadXMLNode(
         tinyxml2::XMLDocument& doc)
 {
     up_base_node_t root_node;
-    XMLParser::loadXML(doc, root_node);
+    XMLP_ret parse_ret;
+    XMLP_ret loaded_ret = XMLParser::loadXML(doc, root_node);
 
     if (!root_node)
     {
@@ -254,7 +244,15 @@ XMLP_ret XMLProfileManager::loadXMLNode(
 
     if (NodeType::PROFILES == root_node->getType())
     {
-        return XMLProfileManager::extractProfiles(std::move(root_node), "-XML Node-");
+        parse_ret = XMLProfileManager::extractProfiles(std::move(root_node), "-XML Node-");
+        if (parse_ret == XMLP_ret::XML_OK && loaded_ret != XMLP_ret::XML_OK)
+        {
+            return XMLP_ret::XML_NOK;
+        }
+        else
+        {
+            return parse_ret;
+        }
     }
 
     if (NodeType::ROOT == root_node->getType())
@@ -263,7 +261,15 @@ XMLP_ret XMLProfileManager::loadXMLNode(
         {
             if (NodeType::PROFILES == child.get()->getType())
             {
-                return XMLProfileManager::extractProfiles(std::move(child), "-XML Node-");
+                parse_ret = XMLProfileManager::extractProfiles(std::move(child), "-XML Node-");
+                if (parse_ret == XMLP_ret::XML_OK && loaded_ret != XMLP_ret::XML_OK)
+                {
+                    return XMLP_ret::XML_NOK;
+                }
+                else
+                {
+                    return parse_ret;
+                }
             }
         }
     }
@@ -301,21 +307,6 @@ XMLP_ret XMLProfileManager::loadXMLFile(
 
     logInfo(XMLPARSER, "File '" << filename << "' parsed successfully");
 
-    if (NodeType::PROFILES == root_node->getType())
-    {
-        return XMLProfileManager::extractProfiles(std::move(root_node), filename);
-    }
-
-    if (NodeType::TYPES == root_node->getType())
-    {
-        return loaded_ret;
-    }
-
-    if (NodeType::LOG == root_node->getType())
-    {
-        return loaded_ret;
-    }
-
     if (NodeType::ROOT == root_node->getType())
     {
         for (auto&& child: root_node->getChildren())
@@ -324,71 +315,53 @@ XMLP_ret XMLProfileManager::loadXMLFile(
             {
                 return XMLProfileManager::extractProfiles(std::move(child), filename);
             }
-            // TODO Workaround when there is a ROOT tag without PROFILES. Return the corresponding error instead of
-            // XMLP_ret::XML_ERROR. Only the type is checked so the objects do not need to be populated.
-            else if (NodeType::TYPES == child.get()->getType())
-            {
-                return loaded_ret;
-            }
-            else if (NodeType::LOG == child.get()->getType())
-            {
-                return loaded_ret;
-            }
         }
+        return loaded_ret;
+    }
+    else if (NodeType::PROFILES == root_node->getType())
+    {
+        return XMLProfileManager::extractProfiles(std::move(root_node), filename);
     }
 
-    return XMLP_ret::XML_ERROR;
+    return loaded_ret;
 }
 
-XMLP_ret XMLProfileManager::extractDynamicTypes(
-        up_base_node_t profiles,
-        const std::string& filename)
+XMLP_ret XMLProfileManager::loadXMLString(
+        const char* data,
+        size_t length)
 {
-    if (nullptr == profiles)
+    up_base_node_t root_node;
+    XMLP_ret loaded_ret = XMLParser::loadXML(data, length, root_node);
+    if (!root_node || loaded_ret != XMLP_ret::XML_OK)
     {
-        logError(XMLPARSER, "Bad parameters");
+        logError(XMLPARSER, "Error parsing string");
         return XMLP_ret::XML_ERROR;
     }
 
-    unsigned int profile_count = 0u;
-
-    for (auto&& profile: profiles->getChildren())
+    if (NodeType::ROOT == root_node->getType())
     {
-        if (NodeType::TYPE == profile->getType())
+        for (auto&& child: root_node->getChildren())
         {
-            tinyxml2::XMLElement* node = dynamic_cast<tinyxml2::XMLElement*>(profile.get());
-            if (XMLP_ret::XML_OK == XMLParser::loadXMLDynamicTypes(*node))
+            if (NodeType::PROFILES == child.get()->getType())
             {
-                ++profile_count;
+                return XMLProfileManager::extractProfiles(std::move(child), "inmem");
             }
         }
-        else
-        {
-            logError(XMLPARSER, "Not expected tag");
-        }
+        return loaded_ret;
     }
-
-    if (0 == profile_count)
+    else if (NodeType::PROFILES == root_node->getType())
     {
-        xml_files_.emplace(filename, XMLP_ret::XML_ERROR);
-        logError(XMLPARSER, "Error, file '" << filename << "' bad content");
-        return XMLP_ret::XML_ERROR;
+        return XMLProfileManager::extractProfiles(std::move(root_node), "inmem");
     }
 
-    xml_files_.emplace(filename, XMLP_ret::XML_OK);
-
-    return XMLP_ret::XML_OK;
+    return loaded_ret;
 }
 
 XMLP_ret XMLProfileManager::extractProfiles(
         up_base_node_t profiles,
         const std::string& filename)
 {
-    if (nullptr == profiles)
-    {
-        logError(XMLPARSER, "Bad parameters");
-        return XMLP_ret::XML_ERROR;
-    }
+    assert(profiles != nullptr);
 
     unsigned int profile_count = 0u;
 
@@ -461,17 +434,13 @@ XMLP_ret XMLProfileManager::extractProfiles(
                 ret = XMLP_ret::XML_NOK;
             }
         }
-        else
-        {
-            logError(XMLPARSER, "Not expected tag");
-        }
     }
 
     profile_count += static_cast<unsigned int>(transport_profiles_.size()); // Count transport profiles
 
-    if (ret != XMLP_ret::XML_OK && profile_count == 0)
+    if (profile_count == 0)
     {
-        // Could not extract any profile
+        logError(XMLProfileManager, "Could not extract any profile")
         ret = XMLP_ret::XML_ERROR;
     }
 
@@ -661,7 +630,7 @@ XMLP_ret XMLProfileManager::extractTopicProfile(
     }
 
     it = node_topic->getAttributes().find(DEFAULT_PROF);
-    if (false == emplace.second)
+    if (it != node_topic->getAttributes().end() && it->second == "true")
     {
         // +V+ TODO: LOG ERROR IN SECOND ATTEMPT
         default_topic_attributes = *(emplace.first->second.get());

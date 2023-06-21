@@ -23,6 +23,7 @@
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/flowcontrol/ThroughputControllerDescriptor.h>
 #include <fastdds/rtps/attributes/EndpointAttributes.h>
+#include <fastdds/rtps/flowcontrol/FlowControllerConsts.hpp>
 #include <fastrtps/utils/collections/ResourceLimitedContainerConfig.hpp>
 #include <fastrtps/qos/QosPolicies.h>
 
@@ -31,8 +32,6 @@
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
-
-class ReaderProxyData;
 
 typedef enum RTPSWriterPublishMode : octet
 {
@@ -124,7 +123,11 @@ public:
     //!Indicates if the Writer is synchronous or asynchronous
     RTPSWriterPublishMode mode;
 
-    // Throughput controller, always the last one to apply
+    /**
+     * @brief Throughput controller, always the last one to apply
+     *
+     * @deprecated Use flow_controllers on RTPSParticipantAttributes
+     */
     ThroughputControllerDescriptor throughputController;
 
     //! Disable the sending of heartbeat piggybacks.
@@ -138,6 +141,9 @@ public:
 
     //! Keep duration to keep a sample before considering it has been acked
     Duration_t keep_duration;
+
+    //! Flow controller name. Default: fastdds::rtps::FASTDDS_FLOW_CONTROLLER_DEFAULT.
+    const char* flow_controller_name = fastdds::rtps::FASTDDS_FLOW_CONTROLLER_DEFAULT;
 };
 
 } /* namespace rtps */

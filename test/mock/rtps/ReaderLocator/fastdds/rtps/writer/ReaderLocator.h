@@ -28,6 +28,7 @@
 #include <fastrtps/rtps/common/SequenceNumber.h>
 #include <fastrtps/rtps/messages/RTPSMessageGroup.h>
 #include <fastrtps/rtps/common/LocatorSelectorEntry.hpp>
+#include <fastrtps/rtps/messages/RTPSMessageSenderInterface.hpp>
 
 
 namespace eprosima {
@@ -37,6 +38,7 @@ namespace rtps {
 class RTPSParticipantImpl;
 class RTPSWriter;
 class RTPSReader;
+class IDataSharingNotifier;
 
 /**
  * Class ReaderLocator, contains information about a remote reader, without saving its state.
@@ -92,6 +94,16 @@ public:
         return true;
     }
 
+    bool start(
+            const GUID_t& /*remote_guid*/,
+            const ResourceLimitedVector<Locator_t>& /*unicast_locators*/,
+            const ResourceLimitedVector<Locator_t>& /*multicast_locators*/,
+            bool /*expects_inline_qos*/,
+            bool /*is_datasharing*/)
+    {
+        return true;
+    }
+
     /**
      * Try to update information of this object.
      *
@@ -118,6 +130,11 @@ public:
      */
     bool stop(
             const GUID_t& /*remote_guid*/)
+    {
+        return true;
+    }
+
+    bool stop()
     {
         return true;
     }
@@ -172,7 +189,7 @@ public:
      */
     bool send(
             CDRMessage_t* /*message*/,
-            std::chrono::steady_clock::time_point& /*max_blocking_time_point*/) const override
+            std::chrono::steady_clock::time_point /*max_blocking_time_point*/) const override
     {
         return true;
     }
@@ -187,6 +204,44 @@ public:
         return nullptr;
     }
 
+    bool is_datasharing_reader() const
+    {
+        return false;
+    }
+
+    /**
+     * @return The datasharing notifier for this reader or nullptr if the reader is not datasharing.
+     */
+    IDataSharingNotifier* datasharing_notifier()
+    {
+        return nullptr;
+    }
+
+    /**
+     * @return The datasharing notifier for this reader or nullptr if the reader is not datasharing.
+     */
+    const IDataSharingNotifier* datasharing_notifier() const
+    {
+        return nullptr;
+    }
+
+    void datasharing_notify()
+    {
+    }
+
+    size_t locators_size() const
+    {
+        return 0;
+    }
+
+    void lock() override
+    {
+    }
+
+    void unlock() override
+    {
+    }
+
 private:
 
     GUID_t remote_guid_;
@@ -198,5 +253,5 @@ private:
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif
+#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #endif /* _FASTDDS_RTPS_READERLOCATOR_H_*/

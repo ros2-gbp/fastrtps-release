@@ -20,31 +20,37 @@
 #ifndef _TEST_BLACKBOX_PUBSUBWRITER_HPP_
 #define _TEST_BLACKBOX_PUBSUBWRITER_HPP_
 
-#include <fastrtps/fastrtps_fwd.h>
-#include <fastrtps/Domain.h>
-#include <fastrtps/participant/Participant.h>
-#include <fastrtps/participant/ParticipantListener.h>
-#include <fastrtps/attributes/ParticipantAttributes.h>
-#include <fastrtps/publisher/Publisher.h>
-#include <fastrtps/publisher/PublisherListener.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/rtps/common/Locator.h>
-#include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
-#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
-#include <fastrtps/xmlparser/XMLParser.h>
-#include <fastrtps/xmlparser/XMLTree.h>
-#include <fastrtps/utils/IPLocator.h>
-#include <fastrtps/transport/UDPv4TransportDescriptor.h>
-#include <string>
+#include <condition_variable>
 #include <list>
 #include <map>
-#include <condition_variable>
-#include <asio.hpp>
-#include <gtest/gtest.h>
+#include <string>
 #include <thread>
 
+#include <asio.hpp>
+#include <gtest/gtest.h>
+#include <fastrtps/attributes/ParticipantAttributes.h>
+#include <fastrtps/attributes/PublisherAttributes.h>
+#include <fastrtps/Domain.h>
+#include <fastrtps/fastrtps_fwd.h>
+#include <fastrtps/participant/Participant.h>
+#include <fastrtps/participant/ParticipantListener.h>
+#include <fastrtps/publisher/Publisher.h>
+#include <fastrtps/publisher/PublisherListener.h>
+#include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
+#include <fastrtps/rtps/builtin/data/WriterProxyData.h>
+#include <fastrtps/rtps/common/Locator.h>
+#include <fastrtps/transport/UDPTransportDescriptor.h>
+#include <fastrtps/transport/UDPv4TransportDescriptor.h>
+#include <fastrtps/transport/UDPv6TransportDescriptor.h>
+#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/xmlparser/XMLParser.h>
+#include <fastrtps/xmlparser/XMLTree.h>
+#include <fastdds/rtps/flowcontrol/FlowControllerSchedulerPolicy.hpp>
+
 using eprosima::fastrtps::rtps::IPLocator;
+using eprosima::fastrtps::rtps::UDPTransportDescriptor;
 using eprosima::fastrtps::rtps::UDPv4TransportDescriptor;
+using eprosima::fastrtps::rtps::UDPv6TransportDescriptor;
 
 template<class TypeSupport>
 class PubSubWriter
@@ -275,6 +281,11 @@ public:
         }
     }
 
+    eprosima::fastrtps::Publisher& get_native_writer() const
+    {
+        return *publisher_;
+    }
+
     void init()
     {
         //Create participant
@@ -304,11 +315,34 @@ public:
                 std::cout << "Created publisher " << publisher_guid_ << " for topic " <<
                     publisher_attr_.topic.topicName << std::endl;
                 initialized_ = true;
+            }
+        }
+    }
+
+    void createPublisher()
+    {
+        if (participant_ != nullptr)
+        {
+            //Create publisher
+            publisher_ = eprosima::fastrtps::Domain::createPublisher(participant_, publisher_attr_, &listener_);
+
+            if (publisher_ != nullptr)
+            {
+                publisher_guid_ = publisher_->getGuid();
+                std::cout << "Created publisher " << publisher_guid_ << " for topic " <<
+                    publisher_attr_.topic.topicName << std::endl;
+                initialized_ = true;
                 return;
             }
-
-            eprosima::fastrtps::Domain::removeParticipant(participant_);
         }
+        return;
+    }
+
+    void removePublisher()
+    {
+        initialized_ = false;
+        eprosima::fastrtps::Domain::removePublisher(publisher_);
+        return;
     }
 
     bool isInitialized() const
@@ -542,7 +576,12 @@ public:
     bool waitForAllAcked(
             const std::chrono::duration<_Rep, _Period>& max_wait)
     {
-        return publisher_->wait_for_all_acked(eprosima::fastrtps::Time_t((int32_t)max_wait.count(), 0));
+        auto nsecs = std::chrono::duration_cast<std::chrono::nanoseconds>(max_wait);
+        auto secs = std::chrono::duration_cast<std::chrono::seconds>(nsecs);
+        nsecs -= secs;
+        eprosima::fastrtps::Duration_t timeout {static_cast<int32_t>(secs.count()),
+                                                static_cast<uint32_t>(nsecs.count())};
+        return publisher_->wait_for_all_acked(timeout);
     }
 
     void block_until_discover_topic(
@@ -576,6 +615,13 @@ public:
             const eprosima::fastrtps::ReliabilityQosPolicyKind kind)
     {
         publisher_attr_.qos.m_reliability.kind = kind;
+        return *this;
+    }
+
+    PubSubWriter& mem_policy(
+            const eprosima::fastrtps::rtps::MemoryManagementPolicy mem_policy)
+    {
+        publisher_attr_.historyMemoryPolicy = mem_policy;
         return *this;
     }
 
@@ -634,6 +680,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& disable_heartbeat_piggyback(
+            bool value)
+    {
+        publisher_attr_.qos.disable_heartbeat_piggyback = value;
+        return *this;
+    }
+
     PubSubWriter& max_blocking_time(
             const eprosima::fastrtps::Duration_t time)
     {
@@ -642,6 +695,7 @@ public:
     }
 
     PubSubWriter& add_throughput_controller_descriptor_to_pparams(
+            eprosima::fastdds::rtps::FlowControllerSchedulerPolicy,
             uint32_t bytesPerPeriod,
             uint32_t periodInMs)
     {
@@ -720,6 +774,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& resource_limits_extra_samples(
+            const int32_t extra)
+    {
+        publisher_attr_.topic.resourceLimitsQos.extra_samples = extra;
+        return *this;
+    }
+
     PubSubWriter& matched_readers_allocation(
             size_t initial,
             size_t maximum)
@@ -761,7 +822,15 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         publisher_attr_.unicastLocatorList.push_back(loc);
 
@@ -780,7 +849,15 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         publisher_attr_.multicastLocatorList.push_back(loc);
 
@@ -799,7 +876,15 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         participant_attr_.rtps.builtin.metatrafficUnicastLocatorList.push_back(loc);
 
@@ -818,9 +903,71 @@ public:
             uint32_t port)
     {
         eprosima::fastrtps::rtps::Locator_t loc;
-        IPLocator::setIPv4(loc, ip);
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
         loc.port = port;
         participant_attr_.rtps.builtin.metatrafficMulticastLocatorList.push_back(loc);
+
+        return *this;
+    }
+
+    PubSubWriter& set_default_unicast_locators(
+            const eprosima::fastrtps::rtps::LocatorList_t& locators)
+    {
+        participant_attr_.rtps.defaultUnicastLocatorList = locators;
+        return *this;
+    }
+
+    PubSubWriter& add_to_default_unicast_locator_list(
+            const std::string& ip,
+            uint32_t port)
+    {
+        eprosima::fastrtps::rtps::Locator_t loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
+        loc.port = port;
+        participant_attr_.rtps.defaultUnicastLocatorList.push_back(loc);
+
+        return *this;
+    }
+
+    PubSubWriter& set_default_multicast_locators(
+            const eprosima::fastrtps::rtps::LocatorList_t& locators)
+    {
+        participant_attr_.rtps.defaultMulticastLocatorList = locators;
+        return *this;
+    }
+
+    PubSubWriter& add_to_default_multicast_locator_list(
+            const std::string& ip,
+            uint32_t port)
+    {
+        eprosima::fastrtps::rtps::Locator_t loc;
+        if (!IPLocator::setIPv4(loc, ip))
+        {
+            loc.kind = LOCATOR_KIND_UDPv6;
+            if (!IPLocator::setIPv6(loc, ip))
+            {
+                return *this;
+            }
+        }
+
+        loc.port = port;
+        participant_attr_.rtps.defaultMulticastLocatorList.push_back(loc);
 
         return *this;
     }
@@ -837,7 +984,14 @@ public:
     {
         participant_attr_.rtps.builtin.discovery_config.use_SIMPLE_EndpointDiscoveryProtocol = false;
         participant_attr_.rtps.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol = true;
-        participant_attr_.rtps.builtin.discovery_config.setStaticEndpointXMLFilename(filename);
+        participant_attr_.rtps.builtin.discovery_config.static_edp_xml_config(filename);
+        return *this;
+    }
+
+    PubSubWriter& use_writer_liveliness_protocol(
+            bool use_wlp)
+    {
+        participant_attr_.rtps.builtin.use_WriterLivelinessProtocol = use_wlp;
         return *this;
     }
 
@@ -878,12 +1032,20 @@ public:
 
         eprosima::fastrtps::rtps::LocatorList_t default_unicast_locators;
         eprosima::fastrtps::rtps::Locator_t default_unicast_locator;
+        eprosima::fastrtps::rtps::Locator_t loopback_locator;
+        if (!use_udpv4)
+        {
+            default_unicast_locator.kind = LOCATOR_KIND_UDPv6;
+            loopback_locator.kind = LOCATOR_KIND_UDPv6;
+        }
 
         default_unicast_locators.push_back(default_unicast_locator);
         participant_attr_.rtps.builtin.metatrafficUnicastLocatorList = default_unicast_locators;
 
-        eprosima::fastrtps::rtps::Locator_t loopback_locator;
-        IPLocator::setIPv4(loopback_locator, 127, 0, 0, 1);
+        if (!IPLocator::setIPv4(loopback_locator, 127, 0, 0, 1))
+        {
+            IPLocator::setIPv6(loopback_locator, "::1");
+        }
         participant_attr_.rtps.builtin.initialPeersList.push_back(loopback_locator);
         return *this;
     }
@@ -918,6 +1080,15 @@ public:
         return *this;
     }
 
+    PubSubWriter& initial_announcements(
+            uint32_t count,
+            const eprosima::fastrtps::Duration_t& period)
+    {
+        participant_attr_.rtps.builtin.discovery_config.initial_announcements.count = count;
+        participant_attr_.rtps.builtin.discovery_config.initial_announcements.period = period;
+        return *this;
+    }
+
     PubSubWriter& load_publisher_attr(
             const std::string& xml)
     {
@@ -943,7 +1114,15 @@ public:
             uint32_t maxInitialPeerRange)
     {
         participant_attr_.rtps.useBuiltinTransports = false;
-        std::shared_ptr<UDPv4TransportDescriptor> descriptor = std::make_shared<UDPv4TransportDescriptor>();
+        std::shared_ptr<UDPTransportDescriptor> descriptor;
+        if (use_udpv4)
+        {
+            descriptor = std::make_shared<UDPv4TransportDescriptor>();
+        }
+        else
+        {
+            descriptor = std::make_shared<UDPv6TransportDescriptor>();
+        }
         descriptor->maxInitialPeersRange = maxInitialPeerRange;
         participant_attr_.rtps.userTransports.push_back(descriptor);
         return *this;
@@ -995,6 +1174,11 @@ public:
     bool is_matched() const
     {
         return matched_ > 0;
+    }
+
+    unsigned int get_matched() const
+    {
+        return matched_;
     }
 
     unsigned int missed_deadlines() const

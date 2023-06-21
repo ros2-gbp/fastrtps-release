@@ -30,6 +30,7 @@
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
 
+#include <fastdds/rtps/common/Property.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/dds/log/Log.hpp>
 
@@ -44,6 +45,7 @@ namespace dds {
 using fastrtps::xmlparser::XMLProfileManager;
 using fastrtps::xmlparser::XMLP_ret;
 using fastrtps::rtps::InstanceHandle_t;
+using fastrtps::rtps::Property;
 using fastrtps::Duration_t;
 using fastrtps::SubscriberAttributes;
 
@@ -77,6 +79,24 @@ static void set_qos_from_attributes(
     qos.time_based_filter() = attr.qos.m_timeBasedFilter;
     qos.history() = attr.topic.historyQos;
     qos.resource_limits() = attr.topic.resourceLimitsQos;
+    qos.data_sharing() = attr.qos.data_sharing;
+
+    if (attr.qos.m_partition.size() > 0 )
+    {
+        Property property;
+        property.name("partitions");
+        std::string partitions;
+        bool is_first_partition = true;
+
+        for (auto partition : attr.qos.m_partition.names())
+        {
+            partitions += (is_first_partition ? "" : ";") + partition;
+            is_first_partition = false;
+        }
+
+        property.value(std::move(partitions));
+        qos.properties().properties().push_back(std::move(property));
+    }
 }
 
 SubscriberImpl::SubscriberImpl(
@@ -200,13 +220,22 @@ ReturnCode_t SubscriberImpl::set_listener(
     return ReturnCode_t::RETCODE_OK;
 }
 
+DataReaderImpl* SubscriberImpl::create_datareader_impl(
+        const TypeSupport& type,
+        TopicDescription* topic,
+        const DataReaderQos& qos,
+        DataReaderListener* listener)
+{
+    return new DataReaderImpl(this, type, topic, qos, listener);
+}
+
 DataReader* SubscriberImpl::create_datareader(
         TopicDescription* topic,
         const DataReaderQos& qos,
         DataReaderListener* listener,
         const StatusMask& mask)
 {
-    logInfo(SUBSCRIBER, "CREATING SUBSCRIBER IN TOPIC: " << topic->get_name())
+    logInfo(SUBSCRIBER, "CREATING SUBSCRIBER IN TOPIC: " << topic->get_name());
     //Look for the correct type registration
     TypeSupport type_support = participant_->find_type(topic->get_type_name());
 
@@ -225,13 +254,7 @@ DataReader* SubscriberImpl::create_datareader(
 
     topic->get_impl()->reference();
 
-    DataReaderImpl* impl = new DataReaderImpl(
-        this,
-        type_support,
-        topic,
-        qos,
-        listener);
-
+    DataReaderImpl* impl = create_datareader_impl(type_support, topic, qos, listener);
     DataReader* reader = new DataReader(impl, mask);
     impl->user_datareader_ = reader;
 
@@ -271,7 +294,7 @@ DataReader* SubscriberImpl::create_datareader_with_profile(
 }
 
 ReturnCode_t SubscriberImpl::delete_datareader(
-        DataReader* reader)
+        const DataReader* reader)
 {
     if (user_subscriber_ != reader->get_subscriber())
     {
@@ -286,7 +309,11 @@ ReturnCode_t SubscriberImpl::delete_datareader(
         {
             //First extract the reader from the maps to free the mutex
             DataReaderImpl* reader_impl = *dr_it;
-            reader_impl->set_listener(nullptr);
+            if (!reader_impl->can_be_deleted())
+            {
+                return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+            }
+
             it->second.erase(dr_it);
             if (it->second.empty())
             {
@@ -366,14 +393,6 @@ ReturnCode_t SubscriberImpl::notify_datareaders() const
     return ReturnCode_t::RETCODE_OK;
 }
 
-/* TODO
-   bool SubscriberImpl::delete_contained_entities()
-   {
-    logError(PUBLISHER, "Operation not implemented");
-    return false;
-   }
- */
-
 ReturnCode_t SubscriberImpl::set_default_datareader_qos(
         const DataReaderQos& qos)
 {
@@ -435,7 +454,7 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
         DataReaderQos& qos) const
 {
     SubscriberAttributes attr;
-    if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr))
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillSubscriberAttributes(profile_name, attr, false))
     {
         qos = default_datareader_qos_;
         set_qos_from_attributes(qos, attr);
@@ -457,7 +476,7 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
 
 const DomainParticipant* SubscriberImpl::get_participant() const
 {
-    return participant_->get_participant();
+    return const_cast<const DomainParticipantImpl*>(participant_)->get_participant();
 }
 
 void SubscriberImpl::SubscriberReaderListener::on_data_available(
@@ -625,6 +644,67 @@ SubscriberListener* SubscriberImpl::get_listener_for(
         return listener_;
     }
     return participant_->get_listener_for(status);
+}
+
+ReturnCode_t SubscriberImpl::delete_contained_entities()
+{
+    // Let's be optimistic
+    ReturnCode_t result = ReturnCode_t::RETCODE_OK;
+
+    std::lock_guard<std::mutex> lock(mtx_readers_);
+    for (auto reader: readers_)
+    {
+        for (DataReaderImpl* dr : reader.second)
+        {
+            if (!dr->can_be_deleted())
+            {
+                return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
+            }
+        }
+    }
+
+    // We traverse the map trying to delete all readers;
+    auto reader_iterator = readers_.begin();
+    while (reader_iterator != readers_.end())
+    {
+        //First extract the reader from the maps to free the mutex
+        auto it = reader_iterator->second.begin();
+        DataReaderImpl* reader_impl = *it;
+        bool ret_code = reader_impl->can_be_deleted();
+        if (!ret_code)
+        {
+            return ReturnCode_t::RETCODE_ERROR;
+        }
+        reader_impl->set_listener(nullptr);
+        it = reader_iterator->second.erase(it);
+        if (reader_iterator->second.empty())
+        {
+            reader_iterator = readers_.erase(reader_iterator);
+        }
+
+        reader_impl->get_topicdescription()->get_impl()->dereference();
+        delete (reader_impl);
+    }
+    return result;
+}
+
+bool SubscriberImpl::can_be_deleted() const
+{
+    bool return_status = true;
+
+    std::lock_guard<std::mutex> lock(mtx_readers_);
+    for (auto topic_readers : readers_)
+    {
+        for (DataReaderImpl* dr : topic_readers.second)
+        {
+            return_status = dr->can_be_deleted();
+            if (!return_status)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 } /* namespace dds */

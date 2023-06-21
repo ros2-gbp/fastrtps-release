@@ -17,9 +17,9 @@
  *
  */
 
+#include <fastdds/rtps/Endpoint.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
-#include <fastdds/rtps/Endpoint.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -33,7 +33,7 @@ RTPSParticipant::RTPSParticipant(
 
 RTPSParticipant::~RTPSParticipant()
 {
-
+    mp_impl = nullptr;
 }
 
 const GUID_t& RTPSParticipant::getGuid() const
@@ -86,9 +86,16 @@ bool RTPSParticipant::registerWriter(
 bool RTPSParticipant::registerReader(
         RTPSReader* Reader,
         const TopicAttributes& topicAtt,
-        const ReaderQos& rqos)
+        const ReaderQos& rqos,
+        const fastdds::rtps::ContentFilterProperty* content_filter)
 {
-    return mp_impl->registerReader(Reader, topicAtt, rqos);
+    return mp_impl->registerReader(Reader, topicAtt, rqos, content_filter);
+}
+
+void RTPSParticipant::update_attributes(
+        const RTPSParticipantAttributes& patt)
+{
+    mp_impl->update_attributes(patt);
 }
 
 bool RTPSParticipant::updateWriter(
@@ -102,9 +109,10 @@ bool RTPSParticipant::updateWriter(
 bool RTPSParticipant::updateReader(
         RTPSReader* Reader,
         const TopicAttributes& topicAtt,
-        const ReaderQos& rqos)
+        const ReaderQos& rqos,
+        const fastdds::rtps::ContentFilterProperty* content_filter)
 {
-    return mp_impl->updateLocalReader(Reader, topicAtt, rqos);
+    return mp_impl->updateLocalReader(Reader, topicAtt, rqos, content_filter);
 }
 
 std::vector<std::string> RTPSParticipant::getParticipantNames() const
@@ -169,6 +177,40 @@ void RTPSParticipant::enable()
 {
     mp_impl->enable();
 }
+
+#if HAVE_SECURITY
+
+bool RTPSParticipant::is_security_enabled_for_writer(
+        const WriterAttributes& writer_attributes)
+{
+    return mp_impl->is_security_enabled_for_writer(writer_attributes);
+}
+
+bool RTPSParticipant::is_security_enabled_for_reader(
+        const ReaderAttributes& reader_attributes)
+{
+    return mp_impl->is_security_enabled_for_reader(reader_attributes);
+}
+
+#endif // if HAVE_SECURITY
+
+#ifdef FASTDDS_STATISTICS
+
+bool RTPSParticipant::add_statistics_listener(
+        std::shared_ptr<fastdds::statistics::IListener> listener,
+        uint32_t kind)
+{
+    return mp_impl->add_statistics_listener(listener, kind);
+}
+
+bool RTPSParticipant::remove_statistics_listener(
+        std::shared_ptr<fastdds::statistics::IListener> listener,
+        uint32_t kind)
+{
+    return mp_impl->remove_statistics_listener(listener, kind);
+}
+
+#endif // FASTDDS_STATISTICS
 
 } /* namespace rtps */
 } /* namespace fastrtps */

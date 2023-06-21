@@ -23,27 +23,50 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-class RealtimeAllocations : public testing::TestWithParam<bool>
+enum communication_type
+{
+    TRANSPORT,
+    INTRAPROCESS,
+    DATASHARING
+};
+
+class RealtimeAllocations : public testing::TestWithParam<communication_type>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = true;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = false;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
     }
 
@@ -51,9 +74,9 @@ public:
 
 TEST_P(RealtimeAllocations, PubSubReliableWithLimitedSubscribers)
 {
-    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
-    PubSubReader<FixedSizedType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -103,9 +126,9 @@ TEST_P(RealtimeAllocations, PubSubReliableWithLimitedSubscribers)
 
 TEST_P(RealtimeAllocations, AsyncPubSubReliableWithLimitedSubscribers)
 {
-    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
-    PubSubReader<FixedSizedType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -156,9 +179,9 @@ TEST_P(RealtimeAllocations, AsyncPubSubReliableWithLimitedSubscribers)
 
 TEST_P(RealtimeAllocations, PubSubBestEffortWithLimitedSubscribers)
 {
-    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
-    PubSubReader<FixedSizedType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -207,9 +230,9 @@ TEST_P(RealtimeAllocations, PubSubBestEffortWithLimitedSubscribers)
 
 TEST_P(RealtimeAllocations, AsyncPubSubBestEffortWithLimitedSubscribers)
 {
-    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
-    PubSubReader<FixedSizedType> reader2(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader2(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -259,9 +282,9 @@ TEST_P(RealtimeAllocations, AsyncPubSubBestEffortWithLimitedSubscribers)
 
 TEST_P(RealtimeAllocations, PubSubReliableWithLimitedPublishers)
 {
-    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -316,9 +339,9 @@ TEST_P(RealtimeAllocations, PubSubReliableWithLimitedPublishers)
 
 TEST_P(RealtimeAllocations, AsyncPubSubReliableWithLimitedPublishers)
 {
-    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -375,9 +398,9 @@ TEST_P(RealtimeAllocations, AsyncPubSubReliableWithLimitedPublishers)
 
 TEST_P(RealtimeAllocations, PubSubBestEffortWithLimitedPublishers)
 {
-    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -433,9 +456,9 @@ TEST_P(RealtimeAllocations, PubSubBestEffortWithLimitedPublishers)
 
 TEST_P(RealtimeAllocations, AsyncPubSubBestEffortWithLimitedPublishers)
 {
-    PubSubReader<FixedSizedType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer(TEST_TOPIC_NAME);
-    PubSubWriter<FixedSizedType> writer2(TEST_TOPIC_NAME);
+    PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<FixedSizedPubSubType> writer2(TEST_TOPIC_NAME);
 
     reader
             .history_depth(10)
@@ -499,12 +522,20 @@ TEST_P(RealtimeAllocations, AsyncPubSubBestEffortWithLimitedPublishers)
 
 GTEST_INSTANTIATE_TEST_MACRO(RealtimeAllocations,
         RealtimeAllocations,
-        testing::Values(false, true),
+        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
         [](const testing::TestParamInfo<RealtimeAllocations::ParamType>& info)
         {
-            if (info.param)
+            switch (info.param)
             {
-                return "Intraprocess";
+                case INTRAPROCESS:
+                    return "Intraprocess";
+                    break;
+                case DATASHARING:
+                    return "Datasharing";
+                    break;
+                case TRANSPORT:
+                default:
+                    return "Transport";
             }
-            return "NonIntraprocess";
+
         });

@@ -136,6 +136,18 @@ void PDPListener::onNewCacheChangeAdded(
                             << "MTTLoc: " << pdata->metatraffic_locators
                             << " DefLoc:" << pdata->default_locators);
 
+                    RTPSParticipantListener* listener = parent_pdp_->getRTPSParticipant()->getListener();
+                    if (listener != nullptr)
+                    {
+                        std::lock_guard<std::mutex> cb_lock(parent_pdp_->callback_mtx_);
+                        ParticipantDiscoveryInfo info(*pdata);
+                        info.status = status;
+
+                        listener->onParticipantDiscovery(
+                            parent_pdp_->getRTPSParticipant()->getUserRTPSParticipant(),
+                            std::move(info));
+                    }
+
                     // Assigning remote endpoints implies sending a DATA(p) to all matched and fixed readers, since
                     // StatelessWriter::matched_reader_add marks the entire history as unsent if the added reader's
                     // durability is bigger or equal to TRANSIENT_LOCAL_DURABILITY_QOS (TRANSIENT_LOCAL or TRANSIENT),
@@ -162,14 +174,11 @@ void PDPListener::onNewCacheChangeAdded(
 
                 if (parent_pdp_->updateInfoMatchesEDP())
                 {
-                    parent_pdp_->mp_EDP->assignRemoteEndpoints(*pdata);
+                    parent_pdp_->mp_EDP->assignRemoteEndpoints(*pdata, true);
                 }
 
                 lock.unlock();
-            }
 
-            if (pdata != nullptr)
-            {
                 RTPSParticipantListener* listener = parent_pdp_->getRTPSParticipant()->getListener();
                 if (listener != nullptr)
                 {

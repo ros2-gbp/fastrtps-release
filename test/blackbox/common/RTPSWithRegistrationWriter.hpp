@@ -49,6 +49,12 @@ public:
     typedef TypeSupport type_support;
     typedef typename type_support::type type;
 
+    using OnReaderDiscoveryFunctor = std::function <void (
+                        eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS,
+                        const eprosima::fastrtps::rtps::GUID_t&,
+                        const eprosima::fastrtps::rtps::ReaderProxyData*
+                        )>;
+
 private:
 
     class Listener : public eprosima::fastrtps::rtps::WriterListener
@@ -77,6 +83,15 @@ private:
             {
                 writer_.unmatched();
             }
+        }
+
+        void on_reader_discovery(
+                eprosima::fastrtps::rtps::RTPSWriter* writer,
+                eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS reason,
+                const eprosima::fastrtps::rtps::GUID_t& reader_guid,
+                const eprosima::fastrtps::rtps::ReaderProxyData* reader_info) override
+        {
+            writer_.on_reader_discovery(writer, reason, reader_guid, reader_info);
         }
 
     private:
@@ -131,6 +146,8 @@ public:
 
     void init()
     {
+        matched_ = 0;
+
         //Create participant
         participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant(
             (uint32_t)GET_PID() % 230, participant_attr_);
@@ -160,6 +177,16 @@ public:
         ASSERT_EQ(participant_->registerWriter(writer_, topic_attr_, writer_qos_), true);
 
         initialized_ = true;
+    }
+
+    void update()
+    {
+        if (writer_ == nullptr)
+        {
+            return;
+        }
+
+        ASSERT_TRUE(participant_->updateWriter(writer_, topic_attr_, writer_qos_));
     }
 
     void destroy()
@@ -230,19 +257,26 @@ public:
         cv_.notify_one();
     }
 
-    void wait_discovery()
+    void wait_discovery(
+            std::chrono::seconds timeout = std::chrono::seconds::zero())
     {
         std::unique_lock<std::mutex> lock(mutex_);
 
-        if (matched_ == 0)
+        if (matched_ == 0 && timeout == std::chrono::seconds::zero())
         {
             cv_.wait(lock, [this]() -> bool
                     {
                         return matched_ != 0;
                     });
+            ASSERT_NE(matched_, 0u);
         }
-
-        ASSERT_NE(matched_, 0u);
+        else
+        {
+            cv_.wait_for(lock, timeout, [&]()
+                    {
+                        return matched_ != 0;
+                    });
+        }
     }
 
     void wait_undiscovery()
@@ -398,12 +432,63 @@ public:
         return *this;
     }
 
+    RTPSWithRegistrationWriter& user_data(
+            const std::vector<eprosima::fastrtps::rtps::octet>& user_data)
+    {
+        writer_qos_.m_userData = user_data;
+        return *this;
+    }
+
+    RTPSWithRegistrationWriter& set_on_reader_discovery(
+            const OnReaderDiscoveryFunctor& functor)
+    {
+        on_reader_discovery_functor = functor;
+        return *this;
+    }
+
+    RTPSWithRegistrationWriter& partitions(
+            std::vector<std::string>& partitions)
+    {
+        writer_qos_.m_partition.setNames(partitions);
+        return *this;
+    }
+
+    void set_separate_sending(
+            bool separate_sending)
+    {
+        writer_->set_separate_sending(separate_sending);
+    }
+
+    uint32_t get_matched() const
+    {
+        return matched_;
+    }
+
+    void participant_update_attributes()
+    {
+        participant_->update_attributes(participant_attr_);
+    }
+
     const eprosima::fastrtps::rtps::GUID_t& guid() const
     {
         return writer_->getGuid();
     }
 
 private:
+
+    void on_reader_discovery(
+            eprosima::fastrtps::rtps::RTPSWriter* writer,
+            eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS reason,
+            const eprosima::fastrtps::rtps::GUID_t& reader_guid,
+            const eprosima::fastrtps::rtps::ReaderProxyData* reader_info)
+    {
+        ASSERT_EQ(writer_, writer);
+
+        if (on_reader_discovery_functor)
+        {
+            on_reader_discovery_functor(reason, reader_guid, reader_info);
+        }
+    }
 
     RTPSWithRegistrationWriter& operator =(
             const RTPSWithRegistrationWriter&) = delete;
@@ -419,10 +504,11 @@ private:
     bool initialized_;
     std::mutex mutex_;
     std::condition_variable cv_;
-    unsigned int matched_;
+    uint32_t matched_;
     type_support type_;
     std::shared_ptr<eprosima::fastrtps::rtps::IPayloadPool> payload_pool_;
     bool has_payload_pool_ = false;
+    OnReaderDiscoveryFunctor on_reader_discovery_functor;
 };
 
 #endif // _TEST_BLACKBOX_RTPSWITHREGISTRATIONWRITER_HPP_

@@ -93,7 +93,7 @@ XMLP_ret XMLParser::getXMLParticipantAllocationAttributes(
         }
         else if (strcmp(name, MAX_PROPERTIES) == 0)
         {
-            // max number of properties in incomming message - uint32Type
+            // max number of properties in incoming message - uint32Type
             if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &tmp, ident))
             {
                 return XMLP_ret::XML_ERROR;
@@ -102,7 +102,7 @@ XMLP_ret XMLParser::getXMLParticipantAllocationAttributes(
         }
         else if (strcmp(name, MAX_USER_DATA) == 0)
         {
-            // max number of user data in incomming message - uint32Type
+            // max number of user data in incoming message - uint32Type
             if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &tmp, ident))
             {
                 return XMLP_ret::XML_ERROR;
@@ -111,7 +111,7 @@ XMLP_ret XMLParser::getXMLParticipantAllocationAttributes(
         }
         else if (strcmp(name, MAX_PARTITIONS) == 0)
         {
-            // max number of user data in incomming message - uint32Type
+            // max number of user data in incoming message - uint32Type
             if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &tmp, ident))
             {
                 return XMLP_ret::XML_ERROR;
@@ -242,6 +242,7 @@ XMLP_ret XMLParser::getXMLDiscoverySettings(
             <xs:element name="clientAnnouncementPeriod" type="durationType" minOccurs="0"/>
             <xs:element name="discoveryServersList" type="DiscoveryServerList" minOccurs="0"/>
             <xs:element name="staticEndpointXMLFilename" type="stringType" minOccurs="0"/>
+            <xs:element name="static_edp_xml_config" type="stringType" minOccurs="0"/>
         </xs:all>
        </xs:complexType>
      */
@@ -381,7 +382,18 @@ XMLP_ret XMLParser::getXMLDiscoverySettings(
             {
                 return XMLP_ret::XML_ERROR;
             }
-            settings.setStaticEndpointXMLFilename(s.c_str());
+            std::string file_name = "file://" + s;
+            settings.static_edp_xml_config(file_name.c_str());
+        }
+        else if (strcmp(name, STATIC_ENDPOINT_XML_URI) == 0)
+        {
+            // staticEndpointXMLFilename - stringType
+            std::string s = "";
+            if (XMLP_ret::XML_OK != getXMLString(p_aux0, &s, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+            settings.static_edp_xml_config(s.c_str());
         }
         else
         {
@@ -852,6 +864,7 @@ XMLP_ret XMLParser::getXMLResourceLimitsQos(
                 <xs:element name="max_instances" type="int32Type" minOccurs="0"/>
                 <xs:element name="max_samples_per_instance" type="int32Type" minOccurs="0"/>
                 <xs:element name="allocated_samples" type="int32Type" minOccurs="0"/>
+                <xs:element name="extra_samples" type="int32Type" minOccurs="0"/>
             </xs:all>
         </xs:complexType>
      */
@@ -889,6 +902,14 @@ XMLP_ret XMLParser::getXMLResourceLimitsQos(
         {
             // allocated_samples - int32Type
             if (XMLP_ret::XML_OK != getXMLInt(p_aux0, &resourceLimitsQos.allocated_samples, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, EXTRA_SAMPLES) == 0)
+        {
+            // extra_samples - int32Type
+            if (XMLP_ret::XML_OK != getXMLInt(p_aux0, &resourceLimitsQos.extra_samples, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -1072,6 +1093,9 @@ XMLP_ret XMLParser::getXMLWriterQosPolicies(
                 <xs:element name="topicData" type="topicDataQosPolicyType" minOccurs="0"/>
                 <xs:element name="groupData" type="groupDataQosPolicyType" minOccurs="0"/>
                 <xs:element name="publishMode" type="publishModeQosPolicyType" minOccurs="0"/>
+                <xs:element name="data_sharing" type="dataSharingQosPolicyType" minOccurs="0"/>
+                <xs:element name="disablePositiveAcks" type="disablePositiveAcksQosPolicyType" minOccurs="0"/>
+                <xs:element name="disable_heartbeat_piggyback" type="boolType" minOccurs="0"/>
             </xs:all>
         </xs:complexType>
      */
@@ -1153,23 +1177,59 @@ XMLP_ret XMLParser::getXMLWriterQosPolicies(
                 return XMLP_ret::XML_ERROR;
             }
         }
-        else if (strcmp(name, DURABILITY_SRV) == 0 || strcmp(name, USER_DATA) == 0 ||
+        else if (strcmp(name, DURABILITY_SRV) == 0 ||
                 strcmp(name, TIME_FILTER) == 0 || strcmp(name, OWNERSHIP) == 0 ||
                 strcmp(name, OWNERSHIP_STRENGTH) == 0 || strcmp(name, DEST_ORDER) == 0 ||
-                strcmp(name, PRESENTATION) == 0 || strcmp(name, TOPIC_DATA) == 0 ||
-                strcmp(name, GROUP_DATA) == 0)
+                strcmp(name, PRESENTATION) == 0)
         {
             // TODO: Do not supported for now
             //if (nullptr != (p_aux = elem->FirstChildElement(    DURABILITY_SRV))) getXMLDurabilityServiceQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(         USER_DATA))) getXMLUserDataQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(       TIME_FILTER))) getXMLTimeBasedFilterQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(         OWNERSHIP))) getXMLOwnershipQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(OWNERSHIP_STRENGTH))) getXMLOwnershipStrengthQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(        DEST_ORDER))) getXMLDestinationOrderQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(      PRESENTATION))) getXMLPresentationQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(        TOPIC_DATA))) getXMLTopicDataQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(        GROUP_DATA))) getXMLGroupDataQos(p_aux, ident);
-            logError(XMLPARSER, "Quality os Service '" << p_aux0->Value() << "' do not supported for now");
+            logError(XMLPARSER, "Quality of Service '" << p_aux0->Value() << "' do not supported for now");
+        }
+        else if (strcmp(name, DATA_SHARING) == 0)
+        {
+            //data sharing
+            if (XMLP_ret::XML_OK != getXMLDataSharingQos(p_aux0, qos.data_sharing, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, DISABLE_HEARTBEAT_PIGGYBACK) == 0)
+        {
+            // Disable heartbeat piggyback
+            if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &qos.disable_heartbeat_piggyback, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (0 == strcmp(name, USER_DATA))
+        {
+            // userData
+            if (XMLP_ret::XML_OK != getXMLOctetVector(p_aux0, qos.m_userData.data_vec(), ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (0 == strcmp(name, TOPIC_DATA))
+        {
+            // userData
+            if (XMLP_ret::XML_OK != getXMLOctetVector(p_aux0, qos.m_topicData.data_vec(), ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (0 == strcmp(name, GROUP_DATA))
+        {
+            // userData
+            if (XMLP_ret::XML_OK != getXMLOctetVector(p_aux0, qos.m_groupData.data_vec(), ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
         }
         else
         {
@@ -1203,6 +1263,8 @@ XMLP_ret XMLParser::getXMLReaderQosPolicies(
                 <xs:element name="partition" type="partitionQosPolicyType" minOccurs="0"/>
                 <xs:element name="topicData" type="topicDataQosPolicyType" minOccurs="0"/>
                 <xs:element name="groupData" type="groupDataQosPolicyType" minOccurs="0"/>
+                <xs:element name="data_sharing" type="dataSharingQosPolicyType" minOccurs="0"/>
+                <xs:element name="disablePositiveAcks" type="disablePositiveAcksQosPolicyType" minOccurs="0"/>
             </xs:all>
         </xs:complexType>
      */
@@ -1275,22 +1337,50 @@ XMLP_ret XMLParser::getXMLReaderQosPolicies(
                 return XMLP_ret::XML_ERROR;
             }
         }
-        else if (strcmp(name, DURABILITY_SRV) == 0 || strcmp(name, USER_DATA) == 0 ||
+        else if (strcmp(name, DURABILITY_SRV) == 0 ||
                 strcmp(name, TIME_FILTER) == 0 || strcmp(name, OWNERSHIP) == 0 ||
                 strcmp(name, OWNERSHIP_STRENGTH) == 0 || strcmp(name, DEST_ORDER) == 0 ||
-                strcmp(name, PRESENTATION) == 0 || strcmp(name, TOPIC_DATA) == 0 ||
-                strcmp(name, GROUP_DATA) == 0)
+                strcmp(name, PRESENTATION) == 0)
         {
             // TODO: Do not supported for now
             //if (nullptr != (p_aux = elem->FirstChildElement(    DURABILITY_SRV))) getXMLDurabilityServiceQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(         USER_DATA))) getXMLUserDataQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(       TIME_FILTER))) getXMLTimeBasedFilterQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(         OWNERSHIP))) getXMLOwnershipQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(        DEST_ORDER))) getXMLDestinationOrderQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(      PRESENTATION))) getXMLPresentationQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(        TOPIC_DATA))) getXMLTopicDataQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(        GROUP_DATA))) getXMLGroupDataQos(p_aux, ident);
-            logError(XMLPARSER, "Quality os Service '" << p_aux0->Value() << "' do not supported for now");
+            logError(XMLPARSER, "Quality of Service '" << p_aux0->Value() << "' do not supported for now");
+        }
+        else if (strcmp(name, DATA_SHARING) == 0)
+        {
+            //data sharing
+            if (XMLP_ret::XML_OK != getXMLDataSharingQos(p_aux0, qos.data_sharing, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (0 == strcmp(name, USER_DATA))
+        {
+            // userData
+            if (XMLP_ret::XML_OK != getXMLOctetVector(p_aux0, qos.m_userData.data_vec(), ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (0 == strcmp(name, TOPIC_DATA))
+        {
+            // userData
+            if (XMLP_ret::XML_OK != getXMLOctetVector(p_aux0, qos.m_topicData.data_vec(), ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (0 == strcmp(name, GROUP_DATA))
+        {
+            // userData
+            if (XMLP_ret::XML_OK != getXMLOctetVector(p_aux0, qos.m_groupData.data_vec(), ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
         }
         else
         {
@@ -1377,23 +1467,25 @@ XMLP_ret XMLParser::getXMLDurabilityQos(
     return XMLP_ret::XML_OK;
 }
 
-XMLP_ret XMLParser::getXMLDurabilityServiceQos(
+// TODO Implement DurabilityServiceQos
+/*
+   XMLP_ret XMLParser::getXMLDurabilityServiceQos(
         tinyxml2::XMLElement* elem,
         DurabilityServiceQosPolicy& durabilityService,
         uint8_t ident)
-{
-    /*
-        <xs:complexType name="durabilityServiceQosPolicyType">
-            <xs:all minOccurs="0">
-                <xs:element name="service_cleanup_delay" type="durationType" minOccurs="0"/>
-                <xs:element name="history_kind" type="historyQosKindType" minOccurs="0"/>
-                <xs:element name="history_depth" type="uint32Type" minOccurs="0"/>
-                <xs:element name="max_samples" type="uint32Type" minOccurs="0"/>
-                <xs:element name="max_instances" type="uint32Type" minOccurs="0"/>
-                <xs:element name="max_samples_per_instance" type="uint32Type" minOccurs="0"/>
-            </xs:all>
-        </xs:complexType>
-     */
+   {
+
+    //    <xs:complexType name="durabilityServiceQosPolicyType">
+    //        <xs:all minOccurs="0">
+    //            <xs:element name="service_cleanup_delay" type="durationType" minOccurs="0"/>
+    //            <xs:element name="history_kind" type="historyQosKindType" minOccurs="0"/>
+    //            <xs:element name="history_depth" type="uint32Type" minOccurs="0"/>
+    //            <xs:element name="max_samples" type="uint32Type" minOccurs="0"/>
+    //            <xs:element name="max_instances" type="uint32Type" minOccurs="0"/>
+    //            <xs:element name="max_samples_per_instance" type="uint32Type" minOccurs="0"/>
+    //        </xs:all>
+    //    </xs:complexType>
+
 
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
@@ -1411,14 +1503,14 @@ XMLP_ret XMLParser::getXMLDurabilityServiceQos(
         else if (strcmp(name, HISTORY_KIND) == 0)
         {
             // history_kind
-            /*
-                <xs:simpleType name="historyQosKindType">
-                    <xs:restriction base="xs:string">
-                        <xs:enumeration value="KEEP_LAST"/>
-                        <xs:enumeration value="KEEP_ALL"/>
-                    </xs:restriction>
-                </xs:simpleType>
-             */
+            //
+            //    <xs:simpleType name="historyQosKindType">
+            //        <xs:restriction base="xs:string">
+            //            <xs:enumeration value="KEEP_LAST"/>
+            //            <xs:enumeration value="KEEP_ALL"/>
+            //        </xs:restriction>
+            //    </xs:simpleType>
+            //
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
@@ -1478,7 +1570,8 @@ XMLP_ret XMLParser::getXMLDurabilityServiceQos(
         }
     }
     return XMLP_ret::XML_OK;
-}
+   }
+ */
 
 XMLP_ret XMLParser::getXMLDeadlineQos(
         tinyxml2::XMLElement* elem,
@@ -1764,7 +1857,7 @@ XMLP_ret XMLParser::getXMLDisablePositiveAcksQos(
     /*
         <xs:complexType name="disablePositiveAcksQosPolicyType">
             <xs:all>
-                <xs:element name="enabled" type="bool"/>
+                <xs:element name="enabled" type="boolType"/>
                 <xs:element name="duration" type="durationType"/>
             </xs:all>
         </xs:complexType>
@@ -1799,18 +1892,186 @@ XMLP_ret XMLParser::getXMLDisablePositiveAcksQos(
     return XMLP_ret::XML_OK;
 }
 
-XMLP_ret XMLParser::getXMLTimeBasedFilterQos(
+XMLP_ret XMLParser::getXMLDataSharingQos(
         tinyxml2::XMLElement* elem,
-        TimeBasedFilterQosPolicy& timeBasedFilter,
+        DataSharingQosPolicy& data_sharing,
         uint8_t ident)
 {
     /*
-        <xs:complexType name="timeBasedFilterQosPolicyType">
+        <xs:complexType name="dataSharingQosPolicyType">
             <xs:all>
-                <xs:element name="minimum_separation" type="durationType"/>
+                <xs:element name="kind" type="datasharingQosKindType" minOccurs="1"/>
+                <xs:element name="shared_dir" type="stringType" minOccurs="0"/>
+                <xs:element name="domain_ids" type="domainIdVectorType" minOccurs="0"/>
+                <xs:element name="max_domains" type="uint32Type" minOccurs="0"/>
             </xs:all>
         </xs:complexType>
      */
+    bool kind_found = false;
+    DataSharingKind kind = DataSharingKind::AUTO;
+    std::string shm_directory = "";
+    int32_t max_domains = 0;
+    std::vector<uint16_t> domain_ids;
+
+    tinyxml2::XMLElement* p_aux0 = nullptr;
+    const char* name = nullptr;
+    for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
+    {
+        name = p_aux0->Name();
+        if (strcmp(name, KIND) == 0)
+        {
+            /*
+                <xs:simpleType name="datasharingQosKindType">
+                    <xs:restriction base="xs:string">
+                        <xs:enumeration value="ON"/>
+                        <xs:enumeration value="OFF"/>
+                        <xs:enumeration value="DEFAULT"/>
+                    </xs:restriction>
+                </xs:simpleType>
+             */
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
+            {
+                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                return XMLP_ret::XML_ERROR;
+            }
+            if (strcmp(text, ON) == 0)
+            {
+                kind = DataSharingKind::ON;
+            }
+            else if (strcmp(text, OFF) == 0)
+            {
+                kind = DataSharingKind::OFF;
+            }
+            else if (strcmp(text, AUTOMATIC) == 0)
+            {
+                kind = DataSharingKind::AUTO;
+            }
+            else
+            {
+                logError(XMLPARSER, "Node '" << KIND << "' with bad content");
+                return XMLP_ret::XML_ERROR;
+            }
+            kind_found = true;
+        }
+        else if (strcmp(name, SHARED_DIR) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLString(p_aux0, &shm_directory, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, MAX_DOMAINS) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLInt(p_aux0, &max_domains, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+            if (max_domains < 0)
+            {
+                logError(XMLPARSER, "max domains cannot be negative");
+                return XMLP_ret::XML_ERROR;
+            }
+
+        }
+        else if (strcmp(name, DOMAIN_IDS) == 0)
+        {
+            /*
+                <xs:complexType name="domainIdVectorType">
+                    <xs:sequence>
+                        <xs:element name="domainId" type="uint16Type" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+             */
+
+            tinyxml2::XMLElement* p_aux1;
+            const char* name1 = nullptr;
+            bool domain_id_found = false;
+            for (p_aux1 = p_aux0->FirstChildElement(); p_aux1 != NULL; p_aux1 = p_aux1->NextSiblingElement())
+            {
+                name1 = p_aux1->Name();
+                if (strcmp(name1, DOMAIN_ID) == 0)
+                {
+                    uint16_t id;
+                    if (XMLP_ret::XML_OK != getXMLUint(p_aux1, &id, ident))
+                    {
+                        return XMLP_ret::XML_ERROR;
+                    }
+                    domain_ids.push_back(id);
+                    domain_id_found = true;
+                }
+                else
+                {
+                    logError(XMLPARSER, "Invalid element found in 'domain_ids'. Name: " << name1);
+                    return XMLP_ret::XML_ERROR;
+                }
+            }
+
+            if (!domain_id_found)
+            {
+                // Not even one
+                logError(XMLPARSER, "Node '" << DOMAIN_IDS << "' without content");
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else
+        {
+            logError(XMLPARSER, "Invalid element found in 'data_sharing'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+    }
+
+    if (!kind_found)
+    {
+        logError(XMLPARSER, "Node 'data_sharing' without kind");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    if (max_domains != 0 && domain_ids.size() > static_cast<uint32_t>(max_domains))
+    {
+        logError(XMLPARSER, "Node 'data_sharing' defines a maximum of " << max_domains
+                                                                        << " domain IDs but also define " << domain_ids.size() <<
+                " domain IDs");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    data_sharing.set_max_domains(static_cast<uint32_t>(max_domains));
+
+    switch (kind)
+    {
+        case DataSharingKind::ON:
+            data_sharing.on(shm_directory, domain_ids);
+            break;
+
+        case DataSharingKind::AUTO:
+            data_sharing.automatic(shm_directory, domain_ids);
+            break;
+
+        case DataSharingKind::OFF:
+            data_sharing.off();
+            break;
+
+        default:
+            break;
+    }
+
+    return XMLP_ret::XML_OK;
+}
+
+// TODO Implement TimeBasedFilterQos
+/*
+   XMLP_ret XMLParser::getXMLTimeBasedFilterQos(
+        tinyxml2::XMLElement* elem,
+        TimeBasedFilterQosPolicy& timeBasedFilter,
+        uint8_t ident)
+   {
+
+    //    <xs:complexType name="timeBasedFilterQosPolicyType">
+    //        <xs:all>
+    //          <xs:element name="minimum_separation" type="durationType"/>
+    //        </xs:all>
+    //    </xs:complexType>
+
 
     tinyxml2::XMLElement* p_aux0 = nullptr;
     bool bSeparationDefined = false;
@@ -1839,20 +2100,23 @@ XMLP_ret XMLParser::getXMLTimeBasedFilterQos(
         return XMLP_ret::XML_ERROR;
     }
     return XMLP_ret::XML_OK;
-}
+   }
+ */
 
-XMLP_ret XMLParser::getXMLOwnershipQos(
+// TODO Implement OwnershipQos
+/*
+   XMLP_ret XMLParser::getXMLOwnershipQos(
         tinyxml2::XMLElement* elem,
         OwnershipQosPolicy& ownership,
-        uint8_t /*ident*/)
-{
-    /*
-        <xs:complexType name="ownershipQosPolicyType">
-            <xs:all>
-                <xs:element name="kind" type="ownershipQosKindType"/>
-            </xs:all>
-        </xs:complexType>
-     */
+        uint8_t ident)
+   {
+
+    //    <xs:complexType name="ownershipQosPolicyType">
+    //        <xs:all>
+    //            <xs:element name="kind" type="ownershipQosKindType"/>
+    //        </xs:all>
+    //    </xs:complexType>
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     bool bKindDefined = false;
     const char* name = nullptr;
@@ -1861,14 +2125,14 @@ XMLP_ret XMLParser::getXMLOwnershipQos(
         name = p_aux0->Name();
         if (strcmp(name, KIND) == 0)
         {
-            /*
-                <xs:simpleType name="ownershipQosKindType">
-                    <xs:restriction base="xs:string">
-                        <xs:enumeration value="SHARED"/>
-                        <xs:enumeration value="EXCLUSIVE"/>
-                    </xs:restriction>
-                </xs:simpleType>
-             */
+
+            //    <xs:simpleType name="ownershipQosKindType">
+            //        <xs:restriction base="xs:string">
+            //            <xs:enumeration value="SHARED"/>
+            //            <xs:enumeration value="EXCLUSIVE"/>
+            //        </xs:restriction>
+            //    </xs:simpleType>
+
             bKindDefined = true;
             const char* text = p_aux0->GetText();
             if (nullptr == text)
@@ -1903,21 +2167,25 @@ XMLP_ret XMLParser::getXMLOwnershipQos(
         return XMLP_ret::XML_ERROR;
     }
 
-    return XMLP_ret::XML_OK;
-}
+    return XMLP_ret::
+    XML_OK;
+   }
+ */
 
-XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
+// TODO Implement OwnershipStrengthQos
+/*
+   XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
         tinyxml2::XMLElement* elem,
         OwnershipStrengthQosPolicy& ownershipStrength,
         uint8_t ident)
-{
-    /*
-        <xs:complexType name="ownershipStrengthQosPolicyType">
-            <xs:all>
-                <xs:element name="value" type="uint32Type"/>
-            </xs:all>
-        </xs:complexType>
-     */
+   {
+
+    //    <xs:complexType name="ownershipStrengthQosPolicyType">
+    //        <xs:all>
+    //            <xs:element name="value" type="uint32Type"/>
+    //        </xs:all>
+    //    </xs:complexType>
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     bool bValueDefined = false;
     const char* name = nullptr;
@@ -1946,20 +2214,24 @@ XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
     }
 
     return XMLP_ret::XML_OK;
-}
+   }
+ */
 
-XMLP_ret XMLParser::getXMLDestinationOrderQos(
+
+// TODO Implement DestinationOrderQos
+/*
+   XMLP_ret XMLParser::getXMLDestinationOrderQos(
         tinyxml2::XMLElement* elem,
         DestinationOrderQosPolicy& destinationOrder,
-        uint8_t /*ident*/)
-{
-    /*
-        <xs:complexType name="destinationOrderQosPolicyType">
-            <xs:all>
-                <xs:element name="kind" type="destinationOrderQosKindType"/>
-            </xs:all>
-        </xs:complexType>
-     */
+        uint8_t ident)
+   {
+
+    //    <xs:complexType name="destinationOrderQosPolicyType">
+    //        <xs:all>
+    //            <xs:element name="kind" type="destinationOrderQosKindType"/>
+    //        </xs:all>
+    //    </xs:complexType>
+
 
     tinyxml2::XMLElement* p_aux0 = nullptr;
     bool bKindDefined = false;
@@ -1969,14 +2241,14 @@ XMLP_ret XMLParser::getXMLDestinationOrderQos(
         name = p_aux0->Name();
         if (strcmp(name, KIND) == 0)
         {
-            /*
-                <xs:simpleType name="destinationOrderQosKindType">
-                    <xs:restriction base="xs:string">
-                        <xs:enumeration value="BY_RECEPTION_TIMESTAMP"/>
-                        <xs:enumeration value="BY_SOURCE_TIMESTAMP"/>
-                    </xs:restriction>
-                </xs:simpleType>
-             */
+
+            //    <xs:simpleType name="destinationOrderQosKindType">
+            //        <xs:restriction base="xs:string">
+            //            <xs:enumeration value="BY_RECEPTION_TIMESTAMP"/>
+            //            <xs:enumeration value="BY_SOURCE_TIMESTAMP"/>
+            //        </xs:restriction>
+            //    </xs:simpleType>
+
             bKindDefined = true;
             const char* text = p_aux0->GetText();
             if (nullptr == text)
@@ -2012,22 +2284,25 @@ XMLP_ret XMLParser::getXMLDestinationOrderQos(
     }
 
     return XMLP_ret::XML_OK;
-}
+   }
+ */
 
-XMLP_ret XMLParser::getXMLPresentationQos(
+// TODO Implement PresentationQos
+/*
+   XMLP_ret XMLParser::getXMLPresentationQos(
         tinyxml2::XMLElement* elem,
         PresentationQosPolicy& presentation,
         uint8_t ident)
-{
-    /*
-        <xs:complexType name="presentationQosPolicyType">
-            <xs:all minOccurs="0">
-                <xs:element name="access_scope" type="presentationQosKindType" minOccurs="0"/>
-                <xs:element name="coherent_access" type="boolType" minOccurs="0"/>
-                <xs:element name="ordered_access" type="boolType" minOccurs="0"/>
-            </xs:all>
-        </xs:complexType>
-     */
+   {
+
+    //    <xs:complexType name="presentationQosPolicyType">
+    //        <xs:all minOccurs="0">
+    //            <xs:element name="access_scope" type="presentationQosKindType" minOccurs="0"/>
+    //            <xs:element name="coherent_access" type="boolType" minOccurs="0"/>
+    //            <xs:element name="ordered_access" type="boolType" minOccurs="0"/>
+    //        </xs:all>
+    //    </xs:complexType>
+
 
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
@@ -2037,15 +2312,15 @@ XMLP_ret XMLParser::getXMLPresentationQos(
         if (strcmp(name, ACCESS_SCOPE) == 0)
         {
             // access_scope
-            /*
-                <xs:simpleType name="presentationQosKindType">
-                    <xs:restriction base="xs:string">
-                        <xs:enumeration value="INSTANCE"/>
-                        <xs:enumeration value="TOPIC"/>
-                        <xs:enumeration value="GROUP"/>
-                    </xs:restriction>
-                </xs:simpleType>
-             */
+
+            //    <xs:simpleType name="presentationQosKindType">
+            //        <xs:restriction base="xs:string">
+            //            <xs:enumeration value="INSTANCE"/>
+            //            <xs:enumeration value="TOPIC"/>
+            //            <xs:enumeration value="GROUP"/>
+            //        </xs:restriction>
+            //    </xs:simpleType>
+
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
@@ -2093,7 +2368,8 @@ XMLP_ret XMLParser::getXMLPresentationQos(
         }
     }
     return XMLP_ret::XML_OK;
-}
+   }
+ */
 
 XMLP_ret XMLParser::getXMLPartitionQos(
         tinyxml2::XMLElement* elem,
@@ -2504,6 +2780,23 @@ XMLP_ret XMLParser::getXMLLocatorUDPv4(
             {
                 return XMLP_ret::XML_ERROR;
             }
+            // Check whether the address is IPv4
+            if (!IPLocator::isIPv4(s))
+            {
+                auto response = rtps::IPLocator::resolveNameDNS(s);
+
+                // Add the first valid IPv4 address that we can find
+                if (response.first.size() > 0)
+                {
+                    s = response.first.begin()->data();
+                }
+                else
+                {
+                    logError(XMLPARSER,
+                            "DNS server did not return any IPv4 address for: '" << s << "'. Name: " << name);
+                    return XMLP_ret::XML_ERROR;
+                }
+            }
             IPLocator::setIPv4(locator, s);
         }
         else
@@ -2550,6 +2843,23 @@ XMLP_ret XMLParser::getXMLLocatorUDPv6(
             if (XMLP_ret::XML_OK != getXMLString(p_aux0, &s, ident + 1))
             {
                 return XMLP_ret::XML_ERROR;
+            }
+            // Check whether the address is IPv6
+            if (!IPLocator::isIPv6(s))
+            {
+                auto response = rtps::IPLocator::resolveNameDNS(s);
+
+                // Add the first valid IPv6 address that we can find
+                if (response.second.size() > 0)
+                {
+                    s = response.second.begin()->data();
+                }
+                else
+                {
+                    logError(XMLPARSER,
+                            "DNS server did not return any IPv6 address for: '" << s << "'. Name: " << name);
+                    return XMLP_ret::XML_ERROR;
+                }
             }
             IPLocator::setIPv6(locator, s);
         }
@@ -2964,19 +3274,81 @@ XMLP_ret XMLParser::getXMLPropertiesPolicy(
                 p_aux1 = p_aux1->NextSiblingElement(PROPERTY);
             }
         }
+        else
+        {
+            logError(XMLPARSER, "Invalid element found into 'propertyPolicyType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
     }
     return XMLP_ret::XML_OK;
 }
 
-// TODO
 XMLP_ret XMLParser::getXMLOctetVector(
         tinyxml2::XMLElement* elem,
-        std::vector<octet>& /*octetVector*/,
+        std::vector<octet>& octet_vector,
         uint8_t /*ident*/)
 {
-    (void)(elem);
-    logError(XMLPARSER, "Tag '" << elem->Value() << "' octetVector do not supported for now");
-    return XMLP_ret::XML_OK;
+    if (nullptr == elem)
+    {
+        logError(XMLPARSER, "preconditions error");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    tinyxml2::XMLElement* p_aux0 = nullptr;
+    XMLP_ret ret_value = XMLP_ret::XML_OK;
+    size_t num_elems = 0;
+
+    for (p_aux0 = elem->FirstChildElement(); nullptr != p_aux0; p_aux0 = p_aux0->NextSiblingElement())
+    {
+        if (1 < ++num_elems)
+        {
+            logError(XMLPARSER, "More than one tag on " << p_aux0->GetLineNum());
+            ret_value = XMLP_ret::XML_ERROR;
+        }
+        if (0 == strcmp(p_aux0->Name(), VALUE))
+        {
+            std::string text = p_aux0->GetText();
+            std::istringstream ss(text);
+
+            ss >> std::hex;
+
+            while (!ss.eof())
+            {
+                uint16_t o = 0;
+                ss >> o;
+
+                if (!ss || std::numeric_limits<octet>::max() < o)
+                {
+                    logError(XMLPARSER, "Expected an octet value on line " << p_aux0->GetLineNum());
+                    ret_value = XMLP_ret::XML_ERROR;
+                    break;
+                }
+
+                // Add octet in vector.
+                octet_vector.push_back(static_cast<octet>(o));
+
+                if (!ss.eof())
+                {
+                    char c = 0;
+                    ss >> c;
+
+                    if (!ss || '.' != c)
+                    {
+                        logError(XMLPARSER, "Expected a '.' separator on line " << p_aux0->GetLineNum());
+                        ret_value = XMLP_ret::XML_ERROR;
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            logError(XMLPARSER, "Invalid tag with name of " << p_aux0->Name() << " on line " << p_aux0->GetLineNum());
+            ret_value = XMLP_ret::XML_ERROR;
+        }
+    }
+
+    return ret_value;
 }
 
 XMLP_ret XMLParser::getXMLInt(
@@ -3113,6 +3485,7 @@ XMLP_ret XMLParser::getXMLEnum(
                 <xs:enumeration value="CLIENT"/>
                 <xs:enumeration value="SERVER"/>
                 <xs:enumeration value="BACKUP"/>
+                <xs:enumeration value="SUPER_CLIENT"/>
             </xs:restriction>
         </xs:simpleType>
      */
@@ -3390,6 +3763,7 @@ XMLP_ret XMLParser::getXMLPublisherAttributes(
                 <xs:element name="propertiesPolicy" type="propertyPolicyType" minOccurs="0"/>
                 <xs:element name="userDefinedID" type="int16Type" minOccurs="0"/>
                 <xs:element name="entityID" type="int16Type" minOccurs="0"/>
+                <xs:element name="matchedSubscribersAllocation" type="containerAllocationConfigType" minOccurs="0"/>
             </xs:all>
             <xs:attribute name="profile_name" type="stringType" use="required"/>
         </xs:complexType>
@@ -3529,6 +3903,7 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
                 <xs:element name="propertiesPolicy" type="propertyPolicyType" minOccurs="0"/>
                 <xs:element name="userDefinedID" type="int16Type" minOccurs="0"/>
                 <xs:element name="entityID" type="int16Type" minOccurs="0"/>
+                <xs:element name="matchedPublishersAllocation" type="containerAllocationConfigType" minOccurs="0"/>
             </xs:all>
             <xs:attribute name="profile_name" type="stringType" use="required"/>
         </xs:complexType>

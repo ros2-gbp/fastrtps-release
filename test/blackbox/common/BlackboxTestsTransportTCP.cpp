@@ -13,11 +13,13 @@
 // limitations under the License.
 
 #include "BlackboxTests.hpp"
-
 #include "TCPReqRepHelloWorldRequester.hpp"
 #include "TCPReqRepHelloWorldReplier.hpp"
 
 #include <gtest/gtest.h>
+
+#include <fastrtps/transport/TCPv4TransportDescriptor.h>
+#include <fastrtps/transport/TCPv6TransportDescriptor.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -26,8 +28,39 @@ using namespace eprosima::fastrtps::rtps;
 static const char* certs_path = nullptr;
 #endif // if TLS_FOUND
 
+enum communication_type
+{
+    TRANSPORT
+};
+
+class TransportTCP : public testing::TestWithParam<std::tuple<communication_type, bool>>
+{
+public:
+
+    void SetUp() override
+    {
+        test_transport_.reset();
+        use_ipv6 = std::get<1>(GetParam());
+        if (use_ipv6)
+        {
+            test_transport_ = std::make_shared<TCPv6TransportDescriptor>();
+        }
+        else
+        {
+            test_transport_ = std::make_shared<TCPv4TransportDescriptor>();
+        }
+    }
+
+    void TearDown() override
+    {
+        use_ipv6 = false;
+    }
+
+    std::shared_ptr<TCPTransportDescriptor> test_transport_;
+};
+
 // TCP and Domain management with logical ports tests
-TEST(BlackBox, TCPDomainHelloWorld_P0_P1_D0_D0)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P0_P1_D0_D0)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -55,7 +88,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P0_P1_D0_D0)
     }
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P0_P1_D0_D1)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P0_P1_D0_D1)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -75,7 +108,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P0_P1_D0_D1)
     ASSERT_FALSE(replier.is_matched());
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P0_P1_D1_D0)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P0_P1_D1_D0)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -96,7 +129,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P0_P1_D1_D0)
 
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P0_P3_D0_D0)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P0_P3_D0_D0)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -122,7 +155,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P0_P3_D0_D0)
 
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P0_P3_D0_D1)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P0_P3_D0_D1)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -142,7 +175,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P0_P3_D0_D1)
     ASSERT_FALSE(replier.is_matched());
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P0_P3_D1_D0)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P0_P3_D1_D0)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -163,7 +196,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P0_P3_D1_D0)
 
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P3_P0_D0_D0)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P3_P0_D0_D0)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -192,7 +225,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P3_P0_D0_D0)
 
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P3_P0_D0_D1)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P3_P0_D0_D1)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -212,7 +245,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P3_P0_D0_D1)
     ASSERT_FALSE(replier.is_matched());
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P3_P0_D1_D0)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P3_P0_D1_D0)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -233,7 +266,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P3_P0_D1_D0)
 
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P2_P3_D0_D0)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P2_P3_D0_D0)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -259,7 +292,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P2_P3_D0_D0)
 
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P2_P3_D0_D1)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P2_P3_D0_D1)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -279,7 +312,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P2_P3_D0_D1)
     ASSERT_FALSE(replier.is_matched());
 }
 
-TEST(BlackBox, TCPDomainHelloWorld_P2_P3_D1_D0)
+TEST_P(TransportTCP, TCPDomainHelloWorld_P2_P3_D1_D0)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -299,7 +332,7 @@ TEST(BlackBox, TCPDomainHelloWorld_P2_P3_D1_D0)
     ASSERT_FALSE(replier.is_matched());
 }
 
-TEST(BlackBox, TCPMaxInitialPeer_P0_4_P3)
+TEST_P(TransportTCP, TCPMaxInitialPeer_P0_4_P3)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -320,7 +353,7 @@ TEST(BlackBox, TCPMaxInitialPeer_P0_4_P3)
     ASSERT_TRUE(replier.is_matched());
 }
 
-TEST(BlackBox, TCPMaxInitialPeer_P0_4_P4)
+TEST_P(TransportTCP, TCPMaxInitialPeer_P0_4_P4)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -340,7 +373,7 @@ TEST(BlackBox, TCPMaxInitialPeer_P0_4_P4)
     ASSERT_FALSE(replier.is_matched());
 }
 
-TEST(BlackBox, TCPMaxInitialPeer_P0_5_P4)
+TEST_P(TransportTCP, TCPMaxInitialPeer_P0_5_P4)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -362,7 +395,7 @@ TEST(BlackBox, TCPMaxInitialPeer_P0_5_P4)
 }
 
 #if TLS_FOUND
-TEST(BlackBox, TCP_TLS)
+TEST_P(TransportTCP, TCP_TLS)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -397,7 +430,7 @@ void tls_init()
 #endif // if TLS_FOUND
 
 // Regression test for ShrinkLocators/transform_remote_locators mechanism.
-TEST(BlackBox, TCPLocalhost)
+TEST_P(TransportTCP, TCPLocalhost)
 {
     TCPReqRepHelloWorldRequester requester;
     TCPReqRepHelloWorldReplier replier;
@@ -423,6 +456,89 @@ TEST(BlackBox, TCPLocalhost)
         requester.send(count);
         requester.block();
     }
+}
+
+// Test for ==operator TCPTransportDescriptor is not required as it is an abstract class and in TCPv6 is same method
+// Test for copy TCPTransportDescriptor is not required as it is an abstract class and in TCPv6 is same method
+
+// Test == operator for TCPv4
+TEST_P(TransportTCP, TCPv4_equal_operator)
+{
+    // TCPv4TransportDescriptor
+    TCPv4TransportDescriptor tcpv4_transport_1;
+    TCPv4TransportDescriptor tcpv4_transport_2;
+
+    // Compare equal in defult values
+    ASSERT_EQ(tcpv4_transport_1, tcpv4_transport_2);
+
+    // Modify default values in 1
+    tcpv4_transport_1.set_WAN_address("80.80.99.45");
+
+    ASSERT_FALSE(tcpv4_transport_1 == tcpv4_transport_2); // operator== != operator!=, using operator== == false instead
+
+    // Modify default values in 2
+    tcpv4_transport_2.set_WAN_address("80.80.99.45");
+
+    ASSERT_EQ(tcpv4_transport_1, tcpv4_transport_2);
+}
+
+// Test copy constructor and copy assignment for TCPv4
+TEST_P(TransportTCP, TCPv4_copy)
+{
+    TCPv4TransportDescriptor tcpv4_transport;
+    tcpv4_transport.set_WAN_address("80.80.99.45");
+
+    // Copy constructor
+    TCPv4TransportDescriptor tcpv4_transport_copy_constructor(tcpv4_transport);
+    EXPECT_EQ(tcpv4_transport, tcpv4_transport_copy_constructor);
+
+    // Copy assignment
+    TCPv4TransportDescriptor tcpv4_transport_copy = tcpv4_transport;
+    EXPECT_EQ(tcpv4_transport_copy, tcpv4_transport);
+}
+
+// Test == operator for TCPv6
+TEST_P(TransportTCP, TCPv6_equal_operator)
+{
+    // TCPv6TransportDescriptor
+    TCPv6TransportDescriptor tcpv6_transport_1;
+    TCPv6TransportDescriptor tcpv6_transport_2;
+
+    // Compare equal in defult values
+    ASSERT_EQ(tcpv6_transport_1, tcpv6_transport_2);
+
+    // Modify some default values in 1
+    tcpv6_transport_1.enable_tcp_nodelay = !tcpv6_transport_1.enable_tcp_nodelay; // change default value
+    tcpv6_transport_1.max_logical_port = tcpv6_transport_1.max_logical_port + 10; // change default value
+    tcpv6_transport_1.add_listener_port(123u * 98u);
+
+    ASSERT_FALSE(tcpv6_transport_1 == tcpv6_transport_2); // operator== != operator!=, using operator== == false instead
+
+
+    // Modify some default values in 2
+    tcpv6_transport_2.enable_tcp_nodelay = !tcpv6_transport_2.enable_tcp_nodelay; // change default value
+    tcpv6_transport_2.max_logical_port = tcpv6_transport_2.max_logical_port + 10; // change default value
+    tcpv6_transport_2.add_listener_port(123u * 98u);
+
+    ASSERT_EQ(tcpv6_transport_1, tcpv6_transport_2);
+}
+
+// Test copy constructor and copy assignment for TCPv6
+TEST_P(TransportTCP, TCPv6_copy)
+{
+    // Change some varibles in order to check the non default cretion
+    TCPv6TransportDescriptor tcpv6_transport;
+    tcpv6_transport.enable_tcp_nodelay = !tcpv6_transport.enable_tcp_nodelay; // change default value
+    tcpv6_transport.max_logical_port = tcpv6_transport.max_logical_port + 10; // change default value
+    tcpv6_transport.add_listener_port(123u * 98u);
+
+    // Copy constructor
+    TCPv6TransportDescriptor tcpv6_transport_copy_constructor(tcpv6_transport);
+    EXPECT_EQ(tcpv6_transport, tcpv6_transport_copy_constructor);
+
+    // Copy assignment
+    TCPv6TransportDescriptor tcpv6_transport_copy = tcpv6_transport;
+    EXPECT_EQ(tcpv6_transport_copy, tcpv6_transport);
 }
 
 // Test connection is successfully restablished after dropping and relaunching a TCP client (requester)
@@ -485,3 +601,25 @@ TEST(TransportTCP, Client_reconnection)
     delete replier;
     delete requester;
 }
+
+#ifdef INSTANTIATE_TEST_SUITE_P
+#define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
+#else
+#define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_CASE_P(x, y, z, w)
+#endif // ifdef INSTANTIATE_TEST_SUITE_P
+
+GTEST_INSTANTIATE_TEST_MACRO(TransportTCP,
+        TransportTCP,
+        testing::Combine(testing::Values(TRANSPORT), testing::Values(false, true)),
+        [](const testing::TestParamInfo<TransportTCP::ParamType>& info)
+        {
+            bool ipv6 = std::get<1>(info.param);
+            std::string suffix = ipv6 ? "TCPv6" : "TCPv4";
+            switch (std::get<0>(info.param))
+            {
+                case TRANSPORT:
+                default:
+                    return "Transport" + suffix;
+            }
+
+        });

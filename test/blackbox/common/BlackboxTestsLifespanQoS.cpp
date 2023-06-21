@@ -27,28 +27,50 @@
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-class LifespanQos : public testing::TestWithParam<bool>
+enum communication_type
+{
+    TRANSPORT,
+    INTRAPROCESS,
+    DATASHARING
+};
+
+class LifespanQos : public testing::TestWithParam<communication_type>
 {
 public:
 
     void SetUp() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = true;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
-
     }
 
     void TearDown() override
     {
         LibrarySettingsAttributes library_settings;
-        if (GetParam())
+        switch (GetParam())
         {
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+                xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = false;
+                break;
+            case TRANSPORT:
+            default:
+                break;
         }
     }
 
@@ -61,8 +83,8 @@ TEST_P(LifespanQos, LongLifespan)
     // and checks that those changes can be removed from the history
     // as they should not have been removed due to lifespan QoS
 
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME, false);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME, false);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 1;
@@ -101,10 +123,11 @@ TEST_P(LifespanQos, LongLifespan)
     EXPECT_EQ(removed_pub, writer_samples);
 
     // On the reader side we should be able to take the data
-    HelloWorldType::type msg;
-    EXPECT_EQ(reader.takeNextData(&msg), true);
-    EXPECT_EQ(reader.takeNextData(&msg), true);
-    EXPECT_EQ(reader.takeNextData(&msg), true);
+    HelloWorldPubSubType::type msg;
+    for (uint32_t i = 0; i < writer_samples; ++i)
+    {
+        EXPECT_EQ(reader.take_first_data(&msg), true);
+    }
 }
 
 TEST_P(LifespanQos, ShortLifespan)
@@ -113,8 +136,8 @@ TEST_P(LifespanQos, ShortLifespan)
     // and checks that those samples cannot be removed from the history as
     // they have been removed by lifespan QoS
 
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     // Write rate in milliseconds
     uint32_t writer_sleep_ms = 200;
@@ -148,10 +171,11 @@ TEST_P(LifespanQos, ShortLifespan)
     EXPECT_EQ(removed_pub, 0u);
 
     // On the reader side we should not be able to take the data
-    HelloWorldType::type msg;
-    EXPECT_EQ(reader.takeNextData(&msg), false);
-    EXPECT_EQ(reader.takeNextData(&msg), false);
-    EXPECT_EQ(reader.takeNextData(&msg), false);
+    HelloWorldPubSubType::type msg;
+    for (uint32_t i = 0; i < writer_samples; ++i)
+    {
+        EXPECT_EQ(reader.take_first_data(&msg), false);
+    }
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P
@@ -162,13 +186,20 @@ TEST_P(LifespanQos, ShortLifespan)
 
 GTEST_INSTANTIATE_TEST_MACRO(LifespanQos,
         LifespanQos,
-        testing::Values(false, true),
+        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
         [](const testing::TestParamInfo<LifespanQos::ParamType>& info)
         {
-            if (info.param)
+            switch (info.param)
             {
-                return "Intraprocess";
+                case INTRAPROCESS:
+                    return "Intraprocess";
+                    break;
+                case DATASHARING:
+                    return "Datasharing";
+                    break;
+                case TRANSPORT:
+                default:
+                    return "Transport";
             }
-            return "NonIntraprocess";
-        });
 
+        });

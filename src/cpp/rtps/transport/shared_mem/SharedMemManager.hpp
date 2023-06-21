@@ -20,8 +20,9 @@
 #include <unordered_map>
 
 #include <rtps/transport/shared_mem/SharedMemGlobal.hpp>
-#include <rtps/transport/shared_mem/RobustSharedLock.hpp>
-#include <rtps/transport/shared_mem/SharedMemWatchdog.hpp>
+
+#include <utils/shared_memory/RobustSharedLock.hpp>
+#include <utils/shared_memory/SharedMemWatchdog.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -250,9 +251,21 @@ public:
                       " characters");
         }
 
-        uint32_t extra_size =
-                SharedMemSegment::compute_per_allocation_extra_size(std::alignment_of<BufferNode>::value, domain_name);
-        return std::shared_ptr<SharedMemManager>(new SharedMemManager(domain_name, extra_size));
+        try
+        {
+            uint32_t extra_size =
+                    SharedMemSegment::compute_per_allocation_extra_size(std::alignment_of<BufferNode>::value,
+                            domain_name);
+            return std::shared_ptr<SharedMemManager>(new SharedMemManager(domain_name, extra_size));
+        }
+        catch (const std::exception& e)
+        {
+            logError(RTPS_TRANSPORT_SHM, "Failed to create Shared Memory Manager for domain " << domain_name
+                                                                                              << ": " <<
+                    e.what());
+            return std::shared_ptr<SharedMemManager>();
+        }
+
     }
 
     ~SharedMemManager()
@@ -847,9 +860,11 @@ public:
 
             try
             {
-                ret = global_port_->try_push( {shared_mem_buffer->segment_id(), shared_mem_buffer->node_offset(),
-                                               validity_id},
-                                &are_listeners_active);
+                ret = global_port_->try_push(
+                    SharedMemGlobal::BufferDescriptor{shared_mem_buffer->segment_id(),
+                                                      shared_mem_buffer->node_offset(),
+                                                      validity_id},
+                    &are_listeners_active);
 
                 if (!are_listeners_active)
                 {

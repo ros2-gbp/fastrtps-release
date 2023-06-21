@@ -39,7 +39,12 @@ macro(add_gtest)
             if(NOT "${LINK_LIBRARIES_}" STREQUAL "LINK_LIBRARIES_-NOTFOUND")
                 foreach(LIBRARY_LINKED ${LINK_LIBRARIES_})
                     if(TARGET ${LIBRARY_LINKED})
-                        set(WIN_PATH "$<TARGET_FILE_DIR:${LIBRARY_LINKED}>;${WIN_PATH}")
+                        # Check if is a real target or a target interface
+                        get_target_property(type ${LIBRARY_LINKED} TYPE)
+                        if(NOT type STREQUAL "INTERFACE_LIBRARY")
+                            set(WIN_PATH "$<TARGET_FILE_DIR:${LIBRARY_LINKED}>;${WIN_PATH}")
+                        endif()
+                        unset(type)
                     endif()
                 endforeach()
             endif()
@@ -51,13 +56,20 @@ macro(add_gtest)
         endif()
 
         foreach(GTEST_SOURCE_FILE ${GTEST_SOURCES})
-            file(STRINGS ${GTEST_SOURCE_FILE} GTEST_TEST_NAMES REGEX ^TEST)
+            # Normal tests
+            file(STRINGS ${GTEST_SOURCE_FILE} GTEST_TEST_NAMES REGEX "^([T][Y][P][E][D][_])?TEST")
             foreach(GTEST_TEST_NAME ${GTEST_TEST_NAMES})
+
+                if(GTEST_TEST_NAME MATCHES "TYPED_TEST_SUITE")
+                    continue()
+                endif()
+
                 string(REGEX REPLACE ["\) \(,"] ";" GTEST_TEST_NAME ${GTEST_TEST_NAME})
                 list(GET GTEST_TEST_NAME 1 GTEST_GROUP_NAME)
                 list(GET GTEST_TEST_NAME 3 GTEST_TEST_NAME)
                 add_test(NAME ${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}
-                    COMMAND ${command} --gtest_filter=${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}:*/${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}/*)
+                    COMMAND ${command}
+                    --gtest_filter=${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}:*/${GTEST_GROUP_NAME}.${GTEST_TEST_NAME}/*:${GTEST_GROUP_NAME}/*.${GTEST_TEST_NAME})
 
                 # Add environment
                 set(GTEST_ENVIRONMENT "")
@@ -91,7 +103,12 @@ macro(add_gtest)
             if(NOT "${LINK_LIBRARIES_}" STREQUAL "LINK_LIBRARIES_-NOTFOUND")
                 foreach(LIBRARY_LINKED ${LINK_LIBRARIES_})
                     if(TARGET ${LIBRARY_LINKED})
-                        set(WIN_PATH "$<TARGET_FILE_DIR:${LIBRARY_LINKED}>;${WIN_PATH}")
+                        # Check if is a real target or a target interface
+                        get_target_property(type ${LIBRARY_LINKED} TYPE)
+                        if(NOT type STREQUAL "INTERFACE_LIBRARY")
+                            set(WIN_PATH "$<TARGET_FILE_DIR:${LIBRARY_LINKED}>;${WIN_PATH}")
+                        endif()
+                        unset(type)
                     endif()
                 endforeach()
             endif()

@@ -102,9 +102,11 @@ public:
     /**
      * This method assigns the remote builtin endpoints that the remote RTPSParticipant indicates is using to our local builtin endpoints.
      * @param pdata Pointer to the RTPSParticipantProxyData object.
+     * @param assign_secure_endpoints Whether to try assigning secure endpoints
      */
     void assignRemoteEndpoints(
-            const ParticipantProxyData& pdata) override;
+            const ParticipantProxyData& pdata,
+            bool assign_secure_endpoints) override;
     /**
      * Remove remote endpoints from the endpoint discovery protocol
      * @param pdata Pointer to the ParticipantProxyData to remove
@@ -112,7 +114,7 @@ public:
     void removeRemoteEndpoints(
             ParticipantProxyData* pdata) override;
 
-    //! Verify if the given participant EDP enpoints are matched with us
+    //! Verify whether the given participant EDP endpoints are matched with us
     bool areRemoteEndpointsMatched(
             const ParticipantProxyData* pdata) override;
 
@@ -263,12 +265,6 @@ private:
             const GUID_t& local_writer,
             const ReaderProxyData& remote_reader_data) override;
 #endif // if HAVE_SECURITY
-
-protected:
-
-    std::mutex temp_data_lock_;
-    ReaderProxyData temp_reader_proxy_data_;
-    WriterProxyData temp_writer_proxy_data_;
 };
 
 } /* namespace rtps */

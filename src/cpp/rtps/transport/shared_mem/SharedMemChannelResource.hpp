@@ -16,11 +16,11 @@
 #define _FASTDDS_SHAREDMEM_CHANNEL_RESOURCE_
 
 #include <fastdds/rtps/messages/MessageReceiver.h>
-#include <fastrtps/transport/ChannelResource.h>
 #include <fastrtps/rtps/common/Locator.h>
 
 #include <rtps/transport/shared_mem/SharedMemManager.hpp>
 #include <rtps/transport/shared_mem/SharedMemTransport.h>
+#include <rtps/transport/ChannelResource.h>
 
 namespace eprosima {
 namespace fastdds {
@@ -34,7 +34,7 @@ public:
 
     SharedMemChannelResource(
             std::shared_ptr<SharedMemManager::Listener> listener,
-            const fastrtps::rtps::Locator_t& locator,
+            const Locator& locator,
             TransportReceiverInterface* receiver,
             const std::string& dump_file,
             bool should_init_thread = true)
@@ -96,7 +96,7 @@ public:
         ChannelResource::disable();
     }
 
-    const fastrtps::rtps::Locator_t& locator() const
+    const Locator& locator() const
     {
         return locator_;
     }
@@ -121,9 +121,9 @@ private:
      * @param input_locator - Locator that triggered the creation of the resource
      */
     void perform_listen_operation(
-            fastrtps::rtps::Locator_t input_locator)
+            Locator input_locator)
     {
-        fastrtps::rtps::Locator_t remote_locator;
+        Locator remote_locator;
 
         while (alive())
         {
@@ -164,7 +164,7 @@ private:
 protected:
 
     void init_thread(
-            const fastrtps::rtps::Locator_t& locator)
+            const Locator& locator)
     {
         this->thread(std::thread(&SharedMemChannelResource::perform_listen_operation, this, locator));
     }
@@ -173,9 +173,9 @@ protected:
      * Blocking Receive from the specified channel.
      */
     virtual std::shared_ptr<SharedMemManager::Buffer> Receive(
-            fastrtps::rtps::Locator_t& remote_locator)
+            Locator& remote_locator)
     {
-        (void)remote_locator;
+        remote_locator.kind = LOCATOR_KIND_SHM;
 
         try
         {
@@ -204,7 +204,7 @@ protected:
 private:
 
     bool only_multicast_purpose_;
-    fastrtps::rtps::Locator_t locator_;
+    Locator locator_;
 
     SharedMemChannelResource(
             const SharedMemChannelResource&) = delete;

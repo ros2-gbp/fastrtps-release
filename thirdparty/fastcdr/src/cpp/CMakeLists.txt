@@ -57,7 +57,7 @@ elseif(NOT EPROSIMA_INSTALLER)
     # Define public headers
     target_include_directories(${PROJECT_NAME} PUBLIC
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
-        $<INSTALL_INTERFACE:include>
+        $<INSTALL_INTERFACE:${INCLUDE_INSTALL_DIR}>
         )
 
     if(MSVC OR MSVC_IDE)
@@ -69,9 +69,17 @@ elseif(NOT EPROSIMA_INSTALLER)
         if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
             # Export symbols in DLL library
             target_compile_definitions(${PROJECT_NAME} PUBLIC ${PROJECT_NAME_UPPER}_DYN_LINK)
+            set_target_properties(${PROJECT_NAME} PROPERTIES
+                PDB_NAME_DEBUG "${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+                PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
+            )
         else()
             # Rename the library to have a "lib" before.
             set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME lib${PROJECT_NAME})
+            set_target_properties(${PROJECT_NAME} PROPERTIES
+                COMPILE_PDB_NAME_DEBUG "lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+                COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
+            )
         endif()
 
         # For installing purpose.
@@ -126,6 +134,15 @@ if(UNIX AND EPROSIMA_INSTALLER)
 endif()
 
 # Install libraries
+
+# Generate different target names depending on linking
+get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
+if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
+    set(FASTCDR_LINKING dynamic)
+else()
+    set(FASTCDR_LINKING static)
+endif()
+
 if(MSVC OR MSVC_IDE AND EPROSIMA_INSTALLER)
     if(IS_TOP_LEVEL)
         install_msvc_libraries(i86Win32VS2013)
@@ -142,14 +159,14 @@ if(MSVC OR MSVC_IDE AND EPROSIMA_INSTALLER)
         )
 elseif(NOT EPROSIMA_INSTALLER)
     install(TARGETS ${PROJECT_NAME}
-        EXPORT ${PROJECT_NAME}-targets
+        EXPORT ${PROJECT_NAME}-${FASTCDR_LINKING}-targets
         RUNTIME DESTINATION ${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         LIBRARY DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         ARCHIVE DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         COMPONENT libraries${MSVCARCH_EXTENSION}
         )
 
-    export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-targets.cmake)
+    export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-${FASTCDR_LINKING}-targets.cmake)
 
     if(INSTALLER_PLATFORM)
         set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}-${INSTALLER_PLATFORM}/cmake)
@@ -157,25 +174,31 @@ elseif(NOT EPROSIMA_INSTALLER)
         set(INSTALL_DESTINATION_PATH ${LIB_INSTALL_DIR}/cmake/${PROJECT_NAME}${MSVCARCH_DIR_EXTENSION_EXT})
     endif()
 
-    install(EXPORT ${PROJECT_NAME}-targets
+    install(EXPORT ${PROJECT_NAME}-${FASTCDR_LINKING}-targets
         DESTINATION ${INSTALL_DESTINATION_PATH}
         COMPONENT cmake
         )
 
     if(MSVC OR MSVC_IDE)
-        if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
-            # Install pdb files
-            install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Debug/
+        # first try dll symbols
+        get_target_property(PDB_FILE ${PROJECT_NAME} PDB_NAME_DEBUG)
+        if(PDB_FILE)
+            get_target_property(PDB_DIR ${PROJECT_NAME} PDB_OUTPUT_DIRECTORY_DEBUG)
+            set(PDB_FILE "${PDB_DIR}/${PDB_FILE}.pdb")
+        else()
+            # fallback to static lib symbols
+            get_target_property(PDB_FILE ${PROJECT_NAME} COMPILE_PDB_NAME_DEBUG)
+            if(PDB_FILE)
+                get_target_property(PDB_DIR ${PROJECT_NAME} COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG)
+                set(PDB_FILE "${PDB_DIR}/${PDB_FILE}.pdb")
+            endif()
+        endif()
+
+        # install symbols if any
+        if(PDB_FILE)
+            install(FILES ${PDB_FILE}
                 DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-                COMPONENT libraries${MSVCARCH_EXTENSION}
-                CONFIGURATIONS Debug
-                FILES_MATCHING
-                PATTERN "*.pdb"
-                )
-        elseif(NOT (("${MSVC_ARCH}" STREQUAL "i86Win32VS2013") OR ("${MSVC_ARCH}" STREQUAL "x64Win64VS2013")))
-            install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.dir/Debug/${PROJECT_NAME}.pdb
-                DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-                COMPONENT libraries${MSVCARCH_EXTENSION}
+                COMPONENT symbols
                 CONFIGURATIONS Debug
                 )
         endif()

@@ -20,9 +20,6 @@
 #ifndef _FASTDDS_PARTICIPANTIMPL_HPP_
 #define _FASTDDS_PARTICIPANTIMPL_HPP_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-
-#include <atomic>
-
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/participant/RTPSParticipantListener.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
@@ -31,11 +28,15 @@
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
 #include <fastdds/dds/topic/qos/TopicQos.hpp>
+#include <fastdds/dds/topic/ContentFilteredTopic.hpp>
+#include <fastdds/dds/topic/IContentFilterFactory.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
 
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastrtps/types/TypesBase.h>
+
+#include "fastdds/topic/DDSSQLFilter/DDSFilterFactory.hpp"
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -66,6 +67,7 @@ class PublisherListener;
 class Subscriber;
 class SubscriberImpl;
 class SubscriberListener;
+class ReaderFilterCollection;
 
 /**
  * This is the implementation class of the DomainParticipant.
@@ -75,6 +77,7 @@ class DomainParticipantImpl
 {
     friend class DomainParticipantFactory;
     friend class DomainParticipant;
+    friend class ReaderFilterCollection;
 
 protected:
 
@@ -88,7 +91,7 @@ protected:
 
 public:
 
-    ReturnCode_t enable();
+    virtual ReturnCode_t enable();
 
     ReturnCode_t get_qos(
             DomainParticipantQos& qos) const;
@@ -124,6 +127,20 @@ public:
 
     /**
      * Create a Publisher in this Participant.
+     * @param qos QoS of the Publisher.
+     * @param[out] impl Return a pointer to the created Publisher's implementation.
+     * @param listenerer Pointer to the listener.
+     * @param mask StatusMask
+     * @return Pointer to the created Publisher.
+     */
+    Publisher* create_publisher(
+            const PublisherQos& qos,
+            PublisherImpl** impl,
+            PublisherListener* listener = nullptr,
+            const StatusMask& mask = StatusMask::all());
+
+    /**
+     * Create a Publisher in this Participant.
      * @param profile_name Publisher profile name.
      * @param listener Pointer to the listener.
      * @param mask StatusMask
@@ -135,7 +152,7 @@ public:
             const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_publisher(
-            Publisher* publisher);
+            const Publisher* publisher);
 
     /**
      * Create a Subscriber in this Participant.
@@ -162,7 +179,7 @@ public:
             const StatusMask& mask);
 
     ReturnCode_t delete_subscriber(
-            Subscriber* subscriber);
+            const Subscriber* subscriber);
 
     /**
      * Create a Topic in this Participant.
@@ -197,7 +214,27 @@ public:
             const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_topic(
-            Topic* topic);
+            const Topic* topic);
+
+    ContentFilteredTopic* create_contentfilteredtopic(
+            const std::string& name,
+            Topic* related_topic,
+            const std::string& filter_expression,
+            const std::vector<std::string>& expression_parameters,
+            const char* filter_class_name);
+
+    ReturnCode_t delete_contentfilteredtopic(
+            const ContentFilteredTopic* topic);
+
+    ReturnCode_t register_content_filter_factory(
+            const char* filter_class_name,
+            IContentFilterFactory* const filter_factory);
+
+    IContentFilterFactory* lookup_content_filter_factory(
+            const char* filter_class_name);
+
+    ReturnCode_t unregister_content_filter_factory(
+            const char* filter_class_name);
 
     /**
      * Looks up an existing, locally created @ref TopicDescription, based on its name.
@@ -236,27 +273,27 @@ public:
 
     /* TODO
        bool ignore_participant(
-            const fastrtps::rtps::InstanceHandle_t& handle);
+            const InstanceHandle_t& handle);
      */
 
     /* TODO
        bool ignore_topic(
-            const fastrtps::rtps::InstanceHandle_t& handle);
+            const InstanceHandle_t& handle);
      */
 
     /* TODO
        bool ignore_publication(
-            const fastrtps::rtps::InstanceHandle_t& handle);
+            const InstanceHandle_t& handle);
      */
 
     /* TODO
        bool ignore_subscription(
-            const fastrtps::rtps::InstanceHandle_t& handle);
+            const InstanceHandle_t& handle);
      */
 
     DomainId_t get_domain_id() const;
 
-    // TODO bool delete_contained_entities();
+    ReturnCode_t delete_contained_entities();
 
     ReturnCode_t assert_liveliness();
 
@@ -295,28 +332,28 @@ public:
 
     /* TODO
        bool get_discovered_participants(
-            std::vector<fastrtps::rtps::InstanceHandle_t>& participant_handles) const;
+            std::vector<InstanceHandle_t>& participant_handles) const;
      */
 
     /* TODO
        bool get_discovered_participant_data(
             ParticipantBuiltinTopicData& participant_data,
-            const fastrtps::rtps::InstanceHandle_t& participant_handle) const;
+            const InstanceHandle_t& participant_handle) const;
      */
 
     /* TODO
        bool get_discovered_topics(
-            std::vector<fastrtps::rtps::InstanceHandle_t>& topic_handles) const;
+            std::vector<InstanceHandle_t>& topic_handles) const;
      */
 
     /* TODO
        bool get_discovered_topic_data(
             TopicBuiltinTopicData& topic_data,
-            const fastrtps::rtps::InstanceHandle_t& topic_handle) const;
+            const InstanceHandle_t& topic_handle) const;
      */
 
     bool contains_entity(
-            const fastrtps::rtps::InstanceHandle_t& handle,
+            const InstanceHandle_t& handle,
             bool recursive = true) const;
 
     ReturnCode_t get_current_time(
@@ -339,7 +376,7 @@ public:
     const TypeSupport find_type(
             const std::string& type_name) const;
 
-    const fastrtps::rtps::InstanceHandle_t& get_instance_handle() const;
+    const InstanceHandle_t& get_instance_handle() const;
 
     // From here legacy RTPS methods.
 
@@ -348,7 +385,7 @@ public:
     std::vector<std::string> get_participant_names() const;
 
     /**
-     * This method can be used when using a StaticEndpointDiscovery mechanism differnet that the one
+     * This method can be used when using a StaticEndpointDiscovery mechanism different that the one
      * included in FastRTPS, for example when communicating with other implementations.
      * It indicates the Participant that an Endpoint from the XML has been discovered and
      * should be activated.
@@ -376,7 +413,7 @@ public:
             std::function<void(const std::string& name, const fastrtps::types::DynamicType_ptr type)>& callback);
 
     //! Remove all listeners in the hierarchy to allow a quiet destruction
-    void disable();
+    virtual void disable();
 
     /**
      * This method checks if the DomainParticipant has created an entity that has not been
@@ -392,6 +429,11 @@ public:
      */
     DomainParticipantListener* get_listener_for(
             const StatusMask& status);
+
+    uint32_t& id_counter()
+    {
+        return id_counter_;
+    }
 
 protected:
 
@@ -421,14 +463,14 @@ protected:
 
     //!Publisher maps
     std::map<Publisher*, PublisherImpl*> publishers_;
-    std::map<fastrtps::rtps::InstanceHandle_t, Publisher*> publishers_by_handle_;
+    std::map<InstanceHandle_t, Publisher*> publishers_by_handle_;
     mutable std::mutex mtx_pubs_;
 
     PublisherQos default_pub_qos_;
 
     //!Subscriber maps
     std::map<Subscriber*, SubscriberImpl*> subscribers_;
-    std::map<fastrtps::rtps::InstanceHandle_t, Subscriber*> subscribers_by_handle_;
+    std::map<InstanceHandle_t, Subscriber*> subscribers_by_handle_;
     mutable std::mutex mtx_subs_;
 
     SubscriberQos default_sub_qos_;
@@ -439,7 +481,10 @@ protected:
 
     //!Topic map
     std::map<std::string, TopicImpl*> topics_;
-    std::map<fastrtps::rtps::InstanceHandle_t, Topic*> topics_by_handle_;
+    std::map<InstanceHandle_t, Topic*> topics_by_handle_;
+    std::map<std::string, std::unique_ptr<ContentFilteredTopic>> filtered_topics_;
+    std::map<std::string, IContentFilterFactory*> filter_factories_;
+    DDSSQLFilter::DDSFilterFactory dds_sql_filter_factory_;
     mutable std::mutex mtx_topics_;
 
     TopicQos default_topic_qos_;
@@ -458,6 +503,8 @@ protected:
 
     // All parent's child requests
     std::map<fastrtps::rtps::SampleIdentity, std::vector<fastrtps::rtps::SampleIdentity>> parent_requests_;
+
+    uint32_t id_counter_ = 0;
 
     class MyRTPSParticipantListener : public fastrtps::rtps::RTPSParticipantListener
     {
@@ -516,10 +563,7 @@ protected:
     rtps_listener_;
 
     void create_instance_handle(
-            fastrtps::rtps::InstanceHandle_t& handle);
-
-    bool exists_entity_id(
-            const fastrtps::rtps::EntityId_t& entity_id) const;
+            InstanceHandle_t& handle);
 
     ReturnCode_t register_dynamic_type(
             fastrtps::types::DynamicType_ptr dyn_type);
@@ -536,6 +580,14 @@ protected:
     bool check_get_dependencies_request(
             const fastrtps::rtps::SampleIdentity& requestId,
             const fastrtps::types::TypeIdentifierWithSizeSeq& dependencies);
+
+    virtual PublisherImpl* create_publisher_impl(
+            const PublisherQos& qos,
+            PublisherListener* listener);
+
+    virtual SubscriberImpl* create_subscriber_impl(
+            const SubscriberQos& qos,
+            SubscriberListener* listener);
 
     // Always call it with the mutex already taken
     void remove_parent_request(
@@ -557,7 +609,20 @@ protected:
     std::string get_inner_type_name(
             const fastrtps::rtps::SampleIdentity& id) const;
 
-    static void set_qos(
+    IContentFilterFactory* find_content_filter_factory(
+            const char* filter_class_name);
+
+    /**
+     * Set the DomainParticipantQos checking if the Qos can be updated or not
+     *
+     * @param to DomainParticipantQos to be updated
+     * @param from DomainParticipantQos desired
+     * @param first_time Whether the DomainParticipant has been already initialized or not
+     *
+     * @return true if there has been a changed in one of the attributes that can be updated.
+     * false otherwise.
+     */
+    static bool set_qos(
             DomainParticipantQos& to,
             const DomainParticipantQos& from,
             bool first_time);

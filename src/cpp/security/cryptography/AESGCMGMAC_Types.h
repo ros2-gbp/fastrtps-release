@@ -26,8 +26,10 @@
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <fastdds/rtps/security/accesscontrol/EndpointSecurityAttributes.h>
 
-#include <mutex>
+#include <cassert>
+#include <functional>
 #include <limits>
+#include <mutex>
 
 // Fix compilation error on Windows
 #if defined(WIN32) && defined(max)
@@ -61,7 +63,7 @@ constexpr CryptoTransformKind c_transfrom_kind_aes256_gmac = CRYPTO_TRANSFORMATI
 constexpr CryptoTransformKind c_transfrom_kind_aes256_gcm = CRYPTO_TRANSFORMATION_KIND_AES256_GCM;
 
 constexpr std::array<uint8_t, 32> c_empty_key_material =
-{ {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, } };
+{ {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} };
 
 /* Key Storage
  * -----------
@@ -86,6 +88,7 @@ struct KeyMaterial_AES_GCM_GMAC
 };
 
 typedef std::vector<KeyMaterial_AES_GCM_GMAC> KeyMaterial_AES_GCM_GMAC_Seq;
+
 /* SecureSubMessageElements
  * ------------------------
  */
@@ -134,31 +137,17 @@ struct SecureDataTag
 
 struct KeySessionData
 {
-    uint32_t session_id;
-    std::array<uint8_t, 32> SessionKey;
-    uint64_t session_block_counter;
-
-    KeySessionData()
-        : session_id(std::numeric_limits<uint32_t>::max())
-        , session_block_counter(0)
-    {
-    }
-
+    uint32_t session_id = std::numeric_limits<uint32_t>::max();
+    std::array<uint8_t, 32> SessionKey = c_empty_key_material;
+    uint64_t session_block_counter = 0;
 };
 
-class EntityKeyHandle
+struct EntityKeyHandle
 {
-public:
-
-    EntityKeyHandle()
-    {
-    }
-
-    ~EntityKeyHandle()
-    {
-    }
-
     static const char* const class_id_;
+
+    // Reference to an auxiliary exception object on destruction
+    SecurityException* exception_ = {nullptr};
 
     //Plugin security options
     PluginEndpointSecurityAttributesMask EndpointPluginAttributes = 0;
@@ -166,7 +155,7 @@ public:
     KeyMaterial_AES_GCM_GMAC_Seq EntityKeyMaterial;
     //KeyId of the master_key of the parent Participant and pointer to the relevant CryptoHandle
     CryptoTransformKeyId Participant_master_key_id = c_transformKeyIdZero;
-    ParticipantCryptoHandle* Parent_participant = nullptr;
+    std::weak_ptr<ParticipantCryptoHandle> Parent_participant;
 
     //(Direct) ReceiverSpecific Keys - Inherently hold the master_key of the writer
     KeyMaterial_AES_GCM_GMAC_Seq Entity2RemoteKeyMaterial;
@@ -180,24 +169,19 @@ public:
     uint64_t max_blocks_per_session = 0;
     std::mutex mutex_;
 };
-typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_WriterCryptoHandle;
-typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_ReaderCryptoHandle;
-typedef HandleImpl<EntityKeyHandle> AESGCMGMAC_EntityCryptoHandle;
 
+class AESGCMGMAC_KeyFactory;
 
-class ParticipantKeyHandle
+typedef HandleImpl<EntityKeyHandle, AESGCMGMAC_KeyFactory> AESGCMGMAC_WriterCryptoHandle;
+typedef HandleImpl<EntityKeyHandle, AESGCMGMAC_KeyFactory> AESGCMGMAC_ReaderCryptoHandle;
+typedef HandleImpl<EntityKeyHandle, AESGCMGMAC_KeyFactory> AESGCMGMAC_EntityCryptoHandle;
+
+struct ParticipantKeyHandle
 {
-public:
-
-    ParticipantKeyHandle()
-    {
-    }
-
-    ~ParticipantKeyHandle()
-    {
-    }
-
     static const char* const class_id_;
+
+    // Reference to an auxiliary exception object on destruction
+    SecurityException* exception_ = {nullptr};
 
     //Plugin security options
     PluginParticipantSecurityAttributesMask ParticipantPluginAttributes = 0;
@@ -210,19 +194,17 @@ public:
     //(Reverse) ReceiverSpecific Keys - Inherently hold the master_key of the remote readers
     std::vector<KeyMaterial_AES_GCM_GMAC> RemoteParticipant2ParticipantKeyMaterial;
     //List of Pointers to the CryptoHandles of all matched Writers
-    std::vector<DatawriterCryptoHandle*> Writers;
+    std::vector<std::shared_ptr<DatawriterCryptoHandle>> Writers;
     //List of Pointers to the CryptoHandles of all matched Readers
-    std::vector<DatareaderCryptoHandle*> Readers;
+    std::vector<std::shared_ptr<DatareaderCryptoHandle>> Readers;
 
     //Data used to store the current session keys and to determine when it has to be updated
-    uint32_t session_id = std::numeric_limits<uint32_t>::max();
-    std::array<uint8_t, 32> SessionKey;
-    uint64_t session_block_counter = 0;
-    uint64_t max_blocks_per_session = 0;
+    KeySessionData Session;
+    uint64_t max_blocks_per_session = {0};
     std::mutex mutex_;
 };
 
-typedef HandleImpl<ParticipantKeyHandle> AESGCMGMAC_ParticipantCryptoHandle;
+typedef HandleImpl<ParticipantKeyHandle, AESGCMGMAC_KeyFactory> AESGCMGMAC_ParticipantCryptoHandle;
 
 } //namespaces security
 } //namespace rtps

@@ -32,6 +32,8 @@
 
 #include <fastrtps/attributes/SubscriberAttributes.h>
 
+#include <atomic>
+#include <condition_variable>
 #include <map>
 
 class HelloWorldSubscriber
@@ -48,9 +50,12 @@ public:
     //!RUN the subscriber
     void run();
 
-    //!Run the subscriber until number samples have been recevied.
+    //!Run the subscriber until number samples have been received.
     void run(
             uint32_t number);
+
+    //! Initialize all required entities for data transmission
+    void initialize_entities();
 
 private:
 
@@ -73,7 +78,7 @@ public:
     class SubListener
         :  public eprosima::fastdds::dds::DomainParticipantListener
     {
-public:
+    public:
 
         SubListener(
                 HelloWorldSubscriber* sub)
@@ -106,9 +111,18 @@ public:
 
         uint32_t n_samples;
 
+        std::mutex types_mx_;
+
+        std::condition_variable types_cv_;
+
+        eprosima::fastrtps::types::DynamicType_ptr received_type_;
+
+        std::atomic<bool> reception_flag_{false};
+
         HelloWorldSubscriber* subscriber_;
 
-    } m_listener;
+    }
+    m_listener;
 
 };
 

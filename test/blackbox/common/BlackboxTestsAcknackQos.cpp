@@ -22,10 +22,12 @@
 #include <gtest/gtest.h>
 
 #include <fastrtps/utils/TimeConversion.h>
-#include <fastrtps/transport/test_UDPv4Transport.h>
+#include <rtps/transport/test_UDPv4Transport.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
+using test_UDPv4Transport = eprosima::fastdds::rtps::test_UDPv4Transport;
+using test_UDPv4TransportDescriptor = eprosima::fastdds::rtps::test_UDPv4TransportDescriptor;
 
 TEST(AcknackQos, RecoverAfterLosingCommunicationWithDisablePositiveAck)
 {
@@ -34,8 +36,8 @@ TEST(AcknackQos, RecoverAfterLosingCommunicationWithDisablePositiveAck)
     // Then disconnects the communication and sends some more samples.
     // Reconnects and checks that the reader receives only the lost samples by the disconnection.
 
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     // Number of samples written by writer
     uint32_t writer_samples = 15;
@@ -100,8 +102,8 @@ TEST(AcknackQos, NotRecoverAfterLosingCommunicationWithDisablePositiveAck)
     // Then disconnects the communication and sends some more samples.
     // Reconnects and checks that the reader receives only the lost samples by the disconnection.
 
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
 
     // Number of samples written by writer
     uint32_t writer_samples = 15;

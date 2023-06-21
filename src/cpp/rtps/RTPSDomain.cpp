@@ -18,28 +18,34 @@
 
 #include <fastdds/rtps/RTPSDomain.h>
 
-#include <fastdds/dds/log/Log.hpp>
+#include <chrono>
+#include <cstdlib>
+#include <regex>
+#include <string>
+#include <thread>
 
+#include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/history/WriterHistory.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/reader/RTPSReader.h>
 #include <fastdds/rtps/writer/RTPSWriter.h>
 
-#include <fastdds/rtps/transport/UDPv4Transport.h>
-#include <fastdds/rtps/transport/UDPv6Transport.h>
-#include <fastdds/rtps/transport/test_UDPv4Transport.h>
+#include <rtps/transport/UDPv4Transport.h>
+#include <rtps/transport/UDPv6Transport.h>
+#include <rtps/transport/test_UDPv4Transport.h>
 
+#include <fastrtps/utils/IPFinder.h>
+#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/utils/System.h>
+#include <fastrtps/utils/md5.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
-
 #include <rtps/RTPSDomainImpl.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <rtps/common/GuidUtils.hpp>
+#include <utils/Host.hpp>
+#include <utils/SystemInfo.hpp>
 
-#include <chrono>
-#include <thread>
-#include <cstdlib>
-#include <regex>
 
 namespace eprosima {
 namespace fastrtps {
@@ -52,20 +58,19 @@ static void guid_prefix_create(
     eprosima::fastdds::rtps::GuidUtils::instance().guid_prefix_create(ID, guidP);
 }
 
-// environment variables that forces server-client discovery
-// it must contain a list of UDPv4 locators separated by ;
-// the position in the list defines the default server that listens on the locator
-const char* const DEFAULT_ROS2_MASTER_URI = "ROS_DISCOVERY_SERVER";
-
 std::mutex RTPSDomain::m_mutex;
 std::atomic<uint32_t> RTPSDomain::m_maxRTPSParticipantID(1);
 std::vector<RTPSDomain::t_p_RTPSParticipant> RTPSDomain::m_RTPSParticipants;
 std::set<uint32_t> RTPSDomain::m_RTPSParticipantIDs;
+FileWatchHandle RTPSDomainImpl::file_watch_handle_;
 
 void RTPSDomain::stopAll()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
     logInfo(RTPS_PARTICIPANT, "DELETING ALL ENDPOINTS IN THIS DOMAIN");
+
+    // Stop monitoring environment file
+    SystemInfo::stop_watching_file(RTPSDomainImpl::file_watch_handle_);
 
     while (m_RTPSParticipants.size() > 0)
     {
@@ -108,6 +113,21 @@ RTPSParticipant* RTPSDomain::createParticipant(
         return nullptr;
     }
 
+    // Only the first time, initialize environment file watch if the corresponding environment variable is set
+    if (!RTPSDomainImpl::file_watch_handle_)
+    {
+        std::string filename = SystemInfo::get_environment_file();
+        if (!filename.empty() && SystemInfo::file_exists(filename))
+        {
+            // Create filewatch
+            RTPSDomainImpl::file_watch_handle_ = SystemInfo::watch_file(filename, RTPSDomainImpl::file_watch_callback);
+        }
+        else if (!filename.empty())
+        {
+            logWarning(RTPS_PARTICIPANT, filename + " does not exist. File watching not initialized.");
+        }
+    }
+
     uint32_t ID;
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -143,8 +163,6 @@ RTPSParticipant* RTPSDomain::createParticipant(
     }
 
     PParam.participantID = ID;
-    LocatorList_t loc;
-    IPFinder::getIP4Address(&loc);
 
     // Generate a new GuidPrefix_t
     GuidPrefix_t guidP;
@@ -164,17 +182,33 @@ RTPSParticipant* RTPSDomain::createParticipant(
         pimpl = new RTPSParticipantImpl(domain_id, PParam, guidP, p, listen);
     }
 
+    // Check implementation was correctly initialized
+    if (!pimpl->is_initialized())
+    {
+        logError(RTPS_PARTICIPANT, "Cannot create participant due to initialization error");
+        delete pimpl;
+        return nullptr;
+    }
+
     // Above constructors create the sender resources. If a given listening port cannot be allocated an iterative
-    // mechanism will allocate another by default. Change the default listening port is unacceptable for server
-    // discovery.
+    // mechanism will allocate another by default. Change the default listening port is unacceptable for
+    // discovery server Participant.
     if ((PParam.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol_t::SERVER
             || PParam.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol_t::BACKUP)
             && pimpl->did_mutation_took_place_on_meta(
                 PParam.builtin.metatrafficMulticastLocatorList,
                 PParam.builtin.metatrafficUnicastLocatorList))
     {
-        // we do not log an error because the library may use participant creation as a trial for server existence
-        logInfo(RTPS_PARTICIPANT, "Server wasn't able to allocate the specified listening port");
+        if (PParam.builtin.metatrafficMulticastLocatorList.empty() &&
+                PParam.builtin.metatrafficUnicastLocatorList.empty())
+        {
+            logError(RTPS_PARTICIPANT, "Discovery Server requires to specify a listening address.");
+        }
+        else
+        {
+            logError(RTPS_PARTICIPANT, "Discovery Server wasn't able to allocate the specified listening port.");
+        }
+
         delete pimpl;
         return nullptr;
     }
@@ -186,16 +220,6 @@ RTPSParticipant* RTPSDomain::createParticipant(
         delete pimpl;
         return nullptr;
     }
-
-#if HAVE_SECURITY
-    // Check security was correctly initialized
-    if (!pimpl->is_security_initialized())
-    {
-        logError(RTPS_PARTICIPANT, "Cannot create participant due to security initialization error");
-        delete pimpl;
-        return nullptr;
-    }
-#endif // if HAVE_SECURITY
 
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -215,6 +239,7 @@ bool RTPSDomain::removeRTPSParticipant(
 {
     if (p != nullptr)
     {
+        assert((p->mp_impl != nullptr) && "This participant has been previously invalidated");
         p->mp_impl->disable();
 
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -238,6 +263,8 @@ bool RTPSDomain::removeRTPSParticipant(
 void RTPSDomain::removeRTPSParticipant_nts(
         RTPSDomain::t_p_RTPSParticipant& participant)
 {
+    // The destructor of RTPSParticipantImpl already deletes the associated RTPSParticipant and sets
+    // its pointer to the RTPSParticipant to nullptr, so there is no need to do it here manually.
     delete(participant.second);
 }
 
@@ -280,6 +307,49 @@ RTPSWriter* RTPSDomain::createRTPSWriter(
     return nullptr;
 }
 
+RTPSWriter* RTPSDomain::createRTPSWriter(
+        RTPSParticipant* p,
+        const EntityId_t& entity_id,
+        WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+{
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
+    {
+        RTPSWriter* ret_val = nullptr;
+        if (impl->createWriter(&ret_val, watt, payload_pool, hist, listen, entity_id))
+        {
+            return ret_val;
+        }
+    }
+
+    return nullptr;
+}
+
+RTPSWriter* RTPSDomainImpl::create_rtps_writer(
+        RTPSParticipant* p,
+        const EntityId_t& entity_id,
+        WriterAttributes& watt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        const std::shared_ptr<IChangePool>& change_pool,
+        WriterHistory* hist,
+        WriterListener* listen)
+{
+    RTPSParticipantImpl* impl = RTPSDomainImpl::find_local_participant(p->getGuid());
+    if (impl)
+    {
+        RTPSWriter* ret_val = nullptr;
+        if (impl->create_writer(&ret_val, watt, payload_pool, change_pool, hist, listen, entity_id))
+        {
+            return ret_val;
+        }
+    }
+
+    return nullptr;
+}
+
 bool RTPSDomain::removeRTPSWriter(
         RTPSWriter* writer)
 {
@@ -292,7 +362,7 @@ bool RTPSDomain::removeRTPSWriter(
             {
                 t_p_RTPSParticipant participant = *it;
                 lock.unlock();
-                return participant.second->deleteUserEndpoint((Endpoint*)writer);
+                return participant.second->deleteUserEndpoint(writer->getGuid());
             }
         }
     }
@@ -336,6 +406,26 @@ RTPSReader* RTPSDomain::createRTPSReader(
     return nullptr;
 }
 
+RTPSReader* RTPSDomain::createRTPSReader(
+        RTPSParticipant* p,
+        const EntityId_t& entity_id,
+        ReaderAttributes& ratt,
+        const std::shared_ptr<IPayloadPool>& payload_pool,
+        ReaderHistory* rhist,
+        ReaderListener* rlisten)
+{
+    RTPSParticipantImpl* impl = p->mp_impl;
+    if (impl)
+    {
+        RTPSReader* reader;
+        if (impl->createReader(&reader, ratt, payload_pool, rhist, rlisten, entity_id))
+        {
+            return reader;
+        }
+    }
+    return nullptr;
+}
+
 bool RTPSDomain::removeRTPSReader(
         RTPSReader* reader)
 {
@@ -348,7 +438,7 @@ bool RTPSDomain::removeRTPSReader(
             {
                 t_p_RTPSParticipant participant = *it;
                 lock.unlock();
-                return participant.second->deleteUserEndpoint((Endpoint*)reader);
+                return participant.second->deleteUserEndpoint(reader->getGuid());
             }
         }
     }
@@ -361,23 +451,6 @@ RTPSParticipant* RTPSDomain::clientServerEnvironmentCreationOverride(
         const RTPSParticipantAttributes& att,
         RTPSParticipantListener* listen /*= nullptr*/)
 {
-    // retrieve the environment variable value
-    std::string list;
-    {
-#pragma warning(suppress:4996)
-        const char* data = std::getenv(DEFAULT_ROS2_MASTER_URI);
-
-        if (nullptr != data)
-        {
-            list = data;
-        }
-        else
-        {
-            // if the variable is not set abort the server-client default setup
-            return nullptr;
-        }
-    }
-
     // Check the specified discovery protocol: if other than simple it has priority over ros environment variable
     if (att.builtin.discovery_config.discoveryProtocol != DiscoveryProtocol_t::SIMPLE)
     {
@@ -390,9 +463,9 @@ RTPSParticipant* RTPSDomain::clientServerEnvironmentCreationOverride(
     RTPSParticipantAttributes client_att(att);
 
     // Retrieve the info from the environment variable
-    if (!load_environment_server_info(
-                list,
-                client_att.builtin.discovery_config.m_DiscoveryServers))
+    // TODO(jlbueno) This should be protected with the PDP mutex.
+    if (load_environment_server_info(client_att.builtin.discovery_config.m_DiscoveryServers) &&
+            client_att.builtin.discovery_config.m_DiscoveryServers.empty())
     {
         // it's not an error, the environment variable may not be set. Any issue with environment
         // variable syntax is logError already
@@ -410,6 +483,7 @@ RTPSParticipant* RTPSDomain::clientServerEnvironmentCreationOverride(
     {
         // client successfully created
         logInfo(DOMAIN, "Auto default server-client setup. Default client created.");
+        part->mp_impl->client_override(true);
         return part;
     }
 
@@ -521,6 +595,18 @@ bool RTPSDomainImpl::should_intraprocess_between(
     }
 
     return false;
+}
+
+void RTPSDomainImpl::file_watch_callback()
+{
+    // Ensure that all changes have been saved by the OS
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // For all RTPSParticipantImpl registered in the RTPSDomain, call RTPSParticipantImpl::environment_file_has_changed
+    std::lock_guard<std::mutex> guard(RTPSDomain::m_mutex);
+    for (auto participant : RTPSDomain::m_RTPSParticipants)
+    {
+        participant.second->environment_file_has_changed();
+    }
 }
 
 } // namespace rtps

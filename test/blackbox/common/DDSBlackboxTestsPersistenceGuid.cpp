@@ -23,20 +23,57 @@
 #include <thread>
 
 #include <gtest/gtest.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastdds::dds;
 
-class PersistenceGuid : public ::testing::TestWithParam<bool>
+enum communication_type
+{
+    TRANSPORT,
+    INTRAPROCESS,
+    DATASHARING
+};
+
+class PersistenceGuid : public ::testing::TestWithParam<communication_type>
 {
 protected:
 
-    virtual void SetUp()
+    void SetUp() override
     {
+        eprosima::fastrtps::LibrarySettingsAttributes library_settings;
+        switch (GetParam())
+        {
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery =
+                        eprosima::fastrtps::IntraprocessDeliveryType::INTRAPROCESS_FULL;
+                eprosima::fastrtps::xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = true;
+                break;
+            case TRANSPORT:
+            default:
+                break;
+        }
     }
 
-    virtual void TearDown()
+    void TearDown() override
     {
+        eprosima::fastrtps::LibrarySettingsAttributes library_settings;
+        switch (GetParam())
+        {
+            case INTRAPROCESS:
+                library_settings.intraprocess_delivery = eprosima::fastrtps::IntraprocessDeliveryType::INTRAPROCESS_OFF;
+                eprosima::fastrtps::xmlparser::XMLProfileManager::library_settings(library_settings);
+                break;
+            case DATASHARING:
+                enable_datasharing = false;
+                break;
+            case TRANSPORT:
+            default:
+                break;
+        }
         std::remove("persistence.db");
     }
 
@@ -63,7 +100,7 @@ TEST_P(PersistenceGuid, SetPersistenceGuidThroughDDSLayer)
     writer_policy.properties().emplace_back("dds.persistence.guid", "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64");
 
     // Create DataWriter and configure the durability and reliability QoS
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
     writer.entity_property_policy(writer_policy);
     writer.durability_kind(TRANSIENT_DURABILITY_QOS);
     writer.reliability(RELIABLE_RELIABILITY_QOS);
@@ -78,7 +115,7 @@ TEST_P(PersistenceGuid, SetPersistenceGuidThroughDDSLayer)
     reader_policy.properties().emplace_back("dds.persistence.guid", "77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65");
 
     // Create DataReader and configure the durability and reliability QoS
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
     reader.entity_property_policy(reader_policy);
     reader.durability_kind(TRANSIENT_DURABILITY_QOS);
     reader.reliability(RELIABLE_RELIABILITY_QOS);
@@ -136,7 +173,7 @@ TEST_P(PersistenceGuid, SetPersistenceGuidThroughDDSLayer)
 TEST_P(PersistenceGuid, SetPersistenceGuidByXML)
 {
     // Create DataWriter using XML Profile
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
     writer.set_xml_filename("persistence.xml");
     writer.set_participant_profile("persistence_participant");
     writer.set_datawriter_profile("persistence_data_writer");
@@ -145,7 +182,7 @@ TEST_P(PersistenceGuid, SetPersistenceGuidByXML)
     ASSERT_TRUE(writer.isInitialized());
 
     // Create DataReader using XML Profile
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
     reader.set_xml_filename("persistence.xml");
     reader.set_participant_profile("persistence_participant");
     reader.set_datareader_profile("persistence_data_reader");
@@ -211,7 +248,7 @@ TEST_P(PersistenceGuid, SetPersistenceForTransientLocal)
     writer_policy.properties().emplace_back("dds.persistence.guid", "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64");
 
     // Create DataWriter and configure the durability and reliability QoS
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
     writer.property_policy(participant_policy);
     writer.entity_property_policy(writer_policy);
     writer.durability_kind(TRANSIENT_LOCAL_DURABILITY_QOS);
@@ -225,7 +262,7 @@ TEST_P(PersistenceGuid, SetPersistenceForTransientLocal)
     reader_policy.properties().emplace_back("dds.persistence.guid", "77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65");
 
     // Create DataReader and configure the durability and reliability QoS
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
     reader.property_policy(participant_policy);
     reader.entity_property_policy(reader_policy);
     reader.durability_kind(TRANSIENT_LOCAL_DURABILITY_QOS);
@@ -292,7 +329,7 @@ TEST_P(PersistenceGuid, NoSetPersistenceForTransientLocal)
     writer_policy.properties().emplace_back("dds.persistence.guid", "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64");
 
     // Create DataWriter and configure the durability and reliability QoS
-    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
     writer.property_policy(participant_policy);
     writer.entity_property_policy(writer_policy);
     writer.durability_kind(TRANSIENT_LOCAL_DURABILITY_QOS);
@@ -306,7 +343,7 @@ TEST_P(PersistenceGuid, NoSetPersistenceForTransientLocal)
     reader_policy.properties().emplace_back("dds.persistence.guid", "77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65");
 
     // Create DataReader and configure the durability and reliability QoS
-    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
     reader.property_policy(participant_policy);
     reader.entity_property_policy(reader_policy);
     reader.durability_kind(TRANSIENT_LOCAL_DURABILITY_QOS);
@@ -357,13 +394,21 @@ TEST_P(PersistenceGuid, NoSetPersistenceForTransientLocal)
 
 GTEST_INSTANTIATE_TEST_MACRO(PersistenceGuid,
         PersistenceGuid,
-        testing::Values(false, true),
+        testing::Values(TRANSPORT, INTRAPROCESS, DATASHARING),
         [](const testing::TestParamInfo<PersistenceGuid::ParamType>& info)
         {
-            if (info.param)
+            switch (info.param)
             {
-                return "Intraprocess";
+                case INTRAPROCESS:
+                    return "Intraprocess";
+                    break;
+                case DATASHARING:
+                    return "Datasharing";
+                    break;
+                case TRANSPORT:
+                default:
+                    return "Transport";
             }
-            return "NonIntraprocess";
+
         });
 #endif // if HAVE_SQLITE3

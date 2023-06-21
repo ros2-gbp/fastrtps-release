@@ -16,6 +16,7 @@ cmake_minimum_required(VERSION 2.8.12)
 
 if(NOT CMAKE_VERSION VERSION_LESS 3.0)
     cmake_policy(SET CMP0048 NEW)
+    cmake_policy(SET CMP0028 NEW) 
 endif()
 
 project("HelloWorldExampleTCP")
@@ -51,11 +52,15 @@ file(GLOB DDS_TCP_HELLOWORLD_EXAMPLE_SOURCES_CPP "*.cpp")
 configure_file("HelloWorldSubscriber.xml" "HelloWorldSubscriber.xml" COPYONLY)
 configure_file("HelloWorldPublisher.xml" "HelloWorldPublisher.xml" COPYONLY)
 configure_file("dh2048.pem" "dh2048.pem" COPYONLY)
-configure_file("server.pem" "server.pem" COPYONLY)
-configure_file("ca.pem" "ca.pem" COPYONLY)
-
+configure_file("serverkey.pem" "serverkey.pem" COPYONLY)
+configure_file("servercert.pem" "servercert.pem" COPYONLY)
+configure_file("cacert.pem" "cacert.pem" COPYONLY)
 
 add_executable(DDSHelloWorldExampleTCP ${DDS_TCP_HELLOWORLD_EXAMPLE_SOURCES_CXX} ${DDS_TCP_HELLOWORLD_EXAMPLE_SOURCES_CPP})
-target_link_libraries(DDSHelloWorldExampleTCP fastrtps fastcdr foonathan_memory)
+target_compile_definitions(DDSHelloWorldExampleTCP PRIVATE
+    $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
+    $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
+    )
+target_link_libraries(DDSHelloWorldExampleTCP fastrtps fastcdr foonathan_memory fastdds::optionparser)
 install(TARGETS DDSHelloWorldExampleTCP
     RUNTIME DESTINATION examples/C++/DDS/HelloWorldExampleTCP/${BIN_INSTALL_DIR})
