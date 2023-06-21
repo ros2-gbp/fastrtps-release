@@ -506,6 +506,7 @@ public:
     bool send_sample(
             type& msg)
     {
+        default_send_print(msg);
         return datawriter_->write((void*)&msg);
     }
 
@@ -1467,6 +1468,13 @@ public:
     }
 
 #endif // if HAVE_SQLITE3
+
+    PubSubWriter& use_writer_liveliness_protocol(
+            bool use_wlp)
+    {
+        participant_qos_.wire_protocol().builtin.use_WriterLivelinessProtocol = use_wlp;
+        return *this;
+    }
 
 protected:
 
