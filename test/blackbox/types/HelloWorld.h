@@ -23,6 +23,8 @@
 #define _FAST_DDS_GENERATED_HELLOWORLD_H_
 
 
+#include <fastrtps/utils/fixed_size_string.hpp>
+
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -42,16 +44,16 @@
 
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
-#if defined(HelloWorld_SOURCE)
-#define HelloWorld_DllAPI __declspec( dllexport )
+#if defined(HELLOWORLD_SOURCE)
+#define HELLOWORLD_DllAPI __declspec( dllexport )
 #else
-#define HelloWorld_DllAPI __declspec( dllimport )
-#endif // HelloWorld_SOURCE
+#define HELLOWORLD_DllAPI __declspec( dllimport )
+#endif // HELLOWORLD_SOURCE
 #else
-#define HelloWorld_DllAPI
+#define HELLOWORLD_DllAPI
 #endif  // EPROSIMA_USER_DLL_EXPORT
 #else
-#define HelloWorld_DllAPI
+#define HELLOWORLD_DllAPI
 #endif // _WIN32
 
 namespace eprosima {
@@ -63,7 +65,7 @@ class Cdr;
 
 /*!
  * @brief This class represents the structure HelloWorld defined by the user in the IDL file.
- * @ingroup HELLOWORLD
+ * @ingroup HelloWorld
  */
 class HelloWorld
 {
@@ -91,7 +93,7 @@ public:
      * @param x Reference to the object HelloWorld that will be copied.
      */
     eProsima_user_DllExport HelloWorld(
-            HelloWorld&& x);
+            HelloWorld&& x) noexcept;
 
     /*!
      * @brief Copy assignment.
@@ -105,7 +107,7 @@ public:
      * @param x Reference to the object HelloWorld that will be copied.
      */
     eProsima_user_DllExport HelloWorld& operator =(
-            HelloWorld&& x);
+            HelloWorld&& x) noexcept;
 
     /*!
      * @brief Comparison operator.
@@ -145,33 +147,33 @@ public:
      * @param _message New value to be copied in member message
      */
     eProsima_user_DllExport void message(
-            const std::string& _message);
+            const eprosima::fastrtps::fixed_string<128>& _message);
 
     /*!
      * @brief This function moves the value in member message
      * @param _message New value to be moved in member message
      */
     eProsima_user_DllExport void message(
-            std::string&& _message);
+            eprosima::fastrtps::fixed_string<128>&& _message);
 
     /*!
      * @brief This function returns a constant reference to member message
      * @return Constant reference to member message
      */
-    eProsima_user_DllExport const std::string& message() const;
+    eProsima_user_DllExport const eprosima::fastrtps::fixed_string<128>& message() const;
 
     /*!
      * @brief This function returns a reference to member message
      * @return Reference to member message
      */
-    eProsima_user_DllExport std::string& message();
+    eProsima_user_DllExport eprosima::fastrtps::fixed_string<128>& message();
 
     /*!
-     * @brief This function returns the maximum serialized size of an object
-     * depending on the buffer alignment.
-     * @param current_alignment Buffer alignment.
-     * @return Maximum serialized size.
-     */
+    * @brief This function returns the maximum serialized size of an object
+    * depending on the buffer alignment.
+    * @param current_alignment Buffer alignment.
+    * @return Maximum serialized size.
+    */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -226,7 +228,9 @@ public:
 private:
 
     uint16_t m_index;
-    std::string m_message;
+    eprosima::fastrtps::fixed_string<128> m_message;
+
 };
 
 #endif // _FAST_DDS_GENERATED_HELLOWORLD_H_
+

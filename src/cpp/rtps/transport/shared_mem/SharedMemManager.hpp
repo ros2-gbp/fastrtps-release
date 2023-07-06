@@ -110,7 +110,7 @@ private:
                     std::memory_order_relaxed))
             {
             }
-            logWarning(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
+            EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
             return (s.processing_count == 0);
         }
 
@@ -260,8 +260,8 @@ public:
         }
         catch (const std::exception& e)
         {
-            logError(RTPS_TRANSPORT_SHM, "Failed to create Shared Memory Manager for domain " << domain_name
-                                                                                              << ": " <<
+            EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to create Shared Memory Manager for domain " << domain_name
+                                                                                                        << ": " <<
                     e.what());
             return std::shared_ptr<SharedMemManager>();
         }
@@ -380,8 +380,8 @@ public:
             }
             catch (const std::exception& e)
             {
-                logError(RTPS_TRANSPORT_SHM, "Failed to create segment " << segment_name_
-                                                                         << ": " << e.what());
+                EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to create segment " << segment_name_
+                                                                                   << ": " << e.what());
 
                 throw;
             }
@@ -414,7 +414,7 @@ public:
 
             if (overflows_count_)
             {
-                logWarning(RTPS_TRANSPORT_SHM,
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM,
                         "Segment " << segment_id_.to_string().c_str()
                                    << " closed. It had " << "overflows_count "
                                    << overflows_count_);
@@ -662,7 +662,7 @@ public:
                 }
                 catch (const std::exception& e)
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, e.what());
                 }
             }
         }
@@ -766,8 +766,9 @@ public:
                 }
                 else
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, "SHM Listener on port " << global_port_->port_id() << " failure: "
-                                                                           << e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM,
+                            "SHM Listener on port " << global_port_->port_id() << " failure: "
+                                                    << e.what());
 
                     regenerate_port();
                 }
@@ -877,8 +878,8 @@ public:
 
                 if (!global_port_->is_port_ok())
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, "SHM Port " << global_port_->port_id() << " failure: "
-                                                               << e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "SHM Port " << global_port_->port_id() << " failure: "
+                                                                         << e.what());
 
                     regenerate_port();
                     ret = false;

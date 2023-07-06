@@ -20,39 +20,40 @@
 #ifndef _TEST_BLACKBOX_PUBSUBWRITER_HPP_
 #define _TEST_BLACKBOX_PUBSUBWRITER_HPP_
 
-#include <string>
+#include <condition_variable>
 #include <list>
 #include <map>
-#include <condition_variable>
+#include <string>
+#include <thread>
+#include <vector>
+
 #include <asio.hpp>
 #include <gtest/gtest.h>
-#include <thread>
 
 #if _MSC_VER
 #include <Windows.h>
 #endif // _MSC_VER
 
-#include <fastdds/dds/core/condition/StatusCondition.hpp>
 #include <fastdds/dds/core/condition/GuardCondition.hpp>
+#include <fastdds/dds/core/condition/StatusCondition.hpp>
 #include <fastdds/dds/core/condition/WaitSet.hpp>
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/core/policy/QosPolicies.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
-#include <fastdds/dds/topic/Topic.hpp>
-#include <fastdds/dds/publisher/Publisher.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
+#include <fastdds/dds/publisher/Publisher.hpp>
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
-#include <fastdds/dds/core/policy/QosPolicies.hpp>
+#include <fastdds/dds/topic/Topic.hpp>
+#include <fastdds/rtps/flowcontrol/FlowControllerSchedulerPolicy.hpp>
 #include <fastdds/rtps/transport/UDPTransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
+#include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
-#include <fastrtps/utils/IPLocator.h>
-#include <fastdds/rtps/flowcontrol/FlowControllerSchedulerPolicy.hpp>
-
 
 using DomainParticipantFactory = eprosima::fastdds::dds::DomainParticipantFactory;
 using eprosima::fastrtps::rtps::IPLocator;
@@ -170,6 +171,7 @@ class PubSubWriter
             : writer_(writer)
             , times_deadline_missed_(0)
             , times_liveliness_lost_(0)
+            , times_unack_sample_removed_(0)
         {
         }
 
@@ -197,7 +199,7 @@ class PubSubWriter
                 eprosima::fastdds::dds::DataWriter* datawriter,
                 const eprosima::fastrtps::OfferedDeadlineMissedStatus& status) override
         {
-            (void)datawriter;
+            static_cast<void>(datawriter);
             times_deadline_missed_ = status.total_count;
         }
 
@@ -205,7 +207,7 @@ class PubSubWriter
                 eprosima::fastdds::dds::DataWriter* datawriter,
                 const eprosima::fastdds::dds::OfferedIncompatibleQosStatus& status) override
         {
-            (void)datawriter;
+            static_cast<void>(datawriter);
             writer_.incompatible_qos(status);
         }
 
@@ -213,9 +215,18 @@ class PubSubWriter
                 eprosima::fastdds::dds::DataWriter* datawriter,
                 const eprosima::fastrtps::LivelinessLostStatus& status) override
         {
-            (void)datawriter;
+            static_cast<void>(datawriter);
             times_liveliness_lost_ = status.total_count;
             writer_.liveliness_lost();
+        }
+
+        void on_unacknowledged_sample_removed(
+                eprosima::fastdds::dds::DataWriter* datawriter,
+                const eprosima::fastdds::dds::InstanceHandle_t& handle) override
+        {
+            EXPECT_EQ(writer_.datawriter_, datawriter);
+            times_unack_sample_removed_++;
+            instances_removed_unack_.push_back(handle);
         }
 
         unsigned int missed_deadlines() const
@@ -226,6 +237,16 @@ class PubSubWriter
         unsigned int times_liveliness_lost() const
         {
             return times_liveliness_lost_;
+        }
+
+        unsigned int times_unack_sample_removed() const
+        {
+            return times_unack_sample_removed_;
+        }
+
+        std::vector<eprosima::fastdds::dds::InstanceHandle_t>& instances_removed_unack()
+        {
+            return instances_removed_unack_;
         }
 
     private:
@@ -239,6 +260,10 @@ class PubSubWriter
         unsigned int times_deadline_missed_;
         //! The number of times liveliness was lost
         unsigned int times_liveliness_lost_;
+        //! The number of times a sample has been removed unacknowledged
+        unsigned int times_unack_sample_removed_;
+        //! Instance handle collection of those instances that have removed samples unacknowledged
+        std::vector<eprosima::fastdds::dds::InstanceHandle_t> instances_removed_unack_;
 
     }
     listener_;
@@ -295,8 +320,9 @@ public:
             datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
         }
 
-        // By default, memory mode is preallocated (the most restritive)
-        datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
+        datawriter_qos_.endpoint().history_memory_policy =
+                eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         datawriter_qos_.reliable_writer_qos().times.heartbeatPeriod.seconds = 0;
@@ -1268,6 +1294,14 @@ public:
         return *this;
     }
 
+    PubSubWriter& ownership_strength(
+            uint32_t strength)
+    {
+        datawriter_qos_.ownership().kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
+        datawriter_qos_.ownership_strength().value = strength;
+        return *this;
+    }
+
     PubSubWriter& load_publisher_attr(
             const std::string& /*xml*/)
     {
@@ -1381,6 +1415,11 @@ public:
         return (ReturnCode_t::RETCODE_OK == publisher_->set_qos(publisher_qos_));
     }
 
+    bool set_qos()
+    {
+        return (ReturnCode_t::RETCODE_OK == datawriter_->set_qos(datawriter_qos_));
+    }
+
     bool remove_all_changes(
             size_t* number_of_changes_removed)
     {
@@ -1405,6 +1444,16 @@ public:
     unsigned int times_liveliness_lost() const
     {
         return listener_.times_liveliness_lost();
+    }
+
+    unsigned int times_unack_sample_removed() const
+    {
+        return listener_.times_unack_sample_removed();
+    }
+
+    std::vector<eprosima::fastdds::dds::InstanceHandle_t>& instances_removed_unack()
+    {
+        return listener_.instances_removed_unack();
     }
 
     unsigned int times_incompatible_qos() const

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rtps/security/SecurityManager.h"
 #include <chrono>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -101,6 +100,7 @@ TEST(WriterProxyAcknackTests, AcknackBackoff)
     StatefulReader readerMock; // avoid annoying uninteresting call warnings
 
     // Testing the Timed events are properly configured
+    EXPECT_CALL(readerMock, getEventResource()).Times(1u);
     WriterProxy wproxy(&readerMock, RemoteLocatorsAllocationAttributes(), ResourceLimitedContainerConfig());
     wproxy.start(wattr, SequenceNumber_t());
 

@@ -15,7 +15,7 @@
 ###############################################################################
 # CMake build rules for FastCDR                                               #
 ###############################################################################
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.16.3)
 
 set(IS_TOP_LEVEL TRUE)
 if(PROJECT_SOURCE_DIR)
@@ -74,14 +74,14 @@ set(LIB_VERSION_STR "${LIB_MAJOR_VERSION}.${LIB_MINOR_VERSION}.${LIB_PATCH_VERSI
 # Project                                                                     #
 ###############################################################################
 if(CMAKE_VERSION VERSION_LESS 3.0)
-    project(fastcdr C CXX)
+    project(fastcdr CXX)
     set(PROJECT_VERSION_MAJOR "${LIB_MAJOR_VERSION}")
     set(PROJECT_VERSION_MINOR "${LIB_MINOR_VERSION}")
     set(PROJECT_VERSION_PATCH "${LIB_PATCH_VERSION}")
     set(PROJECT_VERSION "${LIB_VERSION_STR}")
 else()
     cmake_policy(SET CMP0048 NEW)
-    project(fastcdr VERSION "${LIB_VERSION_STR}" LANGUAGES C CXX)
+    project(fastcdr VERSION "${LIB_VERSION_STR}" LANGUAGES CXX)
 endif()
 
 set(PROJECT_NAME_STYLED "FastCDR")
@@ -98,6 +98,19 @@ message(STATUS "To change the version modify the file configure.ac")
 # Generation of windows installers.
 ###############################################################################
 option(EPROSIMA_INSTALLER "Activate the creation of a build to create windows installers" OFF)
+
+###############################################################################
+# CCache on Windows on CI
+###############################################################################
+if (MSVC AND CMAKE_CXX_COMPILER_LAUNCHER STREQUAL "ccache")
+    foreach(config DEBUG RELWITHDEBINFO)
+        foreach(lang C CXX)
+            set(flags_var "CMAKE_${lang}_FLAGS_${config}")
+            string(REPLACE "/Zi" "/Z7" ${flags_var} "${${flags_var}}")
+            set(${flags_var} "${${flags_var}}")
+        endforeach()
+    endforeach()
+endif()
 
 ###############################################################################
 # GCC colors if using CCache
@@ -130,8 +143,10 @@ endif()
 # Test system configuration
 ###############################################################################
 include(${PROJECT_SOURCE_DIR}/cmake/common/check_configuration.cmake)
-check_stdcxx()
-check_compile_feature()
+
+set(FORCE_CXX "11" CACHE STRING "C++ standard fulfillment selection")
+check_stdcxx(${FORCE_CXX})
+
 check_endianness()
 check_type_sizes()
 

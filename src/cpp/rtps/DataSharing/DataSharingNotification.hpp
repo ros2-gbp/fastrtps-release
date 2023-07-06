@@ -152,8 +152,8 @@ protected:
         }
         catch (const std::exception& e)
         {
-            logError(HISTORY_DATASHARING_LISTENER, "Failed to create segment " << segment_name_
-                                                                               << ": " << e.what());
+            EPROSIMA_LOG_ERROR(HISTORY_DATASHARING_LISTENER, "Failed to create segment " << segment_name_
+                                                                                         << ": " << e.what());
             return false;
         }
 
@@ -167,8 +167,8 @@ protected:
         {
             T::remove(segment_name_);
 
-            logError(HISTORY_DATASHARING_LISTENER, "Failed to create listener queue " << segment_name_
-                                                                                      << ": " << e.what());
+            EPROSIMA_LOG_ERROR(HISTORY_DATASHARING_LISTENER, "Failed to create listener queue " << segment_name_
+                                                                                                << ": " << e.what());
             return false;
         }
 
@@ -195,8 +195,8 @@ protected:
         }
         catch (const std::exception& e)
         {
-            logError(HISTORY_DATASHARING_LISTENER, "Failed to open segment " << segment_name_
-                                                                             << ": " << e.what());
+            EPROSIMA_LOG_ERROR(HISTORY_DATASHARING_LISTENER, "Failed to open segment " << segment_name_
+                                                                                       << ": " << e.what());
             return false;
         }
 
@@ -207,7 +207,7 @@ protected:
         {
             local_segment.reset();
 
-            logError(HISTORY_DATASHARING_LISTENER, "Failed to open listener queue " << segment_name_);
+            EPROSIMA_LOG_ERROR(HISTORY_DATASHARING_LISTENER, "Failed to open listener queue " << segment_name_);
             return false;
         }
 

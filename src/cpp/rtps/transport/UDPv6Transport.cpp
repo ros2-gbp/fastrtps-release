@@ -14,15 +14,15 @@
 
 #include <rtps/transport/UDPv6Transport.h>
 
-#include <utility>
-#include <cstring>
 #include <algorithm>
+#include <cstring>
+#include <utility>
 
-#include <fastdds/rtps/transport/TransportInterface.h>
 #include <fastdds/dds/log/Log.hpp>
-#include <fastrtps/utils/IPLocator.h>
-#include <fastdds/rtps/network/SenderResource.h>
 #include <fastdds/rtps/messages/MessageReceiver.h>
+#include <fastdds/rtps/transport/SenderResource.h>
+#include <fastdds/rtps/transport/TransportInterface.h>
+#include <fastrtps/utils/IPLocator.h>
 
 using namespace std;
 using namespace asio;
@@ -120,7 +120,7 @@ UDPv6Transport::UDPv6Transport(
 
         if (interface_whitelist_.empty())
         {
-            logError(TRANSPORT, "All whitelist interfaces were filtered out");
+            EPROSIMA_LOG_ERROR(TRANSPORT, "All whitelist interfaces were filtered out");
             interface_whitelist_.emplace_back(ip::address_v6::from_string("2001:db8::"));
         }
     }
@@ -374,8 +374,9 @@ bool UDPv6Transport::OpenInputChannel(
                 }
                 catch (asio::system_error const& e)
                 {
-                    logWarning(RTPS_MSG_OUT, "UDPTransport Error binding " << locatorAddressStr << " at port: (" <<
-                            IPLocator::getPhysicalPort(locator) << ") with msg: " << e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, "UDPTransport Error binding " << locatorAddressStr << " at port: (" <<
+                            IPLocator::getPhysicalPort(
+                                locator) << ") with msg: " << e.what());
                     (void)e;
                 }
             }
@@ -403,7 +404,8 @@ bool UDPv6Transport::OpenInputChannel(
                         catch (std::system_error& ex)
                         {
                             (void)ex;
-                            logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
+                            EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
+                                    "Error joining multicast group on " << ip << ": " << ex.what());
                         }
                     }
                 }
@@ -417,7 +419,8 @@ bool UDPv6Transport::OpenInputChannel(
                     catch (std::system_error& ex)
                     {
                         (void)ex;
-                        logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
+                        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
+                                "Error joining multicast group on " << ip << ": " << ex.what());
                     }
                 }
             }

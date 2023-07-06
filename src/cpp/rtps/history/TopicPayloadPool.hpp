@@ -45,7 +45,7 @@ public:
 
     virtual ~TopicPayloadPool()
     {
-        logInfo(RTPS_UTILS, "PayloadPool destructor");
+        EPROSIMA_LOG_INFO(RTPS_UTILS, "PayloadPool destructor");
 
         for (PayloadNode* payload : all_payloads_)
         {
@@ -141,7 +141,7 @@ protected:
         {
             assert(size > 0);
 
-            buffer = (octet*)calloc(size + offsetof(NodeInfo, data), sizeof(octet));
+            buffer = (octet*)calloc(size + sizeof(NodeInfo) - 1, sizeof(octet));
             if (buffer == nullptr)
             {
                 throw std::bad_alloc();

@@ -23,6 +23,8 @@
 #define _FAST_DDS_GENERATED_STRINGTEST_H_
 
 
+#include <fastrtps/utils/fixed_size_string.hpp>
+
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -42,16 +44,16 @@
 
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
-#if defined(StringTest_SOURCE)
-#define StringTest_DllAPI __declspec( dllexport )
+#if defined(STRINGTEST_SOURCE)
+#define STRINGTEST_DllAPI __declspec( dllexport )
 #else
-#define StringTest_DllAPI __declspec( dllimport )
-#endif // StringTest_SOURCE
+#define STRINGTEST_DllAPI __declspec( dllimport )
+#endif // STRINGTEST_SOURCE
 #else
-#define StringTest_DllAPI
+#define STRINGTEST_DllAPI
 #endif  // EPROSIMA_USER_DLL_EXPORT
 #else
-#define StringTest_DllAPI
+#define STRINGTEST_DllAPI
 #endif // _WIN32
 
 namespace eprosima {
@@ -63,7 +65,7 @@ class Cdr;
 
 /*!
  * @brief This class represents the structure StringTest defined by the user in the IDL file.
- * @ingroup STRINGTEST
+ * @ingroup StringTest
  */
 class StringTest
 {
@@ -91,7 +93,7 @@ public:
      * @param x Reference to the object StringTest that will be copied.
      */
     eProsima_user_DllExport StringTest(
-            StringTest&& x);
+            StringTest&& x) noexcept;
 
     /*!
      * @brief Copy assignment.
@@ -105,7 +107,7 @@ public:
      * @param x Reference to the object StringTest that will be copied.
      */
     eProsima_user_DllExport StringTest& operator =(
-            StringTest&& x);
+            StringTest&& x) noexcept;
 
     /*!
      * @brief Comparison operator.
@@ -126,33 +128,33 @@ public:
      * @param _message New value to be copied in member message
      */
     eProsima_user_DllExport void message(
-            const std::string& _message);
+            const eprosima::fastrtps::fixed_string<10000>& _message);
 
     /*!
      * @brief This function moves the value in member message
      * @param _message New value to be moved in member message
      */
     eProsima_user_DllExport void message(
-            std::string&& _message);
+            eprosima::fastrtps::fixed_string<10000>&& _message);
 
     /*!
      * @brief This function returns a constant reference to member message
      * @return Constant reference to member message
      */
-    eProsima_user_DllExport const std::string& message() const;
+    eProsima_user_DllExport const eprosima::fastrtps::fixed_string<10000>& message() const;
 
     /*!
      * @brief This function returns a reference to member message
      * @return Reference to member message
      */
-    eProsima_user_DllExport std::string& message();
+    eProsima_user_DllExport eprosima::fastrtps::fixed_string<10000>& message();
 
     /*!
-     * @brief This function returns the maximum serialized size of an object
-     * depending on the buffer alignment.
-     * @param current_alignment Buffer alignment.
-     * @return Maximum serialized size.
-     */
+    * @brief This function returns the maximum serialized size of an object
+    * depending on the buffer alignment.
+    * @param current_alignment Buffer alignment.
+    * @return Maximum serialized size.
+    */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -206,7 +208,9 @@ public:
 
 private:
 
-    std::string m_message;
+    eprosima::fastrtps::fixed_string<10000> m_message;
+
 };
 
 #endif // _FAST_DDS_GENERATED_STRINGTEST_H_
+

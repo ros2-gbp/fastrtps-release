@@ -24,6 +24,7 @@
 
 #include <string>
 #include <fstream>
+#include <sstream>
 #include <streambuf>
 #include <memory>
 #include <gtest/gtest.h>
@@ -65,6 +66,9 @@ public:
     SHMTransportTests()
     {
         eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
+        std::ostringstream ss;
+        ss << "SHMTests_" << GET_PID();
+        domain_name = ss.str();
     }
 
     ~SHMTransportTests()
@@ -74,6 +78,8 @@ public:
     }
 
     SharedMemTransportDescriptor descriptor;
+
+    std::string domain_name;
 };
 
 class SHMCondition : public ::testing::Test
@@ -961,8 +967,6 @@ TEST_F(SHMTransportTests, port_and_segment_overflow_discard)
 
 TEST_F(SHMTransportTests, port_mutex_deadlock_recover)
 {
-    const std::string domain_name("SHMTests");
-
     auto shared_mem_manager = SharedMemManager::create(domain_name);
     SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
     MockPortSharedMemGlobal port_mocker;
@@ -999,8 +1003,6 @@ TEST_F(SHMTransportTests, port_mutex_deadlock_recover)
 
 TEST_F(SHMTransportTests, port_lock_read_exclusive)
 {
-    const std::string domain_name("SHMTests");
-
     auto shared_mem_manager = SharedMemManager::create(domain_name);
 
     shared_mem_manager->remove_port(0);
@@ -1124,7 +1126,6 @@ TEST_F(SHMTransportTests, robust_shared_lock)
 // when reading / writing in the mapped mem.
 TEST_F(SHMTransportTests, memory_bounds)
 {
-    const std::string domain_name("SHMTests");
     auto shared_mem_manager = SharedMemManager::create(domain_name);
     auto shm_path = SharedDir::get_file_path("");
 
@@ -1259,8 +1260,6 @@ TEST_F(SHMTransportTests, memory_bounds)
 
 TEST_F(SHMTransportTests, port_listener_dead_recover)
 {
-    const std::string domain_name("SHMTests");
-
     auto shared_mem_manager = SharedMemManager::create(domain_name);
     SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
 
@@ -1346,8 +1345,6 @@ TEST_F(SHMTransportTests, port_listener_dead_recover)
 
 TEST_F(SHMTransportTests, empty_cv_mutex_deadlocked_try_push)
 {
-    const std::string domain_name("SHMTests");
-
     auto shared_mem_manager = SharedMemManager::create(domain_name);
     SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
     MockPortSharedMemGlobal port_mocker;
@@ -1384,8 +1381,6 @@ TEST_F(SHMTransportTests, empty_cv_mutex_deadlocked_try_push)
 
 TEST_F(SHMTransportTests, dead_listener_sender_port_recover)
 {
-    const std::string domain_name("SHMTests");
-
     auto shared_mem_manager = SharedMemManager::create(domain_name);
     SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
 
@@ -1426,8 +1421,6 @@ TEST_F(SHMTransportTests, dead_listener_sender_port_recover)
 
 TEST_F(SHMTransportTests, port_not_ok_listener_recover)
 {
-    const std::string domain_name("SHMTests");
-
     auto shared_mem_manager = SharedMemManager::create(domain_name);
     SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
 
@@ -1473,8 +1466,6 @@ TEST_F(SHMTransportTests, port_not_ok_listener_recover)
 
 TEST_F(SHMTransportTests, buffer_recover)
 {
-    const std::string domain_name("SHMTests");
-
     auto shared_mem_manager = SharedMemManager::create(domain_name);
 
     auto segment = shared_mem_manager->create_segment(3, 3);
@@ -1621,7 +1612,6 @@ TEST_F(SHMTransportTests, buffer_recover)
 
 TEST_F(SHMTransportTests, remote_segments_free)
 {
-    const std::string domain_name("SHMTests");
     uint32_t num_participants = 100;
 
     std::vector<std::shared_ptr<SharedMemManager>> managers;
@@ -2151,14 +2141,112 @@ TEST_F(SHMTransportTests, dump_file)
         std::string dump_text((std::istreambuf_iterator<char>(dump_file)),
                 std::istreambuf_iterator<char>());
 
-        ASSERT_EQ(dump_text.length(), 312u);
-        ASSERT_EQ(dump_text.c_str()[308], '6');
-        ASSERT_EQ(dump_text.c_str()[309], 'f');
-        ASSERT_EQ(dump_text.c_str()[310], 10);
-        ASSERT_EQ(dump_text.c_str()[311], 10);
+        ASSERT_EQ(dump_text.length(), 310u);
+        ASSERT_EQ(dump_text.c_str()[306], '6');
+        ASSERT_EQ(dump_text.c_str()[307], 'f');
+        ASSERT_EQ(dump_text.c_str()[308], 10);
+        ASSERT_EQ(dump_text.c_str()[309], 10);
     }
 
     std::remove(log_file.c_str());
+}
+
+TEST_F(SHMTransportTests, named_mutex_concurrent_open_create)
+{
+    auto shared_mem_manager = SharedMemManager::create(domain_name);
+    SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
+    MockPortSharedMemGlobal port_mocker;
+
+    port_mocker.remove_port_mutex(domain_name, 0);
+
+    Semaphore sem_get_port;
+    Semaphore sem_end_thread_get_port;
+    std::thread thread_get_port([&]
+            {
+                auto port_mutex = port_mocker.get_port_mutex(domain_name, 0, false);
+
+                sem_get_port.post();
+                sem_end_thread_get_port.wait();
+            }
+            );
+
+    auto global_port = shared_mem_global->open_port(0, 1, 1000);
+
+    sem_get_port.wait();
+    sem_end_thread_get_port.post();
+    thread_get_port.join();
+}
+
+TEST_F(SHMTransportTests, named_mutex_concurrent_open)
+{
+    auto shared_mem_manager = SharedMemManager::create(domain_name);
+    SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
+    MockPortSharedMemGlobal port_mocker;
+
+    port_mocker.remove_port_mutex(domain_name, 0);
+
+    auto global_port = shared_mem_global->open_port(0, 1, 1000);
+
+    Semaphore sem_lock_done;
+    Semaphore sem_second_lock;
+    Semaphore sem_second_lock_done;
+    Semaphore sem_end_thread_locker;
+    std::atomic<int> lock_count(0);
+    std::thread thread_locker([&]
+            {
+                // lock has to be done in another thread because
+                // boost::inteprocess_named_mutex and  interprocess_mutex are recursive in Win32
+                auto port_mutex = port_mocker.get_port_mutex(domain_name, 0);
+                bool locked = port_mutex->try_lock();
+                if (locked)
+                {
+                    ++lock_count;
+                }
+
+                sem_lock_done.post();
+                sem_second_lock.wait();
+
+                if (locked)
+                {
+                    port_mutex->unlock();
+                }
+                else
+                {
+                    port_mutex->lock();
+                    ++lock_count;
+                }
+
+                sem_second_lock_done.post();
+                sem_end_thread_locker.wait();
+            }
+            );
+
+    auto port_mutex = port_mocker.get_port_mutex(domain_name, 0);
+    bool locked = port_mutex->try_lock();
+    if (locked)
+    {
+        ++lock_count;
+    }
+
+    sem_lock_done.wait();
+    ASSERT_EQ(lock_count, 1);
+
+    sem_second_lock.post();
+    if (locked)
+    {
+        port_mutex->unlock();
+    }
+    else
+    {
+        port_mutex->lock();
+        ++lock_count;
+    }
+
+    sem_second_lock_done.wait();
+    ASSERT_EQ(lock_count, 2);
+
+    sem_end_thread_locker.post();
+    thread_locker.join();
 }
 
 int main(
