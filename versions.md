@@ -1,6 +1,19 @@
 Forthcoming
 -----------
 
+Version 2.11.0
+--------------
+
+* Added Participant ignore local endpoints feature.
+* Remove `FASTDDS_STATIC` CMake option.
+  Please, use `BUILD_SHARED_LIBS=OFF` instead.
+* Fixed exported symbols on ContentFilteredTopic (ABI break)
+* Deprecated the DDS:Crypto:AES-GCM-GMAC plugin configuration through the DomainParticipant PropertyPolicyQos (security vulnerability).
+* `DomainParticipantListener::on_participant_discovery` changed behavior (fix API break in 2.10.0).
+* Included XML schema for static discovery profile configuration.
+* Extend DynamicDataHelper API providing `print` overload with `std::ostream` parameter (API extension in Dynamic Types).
+* TypeLookup Service configuration through XML.
+
 Version 2.10.1
 --------------
 
@@ -17,7 +30,7 @@ Version 2.10.0
 * Added ignore RTPS entity API in RTPSParticipant (ABI break on RTPS layer).
 * Overload `PDP::removeWriterProxyData` and `PDP::removeReaderProxyData` (ABI break on RTPS layer).
 * Overload RTPS discovery callbacks in RTPSParticipantListener (ABI break on RTPS layer).
-* Overload DDS discovery callbacks in DomainParticipantListener (ABI break on DDS layer). 
+* Overload DDS discovery callbacks in DomainParticipantListener (ABI break on DDS layer).
 * Added on_incompatible_type to RTPS listeners (ABI break on RTPS layer).
 * Added support for QNX 7.1 build.
 

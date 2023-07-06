@@ -28,6 +28,7 @@
 
 #include "Types.h"
 
+
 #if !defined(GEN_API_VER) || (GEN_API_VER != 1)
 #error \
     Generated Types is not compatible with current installed Fast DDS. Please, regenerate it with fastddsgen.
@@ -35,9 +36,10 @@
 
 
 
+
 /*!
  * @brief This class represents the TopicDataType of the type MyEnumStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MyEnumStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -98,10 +100,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type MyBadEnumStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MyBadEnumStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -162,11 +166,13 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
 typedef MyEnum MyAliasEnum;
+
 /*!
  * @brief This class represents the TopicDataType of the type MyAliasEnumStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MyAliasEnumStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -227,10 +233,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type BasicStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class BasicStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -291,10 +299,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type BasicNamesStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class BasicNamesStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -355,10 +365,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type BasicBadStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class BasicBadStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -419,10 +431,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type BasicWideStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class BasicWideStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -483,10 +497,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type BadBasicWideStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class BadBasicWideStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -547,10 +563,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type StringStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class StringStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -611,10 +629,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type LargeStringStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class LargeStringStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -675,10 +695,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type WStringStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class WStringStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -739,10 +761,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type LargeWStringStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class LargeWStringStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -803,10 +827,41 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
+#ifndef SWIG
+namespace detail {
+
+    template<typename Tag, typename Tag::type M>
+    struct ArrayStruct_rob
+    {
+        friend constexpr typename Tag::type get(
+                Tag)
+        {
+            return M;
+        }
+    };
+
+    struct ArrayStruct_f
+    {
+        typedef std::array<int32_t, 2> ArrayStruct::* type;
+        friend constexpr type get(
+                ArrayStruct_f);
+    };
+
+    template struct ArrayStruct_rob<ArrayStruct_f, &ArrayStruct::m_my_array>;
+
+    template <typename T, typename Tag>
+    inline size_t constexpr ArrayStruct_offset_of() {
+        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
+    }
+}
+#endif
+
 /*!
  * @brief This class represents the TopicDataType of the type ArrayStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class ArrayStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -850,7 +905,7 @@ public:
 #ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
     eProsima_user_DllExport inline bool is_plain() const override
     {
-        return true;
+        return is_plain_impl();
     }
 
 #endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
@@ -867,10 +922,47 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
-};
+
+private:
+
+    static constexpr bool is_plain_impl()
+    {
+        return 8ULL == (detail::ArrayStruct_offset_of<ArrayStruct, detail::ArrayStruct_f>() + sizeof(std::array<int32_t, 2>));
+
+    }};
+
+#ifndef SWIG
+namespace detail {
+
+    template<typename Tag, typename Tag::type M>
+    struct ArrayStructEqual_rob
+    {
+        friend constexpr typename Tag::type get(
+                Tag)
+        {
+            return M;
+        }
+    };
+
+    struct ArrayStructEqual_f
+    {
+        typedef std::array<int32_t, 2> ArrayStructEqual::* type;
+        friend constexpr type get(
+                ArrayStructEqual_f);
+    };
+
+    template struct ArrayStructEqual_rob<ArrayStructEqual_f, &ArrayStructEqual::m_my_array_equal>;
+
+    template <typename T, typename Tag>
+    inline size_t constexpr ArrayStructEqual_offset_of() {
+        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
+    }
+}
+#endif
+
 /*!
  * @brief This class represents the TopicDataType of the type ArrayStructEqual defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class ArrayStructEqualPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -914,7 +1006,7 @@ public:
 #ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
     eProsima_user_DllExport inline bool is_plain() const override
     {
-        return true;
+        return is_plain_impl();
     }
 
 #endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
@@ -931,10 +1023,47 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
-};
+
+private:
+
+    static constexpr bool is_plain_impl()
+    {
+        return 8ULL == (detail::ArrayStructEqual_offset_of<ArrayStructEqual, detail::ArrayStructEqual_f>() + sizeof(std::array<int32_t, 2>));
+
+    }};
+
+#ifndef SWIG
+namespace detail {
+
+    template<typename Tag, typename Tag::type M>
+    struct ArrayBadStruct_rob
+    {
+        friend constexpr typename Tag::type get(
+                Tag)
+        {
+            return M;
+        }
+    };
+
+    struct ArrayBadStruct_f
+    {
+        typedef std::array<uint8_t, 2> ArrayBadStruct::* type;
+        friend constexpr type get(
+                ArrayBadStruct_f);
+    };
+
+    template struct ArrayBadStruct_rob<ArrayBadStruct_f, &ArrayBadStruct::m_my_array>;
+
+    template <typename T, typename Tag>
+    inline size_t constexpr ArrayBadStruct_offset_of() {
+        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
+    }
+}
+#endif
+
 /*!
  * @brief This class represents the TopicDataType of the type ArrayBadStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class ArrayBadStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -978,7 +1107,7 @@ public:
 #ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
     eProsima_user_DllExport inline bool is_plain() const override
     {
-        return true;
+        return is_plain_impl();
     }
 
 #endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
@@ -995,10 +1124,47 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
-};
+
+private:
+
+    static constexpr bool is_plain_impl()
+    {
+        return 2ULL == (detail::ArrayBadStruct_offset_of<ArrayBadStruct, detail::ArrayBadStruct_f>() + sizeof(std::array<uint8_t, 2>));
+
+    }};
+
+#ifndef SWIG
+namespace detail {
+
+    template<typename Tag, typename Tag::type M>
+    struct ArrayDimensionsStruct_rob
+    {
+        friend constexpr typename Tag::type get(
+                Tag)
+        {
+            return M;
+        }
+    };
+
+    struct ArrayDimensionsStruct_f
+    {
+        typedef std::array<std::array<int32_t, 2>, 2> ArrayDimensionsStruct::* type;
+        friend constexpr type get(
+                ArrayDimensionsStruct_f);
+    };
+
+    template struct ArrayDimensionsStruct_rob<ArrayDimensionsStruct_f, &ArrayDimensionsStruct::m_my_array>;
+
+    template <typename T, typename Tag>
+    inline size_t constexpr ArrayDimensionsStruct_offset_of() {
+        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
+    }
+}
+#endif
+
 /*!
  * @brief This class represents the TopicDataType of the type ArrayDimensionsStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class ArrayDimensionsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1042,7 +1208,7 @@ public:
 #ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
     eProsima_user_DllExport inline bool is_plain() const override
     {
-        return true;
+        return is_plain_impl();
     }
 
 #endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
@@ -1059,10 +1225,47 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
-};
+
+private:
+
+    static constexpr bool is_plain_impl()
+    {
+        return 16ULL == (detail::ArrayDimensionsStruct_offset_of<ArrayDimensionsStruct, detail::ArrayDimensionsStruct_f>() + sizeof(std::array<std::array<int32_t, 2>, 2>));
+
+    }};
+
+#ifndef SWIG
+namespace detail {
+
+    template<typename Tag, typename Tag::type M>
+    struct ArraySizeStruct_rob
+    {
+        friend constexpr typename Tag::type get(
+                Tag)
+        {
+            return M;
+        }
+    };
+
+    struct ArraySizeStruct_f
+    {
+        typedef std::array<int32_t, 5> ArraySizeStruct::* type;
+        friend constexpr type get(
+                ArraySizeStruct_f);
+    };
+
+    template struct ArraySizeStruct_rob<ArraySizeStruct_f, &ArraySizeStruct::m_my_array>;
+
+    template <typename T, typename Tag>
+    inline size_t constexpr ArraySizeStruct_offset_of() {
+        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
+    }
+}
+#endif
+
 /*!
  * @brief This class represents the TopicDataType of the type ArraySizeStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class ArraySizeStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1106,7 +1309,7 @@ public:
 #ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
     eProsima_user_DllExport inline bool is_plain() const override
     {
-        return true;
+        return is_plain_impl();
     }
 
 #endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
@@ -1123,10 +1326,18 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
-};
+
+private:
+
+    static constexpr bool is_plain_impl()
+    {
+        return 20ULL == (detail::ArraySizeStruct_offset_of<ArraySizeStruct, detail::ArraySizeStruct_f>() + sizeof(std::array<int32_t, 5>));
+
+    }};
+
 /*!
  * @brief This class represents the TopicDataType of the type SequenceStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SequenceStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1187,10 +1398,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SequenceStructEqual defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SequenceStructEqualPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1251,10 +1464,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SequenceBadStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SequenceBadStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1315,10 +1530,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SequenceBoundsStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SequenceBoundsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1379,10 +1596,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SequenceSequenceStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SequenceSequenceStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1443,10 +1662,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SequenceSequenceBoundsStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SequenceSequenceBoundsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1507,10 +1728,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type MapStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MapStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1571,10 +1794,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type MapStructEqual defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MapStructEqualPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1635,10 +1860,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type MapBadKeyStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MapBadKeyStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1699,10 +1926,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type MapBadElemStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MapBadElemStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1763,10 +1992,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type MapBoundsStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MapBoundsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1827,10 +2058,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type MapMapStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MapMapStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1891,10 +2124,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type MapMapBoundsStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class MapMapBoundsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -1955,7 +2190,9 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 
 
 
@@ -1963,7 +2200,7 @@ public:
 
 /*!
  * @brief This class represents the TopicDataType of the type SimpleUnionStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SimpleUnionStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -2024,10 +2261,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SimpleUnionStructEqual defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SimpleUnionStructEqualPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -2088,10 +2327,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SimpleUnionNamesStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SimpleUnionNamesStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -2152,10 +2393,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SimpleTypeUnionStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SimpleTypeUnionStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -2216,10 +2459,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SimpleBadUnionStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SimpleBadUnionStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -2280,10 +2525,12 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
 /*!
  * @brief This class represents the TopicDataType of the type SimplBadDiscUnionStruct defined by the user in the IDL file.
- * @ingroup TYPES
+ * @ingroup Types
  */
 class SimplBadDiscUnionStructPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -2344,6 +2591,8 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
 
 #endif // _FAST_DDS_GENERATED_TYPES_PUBSUBTYPES_H_
+
