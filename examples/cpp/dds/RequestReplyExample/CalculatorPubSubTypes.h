@@ -28,15 +28,17 @@
 
 #include "Calculator.h"
 
+
 #if !defined(GEN_API_VER) || (GEN_API_VER != 1)
 #error \
     Generated Calculator is not compatible with current installed Fast DDS. Please, regenerate it with fastddsgen.
 #endif  // GEN_API_VER
 
 
+
 /*!
  * @brief This class represents the TopicDataType of the type RequestType defined by the user in the IDL file.
- * @ingroup CALCULATOR
+ * @ingroup Calculator
  */
 class RequestTypePubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -97,10 +99,41 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
+
 };
+
+#ifndef SWIG
+namespace detail {
+
+    template<typename Tag, typename Tag::type M>
+    struct ReplyType_rob
+    {
+        friend constexpr typename Tag::type get(
+                Tag)
+        {
+            return M;
+        }
+    };
+
+    struct ReplyType_f
+    {
+        typedef int64_t ReplyType::* type;
+        friend constexpr type get(
+                ReplyType_f);
+    };
+
+    template struct ReplyType_rob<ReplyType_f, &ReplyType::m_z>;
+
+    template <typename T, typename Tag>
+    inline size_t constexpr ReplyType_offset_of() {
+        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
+    }
+}
+#endif
+
 /*!
  * @brief This class represents the TopicDataType of the type ReplyType defined by the user in the IDL file.
- * @ingroup CALCULATOR
+ * @ingroup Calculator
  */
 class ReplyTypePubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -144,7 +177,7 @@ public:
 #ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
     eProsima_user_DllExport inline bool is_plain() const override
     {
-        return true;
+        return is_plain_impl();
     }
 
 #endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
@@ -161,6 +194,14 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
-};
+
+private:
+
+    static constexpr bool is_plain_impl()
+    {
+        return 8ULL == (detail::ReplyType_offset_of<ReplyType, detail::ReplyType_f>() + sizeof(int64_t));
+
+    }};
 
 #endif // _FAST_DDS_GENERATED_CALCULATOR_PUBSUBTYPES_H_
+

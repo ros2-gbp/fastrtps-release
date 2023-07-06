@@ -34,7 +34,7 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define HelloWorld_max_cdr_typesize 25ULL;
+#define HelloWorld_max_cdr_typesize 24ULL;
 #define HelloWorld_max_key_cdr_typesize 0ULL;
 
 HelloWorld::HelloWorld()
@@ -226,3 +226,4 @@ void HelloWorld::serializeKey(
 {
     (void) scdr;
 }
+
