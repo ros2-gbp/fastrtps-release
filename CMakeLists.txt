@@ -30,7 +30,7 @@ endif()
 ###############################################################################
 # Project                                                                     #
 ###############################################################################
-project(fastrtps VERSION "2.10.1" LANGUAGES C CXX)
+project(fastrtps VERSION "2.11.0" LANGUAGES C CXX)
 
 set(PROJECT_NAME_LARGE "Fast RTPS")
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
@@ -191,7 +191,7 @@ if(APPEND_PROJECT_NAME_TO_INCLUDEDIR)
 endif()
 set(INCLUDE_INSTALL_DIR "${_include_dir}" CACHE PATH "Installation directory for C++ headers")
 unset(_include_dir)
-set(LIB_INSTALL_DIR lib/ CACHE PATH "Installation directory for libraries")
+set(LIB_INSTALL_DIR lib${LIB_SUFFIX}/ CACHE PATH "Installation directory for libraries")
 set(DATA_INSTALL_DIR share/ CACHE PATH "Installation directory for data")
 if(WIN32)
     set(DOC_DIR "doc")
@@ -502,12 +502,27 @@ if(BUILD_DOCUMENTATION)
 
         file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/readthedocs_custom_template.cmake [=[
 
-            file(DOWNLOAD "https://fast-dds.docs.eprosima.com/_/downloads/en/v${PROJECT_VERSION}/htmlzip/" "./eprosima-fast-rtps.zip")
+            file(DOWNLOAD "https://fast-dds.docs.eprosima.com/_/downloads/en/v${PROJECT_VERSION}/htmlzip/" "./eprosima-fast-rtps.zip"
+                 STATUS DOWNLOAD_STATUS)
+
+            # As stated in CMake's documentation: https://cmake.org/cmake/help/latest/command/file.html#transfer
+            # STATUS will return a list with two elements: the numeric status and the message returned.
+            # A 0 numeric error means no error in the operation 
+            list(GET DOWNLOAD_STATUS 0 DOWNLOAD_RC)
+            
+            if (DOWNLOAD_RC)
+                message(STATUS "Unable to download documentation for version ${PROJECT_VERSION}. Falling back to latest.")
+                file(DOWNLOAD "https://fast-dds.docs.eprosima.com/_/downloads/en/latest/htmlzip/" "./eprosima-fast-rtps.zip")
+            endif()
             # TODO: when windows ci CMake version surpasses 17 favor file() instead of UNZIP as in the next line
             # file(ARCHIVE_EXTRACT INPUT "./eprosima-fast-rtps.zip" DESTINATION  "${PROJECT_BINARY_DIR}/doc/")
             execute_process(COMMAND "${UNZIP_EXE}" "./eprosima-fast-rtps.zip" -d "${PROJECT_BINARY_DIR}/doc/")
             file(REMOVE_RECURSE "${PROJECT_BINARY_DIR}/doc/manual")
-            file(RENAME "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual")
+            if (DOWNLOAD_RC)
+                file(RENAME "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-latest" "${PROJECT_BINARY_DIR}/doc/manual")
+            else()
+                file(RENAME "${PROJECT_BINARY_DIR}/doc/eprosima-fast-rtps-v${PROJECT_VERSION}" "${PROJECT_BINARY_DIR}/doc/manual")
+            endif()
             file(REMOVE  "./eprosima-fast-rtps.zip")
 
             ]=])
@@ -539,8 +554,13 @@ install(FILES ${PROJECT_SOURCE_DIR}/LICENSE
     COMPONENT licenses
     )
 
-# Install xml validator
+# Install xml validators
 install(FILES ${PROJECT_SOURCE_DIR}/resources/xsd/fastRTPS_profiles.xsd
+    DESTINATION ${DATA_INSTALL_DIR}
+    COMPONENT xsd
+    )
+
+install(FILES ${PROJECT_SOURCE_DIR}/resources/xsd/fastdds_static_discovery.xsd
     DESTINATION ${DATA_INSTALL_DIR}
     COMPONENT xsd
     )
