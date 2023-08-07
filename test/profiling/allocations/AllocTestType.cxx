@@ -34,12 +34,9 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define AllocTestType_max_cdr_typesize 4ULL;
-#define AllocTestType_max_key_cdr_typesize 0ULL;
-
 AllocTestType::AllocTestType()
 {
-    // unsigned long m_index
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@52f759d7
     m_index = 0;
 
 }
@@ -55,7 +52,7 @@ AllocTestType::AllocTestType(
 }
 
 AllocTestType::AllocTestType(
-        AllocTestType&& x) noexcept 
+        AllocTestType&& x)
 {
     m_index = x.m_index;
 }
@@ -70,7 +67,7 @@ AllocTestType& AllocTestType::operator =(
 }
 
 AllocTestType& AllocTestType::operator =(
-        AllocTestType&& x) noexcept
+        AllocTestType&& x)
 {
 
     m_index = x.m_index;
@@ -94,8 +91,13 @@ bool AllocTestType::operator !=(
 size_t AllocTestType::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return AllocTestType_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t AllocTestType::getCdrSerializedSize(
@@ -156,12 +158,14 @@ uint32_t& AllocTestType::index()
 }
 
 
-
 size_t AllocTestType::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return AllocTestType_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+    return current_align;
 }
 
 bool AllocTestType::isKeyDefined()
@@ -173,5 +177,5 @@ void AllocTestType::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
+     
 }
-

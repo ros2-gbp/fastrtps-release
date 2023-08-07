@@ -22,8 +22,7 @@ set(STRINGMATCHINGTESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/StringMatching.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/StringMatching.cpp)
 
 set(FIXEDSIZESTRINGTESTS_SOURCE
     FixedSizeStringTests.cpp)
@@ -40,8 +39,7 @@ set(LOCATORTESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp)
 
 set(FIXEDSIZEQUEUETESTS_SOURCE
     FixedSizeQueueTests.cpp)
@@ -58,8 +56,7 @@ target_compile_definitions(StringMatchingTests PRIVATE FASTRTPS_NO_LIB
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(StringMatchingTests PRIVATE
-    ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
-    ${PROJECT_SOURCE_DIR}/src/cpp)
+    ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
 target_link_libraries(StringMatchingTests GTest::gtest ${MOCKS})
 if(MSVC OR MSVC_IDE)
     target_link_libraries(StringMatchingTests ${PRIVACY} iphlpapi Shlwapi
@@ -108,17 +105,9 @@ target_compile_definitions(LocatorTests PRIVATE FASTRTPS_NO_LIB
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(LocatorTests PRIVATE
-    ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include ${Asio_INCLUDE_DIR}
-    ${PROJECT_SOURCE_DIR}/src/cpp)
+    ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include ${Asio_INCLUDE_DIR})
 target_link_libraries(LocatorTests GTest::gtest ${MOCKS})
-if(QNX)
-    target_link_libraries(LocatorTests socket)
-endif()
-if(EPROSIMA_TEST_DNS_NOT_SET_UP)
-    set(IGNORE_COMMAND LocatorDNSTests)
-endif()
-add_gtest(LocatorTests SOURCES ${LOCATORTESTS_SOURCE} IGNORE ${IGNORE_COMMAND})
-unset(IGNORE_COMMAND)
+add_gtest(LocatorTests SOURCES ${LOCATORTESTS_SOURCE})
 # Skip DNS related tests when not running on our CI
 if(NOT(EPROSIMA_BUILD))
     message(STATUS "Ignoring DNS tests")
@@ -127,6 +116,7 @@ if(NOT(EPROSIMA_BUILD))
         LocatorDNSTests
         )
 endif()
+
 
 add_executable(FixedSizeQueueTests ${FIXEDSIZEQUEUETESTS_SOURCE})
 target_compile_definitions(FixedSizeQueueTests PRIVATE FASTRTPS_NO_LIB)
@@ -155,13 +145,3 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/environment_test_file.json
     ${CMAKE_CURRENT_BINARY_DIR}/environment_test_file.json COPYONLY)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/empty_environment_test_file.json
     ${CMAKE_CURRENT_BINARY_DIR}/empty_environment_test_file.json COPYONLY)
-
-if(ANDROID)
-    set_property(TARGET StringMatchingTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET FixedSizeQueueTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET BitmapRangeTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET ResourceLimitedVectorTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET LocatorTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET FixedSizeStringTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET SystemInfoTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()

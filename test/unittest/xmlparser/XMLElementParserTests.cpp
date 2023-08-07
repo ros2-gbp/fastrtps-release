@@ -1490,13 +1490,13 @@ TEST_F(XMLParserTests, getXMLWriterReaderQosPolicies)
 }
 
 /*
- * This test checks that there is a EPROSIMA_LOG_ERROR when setting up a non supported <data_writer>/<data_reader> qos
- * 1. Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <durabilityService> Qos.
- * 3. Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <timeBasedFilter> Qos.
- * 4. Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <ownership> Qos.
- * 5. Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <ownershipStrength> Qos.
- * 6. Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <destinationOrder> Qos.
- * 7. Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <presentation> Qos.
+ * This test checks that there is a logError when setting up a non supported <data_writer>/<data_reader> qos
+ * 1. Check that there is a logError when trying to set up the <durabilityService> Qos.
+ * 3. Check that there is a logError when trying to set up the <timeBasedFilter> Qos.
+ * 4. Check that there is a logError when trying to set up the <ownership> Qos.
+ * 5. Check that there is a logError when trying to set up the <ownershipStrength> Qos.
+ * 6. Check that there is a logError when trying to set up the <destinationOrder> Qos.
+ * 7. Check that there is a logError when trying to set up the <presentation> Qos.
  */
 TEST_F(XMLParserTests, getXMLWriterReaderUnsupportedQosPolicies)
 {
@@ -1521,35 +1521,49 @@ TEST_F(XMLParserTests, getXMLWriterReaderUnsupportedQosPolicies)
 
     char xml[600];
 
-    // Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <durabilityService> Qos.
+    // Check that there is a logError when trying to set up the <durabilityService> Qos.
     sprintf(xml, xml_p, "<durabilityService></durabilityService>");
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     titleElement = xml_doc.RootElement();
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLWriterQosPolicies_wrapper(titleElement, wqos, ident));
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLReaderQosPolicies_wrapper(titleElement, rqos, ident));
 
-    // Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <timeBasedFilter> Qos.
+    // Check that there is a logError when trying to set up the <timeBasedFilter> Qos.
     sprintf(xml, xml_p, "<timeBasedFilter></timeBasedFilter>");
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     titleElement = xml_doc.RootElement();
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLWriterQosPolicies_wrapper(titleElement, wqos, ident));
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLReaderQosPolicies_wrapper(titleElement, rqos, ident));
 
-    // Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <destinationOrder> Qos.
+    // Check that there is a logError when trying to set up the <ownership> Qos.
+    sprintf(xml, xml_p, "<ownership></ownership>");
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLWriterQosPolicies_wrapper(titleElement, wqos, ident));
+    EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLReaderQosPolicies_wrapper(titleElement, rqos, ident));
+
+    // Check that there is a logError when trying to set up the <ownershipStrength> Qos.
+    sprintf(xml, xml_p, "<ownershipStrength></ownershipStrength>");
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLWriterQosPolicies_wrapper(titleElement, wqos, ident));
+    EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLReaderQosPolicies_wrapper(titleElement, rqos, ident));
+
+    // Check that there is a logError when trying to set up the <destinationOrder> Qos.
     sprintf(xml, xml_p, "<destinationOrder></destinationOrder>");
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     titleElement = xml_doc.RootElement();
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLWriterQosPolicies_wrapper(titleElement, wqos, ident));
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLReaderQosPolicies_wrapper(titleElement, rqos, ident));
 
-    // Check that there is a EPROSIMA_LOG_ERROR when trying to set up the <presentation> Qos.
+    // Check that there is a logError when trying to set up the <presentation> Qos.
     sprintf(xml, xml_p, "<presentation></presentation>");
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     titleElement = xml_doc.RootElement();
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLWriterQosPolicies_wrapper(titleElement, wqos, ident));
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLReaderQosPolicies_wrapper(titleElement, rqos, ident));
 
-    helper_block_for_at_least_entries(8);
+    helper_block_for_at_least_entries(12);
     auto consumed_entries = mock_consumer->ConsumedEntries();
     // Expect 18 log errors.
     uint32_t num_errors = 0;
@@ -1560,7 +1574,7 @@ TEST_F(XMLParserTests, getXMLWriterReaderUnsupportedQosPolicies)
             num_errors++;
         }
     }
-    EXPECT_EQ(num_errors, 8u);
+    EXPECT_EQ(num_errors, 12u);
 }
 
 /*
@@ -1812,7 +1826,6 @@ TEST_F(XMLParserTests, getXMLDurabilityQosKind)
  *      <writerPayloadSize>
  *      <mutation_tries>
  *      <avoid_builtin_multicast>
- *      <typelookup_config>
  * 2. Check invalid element
  */
 TEST_F(XMLParserTests, getXMLBuiltinAttributes_NegativeClauses)
@@ -1851,8 +1864,7 @@ TEST_F(XMLParserTests, getXMLBuiltinAttributes_NegativeClauses)
         "readerPayloadSize",
         "writerPayloadSize",
         "mutation_tries",
-        "avoid_builtin_multicast",
-        "typelookup_config"
+        "avoid_builtin_multicast"
     };
 
     for (std::string tag : field_vec)
@@ -3629,237 +3641,4 @@ TEST_F(XMLParserTests, getXMLDataSharingQos_negativeCases)
         EXPECT_EQ(XMLP_ret::XML_ERROR,
                 XMLParserTest::propertiesPolicy_wrapper(titleElement, datasharing_policy, ident));
     }
-}
-
-/*
- * This test checks the proper parsing of the <ownership> xml elements to a OwnershipQosPolicy object.
- * 1. Correct parsing of a valid <ownership> set to SHARED.
- * 2. Correct parsing of a valid <ownership> set to EXCLUSIVE.
- * 3. Check no kind.
- * 4. Check an invalid kind.
- */
-TEST_F(XMLParserTests, getXMLOwnershipQos)
-{
-    uint8_t ident = 1;
-    OwnershipQosPolicy ownership_policy;
-    tinyxml2::XMLDocument xml_doc;
-    tinyxml2::XMLElement* titleElement;
-
-    {
-        // Template xml
-        const char* xml_p =
-                "\
-                <ownership>\
-                    <kind>%s</kind>\
-                </ownership>\
-                ";
-        char xml[1000];
-
-        sprintf(xml, xml_p, "SHARED");
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_policy, ident));
-        EXPECT_EQ(ownership_policy.kind, OwnershipQosPolicyKind::SHARED_OWNERSHIP_QOS);
-
-        sprintf(xml, xml_p, "EXCLUSIVE");
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_policy, ident));
-        EXPECT_EQ(ownership_policy.kind, OwnershipQosPolicyKind::EXCLUSIVE_OWNERSHIP_QOS);
-    }
-
-    {
-        const char* xml =
-                "\
-                <ownership>\
-                </ownership>\
-                ";
-
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_ERROR,
-                XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_policy, ident));
-    }
-
-    {
-        const char* xml =
-                "\
-                <ownership>\
-                    <kind>INVALID</kind>\
-                </ownership>\
-                ";
-
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_ERROR,
-                XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_policy, ident));
-    }
-}
-
-/*
- * This test checks the proper parsing of the <ownershipStrength> xml elements to a OwnershipQosPolicy object.
- * 1. Correct parsing of a valid <ownershipStrength> value set to 0.
- * 2. Correct parsing of a valid <ownershipStrength> value set to 100.
- * 3. Check no value.
- * 4. Check an invalid value.
- */
-TEST_F(XMLParserTests, getXMLOwnershipStrengthQos)
-{
-    uint8_t ident = 1;
-    OwnershipStrengthQosPolicy ownership_strength_policy;
-    tinyxml2::XMLDocument xml_doc;
-    tinyxml2::XMLElement* titleElement;
-
-    {
-        // Template xml
-        const char* xml_p =
-                "\
-                <ownershipStrength>\
-                    <value>%s</value>\
-                </ownershipStrength>\
-                ";
-        char xml[1000];
-
-        sprintf(xml, xml_p, "0");
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_OK,
-                XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_strength_policy, ident));
-        EXPECT_EQ(ownership_strength_policy.value, 0u);
-
-        sprintf(xml, xml_p, "100");
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_OK,
-                XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_strength_policy, ident));
-        EXPECT_EQ(ownership_strength_policy.value, 100u);
-    }
-
-    {
-        const char* xml =
-                "\
-                <ownershipStrength>\
-                </ownershipStrength>\
-                ";
-
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_ERROR,
-                XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_strength_policy, ident));
-    }
-
-    {
-        const char* xml =
-                "\
-                <ownershipStrength>\
-                    <value>INVALID</value>\
-                </ownershipStrength>\
-                ";
-
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_ERROR,
-                XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_strength_policy, ident));
-    }
-}
-
-/*
- * This test checks the positive cases of configuration through XML of the TypeLookupService.
- * 1. Check that the XML return code is correct for the TypeLookup configuration settings.
- * 2. Check that the flags are corretly set.
- */
-TEST_F(XMLParserTests, getXMLTypeLookupSettings)
-{
-    uint8_t ident = 1;
-    TypeLookupSettings settings;
-    tinyxml2::XMLDocument xml_doc;
-    tinyxml2::XMLElement* titleElement;
-
-    // XML snippet
-    const char* xml =
-            "\
-            <typelookup_config>\
-                <use_server>true</use_server>\
-                <use_client>false</use_client>\
-            </typelookup_config>\
-            ";
-
-    // Load the xml
-    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-    // Check that the XML return code is correct for the TypeLookup settings
-    titleElement = xml_doc.RootElement();
-    EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLTypeLookupSettings_wrapper(titleElement, settings, ident));
-    EXPECT_TRUE(settings.use_server);
-    EXPECT_FALSE(settings.use_client);
-
-    // XML snippet
-    xml =
-            "\
-            <typelookup_config>\
-                <use_server>false</use_server>\
-                <use_client>true</use_client>\
-            </typelookup_config>\
-            ";
-
-    // Load the xml
-    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-    // Check that the XML return code is correct for the TypeLookup settings
-    EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLTypeLookupSettings_wrapper(titleElement, settings, ident));
-    EXPECT_FALSE(settings.use_server);
-    EXPECT_TRUE(settings.use_client);
-}
-
-/*
- * This test checks the negative cases in the <typelookup_config> xml element.
- * 1. Check an invalid tag of:
- *      <use_client>
- *      <use_server>
- * 2. Check invalid element.
- */
-TEST_F(XMLParserTests, getXMLTypeLookupSettings_NegativeClauses)
-{
-    uint8_t ident = 1;
-    TypeLookupSettings settings;
-    tinyxml2::XMLDocument xml_doc;
-    tinyxml2::XMLElement* titleElement;
-
-    // Parametrized XML
-    const char* xml_p =
-            "\
-            <typelookup_config>\
-                %s\
-            </typelookup_config>\
-            ";
-    char xml[1000];
-
-    const char* field_p =
-            "\
-            <%s>\
-                <bad_element> </bad_element>\
-            </%s>\
-            ";
-    char field[500];
-
-    std::vector<std::string> field_vec =
-    {
-        "use_client",
-        "use_server",
-    };
-
-    for (std::string tag : field_vec)
-    {
-        sprintf(field, field_p, tag.c_str(), tag.c_str());
-        sprintf(xml, xml_p, field);
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(XMLP_ret::XML_ERROR,
-                XMLParserTest::getXMLTypeLookupSettings_wrapper(titleElement, settings, ident));
-    }
-
-    // Invalid element
-    sprintf(xml, xml_p, "<bad_element> </bad_element>");
-    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
-    titleElement = xml_doc.RootElement();
-    EXPECT_EQ(XMLP_ret::XML_ERROR,
-            XMLParserTest::getXMLTypeLookupSettings_wrapper(titleElement, settings, ident));
 }

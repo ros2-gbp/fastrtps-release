@@ -34,14 +34,9 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define TestRegression3361_max_cdr_typesize 260ULL;
-
-#define TestRegression3361_max_key_cdr_typesize 0ULL;
-
-
 TestRegression3361::TestRegression3361()
 {
-    // TestModule::MACHINEID m_uuid
+    // m_uuid com.eprosima.idl.parser.typecode.AliasTypeCode@212bf671
     m_uuid ="";
 
 }
@@ -57,7 +52,7 @@ TestRegression3361::TestRegression3361(
 }
 
 TestRegression3361::TestRegression3361(
-        TestRegression3361&& x) noexcept 
+        TestRegression3361&& x)
 {
     m_uuid = std::move(x.m_uuid);
 }
@@ -72,7 +67,7 @@ TestRegression3361& TestRegression3361::operator =(
 }
 
 TestRegression3361& TestRegression3361::operator =(
-        TestRegression3361&& x) noexcept
+        TestRegression3361&& x)
 {
 
     m_uuid = std::move(x.m_uuid);
@@ -96,8 +91,12 @@ bool TestRegression3361::operator !=(
 size_t TestRegression3361::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return TestRegression3361_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+    return current_alignment - initial_alignment;
 }
 
 size_t TestRegression3361::getCdrSerializedSize(
@@ -165,12 +164,14 @@ TestModule::MACHINEID& TestRegression3361::uuid()
     return m_uuid;
 }
 
-
 size_t TestRegression3361::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return TestRegression3361_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+    return current_align;
 }
 
 bool TestRegression3361::isKeyDefined()
@@ -182,5 +183,5 @@ void TestRegression3361::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
+     
 }
-

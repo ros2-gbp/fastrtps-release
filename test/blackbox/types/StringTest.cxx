@@ -34,12 +34,9 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define StringTest_max_cdr_typesize 10005ULL;
-#define StringTest_max_key_cdr_typesize 0ULL;
-
 StringTest::StringTest()
 {
-    // string m_message
+    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@4b44655e
     m_message ="";
 
 }
@@ -55,7 +52,7 @@ StringTest::StringTest(
 }
 
 StringTest::StringTest(
-        StringTest&& x) noexcept 
+        StringTest&& x)
 {
     m_message = std::move(x.m_message);
 }
@@ -70,7 +67,7 @@ StringTest& StringTest::operator =(
 }
 
 StringTest& StringTest::operator =(
-        StringTest&& x) noexcept
+        StringTest&& x)
 {
 
     m_message = std::move(x.m_message);
@@ -94,8 +91,12 @@ bool StringTest::operator !=(
 size_t StringTest::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return StringTest_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 10000 + 1;
+
+    return current_alignment - initial_alignment;
 }
 
 size_t StringTest::getCdrSerializedSize(
@@ -115,7 +116,7 @@ void StringTest::serialize(
         eprosima::fastcdr::Cdr& scdr) const
 {
 
-    scdr << m_message.c_str();
+    scdr << m_message;
 
 }
 
@@ -123,18 +124,15 @@ void StringTest::deserialize(
         eprosima::fastcdr::Cdr& dcdr)
 {
 
-    {
-        std::string aux;
-        dcdr >> aux;
-        m_message = aux.c_str();
-    }}
+    dcdr >> m_message;
+}
 
 /*!
  * @brief This function copies the value in member message
  * @param _message New value to be copied in member message
  */
 void StringTest::message(
-        const eprosima::fastrtps::fixed_string<10000>& _message)
+        const std::string& _message)
 {
     m_message = _message;
 }
@@ -144,7 +142,7 @@ void StringTest::message(
  * @param _message New value to be moved in member message
  */
 void StringTest::message(
-        eprosima::fastrtps::fixed_string<10000>&& _message)
+        std::string&& _message)
 {
     m_message = std::move(_message);
 }
@@ -153,7 +151,7 @@ void StringTest::message(
  * @brief This function returns a constant reference to member message
  * @return Constant reference to member message
  */
-const eprosima::fastrtps::fixed_string<10000>& StringTest::message() const
+const std::string& StringTest::message() const
 {
     return m_message;
 }
@@ -162,17 +160,19 @@ const eprosima::fastrtps::fixed_string<10000>& StringTest::message() const
  * @brief This function returns a reference to member message
  * @return Reference to member message
  */
-eprosima::fastrtps::fixed_string<10000>& StringTest::message()
+std::string& StringTest::message()
 {
     return m_message;
 }
 
-
 size_t StringTest::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return StringTest_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+    return current_align;
 }
 
 bool StringTest::isKeyDefined()
@@ -184,5 +184,5 @@ void StringTest::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
+     
 }
-

@@ -167,6 +167,8 @@ public:
             const InstanceHandle_t& handle);
 
     /**
+     * NOT YET IMPLEMENTED
+     *
      * @brief This operation performs the same function as write except that it also provides the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp" that is made available to DataReader
      * objects by means of the @ref eprosima::fastdds::dds::SampleInfo::source_timestamp attribute "source_timestamp"
@@ -209,6 +211,8 @@ public:
             void* instance);
 
     /**
+     * NOT YET IMPLEMENTED
+     *
      * @brief This operation performs the same function as register_instance and can be used instead of
      * @ref register_instance in the cases where the application desires to specify the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp".
@@ -254,6 +258,8 @@ public:
             const InstanceHandle_t& handle);
 
     /**
+     * NOT YET IMPLEMENTED
+     *
      * @brief This operation performs the same function as @ref unregister_instance and can be used instead of
      * @ref unregister_instance in the cases where the application desires to specify the value for the
      * @ref eprosima::fastdds::dds::SampleInfo::source_timestamp "source_timestamp".
@@ -514,7 +520,7 @@ public:
      * @param[out] subscription_data subscription data struct
      * @param subscription_handle InstanceHandle_t of the subscription
      * @return RETCODE_OK
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
+     *
      */
     RTPS_DllAPI ReturnCode_t get_matched_subscription_data(
             builtin::SubscriptionBuiltinTopicData& subscription_data,
@@ -525,7 +531,6 @@ public:
      *
      * @param[out] subscription_handles Vector where the InstanceHandle_t are returned
      * @return RETCODE_OK
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_matched_subscriptions(
             std::vector<InstanceHandle_t>& subscription_handles) const;

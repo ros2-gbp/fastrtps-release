@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_ALLOCTESTTYPE_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -44,16 +42,16 @@
 
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
-#if defined(ALLOCTESTTYPE_SOURCE)
-#define ALLOCTESTTYPE_DllAPI __declspec( dllexport )
+#if defined(AllocTestType_SOURCE)
+#define AllocTestType_DllAPI __declspec( dllexport )
 #else
-#define ALLOCTESTTYPE_DllAPI __declspec( dllimport )
-#endif // ALLOCTESTTYPE_SOURCE
+#define AllocTestType_DllAPI __declspec( dllimport )
+#endif // AllocTestType_SOURCE
 #else
-#define ALLOCTESTTYPE_DllAPI
+#define AllocTestType_DllAPI
 #endif  // EPROSIMA_USER_DLL_EXPORT
 #else
-#define ALLOCTESTTYPE_DllAPI
+#define AllocTestType_DllAPI
 #endif // _WIN32
 
 namespace eprosima {
@@ -65,7 +63,7 @@ class Cdr;
 
 /*!
  * @brief This class represents the structure AllocTestType defined by the user in the IDL file.
- * @ingroup AllocTestType
+ * @ingroup ALLOCTESTTYPE
  */
 class AllocTestType
 {
@@ -93,7 +91,7 @@ public:
      * @param x Reference to the object AllocTestType that will be copied.
      */
     eProsima_user_DllExport AllocTestType(
-            AllocTestType&& x) noexcept;
+            AllocTestType&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +105,7 @@ public:
      * @param x Reference to the object AllocTestType that will be copied.
      */
     eProsima_user_DllExport AllocTestType& operator =(
-            AllocTestType&& x) noexcept;
+            AllocTestType&& x);
 
     /*!
      * @brief Comparison operator.
@@ -144,11 +142,11 @@ public:
 
 
     /*!
-    * @brief This function returns the maximum serialized size of an object
-    * depending on the buffer alignment.
-    * @param current_alignment Buffer alignment.
-    * @return Maximum serialized size.
-    */
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -203,8 +201,6 @@ public:
 private:
 
     uint32_t m_index;
-
 };
 
 #endif // _FAST_DDS_GENERATED_ALLOCTESTTYPE_H_
-

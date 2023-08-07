@@ -195,20 +195,6 @@ public:
     RTPS_DllAPI virtual const fastdds::rtps::IReaderDataFilter* reader_data_filter() const = 0;
 
     /**
-     * @brief Check if a specific change has been delivered to the transport layer of every matched remote RTPSReader
-     * at least once.
-     *
-     * @param seq_num Sequence number of the change to check.
-     * @return true if delivered. False otherwise.
-     */
-    RTPS_DllAPI virtual bool has_been_fully_delivered(
-            const SequenceNumber_t& seq_num) const
-    {
-        static_cast<void>(seq_num);
-        return false;
-    }
-
-    /**
      * Check if a specific change has been acknowledged by all Readers.
      * Is only useful in reliable Writer. In BE Writers returns false when pending to be sent.
      * @return True if acknowledged by all.
@@ -295,17 +281,6 @@ public:
             unsigned int max = 0);
 
     /**
-     * @brief Returns if disable positive ACKs QoS is enabled.
-     *
-     * @return Best effort writers always return false.
-     *         Reliable writers override this method.
-     */
-    RTPS_DllAPI virtual bool get_disable_positive_acks() const
-    {
-        return false;
-    }
-
-    /**
      * Tries to remove a change waiting a maximum of the provided microseconds.
      * @param max_blocking_time_point Maximum time to wait for.
      * @param lock Lock of the Change list.
@@ -329,7 +304,7 @@ public:
 
 #ifdef FASTDDS_STATISTICS
 
-    /**
+    /*
      * Add a listener to receive statistics backend callbacks
      * @param listener
      * @return true if successfully added
@@ -337,21 +312,13 @@ public:
     RTPS_DllAPI bool add_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener);
 
-    /**
+    /*
      * Remove a listener from receiving statistics backend callbacks
      * @param listener
      * @return true if successfully removed
      */
     RTPS_DllAPI bool remove_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener);
-
-    /**
-     * @brief Set the enabled statistics writers mask
-     *
-     * @param enabled_writers The new mask to set
-     */
-    RTPS_DllAPI void set_enabled_statistics_writers_mask(
-            uint32_t enabled_writers);
 
 #endif // FASTDDS_STATISTICS
 
@@ -575,8 +542,7 @@ protected:
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(RTPS_WRITER,
-                            "Error sending fragment (" << change->sequenceNumber << ", " << frag << ")");
+                    logError(RTPS_WRITER, "Error sending fragment (" << change->sequenceNumber << ", " << frag << ")");
                     break;
                 }
             }
@@ -590,7 +556,7 @@ protected:
             }
             else
             {
-                EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
+                logError(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
             }
         }
 

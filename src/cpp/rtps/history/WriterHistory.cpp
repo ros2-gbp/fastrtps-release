@@ -64,14 +64,14 @@ bool WriterHistory::prepare_and_add_change(
 {
     if (a_change->writerGUID != mp_writer->getGuid())
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
+        logError(RTPS_WRITER_HISTORY,
                 "Change writerGUID " << a_change->writerGUID << " different than Writer GUID " <<
                 mp_writer->getGuid());
         return false;
     }
     if ((m_att.memoryPolicy == PREALLOCATED_MEMORY_MODE) && a_change->serializedPayload.length > m_att.payloadMaxSize)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
+        logError(RTPS_WRITER_HISTORY,
                 "Change payload size of '" << a_change->serializedPayload.length <<
                 "' bytes is larger than the history payload size of '" << m_att.payloadMaxSize <<
                 "' bytes and cannot be resized.");
@@ -80,20 +80,13 @@ bool WriterHistory::prepare_and_add_change(
 
     if (m_isHistoryFull)
     {
-        EPROSIMA_LOG_WARNING(RTPS_WRITER_HISTORY, "History full for writer " << a_change->writerGUID);
+        logWarning(RTPS_WRITER_HISTORY, "History full for writer " << a_change->writerGUID);
         return false;
     }
 
     ++m_lastCacheChangeSeqNum;
     a_change->sequenceNumber = m_lastCacheChangeSeqNum;
-    if (wparams.source_timestamp().seconds() < 0)
-    {
-        Time_t::now(a_change->sourceTimestamp);
-    }
-    else
-    {
-        a_change->sourceTimestamp = wparams.source_timestamp();
-    }
+    Time_t::now(a_change->sourceTimestamp);
     a_change->writer_info.num_sent_submessages = 0;
 
     a_change->write_params = wparams;
@@ -110,7 +103,7 @@ bool WriterHistory::prepare_and_add_change(
         m_isHistoryFull = true;
     }
 
-    EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY,
+    logInfo(RTPS_WRITER_HISTORY,
             "Change " << a_change->sequenceNumber << " added with " << a_change->serializedPayload.length << " bytes");
 
     return true;
@@ -130,8 +123,7 @@ bool WriterHistory::add_change_(
 {
     if (mp_writer == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
-                "You need to create a Writer with this History before adding any changes");
+        logError(RTPS_WRITER_HISTORY, "You need to create a Writer with this History before adding any changes");
         return false;
     }
 
@@ -153,13 +145,13 @@ bool WriterHistory::matches_change(
     if (nullptr == outer_change
             || nullptr == inner_change)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY, "Pointer is not valid");
+        logError(RTPS_WRITER_HISTORY, "Pointer is not valid");
         return false;
     }
 
     if (outer_change->writerGUID != mp_writer->getGuid())
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
+        logError(RTPS_WRITER_HISTORY,
                 "Change writerGUID " << outer_change->writerGUID << " different than Writer GUID " <<
                 mp_writer->getGuid());
         return false;
@@ -174,14 +166,13 @@ History::iterator WriterHistory::remove_change_nts(
 {
     if (mp_writer == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
-                "You need to create a Writer with this History before removing any changes");
+        logError(RTPS_WRITER_HISTORY, "You need to create a Writer with this History before removing any changes");
         return changesEnd();
     }
 
     if ( removal == changesEnd())
     {
-        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Trying to remove without a proper CacheChange_t referenced");
+        logInfo(RTPS_WRITER_HISTORY, "Trying to remove without a proper CacheChange_t referenced");
         return changesEnd();
     }
 
@@ -227,8 +218,7 @@ CacheChange_t* WriterHistory::remove_change_and_reuse(
 {
     if (mp_writer == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
-                "You need to create a Writer with this History before removing any changes");
+        logError(RTPS_WRITER_HISTORY, "You need to create a Writer with this History before removing any changes");
         return nullptr;
     }
 
@@ -241,7 +231,7 @@ CacheChange_t* WriterHistory::remove_change_and_reuse(
 
     if ( it == changesEnd())
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY, "Sequence number provided doesn't match any change in history");
+        logError(RTPS_WRITER_HISTORY, "Sequence number provided doesn't match any change in history");
         return nullptr;
     }
 
@@ -256,8 +246,7 @@ bool WriterHistory::remove_min_change()
 
     if (mp_writer == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY,
-                "You need to create a Writer with this History before removing any changes");
+        logError(RTPS_WRITER_HISTORY, "You need to create a Writer with this History before removing any changes");
         return false;
     }
 
@@ -307,7 +296,7 @@ void WriterHistory::set_fragments(
     uint32_t inline_qos_size = change->inline_qos.length;
     if (change->write_params.related_sample_identity() != SampleIdentity::unknown())
     {
-        inline_qos_size += (2 * fastdds::dds::ParameterSerializer<Parameter_t>::PARAMETER_SAMPLE_IDENTITY_SIZE);
+        inline_qos_size += fastdds::dds::ParameterSerializer<Parameter_t>::PARAMETER_SAMPLE_IDENTITY_SIZE;
     }
     if (ChangeKind_t::ALIVE != change->kind && TopicKind_t::WITH_KEY == mp_writer->m_att.topicKind)
     {

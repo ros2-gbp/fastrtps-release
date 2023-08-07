@@ -202,17 +202,6 @@ public:
     bool matched_reader_is_matched(
             const GUID_t& reader_guid) override;
 
-    /**
-     * @brief Check if a specific change has been delivered to the transport layer at least once for every matched
-     * remote RTPSReader.
-     *
-     * @param seq_num Sequence number of the change to check.
-     * @return true if delivered.
-     * @return false otherwise.
-     */
-    bool has_been_fully_delivered(
-            const SequenceNumber_t& seq_num) const override;
-
     bool is_acked_by_all(
             const CacheChange_t* a_change) const override;
 
@@ -307,7 +296,7 @@ public:
      *
      * @return True if positive acks are disabled, false otherwise
      */
-    bool get_disable_positive_acks() const override
+    inline bool get_disable_positive_acks() const
     {
         return disable_positive_acks_;
     }

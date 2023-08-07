@@ -133,7 +133,7 @@ ReturnCode_t TypeDescriptor::copy_from(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error copying TypeDescriptor, invalid input descriptor");
+        logError(DYN_TYPES, "Error copying TypeDescriptor, invalid input descriptor");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -161,7 +161,7 @@ uint32_t TypeDescriptor::get_bounds(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error getting bounds value. Index out of range.");
+        logError(DYN_TYPES, "Error getting bounds value. Index out of range.");
         return BOUND_UNLIMITED;
     }
 }
@@ -334,7 +334,7 @@ ReturnCode_t TypeDescriptor::apply_annotation(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation. The input descriptor isn't consistent.");
+        logError(DYN_TYPES, "Error applying annotation. The input descriptor isn't consistent.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }

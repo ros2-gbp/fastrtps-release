@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_KEYEDDATA1MB_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -44,16 +42,16 @@
 
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
-#if defined(KEYEDDATA1MB_SOURCE)
-#define KEYEDDATA1MB_DllAPI __declspec( dllexport )
+#if defined(KeyedData1mb_SOURCE)
+#define KeyedData1mb_DllAPI __declspec( dllexport )
 #else
-#define KEYEDDATA1MB_DllAPI __declspec( dllimport )
-#endif // KEYEDDATA1MB_SOURCE
+#define KeyedData1mb_DllAPI __declspec( dllimport )
+#endif // KeyedData1mb_SOURCE
 #else
-#define KEYEDDATA1MB_DllAPI
+#define KeyedData1mb_DllAPI
 #endif  // EPROSIMA_USER_DLL_EXPORT
 #else
-#define KEYEDDATA1MB_DllAPI
+#define KeyedData1mb_DllAPI
 #endif // _WIN32
 
 namespace eprosima {
@@ -65,7 +63,7 @@ class Cdr;
 
 /*!
  * @brief This class represents the structure KeyedData1mb defined by the user in the IDL file.
- * @ingroup KeyedData1mb
+ * @ingroup KEYEDDATA1MB
  */
 class KeyedData1mb
 {
@@ -93,7 +91,7 @@ public:
      * @param x Reference to the object KeyedData1mb that will be copied.
      */
     eProsima_user_DllExport KeyedData1mb(
-            KeyedData1mb&& x) noexcept;
+            KeyedData1mb&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +105,7 @@ public:
      * @param x Reference to the object KeyedData1mb that will be copied.
      */
     eProsima_user_DllExport KeyedData1mb& operator =(
-            KeyedData1mb&& x) noexcept;
+            KeyedData1mb&& x);
 
     /*!
      * @brief Comparison operator.
@@ -169,11 +167,11 @@ public:
     eProsima_user_DllExport std::vector<uint8_t>& data();
 
     /*!
-    * @brief This function returns the maximum serialized size of an object
-    * depending on the buffer alignment.
-    * @param current_alignment Buffer alignment.
-    * @return Maximum serialized size.
-    */
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -229,8 +227,6 @@ private:
 
     uint16_t m_key;
     std::vector<uint8_t> m_data;
-
 };
 
 #endif // _FAST_DDS_GENERATED_KEYEDDATA1MB_H_
-

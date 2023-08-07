@@ -34,42 +34,9 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define eprosima_fastdds_statistics_DiscoveryTime_max_cdr_typesize 820ULL;
-#define eprosima_fastdds_statistics_PhysicalData_max_cdr_typesize 796ULL;
-
-#define eprosima_fastdds_statistics_detail_Locator_s_max_cdr_typesize 24ULL;
-
-#define eprosima_fastdds_statistics_detail_GuidPrefix_s_max_cdr_typesize 12ULL;
-#define eprosima_fastdds_statistics_detail_SampleIdentity_s_max_cdr_typesize 24ULL;
-#define eprosima_fastdds_statistics_EntityData_max_cdr_typesize 20ULL;
-#define eprosima_fastdds_statistics_Entity2LocatorTraffic_max_cdr_typesize 58ULL;
-#define eprosima_fastdds_statistics_detail_EntityId_s_max_cdr_typesize 4ULL;
-#define eprosima_fastdds_statistics_EntityCount_max_cdr_typesize 24ULL;
-#define eprosima_fastdds_statistics_WriterReaderData_max_cdr_typesize 36ULL;
-#define eprosima_fastdds_statistics_SampleIdentityCount_max_cdr_typesize 32ULL;
-#define eprosima_fastdds_statistics_Locator2LocatorData_max_cdr_typesize 52ULL;
-#define eprosima_fastdds_statistics_detail_GUID_s_max_cdr_typesize 16ULL;
-#define eprosima_fastdds_statistics_detail_SequenceNumber_s_max_cdr_typesize 8ULL;
-#define eprosima_fastdds_statistics_DiscoveryTime_max_key_cdr_typesize 32ULL;
-#define eprosima_fastdds_statistics_PhysicalData_max_key_cdr_typesize 16ULL;
-
-#define eprosima_fastdds_statistics_detail_Locator_s_max_key_cdr_typesize 0ULL;
-
-#define eprosima_fastdds_statistics_detail_GuidPrefix_s_max_key_cdr_typesize 0ULL;
-#define eprosima_fastdds_statistics_detail_SampleIdentity_s_max_key_cdr_typesize 0ULL;
-#define eprosima_fastdds_statistics_EntityData_max_key_cdr_typesize 16ULL;
-#define eprosima_fastdds_statistics_Entity2LocatorTraffic_max_key_cdr_typesize 40ULL;
-#define eprosima_fastdds_statistics_detail_EntityId_s_max_key_cdr_typesize 0ULL;
-#define eprosima_fastdds_statistics_EntityCount_max_key_cdr_typesize 16ULL;
-#define eprosima_fastdds_statistics_WriterReaderData_max_key_cdr_typesize 32ULL;
-#define eprosima_fastdds_statistics_SampleIdentityCount_max_key_cdr_typesize 24ULL;
-#define eprosima_fastdds_statistics_Locator2LocatorData_max_key_cdr_typesize 48ULL;
-#define eprosima_fastdds_statistics_detail_GUID_s_max_key_cdr_typesize 0ULL;
-#define eprosima_fastdds_statistics_detail_SequenceNumber_s_max_key_cdr_typesize 0ULL;
-
 eprosima::fastdds::statistics::detail::EntityId_s::EntityId_s()
 {
-    // octet m_value
+    // m_value com.eprosima.idl.parser.typecode.ArrayTypeCode@5ae63ade
     memset(&m_value, 0, (4) * 1);
 
 }
@@ -85,7 +52,7 @@ eprosima::fastdds::statistics::detail::EntityId_s::EntityId_s(
 }
 
 eprosima::fastdds::statistics::detail::EntityId_s::EntityId_s(
-        EntityId_s&& x) noexcept 
+        EntityId_s&& x)
 {
     m_value = std::move(x.m_value);
 }
@@ -100,7 +67,7 @@ eprosima::fastdds::statistics::detail::EntityId_s& eprosima::fastdds::statistics
 }
 
 eprosima::fastdds::statistics::detail::EntityId_s& eprosima::fastdds::statistics::detail::EntityId_s::operator =(
-        EntityId_s&& x) noexcept
+        EntityId_s&& x)
 {
 
     m_value = std::move(x.m_value);
@@ -124,8 +91,13 @@ bool eprosima::fastdds::statistics::detail::EntityId_s::operator !=(
 size_t eprosima::fastdds::statistics::detail::EntityId_s::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_EntityId_s_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += ((4) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::detail::EntityId_s::getCdrSerializedSize(
@@ -196,12 +168,14 @@ std::array<uint8_t, 4>& eprosima::fastdds::statistics::detail::EntityId_s::value
     return m_value;
 }
 
-
 size_t eprosima::fastdds::statistics::detail::EntityId_s::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_EntityId_s_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::detail::EntityId_s::isKeyDefined()
@@ -213,12 +187,12 @@ void eprosima::fastdds::statistics::detail::EntityId_s::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-}
 
+}
 
 eprosima::fastdds::statistics::detail::GuidPrefix_s::GuidPrefix_s()
 {
-    // octet m_value
+    // m_value com.eprosima.idl.parser.typecode.ArrayTypeCode@1f36e637
     memset(&m_value, 0, (12) * 1);
 
 }
@@ -234,7 +208,7 @@ eprosima::fastdds::statistics::detail::GuidPrefix_s::GuidPrefix_s(
 }
 
 eprosima::fastdds::statistics::detail::GuidPrefix_s::GuidPrefix_s(
-        GuidPrefix_s&& x) noexcept 
+        GuidPrefix_s&& x)
 {
     m_value = std::move(x.m_value);
 }
@@ -249,7 +223,7 @@ eprosima::fastdds::statistics::detail::GuidPrefix_s& eprosima::fastdds::statisti
 }
 
 eprosima::fastdds::statistics::detail::GuidPrefix_s& eprosima::fastdds::statistics::detail::GuidPrefix_s::operator =(
-        GuidPrefix_s&& x) noexcept
+        GuidPrefix_s&& x)
 {
 
     m_value = std::move(x.m_value);
@@ -273,8 +247,13 @@ bool eprosima::fastdds::statistics::detail::GuidPrefix_s::operator !=(
 size_t eprosima::fastdds::statistics::detail::GuidPrefix_s::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_GuidPrefix_s_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += ((12) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::detail::GuidPrefix_s::getCdrSerializedSize(
@@ -345,12 +324,14 @@ std::array<uint8_t, 12>& eprosima::fastdds::statistics::detail::GuidPrefix_s::va
     return m_value;
 }
 
-
 size_t eprosima::fastdds::statistics::detail::GuidPrefix_s::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_GuidPrefix_s_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::detail::GuidPrefix_s::isKeyDefined()
@@ -362,14 +343,14 @@ void eprosima::fastdds::statistics::detail::GuidPrefix_s::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-}
 
+}
 
 eprosima::fastdds::statistics::detail::GUID_s::GUID_s()
 {
-    // eprosima::fastdds::statistics::detail::GuidPrefix_s m_guidPrefix
+    // m_guidPrefix com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@59906517
 
-    // eprosima::fastdds::statistics::detail::EntityId_s m_entityId
+    // m_entityId com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@5bfbf16f
 
 
 }
@@ -388,7 +369,7 @@ eprosima::fastdds::statistics::detail::GUID_s::GUID_s(
 }
 
 eprosima::fastdds::statistics::detail::GUID_s::GUID_s(
-        GUID_s&& x) noexcept 
+        GUID_s&& x)
 {
     m_guidPrefix = std::move(x.m_guidPrefix);
     m_entityId = std::move(x.m_entityId);
@@ -405,7 +386,7 @@ eprosima::fastdds::statistics::detail::GUID_s& eprosima::fastdds::statistics::de
 }
 
 eprosima::fastdds::statistics::detail::GUID_s& eprosima::fastdds::statistics::detail::GUID_s::operator =(
-        GUID_s&& x) noexcept
+        GUID_s&& x)
 {
 
     m_guidPrefix = std::move(x.m_guidPrefix);
@@ -430,8 +411,13 @@ bool eprosima::fastdds::statistics::detail::GUID_s::operator !=(
 size_t eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_GUID_s_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::GuidPrefix_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += eprosima::fastdds::statistics::detail::EntityId_s::getMaxCdrSerializedSize(current_alignment);
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::detail::GUID_s::getCdrSerializedSize(
@@ -540,12 +526,16 @@ eprosima::fastdds::statistics::detail::EntityId_s& eprosima::fastdds::statistics
     return m_entityId;
 }
 
-
 size_t eprosima::fastdds::statistics::detail::GUID_s::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_GUID_s_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::detail::GUID_s::isKeyDefined()
@@ -557,14 +547,14 @@ void eprosima::fastdds::statistics::detail::GUID_s::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-}
 
+}
 
 eprosima::fastdds::statistics::detail::SequenceNumber_s::SequenceNumber_s()
 {
-    // long m_high
+    // m_high com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4d3167f4
     m_high = 0;
-    // unsigned long m_low
+    // m_low com.eprosima.idl.parser.typecode.PrimitiveTypeCode@ed9d034
     m_low = 0;
 
 }
@@ -583,7 +573,7 @@ eprosima::fastdds::statistics::detail::SequenceNumber_s::SequenceNumber_s(
 }
 
 eprosima::fastdds::statistics::detail::SequenceNumber_s::SequenceNumber_s(
-        SequenceNumber_s&& x) noexcept 
+        SequenceNumber_s&& x)
 {
     m_high = x.m_high;
     m_low = x.m_low;
@@ -600,7 +590,7 @@ eprosima::fastdds::statistics::detail::SequenceNumber_s& eprosima::fastdds::stat
 }
 
 eprosima::fastdds::statistics::detail::SequenceNumber_s& eprosima::fastdds::statistics::detail::SequenceNumber_s::operator =(
-        SequenceNumber_s&& x) noexcept
+        SequenceNumber_s&& x)
 {
 
     m_high = x.m_high;
@@ -625,8 +615,17 @@ bool eprosima::fastdds::statistics::detail::SequenceNumber_s::operator !=(
 size_t eprosima::fastdds::statistics::detail::SequenceNumber_s::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_SequenceNumber_s_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::detail::SequenceNumber_s::getCdrSerializedSize(
@@ -721,12 +720,16 @@ uint32_t& eprosima::fastdds::statistics::detail::SequenceNumber_s::low()
 }
 
 
-
 size_t eprosima::fastdds::statistics::detail::SequenceNumber_s::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_SequenceNumber_s_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::detail::SequenceNumber_s::isKeyDefined()
@@ -738,14 +741,14 @@ void eprosima::fastdds::statistics::detail::SequenceNumber_s::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-}
 
+}
 
 eprosima::fastdds::statistics::detail::SampleIdentity_s::SampleIdentity_s()
 {
-    // eprosima::fastdds::statistics::detail::GUID_s m_writer_guid
+    // m_writer_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // eprosima::fastdds::statistics::detail::SequenceNumber_s m_sequence_number
+    // m_sequence_number com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@1060b431
 
 
 }
@@ -764,7 +767,7 @@ eprosima::fastdds::statistics::detail::SampleIdentity_s::SampleIdentity_s(
 }
 
 eprosima::fastdds::statistics::detail::SampleIdentity_s::SampleIdentity_s(
-        SampleIdentity_s&& x) noexcept 
+        SampleIdentity_s&& x)
 {
     m_writer_guid = std::move(x.m_writer_guid);
     m_sequence_number = std::move(x.m_sequence_number);
@@ -781,7 +784,7 @@ eprosima::fastdds::statistics::detail::SampleIdentity_s& eprosima::fastdds::stat
 }
 
 eprosima::fastdds::statistics::detail::SampleIdentity_s& eprosima::fastdds::statistics::detail::SampleIdentity_s::operator =(
-        SampleIdentity_s&& x) noexcept
+        SampleIdentity_s&& x)
 {
 
     m_writer_guid = std::move(x.m_writer_guid);
@@ -806,8 +809,13 @@ bool eprosima::fastdds::statistics::detail::SampleIdentity_s::operator !=(
 size_t eprosima::fastdds::statistics::detail::SampleIdentity_s::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_SampleIdentity_s_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += eprosima::fastdds::statistics::detail::SequenceNumber_s::getMaxCdrSerializedSize(current_alignment);
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::detail::SampleIdentity_s::getCdrSerializedSize(
@@ -916,12 +924,16 @@ eprosima::fastdds::statistics::detail::SequenceNumber_s& eprosima::fastdds::stat
     return m_sequence_number;
 }
 
-
 size_t eprosima::fastdds::statistics::detail::SampleIdentity_s::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_SampleIdentity_s_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::detail::SampleIdentity_s::isKeyDefined()
@@ -933,16 +945,16 @@ void eprosima::fastdds::statistics::detail::SampleIdentity_s::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-}
 
+}
 
 eprosima::fastdds::statistics::detail::Locator_s::Locator_s()
 {
-    // long m_kind
+    // m_kind com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6a1aab78
     m_kind = 0;
-    // unsigned long m_port
+    // m_port com.eprosima.idl.parser.typecode.PrimitiveTypeCode@462d5aee
     m_port = 0;
-    // octet m_address
+    // m_address com.eprosima.idl.parser.typecode.ArrayTypeCode@69b0fd6f
     memset(&m_address, 0, (16) * 1);
 
 }
@@ -963,7 +975,7 @@ eprosima::fastdds::statistics::detail::Locator_s::Locator_s(
 }
 
 eprosima::fastdds::statistics::detail::Locator_s::Locator_s(
-        Locator_s&& x) noexcept 
+        Locator_s&& x)
 {
     m_kind = x.m_kind;
     m_port = x.m_port;
@@ -982,7 +994,7 @@ eprosima::fastdds::statistics::detail::Locator_s& eprosima::fastdds::statistics:
 }
 
 eprosima::fastdds::statistics::detail::Locator_s& eprosima::fastdds::statistics::detail::Locator_s::operator =(
-        Locator_s&& x) noexcept
+        Locator_s&& x)
 {
 
     m_kind = x.m_kind;
@@ -1008,8 +1020,20 @@ bool eprosima::fastdds::statistics::detail::Locator_s::operator !=(
 size_t eprosima::fastdds::statistics::detail::Locator_s::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_Locator_s_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += ((16) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::detail::Locator_s::getCdrSerializedSize(
@@ -1147,12 +1171,17 @@ std::array<uint8_t, 16>& eprosima::fastdds::statistics::detail::Locator_s::addre
     return m_address;
 }
 
-
 size_t eprosima::fastdds::statistics::detail::Locator_s::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_detail_Locator_s_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::detail::Locator_s::isKeyDefined()
@@ -1164,23 +1193,23 @@ void eprosima::fastdds::statistics::detail::Locator_s::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-}
 
+}
 
 
 eprosima::fastdds::statistics::DiscoveryTime::DiscoveryTime()
 {
-    // eprosima::fastdds::statistics::detail::GUID_s m_local_participant_guid
+    // m_local_participant_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // eprosima::fastdds::statistics::detail::GUID_s m_remote_entity_guid
+    // m_remote_entity_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // unsigned long long m_time
+    // m_time com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7f010382
     m_time = 0;
-    // string m_host
+    // m_host com.eprosima.idl.parser.typecode.StringTypeCode@1e802ef9
     m_host ="";
-    // string m_user
+    // m_user com.eprosima.idl.parser.typecode.StringTypeCode@2b6faea6
     m_user ="";
-    // string m_process
+    // m_process com.eprosima.idl.parser.typecode.StringTypeCode@778d1062
     m_process ="";
 
 }
@@ -1207,7 +1236,7 @@ eprosima::fastdds::statistics::DiscoveryTime::DiscoveryTime(
 }
 
 eprosima::fastdds::statistics::DiscoveryTime::DiscoveryTime(
-        DiscoveryTime&& x) noexcept 
+        DiscoveryTime&& x)
 {
     m_local_participant_guid = std::move(x.m_local_participant_guid);
     m_remote_entity_guid = std::move(x.m_remote_entity_guid);
@@ -1232,7 +1261,7 @@ eprosima::fastdds::statistics::DiscoveryTime& eprosima::fastdds::statistics::Dis
 }
 
 eprosima::fastdds::statistics::DiscoveryTime& eprosima::fastdds::statistics::DiscoveryTime::operator =(
-        DiscoveryTime&& x) noexcept
+        DiscoveryTime&& x)
 {
 
     m_local_participant_guid = std::move(x.m_local_participant_guid);
@@ -1261,8 +1290,22 @@ bool eprosima::fastdds::statistics::DiscoveryTime::operator !=(
 size_t eprosima::fastdds::statistics::DiscoveryTime::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_DiscoveryTime_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::DiscoveryTime::getCdrSerializedSize(
@@ -1295,9 +1338,9 @@ void eprosima::fastdds::statistics::DiscoveryTime::serialize(
     scdr << m_local_participant_guid;
     scdr << m_remote_entity_guid;
     scdr << m_time;
-    scdr << m_host.c_str();
-    scdr << m_user.c_str();
-    scdr << m_process.c_str();
+    scdr << m_host;
+    scdr << m_user;
+    scdr << m_process;
 
 }
 
@@ -1527,12 +1570,20 @@ std::string& eprosima::fastdds::statistics::DiscoveryTime::process()
     return m_process;
 }
 
-
 size_t eprosima::fastdds::statistics::DiscoveryTime::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_DiscoveryTime_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_align);
+     current_align += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_align);
+
+
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::DiscoveryTime::isKeyDefined()
@@ -1544,20 +1595,16 @@ void eprosima::fastdds::statistics::DiscoveryTime::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-    m_local_participant_guid.serialize(scdr);    
-   m_remote_entity_guid.serialize(scdr);    
- 
- 
- 
-  
-}
+     scdr << m_local_participant_guid;
+       scdr << m_remote_entity_guid;
 
+}
 
 eprosima::fastdds::statistics::EntityCount::EntityCount()
 {
-    // eprosima::fastdds::statistics::detail::GUID_s m_guid
+    // m_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // unsigned long long m_count
+    // m_count com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1ed1993a
     m_count = 0;
 
 }
@@ -1576,7 +1623,7 @@ eprosima::fastdds::statistics::EntityCount::EntityCount(
 }
 
 eprosima::fastdds::statistics::EntityCount::EntityCount(
-        EntityCount&& x) noexcept 
+        EntityCount&& x)
 {
     m_guid = std::move(x.m_guid);
     m_count = x.m_count;
@@ -1593,7 +1640,7 @@ eprosima::fastdds::statistics::EntityCount& eprosima::fastdds::statistics::Entit
 }
 
 eprosima::fastdds::statistics::EntityCount& eprosima::fastdds::statistics::EntityCount::operator =(
-        EntityCount&& x) noexcept
+        EntityCount&& x)
 {
 
     m_guid = std::move(x.m_guid);
@@ -1618,8 +1665,15 @@ bool eprosima::fastdds::statistics::EntityCount::operator !=(
 size_t eprosima::fastdds::statistics::EntityCount::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_EntityCount_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::EntityCount::getCdrSerializedSize(
@@ -1721,12 +1775,16 @@ uint64_t& eprosima::fastdds::statistics::EntityCount::count()
 }
 
 
-
 size_t eprosima::fastdds::statistics::EntityCount::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_EntityCount_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_align);
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::EntityCount::isKeyDefined()
@@ -1738,16 +1796,15 @@ void eprosima::fastdds::statistics::EntityCount::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-    m_guid.serialize(scdr);    
-  
-}
+     scdr << m_guid;
 
+}
 
 eprosima::fastdds::statistics::SampleIdentityCount::SampleIdentityCount()
 {
-    // eprosima::fastdds::statistics::detail::SampleIdentity_s m_sample_id
+    // m_sample_id com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3cc2931c
 
-    // unsigned long long m_count
+    // m_count com.eprosima.idl.parser.typecode.PrimitiveTypeCode@20d28811
     m_count = 0;
 
 }
@@ -1766,7 +1823,7 @@ eprosima::fastdds::statistics::SampleIdentityCount::SampleIdentityCount(
 }
 
 eprosima::fastdds::statistics::SampleIdentityCount::SampleIdentityCount(
-        SampleIdentityCount&& x) noexcept 
+        SampleIdentityCount&& x)
 {
     m_sample_id = std::move(x.m_sample_id);
     m_count = x.m_count;
@@ -1783,7 +1840,7 @@ eprosima::fastdds::statistics::SampleIdentityCount& eprosima::fastdds::statistic
 }
 
 eprosima::fastdds::statistics::SampleIdentityCount& eprosima::fastdds::statistics::SampleIdentityCount::operator =(
-        SampleIdentityCount&& x) noexcept
+        SampleIdentityCount&& x)
 {
 
     m_sample_id = std::move(x.m_sample_id);
@@ -1808,8 +1865,15 @@ bool eprosima::fastdds::statistics::SampleIdentityCount::operator !=(
 size_t eprosima::fastdds::statistics::SampleIdentityCount::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_SampleIdentityCount_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::SampleIdentity_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::SampleIdentityCount::getCdrSerializedSize(
@@ -1911,12 +1975,16 @@ uint64_t& eprosima::fastdds::statistics::SampleIdentityCount::count()
 }
 
 
-
 size_t eprosima::fastdds::statistics::SampleIdentityCount::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_SampleIdentityCount_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += eprosima::fastdds::statistics::detail::SampleIdentity_s::getMaxCdrSerializedSize(current_align);
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::SampleIdentityCount::isKeyDefined()
@@ -1928,22 +1996,21 @@ void eprosima::fastdds::statistics::SampleIdentityCount::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-    m_sample_id.serialize(scdr);    
-  
-}
+     scdr << m_sample_id;
 
+}
 
 eprosima::fastdds::statistics::Entity2LocatorTraffic::Entity2LocatorTraffic()
 {
-    // eprosima::fastdds::statistics::detail::GUID_s m_src_guid
+    // m_src_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // eprosima::fastdds::statistics::detail::Locator_s m_dst_locator
+    // m_dst_locator com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@5c909414
 
-    // unsigned long long m_packet_count
+    // m_packet_count com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4b14c583
     m_packet_count = 0;
-    // unsigned long long m_byte_count
+    // m_byte_count com.eprosima.idl.parser.typecode.PrimitiveTypeCode@65466a6a
     m_byte_count = 0;
-    // short m_byte_magnitude_order
+    // m_byte_magnitude_order com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4ddced80
     m_byte_magnitude_order = 0;
 
 }
@@ -1968,7 +2035,7 @@ eprosima::fastdds::statistics::Entity2LocatorTraffic::Entity2LocatorTraffic(
 }
 
 eprosima::fastdds::statistics::Entity2LocatorTraffic::Entity2LocatorTraffic(
-        Entity2LocatorTraffic&& x) noexcept 
+        Entity2LocatorTraffic&& x)
 {
     m_src_guid = std::move(x.m_src_guid);
     m_dst_locator = std::move(x.m_dst_locator);
@@ -1991,7 +2058,7 @@ eprosima::fastdds::statistics::Entity2LocatorTraffic& eprosima::fastdds::statist
 }
 
 eprosima::fastdds::statistics::Entity2LocatorTraffic& eprosima::fastdds::statistics::Entity2LocatorTraffic::operator =(
-        Entity2LocatorTraffic&& x) noexcept
+        Entity2LocatorTraffic&& x)
 {
 
     m_src_guid = std::move(x.m_src_guid);
@@ -2019,8 +2086,22 @@ bool eprosima::fastdds::statistics::Entity2LocatorTraffic::operator !=(
 size_t eprosima::fastdds::statistics::Entity2LocatorTraffic::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_Entity2LocatorTraffic_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += eprosima::fastdds::statistics::detail::Locator_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::Entity2LocatorTraffic::getCdrSerializedSize(
@@ -2228,12 +2309,19 @@ int16_t& eprosima::fastdds::statistics::Entity2LocatorTraffic::byte_magnitude_or
 }
 
 
-
 size_t eprosima::fastdds::statistics::Entity2LocatorTraffic::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_Entity2LocatorTraffic_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_align);
+     current_align += eprosima::fastdds::statistics::detail::Locator_s::getMaxCdrSerializedSize(current_align);
+
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::Entity2LocatorTraffic::isKeyDefined()
@@ -2245,21 +2333,18 @@ void eprosima::fastdds::statistics::Entity2LocatorTraffic::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-    m_src_guid.serialize(scdr);    
-   m_dst_locator.serialize(scdr);    
- 
- 
-  
-}
+     scdr << m_src_guid;
+       scdr << m_dst_locator;
 
+}
 
 eprosima::fastdds::statistics::WriterReaderData::WriterReaderData()
 {
-    // eprosima::fastdds::statistics::detail::GUID_s m_writer_guid
+    // m_writer_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // eprosima::fastdds::statistics::detail::GUID_s m_reader_guid
+    // m_reader_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // float m_data
+    // m_data com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2ea227af
     m_data = 0.0;
 
 }
@@ -2280,7 +2365,7 @@ eprosima::fastdds::statistics::WriterReaderData::WriterReaderData(
 }
 
 eprosima::fastdds::statistics::WriterReaderData::WriterReaderData(
-        WriterReaderData&& x) noexcept 
+        WriterReaderData&& x)
 {
     m_writer_guid = std::move(x.m_writer_guid);
     m_reader_guid = std::move(x.m_reader_guid);
@@ -2299,7 +2384,7 @@ eprosima::fastdds::statistics::WriterReaderData& eprosima::fastdds::statistics::
 }
 
 eprosima::fastdds::statistics::WriterReaderData& eprosima::fastdds::statistics::WriterReaderData::operator =(
-        WriterReaderData&& x) noexcept
+        WriterReaderData&& x)
 {
 
     m_writer_guid = std::move(x.m_writer_guid);
@@ -2325,8 +2410,16 @@ bool eprosima::fastdds::statistics::WriterReaderData::operator !=(
 size_t eprosima::fastdds::statistics::WriterReaderData::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_WriterReaderData_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::WriterReaderData::getCdrSerializedSize(
@@ -2468,12 +2561,17 @@ float& eprosima::fastdds::statistics::WriterReaderData::data()
 }
 
 
-
 size_t eprosima::fastdds::statistics::WriterReaderData::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_WriterReaderData_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_align);
+     current_align += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_align);
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::WriterReaderData::isKeyDefined()
@@ -2485,19 +2583,18 @@ void eprosima::fastdds::statistics::WriterReaderData::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-    m_writer_guid.serialize(scdr);    
-   m_reader_guid.serialize(scdr);    
-  
-}
+     scdr << m_writer_guid;
+       scdr << m_reader_guid;
 
+}
 
 eprosima::fastdds::statistics::Locator2LocatorData::Locator2LocatorData()
 {
-    // eprosima::fastdds::statistics::detail::Locator_s m_src_locator
+    // m_src_locator com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@5c909414
 
-    // eprosima::fastdds::statistics::detail::Locator_s m_dst_locator
+    // m_dst_locator com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@5c909414
 
-    // float m_data
+    // m_data com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4386f16
     m_data = 0.0;
 
 }
@@ -2518,7 +2615,7 @@ eprosima::fastdds::statistics::Locator2LocatorData::Locator2LocatorData(
 }
 
 eprosima::fastdds::statistics::Locator2LocatorData::Locator2LocatorData(
-        Locator2LocatorData&& x) noexcept 
+        Locator2LocatorData&& x)
 {
     m_src_locator = std::move(x.m_src_locator);
     m_dst_locator = std::move(x.m_dst_locator);
@@ -2537,7 +2634,7 @@ eprosima::fastdds::statistics::Locator2LocatorData& eprosima::fastdds::statistic
 }
 
 eprosima::fastdds::statistics::Locator2LocatorData& eprosima::fastdds::statistics::Locator2LocatorData::operator =(
-        Locator2LocatorData&& x) noexcept
+        Locator2LocatorData&& x)
 {
 
     m_src_locator = std::move(x.m_src_locator);
@@ -2563,8 +2660,16 @@ bool eprosima::fastdds::statistics::Locator2LocatorData::operator !=(
 size_t eprosima::fastdds::statistics::Locator2LocatorData::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_Locator2LocatorData_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::Locator_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += eprosima::fastdds::statistics::detail::Locator_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::Locator2LocatorData::getCdrSerializedSize(
@@ -2706,12 +2811,17 @@ float& eprosima::fastdds::statistics::Locator2LocatorData::data()
 }
 
 
-
 size_t eprosima::fastdds::statistics::Locator2LocatorData::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_Locator2LocatorData_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += eprosima::fastdds::statistics::detail::Locator_s::getMaxCdrSerializedSize(current_align);
+     current_align += eprosima::fastdds::statistics::detail::Locator_s::getMaxCdrSerializedSize(current_align);
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::Locator2LocatorData::isKeyDefined()
@@ -2723,17 +2833,16 @@ void eprosima::fastdds::statistics::Locator2LocatorData::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-    m_src_locator.serialize(scdr);    
-   m_dst_locator.serialize(scdr);    
-  
-}
+     scdr << m_src_locator;
+       scdr << m_dst_locator;
 
+}
 
 eprosima::fastdds::statistics::EntityData::EntityData()
 {
-    // eprosima::fastdds::statistics::detail::GUID_s m_guid
+    // m_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // float m_data
+    // m_data com.eprosima.idl.parser.typecode.PrimitiveTypeCode@363ee3a2
     m_data = 0.0;
 
 }
@@ -2752,7 +2861,7 @@ eprosima::fastdds::statistics::EntityData::EntityData(
 }
 
 eprosima::fastdds::statistics::EntityData::EntityData(
-        EntityData&& x) noexcept 
+        EntityData&& x)
 {
     m_guid = std::move(x.m_guid);
     m_data = x.m_data;
@@ -2769,7 +2878,7 @@ eprosima::fastdds::statistics::EntityData& eprosima::fastdds::statistics::Entity
 }
 
 eprosima::fastdds::statistics::EntityData& eprosima::fastdds::statistics::EntityData::operator =(
-        EntityData&& x) noexcept
+        EntityData&& x)
 {
 
     m_guid = std::move(x.m_guid);
@@ -2794,8 +2903,15 @@ bool eprosima::fastdds::statistics::EntityData::operator !=(
 size_t eprosima::fastdds::statistics::EntityData::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_EntityData_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::EntityData::getCdrSerializedSize(
@@ -2897,12 +3013,16 @@ float& eprosima::fastdds::statistics::EntityData::data()
 }
 
 
-
 size_t eprosima::fastdds::statistics::EntityData::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_EntityData_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_align);
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::EntityData::isKeyDefined()
@@ -2914,20 +3034,19 @@ void eprosima::fastdds::statistics::EntityData::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-    m_guid.serialize(scdr);    
-  
-}
+     scdr << m_guid;
 
+}
 
 eprosima::fastdds::statistics::PhysicalData::PhysicalData()
 {
-    // eprosima::fastdds::statistics::detail::GUID_s m_participant_guid
+    // m_participant_guid com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@612fc6eb
 
-    // string m_host
+    // m_host com.eprosima.idl.parser.typecode.StringTypeCode@3c22fc4c
     m_host ="";
-    // string m_user
+    // m_user com.eprosima.idl.parser.typecode.StringTypeCode@460d0a57
     m_user ="";
-    // string m_process
+    // m_process com.eprosima.idl.parser.typecode.StringTypeCode@47d90b9e
     m_process ="";
 
 }
@@ -2950,7 +3069,7 @@ eprosima::fastdds::statistics::PhysicalData::PhysicalData(
 }
 
 eprosima::fastdds::statistics::PhysicalData::PhysicalData(
-        PhysicalData&& x) noexcept 
+        PhysicalData&& x)
 {
     m_participant_guid = std::move(x.m_participant_guid);
     m_host = std::move(x.m_host);
@@ -2971,7 +3090,7 @@ eprosima::fastdds::statistics::PhysicalData& eprosima::fastdds::statistics::Phys
 }
 
 eprosima::fastdds::statistics::PhysicalData& eprosima::fastdds::statistics::PhysicalData::operator =(
-        PhysicalData&& x) noexcept
+        PhysicalData&& x)
 {
 
     m_participant_guid = std::move(x.m_participant_guid);
@@ -2998,8 +3117,18 @@ bool eprosima::fastdds::statistics::PhysicalData::operator !=(
 size_t eprosima::fastdds::statistics::PhysicalData::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_PhysicalData_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t eprosima::fastdds::statistics::PhysicalData::getCdrSerializedSize(
@@ -3026,9 +3155,9 @@ void eprosima::fastdds::statistics::PhysicalData::serialize(
 {
 
     scdr << m_participant_guid;
-    scdr << m_host.c_str();
-    scdr << m_user.c_str();
-    scdr << m_process.c_str();
+    scdr << m_host;
+    scdr << m_user;
+    scdr << m_process;
 
 }
 
@@ -3191,12 +3320,18 @@ std::string& eprosima::fastdds::statistics::PhysicalData::process()
     return m_process;
 }
 
-
 size_t eprosima::fastdds::statistics::PhysicalData::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return eprosima_fastdds_statistics_PhysicalData_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += eprosima::fastdds::statistics::detail::GUID_s::getMaxCdrSerializedSize(current_align);
+
+
+
+
+    return current_align;
 }
 
 bool eprosima::fastdds::statistics::PhysicalData::isKeyDefined()
@@ -3208,32 +3343,29 @@ void eprosima::fastdds::statistics::PhysicalData::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-    m_participant_guid.serialize(scdr);    
- 
- 
-  
-}
+     scdr << m_participant_guid;
 
+}
 
 
 eprosima::fastdds::statistics::Data::Data()
 {
     m__d = HISTORY2HISTORY_LATENCY;
-    // eprosima::fastdds::statistics::WriterReaderData m_writer_reader_data
+    // m_writer_reader_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@49d904ec
 
-    // eprosima::fastdds::statistics::Locator2LocatorData m_locator2locator_data
+    // m_locator2locator_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@48e4374
 
-    // eprosima::fastdds::statistics::EntityData m_entity_data
+    // m_entity_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3d680b5a
 
-    // eprosima::fastdds::statistics::Entity2LocatorTraffic m_entity2locator_traffic
+    // m_entity2locator_traffic com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@4b5d6a01
 
-    // eprosima::fastdds::statistics::EntityCount m_entity_count
+    // m_entity_count com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@4a22f9e2
 
-    // eprosima::fastdds::statistics::DiscoveryTime m_discovery_time
+    // m_discovery_time com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@3c419631
 
-    // eprosima::fastdds::statistics::SampleIdentityCount m_sample_identity_count
+    // m_sample_identity_count com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@418e7838
 
-    // eprosima::fastdds::statistics::PhysicalData m_physical_data
+    // m_physical_data com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@61230f6a
 
 }
 
@@ -3287,7 +3419,7 @@ eprosima::fastdds::statistics::Data::Data(
 }
 
 eprosima::fastdds::statistics::Data::Data(
-        Data&& x) noexcept
+        Data&& x)
 {
     m__d = x.m__d;
 
@@ -3379,7 +3511,7 @@ eprosima::fastdds::statistics::Data& eprosima::fastdds::statistics::Data::operat
 }
 
 eprosima::fastdds::statistics::Data& eprosima::fastdds::statistics::Data::operator =(
-        Data&& x) noexcept
+        Data&& x)
 {
     m__d = x.m__d;
 
@@ -4046,6 +4178,84 @@ eprosima::fastdds::statistics::PhysicalData& eprosima::fastdds::statistics::Data
     }
 
     return m_physical_data;
+}
+
+size_t eprosima::fastdds::statistics::Data::getMaxCdrSerializedSize(
+        size_t current_alignment)
+{
+    size_t initial_alignment = current_alignment;
+    size_t reset_alignment = 0;
+    size_t union_max_size_serialized = 0;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += eprosima::fastdds::statistics::WriterReaderData::getMaxCdrSerializedSize(reset_alignment);
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += eprosima::fastdds::statistics::Locator2LocatorData::getMaxCdrSerializedSize(reset_alignment);
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += eprosima::fastdds::statistics::EntityData::getMaxCdrSerializedSize(reset_alignment);
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += eprosima::fastdds::statistics::Entity2LocatorTraffic::getMaxCdrSerializedSize(reset_alignment);
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += eprosima::fastdds::statistics::EntityCount::getMaxCdrSerializedSize(reset_alignment);
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += eprosima::fastdds::statistics::DiscoveryTime::getMaxCdrSerializedSize(reset_alignment);
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += eprosima::fastdds::statistics::SampleIdentityCount::getMaxCdrSerializedSize(reset_alignment);
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += eprosima::fastdds::statistics::PhysicalData::getMaxCdrSerializedSize(reset_alignment);
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+
+
+    return union_max_size_serialized - initial_alignment;
 }
 
 // TODO(Ricardo) Review

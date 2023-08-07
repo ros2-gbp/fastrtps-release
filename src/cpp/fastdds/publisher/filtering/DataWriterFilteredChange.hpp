@@ -45,7 +45,9 @@ struct DataWriterFilteredChange final : public fastrtps::rtps::CacheChange_t
     {
     }
 
-    ~DataWriterFilteredChange() override = default;
+    ~DataWriterFilteredChange()
+    {
+    }
 
     /**
      * Query about the relevance of this change for certain reader.

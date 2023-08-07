@@ -39,7 +39,7 @@ protected:
     DynamicType_ptr key_element_type_;      // Key Type for maps.
     std::vector<AnnotationDescriptor*> annotation_; // Annotations to apply
 
-    RTPS_DllAPI void clean();
+    void clean();
 
     static bool is_type_name_consistent(
             const std::string& sName);
@@ -52,7 +52,7 @@ protected:
 
 public:
 
-    RTPS_DllAPI TypeDescriptor();
+    TypeDescriptor();
 
     RTPS_DllAPI TypeDescriptor(
             const TypeDescriptor* other);
@@ -63,96 +63,96 @@ public:
 
     RTPS_DllAPI ~TypeDescriptor();
 
-    RTPS_DllAPI ReturnCode_t copy_from(
+    ReturnCode_t copy_from(
             const TypeDescriptor* descriptor);
 
-    RTPS_DllAPI bool equals(
+    bool equals(
             const TypeDescriptor* descriptor) const;
 
-    RTPS_DllAPI bool is_consistent() const;
+    bool is_consistent() const;
 
-    RTPS_DllAPI DynamicType_ptr get_base_type() const;
+    DynamicType_ptr get_base_type() const;
 
-    RTPS_DllAPI uint32_t get_bounds(
+    uint32_t get_bounds(
             uint32_t index = 0) const;
 
-    RTPS_DllAPI uint32_t get_bounds_size() const;
+    uint32_t get_bounds_size() const;
 
-    RTPS_DllAPI DynamicType_ptr get_discriminator_type() const;
+    DynamicType_ptr get_discriminator_type() const;
 
-    RTPS_DllAPI DynamicType_ptr get_element_type() const;
+    DynamicType_ptr get_element_type() const;
 
-    RTPS_DllAPI DynamicType_ptr get_key_element_type() const;
+    DynamicType_ptr get_key_element_type() const;
 
-    RTPS_DllAPI TypeKind get_kind() const;
+    TypeKind get_kind() const;
 
-    RTPS_DllAPI std::string get_name() const;
+    std::string get_name() const;
 
-    RTPS_DllAPI uint32_t get_total_bounds() const;
+    uint32_t get_total_bounds() const;
 
-    RTPS_DllAPI void set_kind(
+    void set_kind(
             TypeKind kind);
 
-    RTPS_DllAPI void set_name(
+    void set_name(
             std::string name);
 
-    RTPS_DllAPI ReturnCode_t apply_annotation(
+    ReturnCode_t apply_annotation(
             AnnotationDescriptor& descriptor);
 
-    RTPS_DllAPI ReturnCode_t apply_annotation(
+    ReturnCode_t apply_annotation(
             const std::string& annotation_name,
             const std::string& key,
             const std::string& value);
 
-    RTPS_DllAPI AnnotationDescriptor* get_annotation(
+    AnnotationDescriptor* get_annotation(
             const std::string& name) const;
 
     // Annotations application
-    RTPS_DllAPI bool annotation_is_extensibility() const;
+    bool annotation_is_extensibility() const;
 
-    RTPS_DllAPI bool annotation_is_mutable() const;
+    bool annotation_is_mutable() const;
 
-    RTPS_DllAPI bool annotation_is_final() const;
+    bool annotation_is_final() const;
 
-    RTPS_DllAPI bool annotation_is_appendable() const;
+    bool annotation_is_appendable() const;
 
-    RTPS_DllAPI bool annotation_is_nested() const;
+    bool annotation_is_nested() const;
 
-    RTPS_DllAPI bool annotation_is_bit_bound() const;
+    bool annotation_is_bit_bound() const;
 
-    RTPS_DllAPI bool annotation_is_key() const;
+    bool annotation_is_key() const;
 
-    RTPS_DllAPI bool annotation_is_non_serialized() const;
+    bool annotation_is_non_serialized() const;
 
     // Annotation getters
-    RTPS_DllAPI std::string annotation_get_extensibility() const;
+    std::string annotation_get_extensibility() const;
 
-    RTPS_DllAPI bool annotation_get_nested() const;
+    bool annotation_get_nested() const;
 
-    RTPS_DllAPI uint16_t annotation_get_bit_bound() const;
+    uint16_t annotation_get_bit_bound() const;
 
-    RTPS_DllAPI bool annotation_get_key() const;
+    bool annotation_get_key() const;
 
     // Annotation setters
-    RTPS_DllAPI void annotation_set_extensibility(
+    void annotation_set_extensibility(
             const std::string& extensibility);
 
-    RTPS_DllAPI void annotation_set_mutable();
+    void annotation_set_mutable();
 
-    RTPS_DllAPI void annotation_set_final();
+    void annotation_set_final();
 
-    RTPS_DllAPI void annotation_set_appendable();
+    void annotation_set_appendable();
 
-    RTPS_DllAPI void annotation_set_nested(
+    void annotation_set_nested(
             bool nested);
 
-    RTPS_DllAPI void annotation_set_bit_bound(
+    void annotation_set_bit_bound(
             uint16_t bit_bound);
 
-    RTPS_DllAPI void annotation_set_key(
+    void annotation_set_key(
             bool key);
 
-    RTPS_DllAPI void annotation_set_non_serialized(
+    void annotation_set_non_serialized(
             bool non_serialized);
 };
 

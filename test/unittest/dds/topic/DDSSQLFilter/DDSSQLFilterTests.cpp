@@ -70,48 +70,6 @@ static const std::map<std::string, std::set<std::string>> type_compatibility_mat
     {"ENUM2_STR", {"ENUM2", "CHAR", "STRING"}}
 };
 
-static const std::vector<std::string> operators
-{
-    " = ", " > ", " >= ", " < ", " <= ", " <> ", " != "
-};
-
-static const std::vector<std::pair<std::string, std::string>> checks_compare
-{
-    // string values
-    {"'XYZ'", "STRING"},
-    {"'%XYZ'", "STRING"},
-    {"'XYZ%'", "STRING"},
-    {"'%X%Y%Z%'", "STRING"},
-    // Char values
-    {"'A'", "CHAR"},
-    {"'%'", "CHAR"},
-    {"'''", "CHAR"},
-    // Boolean values
-    {"FALSE", "BOOL"},
-    {"false", "BOOL"},
-    {"TRUE", "BOOL"},
-    {"true", "BOOL"},
-    // Integer values
-    {"1", "INT"},
-    {"-1", "INT"},
-    {"0xabcdef", "INT"},
-    {"-0xFEEDBAC0", "INT"},
-    // Floating point values
-    {"1.0", "FLOAT"},
-    {"-1.0", "FLOAT"},
-    {"1e2", "FLOAT"},
-    {"-1e2", "FLOAT"},
-    // Enum Color values
-    {"'RED'", "ENUM_STR"},
-    {"'GREEN'", "ENUM_STR"},
-    {"'BLUE'", "ENUM_STR"},
-    // Enum Material values
-    {"'WOOD'", "ENUM2_STR"},
-    {"'PLASTIC'", "ENUM2_STR"},
-    {"'METAL'", "ENUM2_STR"},
-    {"'CONCRETE'", "ENUM2_STR"},
-};
-
 static bool are_types_compatible(
         const std::string& type1,
         const std::string& type2)
@@ -174,7 +132,6 @@ protected:
     void run(
             const std::vector<TestCase>& test_cases)
     {
-        std::cout << "Test Cases: " << test_cases.size() << std::endl;
         for (const TestCase& tc : test_cases)
         {
             run(tc);
@@ -449,8 +406,13 @@ TEST_F(DDSSQLFilterTests, type_compatibility_match)
     }
 }
 
-TEST_F(DDSSQLFilterTests, type_compatibility_compare_field_op_field)
+TEST_F(DDSSQLFilterTests, type_compatibility_compare)
 {
+    static const std::vector<std::string> operators
+    {
+        " = ", " > ", " >= ", " < ", " <= ", " <> ", " != "
+    };
+
     // field1 OP field2
     {
         std::vector<TestCase> test_cases;
@@ -468,16 +430,52 @@ TEST_F(DDSSQLFilterTests, type_compatibility_compare_field_op_field)
         }
         run(test_cases);
     }
-}
 
-TEST_F(DDSSQLFilterTests, type_compatibility_compare_field_op_operand)
-{
     // field OP operand
+    // operand OP field
+    // operand OP operand
     {
+        static const std::vector<std::pair<std::string, std::string>> checks
+        {
+            // string values
+            {"'XYZ'", "STRING"},
+            {"'%XYZ'", "STRING"},
+            {"'XYZ%'", "STRING"},
+            {"'%X%Y%Z%'", "STRING"},
+            // Char values
+            {"'A'", "CHAR"},
+            {"'%'", "CHAR"},
+            {"'''", "CHAR"},
+            // Boolean values
+            {"FALSE", "BOOL"},
+            {"false", "BOOL"},
+            {"TRUE", "BOOL"},
+            {"true", "BOOL"},
+            // Integer values
+            {"1", "INT"},
+            {"-1", "INT"},
+            {"0xabcdef", "INT"},
+            {"-0xFEEDBAC0", "INT"},
+            // Floating point values
+            {"1.0", "FLOAT"},
+            {"-1.0", "FLOAT"},
+            {"1e2", "FLOAT"},
+            {"-1e2", "FLOAT"},
+            // Enum Color values
+            {"'RED'", "ENUM_STR"},
+            {"'GREEN'", "ENUM_STR"},
+            {"'BLUE'", "ENUM_STR"},
+            // Enum Material values
+            {"'WOOD'", "ENUM2_STR"},
+            {"'PLASTIC'", "ENUM2_STR"},
+            {"'METAL'", "ENUM2_STR"},
+            {"'CONCRETE'", "ENUM2_STR"},
+        };
+
         std::vector<TestCase> test_cases;
         for (const auto& field : primitive_fields)
         {
-            for (auto& check : checks_compare)
+            for (auto& check : checks)
             {
                 bool ok = are_types_compatible(field.second, check.second);
                 ReturnCode_t ret = ok ? ok_code : bad_code;
@@ -489,28 +487,8 @@ TEST_F(DDSSQLFilterTests, type_compatibility_compare_field_op_operand)
                     test_cases.emplace_back(TestCase{ field.first + op + "%0", {check.first}, ret });
                     test_cases.emplace_back(TestCase{ field.first + op + "%1", {check.first}, bad_code });
                     test_cases.emplace_back(TestCase{ field.first + op + "%0", {}, bad_code });
-                }
-            }
-        }
 
-        run(test_cases);
-    }
-}
-
-TEST_F(DDSSQLFilterTests, type_compatibility_compare_operand_op_field)
-{
-    // operand OP field
-    {
-        std::vector<TestCase> test_cases;
-        for (const auto& field : primitive_fields)
-        {
-            for (auto& check : checks_compare)
-            {
-                bool ok = are_types_compatible(field.second, check.second);
-                ReturnCode_t ret = ok ? ok_code : bad_code;
-
-                for (const std::string& op : operators)
-                {
+                    // operand OP field
                     test_cases.emplace_back(TestCase{ check.first + op + field.first, {}, ret });
                     test_cases.emplace_back(TestCase{ "%0" + op + field.first, {check.first}, ret });
                     test_cases.emplace_back(TestCase{ "%1" + op + field.first, {check.first}, bad_code });
@@ -519,18 +497,9 @@ TEST_F(DDSSQLFilterTests, type_compatibility_compare_operand_op_field)
             }
         }
 
-        run(test_cases);
-    }
-}
-
-TEST_F(DDSSQLFilterTests, type_compatibility_compare_operand_op_operand)
-{
-    // operand OP operand
-    {
-        std::vector<TestCase> test_cases;
-        for (const auto& check1 : checks_compare)
+        for (const auto& check1 : checks)
         {
-            for (auto& check2 : checks_compare)
+            for (auto& check2 : checks)
             {
                 for (const std::string& op : operators)
                 {

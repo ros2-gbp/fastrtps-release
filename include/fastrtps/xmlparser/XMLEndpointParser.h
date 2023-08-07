@@ -85,8 +85,7 @@ public:
     virtual ~XMLEndpointParser();
     /**
      * Load the XML file
-     * @param filename Name or data of the file to load and parse.
-     * The string could contain a filename (file://) or the XML content directly (data://), filename assumed if neither
+     * @param filename Name of the file to load and parse.
      * @return True if correct.
      */
     XMLP_ret loadXMLFile(

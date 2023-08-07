@@ -164,7 +164,7 @@ public:
         return m_changes.rend();
     }
 
-    RecursiveTimedMutex* getMutex() const
+    RecursiveTimedMutex* getMutex()
     {
         return mp_mutex;
     }

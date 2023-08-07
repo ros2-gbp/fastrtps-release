@@ -23,8 +23,6 @@
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 
-#include <fastdds/dds/log/Log.hpp>
-
 #include <gtest/gtest.h>
 
 class AuthenticationPluginTest : public ::testing::Test
@@ -37,8 +35,6 @@ protected:
 
     virtual void TearDown()
     {
-        eprosima::fastdds::dds::Log::Flush();
-        eprosima::fastdds::dds::Log::KillThread();
     }
 
 public:

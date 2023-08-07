@@ -104,7 +104,7 @@ bool EDPServer::createSEDPEndpoints()
             publications_writer_.first->reader_data_filter(edp_publications_filter);
             // 1.2. Enable separate sending so the filter can be called for each change and reader proxy
             publications_writer_.first->set_separate_sending(true);
-            EPROSIMA_LOG_INFO(RTPS_EDP, "SEDP Publications Writer created");
+            logInfo(RTPS_EDP, "SEDP Publications Writer created");
 
             // TODO check if this should be done here or below
             publications_writer_.second->remove_all_changes();
@@ -114,7 +114,7 @@ bool EDPServer::createSEDPEndpoints()
             // Something went wrong. Delete publications writer history and set it to nullptr. Return false
             delete(publications_writer_.second);
             publications_writer_.second = nullptr;
-            EPROSIMA_LOG_ERROR(RTPS_EDP, "Error creating SEDP Publications Writer");
+            logError(RTPS_EDP, "Error creating SEDP Publications Writer");
             return false;
         }
 
@@ -128,20 +128,20 @@ bool EDPServer::createSEDPEndpoints()
         {
             // Cast subscriptions reader to a StatefulReader, since we now that's what it is
             subscriptions_reader_.first = dynamic_cast<StatefulReader*>(raux);
-            EPROSIMA_LOG_INFO(RTPS_EDP, "SEDP Subscriptions Reader created");
+            logInfo(RTPS_EDP, "SEDP Subscriptions Reader created");
         }
         else
         {
             // Something went wrong. Delete subscriptions reader history and set it to nullptr. Return false
             delete(subscriptions_reader_.second);
             subscriptions_reader_.second = nullptr;
-            EPROSIMA_LOG_ERROR(RTPS_EDP, "Error creating SEDP Subscriptions Reader");
+            logError(RTPS_EDP, "Error creating SEDP Subscriptions Reader");
             return false;
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_EDP, "Server operation requires the presence of all 4 builtin endpoints");
+        logError(RTPS_EDP, "Server operation requires the presence of all 4 builtin endpoints");
         return false;
     }
 
@@ -172,7 +172,7 @@ bool EDPServer::createSEDPEndpoints()
             subscriptions_writer_.first->reader_data_filter(edp_subscriptions_filter);
             // 1.2. Enable separate sending so the filter can be called for each change and reader proxy
             subscriptions_writer_.first->set_separate_sending(true);
-            EPROSIMA_LOG_INFO(RTPS_EDP, "SEDP Subscriptions Writer created");
+            logInfo(RTPS_EDP, "SEDP Subscriptions Writer created");
 
             // TODO check if this should be done here or below
             subscriptions_writer_.second->remove_all_changes();
@@ -182,7 +182,7 @@ bool EDPServer::createSEDPEndpoints()
             // Something went wrong. Delete subscriptions writer history and set it to nullptr. Return false
             delete(subscriptions_writer_.second);
             subscriptions_writer_.second = nullptr;
-            EPROSIMA_LOG_ERROR(RTPS_EDP, "Error creating SEDP Subscriptions Writer");
+            logError(RTPS_EDP, "Error creating SEDP Subscriptions Writer");
             return false;
         }
 
@@ -195,31 +195,31 @@ bool EDPServer::createSEDPEndpoints()
         {
             // Cast publications reader to a StatefulReader, since we now that's what it is
             publications_reader_.first = dynamic_cast<StatefulReader*>(raux);
-            EPROSIMA_LOG_INFO(RTPS_EDP, "SEDP Publications Reader created");
+            logInfo(RTPS_EDP, "SEDP Publications Reader created");
         }
         else
         {
             // Something went wrong. Delete publications reader history and set it to nullptr. Return false
             delete(publications_reader_.second);
             publications_reader_.second = nullptr;
-            EPROSIMA_LOG_ERROR(RTPS_EDP, "Error creating SEDP Publications Reader");
+            logError(RTPS_EDP, "Error creating SEDP Publications Reader");
             return false;
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_EDP, "Server operation requires the presence of all 4 builtin endpoints");
+        logError(RTPS_EDP, "Server operation requires the presence of all 4 builtin endpoints");
         return false;
     }
 
-    EPROSIMA_LOG_INFO(RTPS_EDP, "Creation finished");
+    logInfo(RTPS_EDP, "Creation finished");
     return created;
 }
 
 bool EDPServer::removeLocalReader(
         RTPSReader* R)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP, "Removing local reader: " << R->getGuid().entityId);
+    logInfo(RTPS_EDP, "Removing local reader: " << R->getGuid().entityId);
 
     // Get subscriptions writer and reader guid
     auto* writer = &subscriptions_writer_;
@@ -267,7 +267,7 @@ bool EDPServer::removeLocalReader(
             else
             {
                 // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-                get_pdp()->release_change_from_writer(change);
+                get_pdp()->mp_PDPWriter->release_change(change);
             }
             return true;
         }
@@ -278,7 +278,7 @@ bool EDPServer::removeLocalReader(
 bool EDPServer::removeLocalWriter(
         RTPSWriter* W)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP, "Removing local writer: " << W->getGuid().entityId);
+    logInfo(RTPS_EDP, "Removing local writer: " << W->getGuid().entityId);
 
     // Get publications writer and writer guid
     auto* writer = &publications_writer_;
@@ -327,7 +327,7 @@ bool EDPServer::removeLocalWriter(
             else
             {
                 // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-                get_pdp()->release_change_from_writer(change);
+                get_pdp()->mp_PDPWriter->release_change(change);
             }
             return true;
         }
@@ -339,7 +339,7 @@ bool EDPServer::processLocalWriterProxyData(
         RTPSWriter* local_writer,
         WriterProxyData* wdata)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP, "Processing local writer: " << wdata->guid().entityId);
+    logInfo(RTPS_EDP, "Processing local writer: " << wdata->guid().entityId);
     // We actually don't need the writer here
     (void)local_writer;
 
@@ -374,14 +374,14 @@ bool EDPServer::processLocalWriterProxyData(
         else
         {
             // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-            get_pdp()->release_change_from_writer(change);
+            get_pdp()->mp_PDPWriter->release_change(change);
         }
         // Return whether the DATA(w) was generated correctly
         return ret_val;
     }
 
     // Return the change to the pool and return false
-    get_pdp()->release_change_from_writer(change);
+    get_pdp()->mp_PDPWriter->release_change(change);
     return false;
 }
 
@@ -389,7 +389,7 @@ bool EDPServer::processLocalReaderProxyData(
         RTPSReader* local_reader,
         ReaderProxyData* rdata)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP, "Processing local reader: " << rdata->guid().entityId);
+    logInfo(RTPS_EDP, "Processing local reader: " << rdata->guid().entityId);
     // We actually don't need the reader here
     (void)local_reader;
 
@@ -424,94 +424,15 @@ bool EDPServer::processLocalReaderProxyData(
         else
         {
             // If the database doesn't take the ownership, then return the CacheChante_t to the pool.
-            get_pdp()->release_change_from_writer(change);
+            get_pdp()->mp_PDPWriter->release_change(change);
         }
         // Return whether the DATA(w) was generated correctly
         return ret_val;
     }
 
     // Return the change to the pool and return false
-    get_pdp()->release_change_from_writer(change);
+    get_pdp()->mp_PDPWriter->release_change(change);
     return false;
-}
-
-bool EDPServer::process_disposal(
-        fastrtps::rtps::CacheChange_t* disposal_change,
-        fastdds::rtps::ddb::DiscoveryDataBase& discovery_db,
-        fastrtps::rtps::GuidPrefix_t& change_guid_prefix,
-        bool should_publish_disposal)
-{
-    bool ret_val = false;
-    eprosima::fastrtps::rtps::WriteParams wp = disposal_change->write_params;
-
-    // DATA(Uw) or DATA(Ur) cases
-    if (discovery_db.is_writer(disposal_change) || discovery_db.is_reader(disposal_change))
-    {
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER_DISPOSAL, "Disposal is: " <<
-                (discovery_db.is_writer(
-                    disposal_change) ? "writer" : "reader") << " handle: " << disposal_change->instanceHandle);
-
-        auto builtin_pair = get_builtin_writer_history_pair_by_entity(disposal_change->writerGUID.entityId);
-
-        if (nullptr != builtin_pair.first && nullptr != builtin_pair.second)
-        {
-            // Lock EDP writer
-            std::unique_lock<fastrtps::RecursiveTimedMutex> lock(builtin_pair.first->getMutex());
-
-            // Remove all DATA(w/r) with the same sample identity as the DATA(Uw/Ur) from EDP PUBs/Subs writer's history
-            discovery_db.remove_related_alive_from_history_nts(builtin_pair.second, change_guid_prefix);
-
-            if (should_publish_disposal)
-            {
-                disposal_change->writerGUID.entityId = builtin_pair.first->getGuid().entityId;
-                builtin_pair.second->add_change(disposal_change, wp);
-            }
-
-            ret_val = true;
-        }
-    }
-
-    return ret_val;
-}
-
-bool EDPServer::process_and_release_change(
-        fastrtps::rtps::CacheChange_t* change,
-        bool release_from_reader)
-{
-    bool ret_val = false;
-
-    auto pdp = get_pdp();
-
-    auto builtin_to_remove_from = get_builtin_writer_history_pair_by_entity(change->writerGUID.entityId);
-
-    if (nullptr != builtin_to_remove_from.first && nullptr != builtin_to_remove_from.second)
-    {
-        pdp->remove_change_from_writer_history(
-            builtin_to_remove_from.first,
-            builtin_to_remove_from.second,
-            change,
-            false);
-
-        if (release_from_reader)
-        {
-            auto builtin_to_release = get_builtin_reader_history_pair_by_entity(change->writerGUID.entityId);
-
-            if (nullptr != builtin_to_release.first)
-            {
-                builtin_to_release.first->releaseCache(change);
-                ret_val = true;
-            }
-        }
-        else
-        {
-            auto builtin_to_release = builtin_to_remove_from;
-
-            builtin_to_release.first->release_change(change);
-            ret_val = true;
-        }
-    }
-
-    return ret_val;
 }
 
 } /* namespace rtps */

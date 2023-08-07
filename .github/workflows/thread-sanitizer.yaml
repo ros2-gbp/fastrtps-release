@@ -1,40 +1,16 @@
 name: Thread Sanitizer analysis
 on:
   workflow_dispatch:
-    inputs:
-      optional_cmake_args:
-        description: 'Optional CMake Compilation Flags'
-        required: false
-        type: string
-      optional_ctest_args:
-        description: 'Optional CTest Testing Flags'
-        required: false
-        type: string
-
   push:
     branches:
-      - 'master'
-    paths-ignore:
-      - '**.md'
-      - '**.txt'
-      - '!**/CMakeLists.txt'
-
+      - 'feature/tsan/fixes'
   pull_request:
     branches:
-      - 'master'
-    paths-ignore:
-      - '**.md'
-      - '**.txt'
-      - '!**/CMakeLists.txt'
-
+      - 'feature/tsan/fixes'
 env:
-  TSAN_OPTIONS: second_deadlock_stack=1 history_size=7 memory_limit_mb=5000
+  TSAN_OPTIONS: second_deadlock_stack=1
   # ubuntu host doesn't have an environment SHELL value (docker and vm images does)???
   SHELL: /bin/bash
-  # GCC 11.3 (Ubuntu Jammy default) produces several false positives regarding timed synchronization protocols
-  # These issues were fixed in GCC 12 so we upgrade to that version.
-  CC: gcc-12
-  CXX: g++-12
 
 defaults:
   run:
@@ -43,9 +19,7 @@ defaults:
 jobs:
   ubuntu-sanitizer-run:
     name: Sanitizer Evaluation
-    if: ${{ !(contains(github.event.pull_request.labels.*.name, 'no-test') ||
-              contains(github.event.pull_request.labels.*.name, 'skip-ci')) }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Download the sanitizers cmake module and apply some fixes
         run: |
@@ -61,7 +35,7 @@ jobs:
       - name: Download googletest and make it sanitizer aware
         run: |
           cd ws
-          git clone --branch release-1.11.0 https://github.com/google/googletest.git
+          git clone https://github.com/google/googletest.git
           cd googletest
           git remote add efork https://github.com/MiguelBarro/googletest.git
           git fetch efork
@@ -72,7 +46,7 @@ jobs:
           cd ws
           cmake -DCMAKE_MODULE_PATH="$(pwd)/sanitizers-cmake/cmake" -DCMAKE_INSTALL_PREFIX="./install" `
                 -DBUILD_GMOCK=ON -DSANITIZE_THREAD=ON -DCMAKE_BUILD_TYPE=Debug `
-                -DCMAKE_VERBOSE_MAKEFILE=ON -B ./build/googletest ./googletest
+                -DCMAKE_VERBOSE_MAKEFILE=ON -B ./build/googletest ./googletest 
           cmake --build ./build/googletest --target install --verbose
 
       - name: Download Fast-CDR and make it sanitizer aware
@@ -89,7 +63,7 @@ jobs:
           cd ws
           cmake -DCMAKE_INSTALL_PREFIX="./install" -DCMAKE_PREFIX_PATH="./install" `
                 -DCMAKE_MODULE_PATH="$(pwd)/sanitizers-cmake/cmake" -DCMAKE_VERBOSE_MAKEFILE=ON `
-                -DSANITIZE_THREAD=ON -DCMAKE_BUILD_TYPE=Debug -B ./build/fastcdr ./Fast-CDR
+                -DSANITIZE_THREAD=ON -DCMAKE_BUILD_TYPE=Debug -B ./build/fastcdr ./Fast-CDR 
           cmake --build ./build/fastcdr --target install --verbose
 
       - name: Download foonathan/memory and make it sanitizer aware
@@ -121,7 +95,7 @@ jobs:
           git diff --name-only HEAD~1
           git remote add efork https://github.com/MiguelBarro/Fast-DDS.git
           git fetch efork
-          git merge --no-edit efork/bugfix/add_sanitizer_support
+          git merge --no-edit efork/bugfix/add_sanitizer_support | Out-Null
 
       - name: Build & install Fast-DDS
         run: |
@@ -130,27 +104,21 @@ jobs:
                 -DCMAKE_MODULE_PATH="$(pwd)/sanitizers-cmake/cmake" -DCMAKE_VERBOSE_MAKEFILE=ON -DSANITIZE_THREAD=ON `
                 -DGTEST_INDIVIDUAL=ON -DFASTDDS_STATISTICS=ON -DTHIRDPARTY=ON `
                 -DCOMPILE_EXAMPLES=OFF -DEPROSIMA_BUILD_TESTS=ON -DSECURITY=ON `
-                -DRTPS_API_TESTS=ON -DFASTRTPS_API_TESTS=ON -DFASTDDS_PIM_API_TESTS=ON `
-                -DCMAKE_BUILD_TYPE=Debug ${{ inputs.optional_cmake_args }} -B ./build/fastdds ./Fast-DDS
+                -DCMAKE_BUILD_TYPE=Debug -B ./build/fastdds ./Fast-DDS
           # Create a symlink to the reports folder
           $report_dir = gci -Path ./build/fastdds -Attributes D |
-            ? Name -like "$(Get-Date -Format 'MMMM-dd-yyyy')*"
-          $report_dir = Join-Path $report_dir tsan | gi
-          echo "report folder is: $report_dir"
+            ? Name -like "$(Get-Date -Format 'MMMM-dd-yyyy')*" 
           New-Item -ItemType SymbolicLink -Target $report_dir -Path ./build/fastdds/reports
           cmake --build ./build/fastdds --target install -j 2 --verbose
 
       - name: Run Fast-DDS test & generate sanitizer reports
         run: |
           cd ws/build/fastdds
-          # Exclude DDSSQLFilterValueTests tests to prevent hitting GH Actions resource limits
-          ctest --timeout 30 -j 2 -V -E DDSSQLFilterValueTests ${{ inputs.optional_ctest_args }}
+          ctest --timeout 30 -j 2 -V
           # ctest fails if sanitizer reports are present
-          $LASTEXITCODE=0
+          $LASTEXITCODE=0 
 
       - name: Process sanitizer reports
-        id: report_summary
-        continue-on-error: true
         run: |
           # Create a dir for the exports
           $exports = New-Item -ItemType Directory -Path ./ws/exports
@@ -159,7 +127,7 @@ jobs:
           # Install the report parser module
           Find-Module -Repository PSGallery -Name SanReportParser | Install-Module -Scope CurrentUser -Force
           # Parse the report files
-          $rp = Show-Tsan (gci)
+          $rp = Show-Tsan (gci) 
           # filter duplicates
           $rp = $rp | group md5hash | % { $_.group[0] }
           # Export raw data
@@ -167,8 +135,8 @@ jobs:
           # Group the reports by issue
           $g = $rp | group fuzzhash
           # Split up deadlocks and race reports
-          $gd = $rp | ? type -match dead | group fuzzhash
-          $gr = $rp | ? type -match race | group fuzzhash
+          $gd = $rp | ? type -match dead | group fuzzhash 
+          $gr = $rp | ? type -match race | group fuzzhash 
           # Simplified deadlock summary (only one representative report and tests associated)
           $sd = $gd | Sort-Object count -desc | select @{l="fuzzhash";e="name"}, count, `
               @{l="échantillon";e={$_.group[0].report}}, @{l="tests"; `
@@ -189,26 +157,12 @@ jobs:
           # Keep a file per issue
           $dir = New-Item -ItemType Directory -Path (Join-Path $exports reports)
           & {$sd; $sr} | % { $_.échantillon | Out-File (Join-Path $dir "$($_.fuzzhash).tsan") }
-          # Create a summary table
-          @{Type="Deadlock";Failed=$sd.count;Hashes=$sd.fuzzhash},
-          @{Type="Data race";Failed=$sr.count;Hashes=$sr.fuzzhash} |
-            % { $_.Summary = $_.Hashes | select -First 5  | Join-String -Separator ", "
-                if ($_.Hashes.count -gt 5 ) {
-                    $_.Summary += ", ..." }; $_ } |
-              % { [PSCustomObject]$_} |
-              New-MDTable -Columns ([ordered]@{Failed=$null;Type=$null;Summary=$null}) |
-              Out-File $Env:GITHUB_STEP_SUMMARY
-          # The step fails on new deadlocks
-          $LASTEXITCODE=$sd.count
+          # Zip an artifact
+          popd
+          gci $exports | Compress-Archive -DestinationPath ./ws/tsan_reports.zip 
 
       - name: Archive sanitation results
         uses: actions/upload-artifact@v3
         with:
-          name: sanitation-report
-          path: /home/runner/work/ws/exports/*
-
-      - name: Check on failures
-        if: ${{ steps.report_summary.outcome == 'failure' }}
-        run: |
-          Write-Host ${{ steps.report_summary.outcome }}
-          exit 1
+            name: sanitation-report
+            path: /home/runner/work/ws/tsan_reports.zip

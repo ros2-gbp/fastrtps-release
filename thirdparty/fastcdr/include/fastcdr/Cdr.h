@@ -30,7 +30,9 @@
 #include <stdlib.h>
 #endif // if !__APPLE__ && !__FreeBSD__ && !__VXWORKS__
 
+#if HAVE_CXX0X
 #include <array>
+#endif // if HAVE_CXX0X
 
 namespace eprosima {
 namespace fastcdr {
@@ -53,7 +55,11 @@ public:
 
     //! @brief This enumeration represents the two posible values of the flag that points if the content is a parameter list (only in DDS CDR).
 
+#ifdef HAVE_CXX0X
     typedef enum : uint8_t
+#else
+    typedef enum
+#endif // ifdef HAVE_CXX0X
     {
         //! @brief Specifies that the content is not a parameter list.
         DDS_CDR_WITHOUT_PL = 0x0,
@@ -64,7 +70,11 @@ public:
     /*!
      * @brief This enumeration represents endianness types.
      */
+#ifdef HAVE_CXX0X
     typedef enum : uint8_t
+#else
+    typedef enum
+#endif // ifdef HAVE_CXX0X
     {
         //! @brief Big endianness.
         BIG_ENDIANNESS = 0x0,
@@ -478,6 +488,7 @@ public:
         return serialize(string_t);
     }
 
+#if HAVE_CXX0X
     /*!
      * @brief This operator template is used to serialize arrays.
      * @param array_t The array that will be serialized in the buffer.
@@ -490,6 +501,8 @@ public:
     {
         return serialize<_T, _Size>(array_t);
     }
+
+#endif // if HAVE_CXX0X
 
     /*!
      * @brief This operator template is used to serialize sequences.
@@ -740,6 +753,7 @@ public:
         return deserialize(string_t);
     }
 
+#if HAVE_CXX0X
     /*!
      * @brief This operator template is used to deserialize arrays.
      * @param array_t The variable that will store the array read from the buffer.
@@ -752,6 +766,8 @@ public:
     {
         return deserialize<_T, _Size>(array_t);
     }
+
+#endif // if HAVE_CXX0X
 
     /*!
      * @brief This operator template is used to deserialize sequences.
@@ -1227,6 +1243,7 @@ public:
         return serialize(string_t.c_str(), endianness);
     }
 
+#if HAVE_CXX0X
     /*!
      * @brief This function template serializes an array.
      * @param array_t The array that will be serialized in the buffer.
@@ -1255,6 +1272,9 @@ public:
         return serializeArray(array_t.data(), array_t.size(), endianness);
     }
 
+#endif // if HAVE_CXX0X
+
+#if !defined(_MSC_VER) && HAVE_CXX0X
     /*!
      * @brief This function template serializes a sequence of booleans.
      * @param vector_t The sequence that will be serialized in the buffer.
@@ -1267,6 +1287,8 @@ public:
     {
         return serializeBoolSequence(vector_t);
     }
+
+#endif // if !defined(_MSC_VER) && HAVE_CXX0X
 
     /*!
      * @brief This function template serializes a sequence.
@@ -1356,8 +1378,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -1828,8 +1849,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -1860,8 +1880,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -1930,8 +1949,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -1991,8 +2009,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -2420,7 +2437,7 @@ public:
     {
         uint32_t length = 0;
         const char* str = readString(length);
-        string_t.assign(str, length);
+        string_t = std::string(str, length);
         return *this;
     }
 
@@ -2452,8 +2469,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -2482,8 +2498,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -2499,6 +2514,7 @@ public:
         return *this;
     }
 
+#if HAVE_CXX0X
     /*!
      * @brief This function template deserializes an array.
      * @param array_t The variable that will store the array read from the buffer.
@@ -2527,6 +2543,9 @@ public:
         return deserializeArray(array_t.data(), array_t.size(), endianness);
     }
 
+#endif // if HAVE_CXX0X
+
+#if !defined(_MSC_VER) && HAVE_CXX0X
     /*!
      * @brief This function template deserializes a sequence.
      * @param vector_t The variable that will store the sequence read from the buffer.
@@ -2539,6 +2558,8 @@ public:
     {
         return deserializeBoolSequence(vector_t);
     }
+
+#endif // if !defined(_MSC_VER) && HAVE_CXX0X
 
     /*!
      * @brief This function template deserializes a sequence.
@@ -2646,8 +2667,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -3116,8 +3136,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -3148,8 +3167,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -3218,8 +3236,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -3235,6 +3252,7 @@ public:
         return *this;
     }
 
+#if !defined(_MSC_VER) && HAVE_CXX0X
     /*!
      * @brief This function template deserializes a string sequence.
      * This function allocates memory to store the sequence. The user pointer will be set to point this allocated memory.
@@ -3268,6 +3286,8 @@ public:
     {
         return deserializeWStringSequence(sequence_t, numElements);
     }
+
+#endif // if !defined(_MSC_VER) && HAVE_CXX0X
 
     /*!
      * @brief This function template deserializes a raw sequence.
@@ -3359,8 +3379,7 @@ public:
             Endianness endianness)
     {
         bool auxSwap = m_swapBytes;
-        m_swapBytes = (m_swapBytes && (static_cast<Endianness>(m_endianness) == endianness)) ||
-                (!m_swapBytes && (static_cast<Endianness>(m_endianness) != endianness));
+        m_swapBytes = (m_swapBytes && (m_endianness == endianness)) || (!m_swapBytes && (m_endianness != endianness));
 
         try
         {
@@ -3398,6 +3417,7 @@ private:
             std::wstring*& sequence_t,
             size_t& numElements);
 
+#if HAVE_CXX0X
     /*!
      * @brief This function template detects the content type of the STD container array and serializes the array.
      * @param array_t The array that will be serialized in the buffer.
@@ -3461,6 +3481,8 @@ private:
     {
         return deserializeArray(array_t->data(), numElements * array_t->size(), endianness);
     }
+
+#endif // if HAVE_CXX0X
 
     /*!
      * @brief This function returns the extra bytes regarding the allignment.

@@ -67,120 +67,58 @@ public:
      * This method is called when a new Participant is discovered, or a previously discovered participant changes
      * its QOS or is removed.
      *
-     * @param[out] participant Pointer to the Participant which discovered the remote participant.
-     * @param[out] info Remote participant information. User can take ownership of the object.
+     * @param participant Pointer to the Participant which discovered the remote participant.
+     * @param info Remote participant information. User can take ownership of the object.
      */
     virtual void on_participant_discovery(
             DomainParticipant* participant,
             fastrtps::rtps::ParticipantDiscoveryInfo&& info)
     {
-        static_cast<void>(participant);
-        static_cast<void>(info);
-    }
-
-    /*!
-     * This method is called when a new Participant is discovered, or a previously discovered participant changes
-     * its QOS or is removed.
-     *
-     * @param[out] participant Pointer to the Participant which discovered the remote participant.
-     * @param[out] info Remote participant information. User can take ownership of the object.
-     * @param[out] should_be_ignored Flag to indicate the library to automatically ignore the discovered Participant.
-     */
-    virtual void on_participant_discovery(
-            DomainParticipant* participant,
-            fastrtps::rtps::ParticipantDiscoveryInfo&& info,
-            bool& should_be_ignored)
-    {
-        static_cast<void>(participant);
-        static_cast<void>(info);
-        should_be_ignored = false;
+        (void)participant, (void)info;
     }
 
 #if HAVE_SECURITY
     /*!
      * This method is called when a new Participant is authenticated.
      *
-     * @param[out] participant Pointer to the authenticated Participant.
-     * @param[out] info Remote participant authentication information. User can take ownership of the object.
+     * @param participant Pointer to the authenticated Participant.
+     * @param info Remote participant authentication information. User can take ownership of the object.
      */
     virtual void onParticipantAuthentication(
             DomainParticipant* participant,
             fastrtps::rtps::ParticipantAuthenticationInfo&& info)
     {
-        static_cast<void>(participant);
-        static_cast<void>(info);
+        (void)participant, (void)info;
     }
 
 #endif // if HAVE_SECURITY
 
     /*!
-     * This method is called when a new DataReader is discovered, or a previously discovered DataReader changes
+     * This method is called when a new Subscriber is discovered, or a previously discovered subscriber changes
      * its QOS or is removed.
      *
-     * @param[out] participant Pointer to the Participant which discovered the remote DataReader.
-     * @param[out] info Remote DataReader information. User can take ownership of the object.
+     * @param participant Pointer to the Participant which discovered the remote subscriber.
+     * @param info Remote subscriber information. User can take ownership of the object.
      */
     virtual void on_subscriber_discovery(
             DomainParticipant* participant,
             fastrtps::rtps::ReaderDiscoveryInfo&& info)
     {
-        static_cast<void>(participant);
-        static_cast<void>(info);
+        (void)participant, (void)info;
     }
 
     /*!
-     * This method is called when a new DataReader is discovered, or a previously discovered DataReader changes
+     * This method is called when a new Publisher is discovered, or a previously discovered publisher changes
      * its QOS or is removed.
      *
-     * @warning Not Supported. This callback will never be called in the current version.
-     *
-     * @param[out] participant Pointer to the Participant which discovered the remote DataReader.
-     * @param[out] info Remote DataReader information. User can take ownership of the object.
-     * @param[out] should_be_ignored Flag to indicate the library to automatically ignore the discovered DataReader.
-     */
-    virtual void on_subscriber_discovery(
-            DomainParticipant* participant,
-            fastrtps::rtps::ReaderDiscoveryInfo&& info,
-            bool& should_be_ignored)
-    {
-        static_cast<void>(participant);
-        static_cast<void>(info);
-        static_cast<void>(should_be_ignored);
-    }
-
-    /*!
-     * This method is called when a new DataWriter is discovered, or a previously discovered DataWriter changes
-     * its QOS or is removed.
-     *
-     * @param[out] participant Pointer to the Participant which discovered the remote DataWriter.
-     * @param[out] info Remote DataWriter information. User can take ownership of the object.
+     * @param participant Pointer to the Participant which discovered the remote publisher.
+     * @param info Remote publisher information. User can take ownership of the object.
      */
     virtual void on_publisher_discovery(
             DomainParticipant* participant,
             fastrtps::rtps::WriterDiscoveryInfo&& info)
     {
-        static_cast<void>(participant);
-        static_cast<void>(info);
-    }
-
-    /*!
-     * This method is called when a new DataWriter is discovered, or a previously discovered DataWriter changes
-     * its QOS or is removed.
-     *
-     * @warning Not Supported. This callback will never be called in the current version.
-     *
-     * @param[out] participant Pointer to the Participant which discovered the remote DataWriter.
-     * @param[out] info Remote DataWriter information. User can take ownership of the object.
-     * @param[out] should_be_ignored Flag to indicate the library to automatically ignore the discovered DataWriter.
-     */
-    virtual void on_publisher_discovery(
-            DomainParticipant* participant,
-            fastrtps::rtps::WriterDiscoveryInfo&& info,
-            bool& should_be_ignored)
-    {
-        static_cast<void>(participant);
-        static_cast<void>(info);
-        static_cast<void>(should_be_ignored);
+        (void)participant, (void)info;
     }
 
     /*!
@@ -198,12 +136,7 @@ public:
             const fastrtps::types::TypeObject* object,
             fastrtps::types::DynamicType_ptr dyn_type)
     {
-        static_cast<void>(participant);
-        static_cast<void>(request_sample_id);
-        static_cast<void>(topic);
-        static_cast<void>(identifier);
-        static_cast<void>(object);
-        static_cast<void>(dyn_type);
+        (void)participant, (void)request_sample_id, (void)topic, (void)identifier, (void)object, (void)dyn_type;
     }
 
     /*!
@@ -216,9 +149,7 @@ public:
             const fastrtps::rtps::SampleIdentity& request_sample_id,
             const fastrtps::types::TypeIdentifierWithSizeSeq& dependencies)
     {
-        static_cast<void>(participant);
-        static_cast<void>(request_sample_id);
-        static_cast<void>(dependencies);
+        (void)participant, (void)request_sample_id, (void)dependencies;
     }
 
     /*!
@@ -230,10 +161,7 @@ public:
             const fastrtps::string_255 type_name,
             const fastrtps::types::TypeInformation& type_information)
     {
-        static_cast<void>(participant);
-        static_cast<void>(topic_name);
-        static_cast<void>(type_name);
-        static_cast<void>(type_information);
+        (void)participant, (void)topic_name, (void)type_name, (void)type_information;
     }
 
     // TODO: Methods in DomainParticipantListener (p.33 - DDS)

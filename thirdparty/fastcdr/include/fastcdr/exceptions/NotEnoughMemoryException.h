@@ -44,6 +44,7 @@ public:
     Cdr_DllAPI NotEnoughMemoryException(
             const NotEnoughMemoryException& ex) noexcept;
 
+#if HAVE_CXX0X
     /*!
      * @brief Default move constructor.
      *
@@ -51,6 +52,7 @@ public:
      */
     Cdr_DllAPI NotEnoughMemoryException(
             NotEnoughMemoryException&& ex) noexcept;
+#endif // if HAVE_CXX0X
 
     /*!
      * @brief Assigment operation.
@@ -60,6 +62,7 @@ public:
     Cdr_DllAPI NotEnoughMemoryException& operator =(
             const NotEnoughMemoryException& ex) noexcept;
 
+#if HAVE_CXX0X
     /*!
      * @brief Assigment operation.
      *
@@ -67,6 +70,7 @@ public:
      */
     Cdr_DllAPI NotEnoughMemoryException& operator =(
             NotEnoughMemoryException&& ex) noexcept;
+#endif // if HAVE_CXX0X
 
     //! @brief Default constructor
     virtual Cdr_DllAPI ~NotEnoughMemoryException() noexcept;

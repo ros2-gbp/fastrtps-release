@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_DATA64KB_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -44,16 +42,16 @@
 
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
-#if defined(DATA64KB_SOURCE)
-#define DATA64KB_DllAPI __declspec( dllexport )
+#if defined(Data64kb_SOURCE)
+#define Data64kb_DllAPI __declspec( dllexport )
 #else
-#define DATA64KB_DllAPI __declspec( dllimport )
-#endif // DATA64KB_SOURCE
+#define Data64kb_DllAPI __declspec( dllimport )
+#endif // Data64kb_SOURCE
 #else
-#define DATA64KB_DllAPI
+#define Data64kb_DllAPI
 #endif  // EPROSIMA_USER_DLL_EXPORT
 #else
-#define DATA64KB_DllAPI
+#define Data64kb_DllAPI
 #endif // _WIN32
 
 namespace eprosima {
@@ -65,7 +63,7 @@ class Cdr;
 
 /*!
  * @brief This class represents the structure Data64kb defined by the user in the IDL file.
- * @ingroup Data64kb
+ * @ingroup DATA64KB
  */
 class Data64kb
 {
@@ -93,7 +91,7 @@ public:
      * @param x Reference to the object Data64kb that will be copied.
      */
     eProsima_user_DllExport Data64kb(
-            Data64kb&& x) noexcept;
+            Data64kb&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +105,7 @@ public:
      * @param x Reference to the object Data64kb that will be copied.
      */
     eProsima_user_DllExport Data64kb& operator =(
-            Data64kb&& x) noexcept;
+            Data64kb&& x);
 
     /*!
      * @brief Comparison operator.
@@ -150,11 +148,11 @@ public:
     eProsima_user_DllExport std::vector<uint8_t>& data();
 
     /*!
-    * @brief This function returns the maximum serialized size of an object
-    * depending on the buffer alignment.
-    * @param current_alignment Buffer alignment.
-    * @return Maximum serialized size.
-    */
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -209,8 +207,6 @@ public:
 private:
 
     std::vector<uint8_t> m_data;
-
 };
 
 #endif // _FAST_DDS_GENERATED_DATA64KB_H_
-

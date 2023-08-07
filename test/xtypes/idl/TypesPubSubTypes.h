@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*!
+/*! 
  * @file TypesPubSubTypes.h
  * This header file contains the declaration of the serialization functions.
  *
@@ -20,2179 +20,621 @@
  */
 
 
-#ifndef _FAST_DDS_GENERATED_TYPES_PUBSUBTYPES_H_
-#define _FAST_DDS_GENERATED_TYPES_PUBSUBTYPES_H_
+#ifndef _TYPES_PUBSUBTYPES_H_
+#define _TYPES_PUBSUBTYPES_H_
 
-#include <fastdds/dds/topic/TopicDataType.hpp>
-#include <fastrtps/utils/md5.h>
+#include <fastrtps/config.h>
+#include <fastrtps/TopicDataType.h>
 
 #include "Types.h"
 
-
 #if !defined(GEN_API_VER) || (GEN_API_VER != 1)
-#error \
-    Generated Types is not compatible with current installed Fast DDS. Please, regenerate it with fastddsgen.
-#endif  // GEN_API_VER
-
+#error Generated Types is not compatible with current installed Fast-RTPS. Please, regenerate it with fastrtpsgen.
+#endif
 
 
 
 /*!
  * @brief This class represents the TopicDataType of the type MyEnumStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MyEnumStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MyEnumStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MyEnumStruct type;
 
-    typedef MyEnumStruct type;
-
-    eProsima_user_DllExport MyEnumStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MyEnumStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MyEnumStructPubSubType();
+	virtual ~MyEnumStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type MyBadEnumStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MyBadEnumStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MyBadEnumStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MyBadEnumStruct type;
 
-    typedef MyBadEnumStruct type;
-
-    eProsima_user_DllExport MyBadEnumStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MyBadEnumStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MyBadEnumStructPubSubType();
+	virtual ~MyBadEnumStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
 typedef MyEnum MyAliasEnum;
-
 /*!
  * @brief This class represents the TopicDataType of the type MyAliasEnumStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MyAliasEnumStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MyAliasEnumStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MyAliasEnumStruct type;
 
-    typedef MyAliasEnumStruct type;
-
-    eProsima_user_DllExport MyAliasEnumStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MyAliasEnumStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MyAliasEnumStructPubSubType();
+	virtual ~MyAliasEnumStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type BasicStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class BasicStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class BasicStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef BasicStruct type;
 
-    typedef BasicStruct type;
-
-    eProsima_user_DllExport BasicStructPubSubType();
-
-    eProsima_user_DllExport virtual ~BasicStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	BasicStructPubSubType();
+	virtual ~BasicStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type BasicNamesStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class BasicNamesStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class BasicNamesStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef BasicNamesStruct type;
 
-    typedef BasicNamesStruct type;
-
-    eProsima_user_DllExport BasicNamesStructPubSubType();
-
-    eProsima_user_DllExport virtual ~BasicNamesStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	BasicNamesStructPubSubType();
+	virtual ~BasicNamesStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type BasicBadStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class BasicBadStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class BasicBadStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef BasicBadStruct type;
 
-    typedef BasicBadStruct type;
-
-    eProsima_user_DllExport BasicBadStructPubSubType();
-
-    eProsima_user_DllExport virtual ~BasicBadStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	BasicBadStructPubSubType();
+	virtual ~BasicBadStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type BasicWideStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class BasicWideStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class BasicWideStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef BasicWideStruct type;
 
-    typedef BasicWideStruct type;
-
-    eProsima_user_DllExport BasicWideStructPubSubType();
-
-    eProsima_user_DllExport virtual ~BasicWideStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	BasicWideStructPubSubType();
+	virtual ~BasicWideStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type BadBasicWideStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class BadBasicWideStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class BadBasicWideStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef BadBasicWideStruct type;
 
-    typedef BadBasicWideStruct type;
-
-    eProsima_user_DllExport BadBasicWideStructPubSubType();
-
-    eProsima_user_DllExport virtual ~BadBasicWideStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	BadBasicWideStructPubSubType();
+	virtual ~BadBasicWideStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type StringStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class StringStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class StringStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef StringStruct type;
 
-    typedef StringStruct type;
-
-    eProsima_user_DllExport StringStructPubSubType();
-
-    eProsima_user_DllExport virtual ~StringStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	StringStructPubSubType();
+	virtual ~StringStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type LargeStringStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class LargeStringStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class LargeStringStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef LargeStringStruct type;
 
-    typedef LargeStringStruct type;
-
-    eProsima_user_DllExport LargeStringStructPubSubType();
-
-    eProsima_user_DllExport virtual ~LargeStringStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	LargeStringStructPubSubType();
+	virtual ~LargeStringStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type WStringStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class WStringStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class WStringStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef WStringStruct type;
 
-    typedef WStringStruct type;
-
-    eProsima_user_DllExport WStringStructPubSubType();
-
-    eProsima_user_DllExport virtual ~WStringStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	WStringStructPubSubType();
+	virtual ~WStringStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type LargeWStringStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class LargeWStringStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class LargeWStringStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef LargeWStringStruct type;
 
-    typedef LargeWStringStruct type;
-
-    eProsima_user_DllExport LargeWStringStructPubSubType();
-
-    eProsima_user_DllExport virtual ~LargeWStringStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	LargeWStringStructPubSubType();
+	virtual ~LargeWStringStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
-#ifndef SWIG
-namespace detail {
-
-    template<typename Tag, typename Tag::type M>
-    struct ArrayStruct_rob
-    {
-        friend constexpr typename Tag::type get(
-                Tag)
-        {
-            return M;
-        }
-    };
-
-    struct ArrayStruct_f
-    {
-        typedef std::array<int32_t, 2> ArrayStruct::* type;
-        friend constexpr type get(
-                ArrayStruct_f);
-    };
-
-    template struct ArrayStruct_rob<ArrayStruct_f, &ArrayStruct::m_my_array>;
-
-    template <typename T, typename Tag>
-    inline size_t constexpr ArrayStruct_offset_of() {
-        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
-    }
-}
-#endif
-
 /*!
  * @brief This class represents the TopicDataType of the type ArrayStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class ArrayStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class ArrayStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef ArrayStruct type;
 
-    typedef ArrayStruct type;
-
-    eProsima_user_DllExport ArrayStructPubSubType();
-
-    eProsima_user_DllExport virtual ~ArrayStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return is_plain_impl();
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        new (memory) ArrayStruct();
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
-private:
-
-    static constexpr bool is_plain_impl()
-    {
-        return 8ULL == (detail::ArrayStruct_offset_of<ArrayStruct, detail::ArrayStruct_f>() + sizeof(std::array<int32_t, 2>));
-
-    }};
-
-#ifndef SWIG
-namespace detail {
-
-    template<typename Tag, typename Tag::type M>
-    struct ArrayStructEqual_rob
-    {
-        friend constexpr typename Tag::type get(
-                Tag)
-        {
-            return M;
-        }
-    };
-
-    struct ArrayStructEqual_f
-    {
-        typedef std::array<int32_t, 2> ArrayStructEqual::* type;
-        friend constexpr type get(
-                ArrayStructEqual_f);
-    };
-
-    template struct ArrayStructEqual_rob<ArrayStructEqual_f, &ArrayStructEqual::m_my_array_equal>;
-
-    template <typename T, typename Tag>
-    inline size_t constexpr ArrayStructEqual_offset_of() {
-        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
-    }
-}
-#endif
-
+	ArrayStructPubSubType();
+	virtual ~ArrayStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
+};
 /*!
  * @brief This class represents the TopicDataType of the type ArrayStructEqual defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class ArrayStructEqualPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class ArrayStructEqualPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef ArrayStructEqual type;
 
-    typedef ArrayStructEqual type;
-
-    eProsima_user_DllExport ArrayStructEqualPubSubType();
-
-    eProsima_user_DllExport virtual ~ArrayStructEqualPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return is_plain_impl();
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        new (memory) ArrayStructEqual();
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
-private:
-
-    static constexpr bool is_plain_impl()
-    {
-        return 8ULL == (detail::ArrayStructEqual_offset_of<ArrayStructEqual, detail::ArrayStructEqual_f>() + sizeof(std::array<int32_t, 2>));
-
-    }};
-
-#ifndef SWIG
-namespace detail {
-
-    template<typename Tag, typename Tag::type M>
-    struct ArrayBadStruct_rob
-    {
-        friend constexpr typename Tag::type get(
-                Tag)
-        {
-            return M;
-        }
-    };
-
-    struct ArrayBadStruct_f
-    {
-        typedef std::array<uint8_t, 2> ArrayBadStruct::* type;
-        friend constexpr type get(
-                ArrayBadStruct_f);
-    };
-
-    template struct ArrayBadStruct_rob<ArrayBadStruct_f, &ArrayBadStruct::m_my_array>;
-
-    template <typename T, typename Tag>
-    inline size_t constexpr ArrayBadStruct_offset_of() {
-        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
-    }
-}
-#endif
-
+	ArrayStructEqualPubSubType();
+	virtual ~ArrayStructEqualPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
+};
 /*!
  * @brief This class represents the TopicDataType of the type ArrayBadStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class ArrayBadStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class ArrayBadStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef ArrayBadStruct type;
 
-    typedef ArrayBadStruct type;
-
-    eProsima_user_DllExport ArrayBadStructPubSubType();
-
-    eProsima_user_DllExport virtual ~ArrayBadStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return is_plain_impl();
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        new (memory) ArrayBadStruct();
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
-private:
-
-    static constexpr bool is_plain_impl()
-    {
-        return 2ULL == (detail::ArrayBadStruct_offset_of<ArrayBadStruct, detail::ArrayBadStruct_f>() + sizeof(std::array<uint8_t, 2>));
-
-    }};
-
-#ifndef SWIG
-namespace detail {
-
-    template<typename Tag, typename Tag::type M>
-    struct ArrayDimensionsStruct_rob
-    {
-        friend constexpr typename Tag::type get(
-                Tag)
-        {
-            return M;
-        }
-    };
-
-    struct ArrayDimensionsStruct_f
-    {
-        typedef std::array<std::array<int32_t, 2>, 2> ArrayDimensionsStruct::* type;
-        friend constexpr type get(
-                ArrayDimensionsStruct_f);
-    };
-
-    template struct ArrayDimensionsStruct_rob<ArrayDimensionsStruct_f, &ArrayDimensionsStruct::m_my_array>;
-
-    template <typename T, typename Tag>
-    inline size_t constexpr ArrayDimensionsStruct_offset_of() {
-        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
-    }
-}
-#endif
-
+	ArrayBadStructPubSubType();
+	virtual ~ArrayBadStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
+};
 /*!
  * @brief This class represents the TopicDataType of the type ArrayDimensionsStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class ArrayDimensionsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class ArrayDimensionsStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef ArrayDimensionsStruct type;
 
-    typedef ArrayDimensionsStruct type;
-
-    eProsima_user_DllExport ArrayDimensionsStructPubSubType();
-
-    eProsima_user_DllExport virtual ~ArrayDimensionsStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return is_plain_impl();
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        new (memory) ArrayDimensionsStruct();
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
-private:
-
-    static constexpr bool is_plain_impl()
-    {
-        return 16ULL == (detail::ArrayDimensionsStruct_offset_of<ArrayDimensionsStruct, detail::ArrayDimensionsStruct_f>() + sizeof(std::array<std::array<int32_t, 2>, 2>));
-
-    }};
-
-#ifndef SWIG
-namespace detail {
-
-    template<typename Tag, typename Tag::type M>
-    struct ArraySizeStruct_rob
-    {
-        friend constexpr typename Tag::type get(
-                Tag)
-        {
-            return M;
-        }
-    };
-
-    struct ArraySizeStruct_f
-    {
-        typedef std::array<int32_t, 5> ArraySizeStruct::* type;
-        friend constexpr type get(
-                ArraySizeStruct_f);
-    };
-
-    template struct ArraySizeStruct_rob<ArraySizeStruct_f, &ArraySizeStruct::m_my_array>;
-
-    template <typename T, typename Tag>
-    inline size_t constexpr ArraySizeStruct_offset_of() {
-        return ((::size_t) &reinterpret_cast<char const volatile&>((((T*)0)->*get(Tag()))));
-    }
-}
-#endif
-
+	ArrayDimensionsStructPubSubType();
+	virtual ~ArrayDimensionsStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
+};
 /*!
  * @brief This class represents the TopicDataType of the type ArraySizeStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class ArraySizeStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class ArraySizeStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef ArraySizeStruct type;
 
-    typedef ArraySizeStruct type;
-
-    eProsima_user_DllExport ArraySizeStructPubSubType();
-
-    eProsima_user_DllExport virtual ~ArraySizeStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return is_plain_impl();
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        new (memory) ArraySizeStruct();
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
-private:
-
-    static constexpr bool is_plain_impl()
-    {
-        return 20ULL == (detail::ArraySizeStruct_offset_of<ArraySizeStruct, detail::ArraySizeStruct_f>() + sizeof(std::array<int32_t, 5>));
-
-    }};
-
+	ArraySizeStructPubSubType();
+	virtual ~ArraySizeStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
+};
 /*!
  * @brief This class represents the TopicDataType of the type SequenceStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SequenceStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SequenceStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SequenceStruct type;
 
-    typedef SequenceStruct type;
-
-    eProsima_user_DllExport SequenceStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SequenceStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SequenceStructPubSubType();
+	virtual ~SequenceStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SequenceStructEqual defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SequenceStructEqualPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SequenceStructEqualPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SequenceStructEqual type;
 
-    typedef SequenceStructEqual type;
-
-    eProsima_user_DllExport SequenceStructEqualPubSubType();
-
-    eProsima_user_DllExport virtual ~SequenceStructEqualPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SequenceStructEqualPubSubType();
+	virtual ~SequenceStructEqualPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SequenceBadStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SequenceBadStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SequenceBadStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SequenceBadStruct type;
 
-    typedef SequenceBadStruct type;
-
-    eProsima_user_DllExport SequenceBadStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SequenceBadStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SequenceBadStructPubSubType();
+	virtual ~SequenceBadStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SequenceBoundsStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SequenceBoundsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SequenceBoundsStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SequenceBoundsStruct type;
 
-    typedef SequenceBoundsStruct type;
-
-    eProsima_user_DllExport SequenceBoundsStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SequenceBoundsStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SequenceBoundsStructPubSubType();
+	virtual ~SequenceBoundsStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SequenceSequenceStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SequenceSequenceStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SequenceSequenceStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SequenceSequenceStruct type;
 
-    typedef SequenceSequenceStruct type;
-
-    eProsima_user_DllExport SequenceSequenceStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SequenceSequenceStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SequenceSequenceStructPubSubType();
+	virtual ~SequenceSequenceStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SequenceSequenceBoundsStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SequenceSequenceBoundsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SequenceSequenceBoundsStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SequenceSequenceBoundsStruct type;
 
-    typedef SequenceSequenceBoundsStruct type;
-
-    eProsima_user_DllExport SequenceSequenceBoundsStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SequenceSequenceBoundsStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SequenceSequenceBoundsStructPubSubType();
+	virtual ~SequenceSequenceBoundsStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type MapStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MapStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MapStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MapStruct type;
 
-    typedef MapStruct type;
-
-    eProsima_user_DllExport MapStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MapStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MapStructPubSubType();
+	virtual ~MapStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type MapStructEqual defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MapStructEqualPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MapStructEqualPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MapStructEqual type;
 
-    typedef MapStructEqual type;
-
-    eProsima_user_DllExport MapStructEqualPubSubType();
-
-    eProsima_user_DllExport virtual ~MapStructEqualPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MapStructEqualPubSubType();
+	virtual ~MapStructEqualPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type MapBadKeyStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MapBadKeyStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MapBadKeyStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MapBadKeyStruct type;
 
-    typedef MapBadKeyStruct type;
-
-    eProsima_user_DllExport MapBadKeyStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MapBadKeyStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MapBadKeyStructPubSubType();
+	virtual ~MapBadKeyStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type MapBadElemStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MapBadElemStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MapBadElemStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MapBadElemStruct type;
 
-    typedef MapBadElemStruct type;
-
-    eProsima_user_DllExport MapBadElemStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MapBadElemStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MapBadElemStructPubSubType();
+	virtual ~MapBadElemStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type MapBoundsStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MapBoundsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MapBoundsStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MapBoundsStruct type;
 
-    typedef MapBoundsStruct type;
-
-    eProsima_user_DllExport MapBoundsStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MapBoundsStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MapBoundsStructPubSubType();
+	virtual ~MapBoundsStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type MapMapStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MapMapStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MapMapStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MapMapStruct type;
 
-    typedef MapMapStruct type;
-
-    eProsima_user_DllExport MapMapStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MapMapStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MapMapStructPubSubType();
+	virtual ~MapMapStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type MapMapBoundsStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class MapMapBoundsStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class MapMapBoundsStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef MapMapBoundsStruct type;
 
-    typedef MapMapBoundsStruct type;
-
-    eProsima_user_DllExport MapMapBoundsStructPubSubType();
-
-    eProsima_user_DllExport virtual ~MapMapBoundsStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	MapMapBoundsStructPubSubType();
+	virtual ~MapMapBoundsStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 
 
 
@@ -2200,399 +642,123 @@ public:
 
 /*!
  * @brief This class represents the TopicDataType of the type SimpleUnionStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SimpleUnionStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SimpleUnionStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SimpleUnionStruct type;
 
-    typedef SimpleUnionStruct type;
-
-    eProsima_user_DllExport SimpleUnionStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SimpleUnionStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SimpleUnionStructPubSubType();
+	virtual ~SimpleUnionStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SimpleUnionStructEqual defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SimpleUnionStructEqualPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SimpleUnionStructEqualPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SimpleUnionStructEqual type;
 
-    typedef SimpleUnionStructEqual type;
-
-    eProsima_user_DllExport SimpleUnionStructEqualPubSubType();
-
-    eProsima_user_DllExport virtual ~SimpleUnionStructEqualPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SimpleUnionStructEqualPubSubType();
+	virtual ~SimpleUnionStructEqualPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SimpleUnionNamesStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SimpleUnionNamesStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SimpleUnionNamesStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SimpleUnionNamesStruct type;
 
-    typedef SimpleUnionNamesStruct type;
-
-    eProsima_user_DllExport SimpleUnionNamesStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SimpleUnionNamesStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SimpleUnionNamesStructPubSubType();
+	virtual ~SimpleUnionNamesStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SimpleTypeUnionStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SimpleTypeUnionStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SimpleTypeUnionStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SimpleTypeUnionStruct type;
 
-    typedef SimpleTypeUnionStruct type;
-
-    eProsima_user_DllExport SimpleTypeUnionStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SimpleTypeUnionStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SimpleTypeUnionStructPubSubType();
+	virtual ~SimpleTypeUnionStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SimpleBadUnionStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SimpleBadUnionStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SimpleBadUnionStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SimpleBadUnionStruct type;
 
-    typedef SimpleBadUnionStruct type;
-
-    eProsima_user_DllExport SimpleBadUnionStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SimpleBadUnionStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SimpleBadUnionStructPubSubType();
+	virtual ~SimpleBadUnionStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
-
 /*!
  * @brief This class represents the TopicDataType of the type SimplBadDiscUnionStruct defined by the user in the IDL file.
- * @ingroup Types
+ * @ingroup TYPES
  */
-class SimplBadDiscUnionStructPubSubType : public eprosima::fastdds::dds::TopicDataType
-{
+class SimplBadDiscUnionStructPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
+        typedef SimplBadDiscUnionStruct type;
 
-    typedef SimplBadDiscUnionStruct type;
-
-    eProsima_user_DllExport SimplBadDiscUnionStructPubSubType();
-
-    eProsima_user_DllExport virtual ~SimplBadDiscUnionStructPubSubType() override;
-
-    eProsima_user_DllExport virtual bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
-
-    eProsima_user_DllExport virtual bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            void* data) override;
-
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override;
-
-    eProsima_user_DllExport virtual bool getKey(
-            void* data,
-            eprosima::fastrtps::rtps::InstanceHandle_t* ihandle,
-            bool force_md5 = false) override;
-
-    eProsima_user_DllExport virtual void* createData() override;
-
-    eProsima_user_DllExport virtual void deleteData(
-            void* data) override;
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-    eProsima_user_DllExport inline bool is_bounded() const override
-    {
-        return true;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-    eProsima_user_DllExport inline bool is_plain() const override
-    {
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_IS_PLAIN
-
-#ifdef TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-    eProsima_user_DllExport inline bool construct_sample(
-            void* memory) const override
-    {
-        (void)memory;
-        return false;
-    }
-
-#endif  // TOPIC_DATA_TYPE_API_HAS_CONSTRUCT_SAMPLE
-
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-
+	SimplBadDiscUnionStructPubSubType();
+	virtual ~SimplBadDiscUnionStructPubSubType();
+	virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+	virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+	virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+		bool force_md5 = false) override;
+	virtual void* createData() override;
+	virtual void deleteData(void * data) override;
+	MD5 m_md5;
+	unsigned char* m_keyBuffer;
 };
 
-#endif // _FAST_DDS_GENERATED_TYPES_PUBSUBTYPES_H_
-
+#endif // _TYPES_PUBSUBTYPES_H_

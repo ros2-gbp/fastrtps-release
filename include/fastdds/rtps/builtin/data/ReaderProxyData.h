@@ -410,7 +410,7 @@ public:
      * @param is_shm_transport_available Indicates whether the Reader is reachable by SHM.
      * @return true on success
      */
-    bool readFromCDRMessage(
+    RTPS_DllAPI bool readFromCDRMessage(
             CDRMessage_t* msg,
             const NetworkFactory& network,
             bool is_shm_transport_available);

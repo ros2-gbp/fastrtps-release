@@ -38,7 +38,6 @@ set(SOURCES_SECURITY_TEST_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/exceptions/Exception.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/security/SecurityManager.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/security/exceptions/SecurityException.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/security/cryptography/AESGCMGMAC_Types.cpp
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/SecurityPluginFactory/rtps/security/SecurityPluginFactory.cpp
@@ -77,7 +76,6 @@ target_include_directories(SecurityAuthentication PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/StatelessReader
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/StatefulReader
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReaderHistory
-    ${PROJECT_SOURCE_DIR}/test/mock/rtps/PDP
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/PDPSimple
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/EDP
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/ParticipantProxyData
@@ -97,7 +95,3 @@ add_gtest(SecurityAuthentication
     ${CMAKE_CURRENT_SOURCE_DIR}/SecurityInitializationTests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SecurityValidationRemoteTests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SecurityHandshakeProcessTests.cpp)
-
-if(ANDROID)
-    set_property(TARGET SecurityAuthentication PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()

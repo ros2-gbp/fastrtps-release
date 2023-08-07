@@ -19,24 +19,26 @@
 
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 
-#include <chrono>
-#include <mutex>
-
 #include <fastdds/dds/log/Log.hpp>
+
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
-#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
+#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
+#include <fastdds/rtps/network/NetworkFactory.h>
 #include <fastdds/rtps/resources/TimedEvent.h>
 #include <fastrtps/utils/TimeConversion.h>
 
 #include <fastdds/core/policy/ParameterList.hpp>
 #include <fastdds/core/policy/QosPoliciesSerializer.hpp>
-#include <rtps/network/NetworkFactory.h>
+#include <fastrtps_deprecated/participant/ParticipantImpl.h>
 #include <rtps/transport/shared_mem/SHMLocator.hpp>
 
 #include "ProxyDataFilters.hpp"
 #include "ProxyHashTables.hpp"
+
+#include <mutex>
+#include <chrono>
 
 using namespace eprosima::fastrtps;
 using ParameterList = eprosima::fastdds::dds::ParameterList;
@@ -103,7 +105,7 @@ ParticipantProxyData::ParticipantProxyData(
 
 ParticipantProxyData::~ParticipantProxyData()
 {
-    EPROSIMA_LOG_INFO(RTPS_PARTICIPANT, m_guid);
+    logInfo(RTPS_PARTICIPANT, m_guid);
 
     // delete all reader proxies
     if (m_readers)
@@ -374,8 +376,14 @@ bool ParticipantProxyData::readFromCDRMessage(
         const NetworkFactory& network,
         bool is_shm_transport_available)
 {
-    auto param_process = [this, &network, &is_shm_transport_available](
-        CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
+    bool are_shm_metatraffic_locators_present = false;
+    bool are_shm_default_locators_present = false;
+    bool is_shm_transport_possible = false;
+
+    auto param_process = [this, &network, &is_shm_transport_possible,
+                    &are_shm_metatraffic_locators_present,
+                    &are_shm_default_locators_present,
+                    &is_shm_transport_available](CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
                 switch (pid)
                 {
@@ -460,7 +468,9 @@ bool ParticipantProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                metatraffic_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_metatraffic_locators_present,
+                                &metatraffic_locators,
                                 temp_locator,
                                 false);
                         }
@@ -480,7 +490,9 @@ bool ParticipantProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                metatraffic_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_metatraffic_locators_present,
+                                &metatraffic_locators,
                                 temp_locator,
                                 true);
                         }
@@ -500,7 +512,9 @@ bool ParticipantProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                default_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &default_locators,
                                 temp_locator,
                                 true);
                         }
@@ -520,7 +534,9 @@ bool ParticipantProxyData::readFromCDRMessage(
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                default_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &default_locators,
                                 temp_locator,
                                 false);
                         }
@@ -594,7 +610,7 @@ bool ParticipantProxyData::readFromCDRMessage(
 
                         identity_token_ = std::move(p.token);
 #else
-                        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT, "Received PID_IDENTITY_TOKEN but security is disabled");
+                        logWarning(RTPS_PARTICIPANT, "Received PID_IDENTITY_TOKEN but security is disabled");
 #endif // if HAVE_SECURITY
                         break;
                     }
@@ -610,8 +626,7 @@ bool ParticipantProxyData::readFromCDRMessage(
 
                         permissions_token_ = std::move(p.token);
 #else
-                        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
-                                "Received PID_PERMISSIONS_TOKEN but security is disabled");
+                        logWarning(RTPS_PARTICIPANT, "Received PID_PERMISSIONS_TOKEN but security is disabled");
 #endif // if HAVE_SECURITY
                         break;
                     }
@@ -629,7 +644,7 @@ bool ParticipantProxyData::readFromCDRMessage(
                         security_attributes_ = p.security_attributes;
                         plugin_security_attributes_ = p.plugin_security_attributes;
 #else
-                        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
+                        logWarning(RTPS_PARTICIPANT,
                                 "Received PID_PARTICIPANT_SECURITY_INFO but security is disabled");
 #endif // if HAVE_SECURITY
                         break;
@@ -778,7 +793,7 @@ void ParticipantProxyData::set_persistence_guid(
     {
         if (!it->modify(persistent_guid))
         {
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Failed to change property <"
+            logError(RTPS_PARTICIPANT, "Failed to change property <"
                     << it->first() << " | " << it->second() << "> to <"
                     << persistent_guid.first << " | " << persistent_guid.second << ">");
         }

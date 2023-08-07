@@ -25,8 +25,7 @@
 
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
-
-#include <fastrtps/utils/shared_mutex.hpp>
+#include <fastdds/rtps/network/NetworkFactory.h>
 
 namespace eprosima {
 
@@ -54,7 +53,6 @@ class WLP;
 class RTPSParticipantImpl;
 class RTPSWriter;
 class RTPSReader;
-class NetworkFactory;
 
 /**
  * Class BuiltinProtocols that contains builtin endpoints implementing the discovery and liveliness protocols.
@@ -68,12 +66,6 @@ private:
 
     BuiltinProtocols();
     virtual ~BuiltinProtocols();
-
-    /*
-     * Mutex to protect the m_DiscoveryServers collection. Element access is not protected by this mutex, the PDP mutex
-     * needs to be used when querying or modifying mutable members of the collection.
-     */
-    mutable eprosima::shared_mutex discovery_mutex_;
 
 public:
 
@@ -198,15 +190,6 @@ public:
     void stopRTPSParticipantAnnouncement();
     //!Reset to timer to make periodic RTPSParticipant Announcements.
     void resetRTPSParticipantAnnouncement();
-
-    /**
-     * Get Discovery mutex
-     * @return Associated Mutex
-     */
-    inline eprosima::shared_mutex& getDiscoveryMutex() const
-    {
-        return discovery_mutex_;
-    }
 
 };
 

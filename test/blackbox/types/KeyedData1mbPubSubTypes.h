@@ -28,16 +28,14 @@
 
 #include "KeyedData1mb.h"
 
-
 #if !defined(GEN_API_VER) || (GEN_API_VER != 1)
 #error \
     Generated KeyedData1mb is not compatible with current installed Fast DDS. Please, regenerate it with fastddsgen.
 #endif  // GEN_API_VER
 
-
 /*!
  * @brief This class represents the TopicDataType of the type KeyedData1mb defined by the user in the IDL file.
- * @ingroup KeyedData1mb
+ * @ingroup KEYEDDATA1MB
  */
 class KeyedData1mbPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -47,7 +45,7 @@ public:
 
     eProsima_user_DllExport KeyedData1mbPubSubType();
 
-    eProsima_user_DllExport virtual ~KeyedData1mbPubSubType() override;
+    eProsima_user_DllExport virtual ~KeyedData1mbPubSubType();
 
     eProsima_user_DllExport virtual bool serialize(
             void* data,
@@ -98,8 +96,6 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
-
 };
 
 #endif // _FAST_DDS_GENERATED_KEYEDDATA1MB_PUBSUBTYPES_H_
-

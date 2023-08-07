@@ -49,19 +49,10 @@ elseif(NOT EPROSIMA_INSTALLER)
     # Create library
     add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES})
     set_common_compile_options(${PROJECT_NAME})
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        VERSION ${PROJECT_VERSION}
-        SOVERSION ${PROJECT_VERSION_MAJOR}
-        )
+    set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+    set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 
-    target_compile_definitions(${PROJECT_NAME}
-        PRIVATE
-        ${PROJECT_NAME_UPPER}_SOURCE
-	INTERFACE
-        $<$<BOOL:${WIN32}>:${PROJECT_NAME_UPPER}_NO_LIB>
-        PUBLIC
-	$<$<STREQUAL:$<TARGET_PROPERTY:${PROJECT_NAME},TYPE>,SHARED_LIBRARY>:${PROJECT_NAME_UPPER}_DYN_LINK>
-        )
+    target_compile_definitions(${PROJECT_NAME} PRIVATE ${PROJECT_NAME_UPPER}_SOURCE)
 
     # Define public headers
     target_include_directories(${PROJECT_NAME} PUBLIC
@@ -70,24 +61,23 @@ elseif(NOT EPROSIMA_INSTALLER)
         )
 
     if(MSVC OR MSVC_IDE)
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-            RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-            RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-            DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-	    )
+        set_target_properties(${PROJECT_NAME} PROPERTIES RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+        set_target_properties(${PROJECT_NAME} PROPERTIES RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+        set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
         get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
         if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
             # Export symbols in DLL library
+            target_compile_definitions(${PROJECT_NAME} PUBLIC ${PROJECT_NAME_UPPER}_DYN_LINK)
             set_target_properties(${PROJECT_NAME} PROPERTIES
-                PDB_NAME_DEBUG ${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+                PDB_NAME_DEBUG "${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
                 PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
             )
         else()
             # Rename the library to have a "lib" before.
+            set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME lib${PROJECT_NAME})
             set_target_properties(${PROJECT_NAME} PROPERTIES
-                OUTPUT_NAME lib${PROJECT_NAME}
-                COMPILE_PDB_NAME_DEBUG lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+                COMPILE_PDB_NAME_DEBUG "lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
                 COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
             )
         endif()
@@ -145,6 +135,14 @@ endif()
 
 # Install libraries
 
+# Generate different target names depending on linking
+get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
+if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
+    set(FASTCDR_LINKING dynamic)
+else()
+    set(FASTCDR_LINKING static)
+endif()
+
 if(MSVC OR MSVC_IDE AND EPROSIMA_INSTALLER)
     if(IS_TOP_LEVEL)
         install_msvc_libraries(i86Win32VS2013)
@@ -160,22 +158,15 @@ if(MSVC OR MSVC_IDE AND EPROSIMA_INSTALLER)
         COMPONENT cmake
         )
 elseif(NOT EPROSIMA_INSTALLER)
-
     install(TARGETS ${PROJECT_NAME}
-        EXPORT ${PROJECT_NAME}-targets
+        EXPORT ${PROJECT_NAME}-${FASTCDR_LINKING}-targets
         RUNTIME DESTINATION ${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         LIBRARY DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         ARCHIVE DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
         COMPONENT libraries${MSVCARCH_EXTENSION}
         )
 
-    # Generate different target names depending on linking
-    get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
-    if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
-         set(FASTCDR_LINKING shared)
-    else()
-         set(FASTCDR_LINKING static)
-    endif()
+    export(TARGETS ${PROJECT_NAME} FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-${FASTCDR_LINKING}-targets.cmake)
 
     if(INSTALLER_PLATFORM)
         set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}-${INSTALLER_PLATFORM}/cmake)
@@ -183,9 +174,8 @@ elseif(NOT EPROSIMA_INSTALLER)
         set(INSTALL_DESTINATION_PATH ${LIB_INSTALL_DIR}/cmake/${PROJECT_NAME}${MSVCARCH_DIR_EXTENSION_EXT})
     endif()
 
-    install(EXPORT ${PROJECT_NAME}-targets
+    install(EXPORT ${PROJECT_NAME}-${FASTCDR_LINKING}-targets
         DESTINATION ${INSTALL_DESTINATION_PATH}
-	FILE ${PROJECT_NAME}-${FASTCDR_LINKING}-targets.cmake
         COMPONENT cmake
         )
 

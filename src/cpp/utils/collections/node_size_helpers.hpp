@@ -26,6 +26,14 @@
 #include <set>
 #include <unordered_map>
 
+// constexpr support for functions on VS 14.0 is defective
+// this macros will disable those scenarios that cannot be properly handled
+#if defined(_WIN32) && (_MSC_VER <= 1900)
+    #define CONSTEXPR_FUNC const
+#else
+    #define CONSTEXPR_FUNC constexpr
+#endif // if defined(_WIN32) && (_MSC_VER <= 1900)
+
 namespace eprosima {
 namespace utilities {
 namespace collections {
@@ -59,7 +67,7 @@ struct pool_size_helper
      * This is the value to be used as first parameter on the memory_pool constructor.
      */
     template<typename Pool>
-    static constexpr size_t min_pool_size(
+    static CONSTEXPR_FUNC size_t min_pool_size(
             size_t num_nodes)
     {
 #ifdef FOONATHAN_MEMORY_MEMORY_POOL_HAS_MIN_BLOCK_SIZE
@@ -77,7 +85,7 @@ private:
 
 #if !defined(FOONATHAN_MEMORY_MEMORY_POOL_HAS_MIN_BLOCK_SIZE)
     template<typename Pool>
-    static constexpr size_t min_size_per_node()
+    static CONSTEXPR_FUNC size_t min_size_per_node()
     {
         // Node size with minimum, plus debug space
         return
@@ -89,7 +97,7 @@ private:
 #endif // if FOONATHAN_MEMORY_DEBUG_DOUBLE_DEALLOC_CHECK
     }
 
-    static constexpr size_t additional_size_per_pool()
+    static CONSTEXPR_FUNC size_t additional_size_per_pool()
     {
         return fm::detail::memory_block_stack::implementation_offset;
     }

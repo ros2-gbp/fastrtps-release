@@ -79,7 +79,7 @@ public:
     {
         //Log::Reset();
         eprosima::fastdds::dds::Log::KillThread();
-        // Please, do not remove RTPSDomain before DomainParticipantFactory
+        eprosima::fastrtps::rtps::RTPSDomain::stopAll();
     }
 
 };

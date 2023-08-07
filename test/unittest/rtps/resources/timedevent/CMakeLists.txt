@@ -23,18 +23,10 @@ set(TIMEDEVENTTESTS_SOURCE mock/MockEvent.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
+    )
 
 if(WIN32)
     add_definitions(-D_WIN32_WINNT=0x0601)
-endif()
-
-if(ANDROID)
-    if (ANDROID_NATIVE_API_LEVEL LESS 24)
-        list(APPEND TIMEDEVENTTESTS_SOURCE
-            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-            )
-    endif()
 endif()
 
 add_executable(TimedEventTests ${TIMEDEVENTTESTS_SOURCE})
@@ -52,7 +44,3 @@ target_include_directories(TimedEventTests PRIVATE
     )
 target_link_libraries(TimedEventTests GTest::gtest ${CMAKE_DL_LIBS})
 add_gtest(TimedEventTests SOURCES ${TIMEDEVENTTESTS_SOURCE})
-
-if(ANDROID)
-    set_property(TARGET TimedEventTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()

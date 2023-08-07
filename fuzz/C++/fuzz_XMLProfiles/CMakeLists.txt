@@ -12,9 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 2.8.12)
 
-project(fuzz_XMLProfiles VERSION 1 LANGUAGES CXX)
+if(NOT CMAKE_VERSION VERSION_LESS 3.0)
+    cmake_policy(SET CMP0048 NEW)
+endif()
+
+project(fuzz_XMLProfiles)
 
 # Find requirements
 if(NOT fastcdr_FOUND)

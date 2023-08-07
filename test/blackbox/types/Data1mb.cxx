@@ -34,12 +34,9 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define Data1mb_max_cdr_typesize 1024004ULL;
-#define Data1mb_max_key_cdr_typesize 0ULL;
-
 Data1mb::Data1mb()
 {
-    // sequence<octet, 1024000> m_data
+    // m_data com.eprosima.idl.parser.typecode.SequenceTypeCode@53ca01a2
 
 
 }
@@ -55,7 +52,7 @@ Data1mb::Data1mb(
 }
 
 Data1mb::Data1mb(
-        Data1mb&& x) noexcept 
+        Data1mb&& x)
 {
     m_data = std::move(x.m_data);
 }
@@ -70,7 +67,7 @@ Data1mb& Data1mb::operator =(
 }
 
 Data1mb& Data1mb::operator =(
-        Data1mb&& x) noexcept
+        Data1mb&& x)
 {
 
     m_data = std::move(x.m_data);
@@ -94,8 +91,16 @@ bool Data1mb::operator !=(
 size_t Data1mb::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return Data1mb_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (1024000 * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t Data1mb::getCdrSerializedSize(
@@ -169,12 +174,14 @@ std::vector<uint8_t>& Data1mb::data()
     return m_data;
 }
 
-
 size_t Data1mb::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return Data1mb_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+    return current_align;
 }
 
 bool Data1mb::isKeyDefined()
@@ -186,5 +193,5 @@ void Data1mb::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
+     
 }
-

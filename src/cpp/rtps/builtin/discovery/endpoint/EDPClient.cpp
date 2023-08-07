@@ -41,7 +41,7 @@ bool EDPClient::processLocalReaderProxyData(
         RTPSReader* local_reader,
         ReaderProxyData* rdata)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP, rdata->guid().entityId);
+    logInfo(RTPS_EDP, rdata->guid().entityId);
     (void)local_reader;
 
     auto* writer = &subscriptions_writer_;
@@ -74,7 +74,7 @@ bool EDPClient::processLocalWriterProxyData(
         RTPSWriter* local_writer,
         WriterProxyData* wdata)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP, wdata->guid().entityId);
+    logInfo(RTPS_EDP, wdata->guid().entityId);
     (void)local_writer;
 
     auto* writer = &publications_writer_;
@@ -106,7 +106,7 @@ bool EDPClient::processLocalWriterProxyData(
 bool EDPClient::removeLocalWriter(
         RTPSWriter* W)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP, W->getGuid().entityId);
+    logInfo(RTPS_EDP, W->getGuid().entityId);
 
     auto* writer = &publications_writer_;
 
@@ -159,7 +159,7 @@ bool EDPClient::removeLocalWriter(
 bool EDPClient::removeLocalReader(
         RTPSReader* R)
 {
-    EPROSIMA_LOG_INFO(RTPS_EDP, R->getGuid().entityId);
+    logInfo(RTPS_EDP, R->getGuid().entityId);
 
     auto* writer = &subscriptions_writer_;
 

@@ -52,13 +52,21 @@ void DataSharingListener::run()
     std::unique_lock<Segment::mutex> lock(notification_->notification_->notification_mutex, std::defer_lock);
     while (is_running_.load())
     {
-        lock.lock();
-        notification_->notification_->notification_cv.wait(lock, [&]
-                {
-                    return !is_running_.load() || notification_->notification_->new_data.load();
-                });
+        try
+        {
+            lock.lock();
+            notification_->notification_->notification_cv.wait(lock, [&]
+                    {
+                        return !is_running_.load() || notification_->notification_->new_data.load();
+                    });
 
-        lock.unlock();
+            lock.unlock();
+        }
+        catch (const boost::interprocess::interprocess_exception& /*e*/)
+        {
+            // Timeout when locking
+            continue;
+        }
 
         if (!is_running_.load())
         {
@@ -118,7 +126,7 @@ void DataSharingListener::stop()
 
 void DataSharingListener::process_new_data ()
 {
-    EPROSIMA_LOG_INFO(RTPS_READER, "Received new data notification");
+    logInfo(RTPS_READER, "Received new data notification");
 
     std::unique_lock<std::mutex> lock(mutex_);
 
@@ -161,22 +169,22 @@ void DataSharingListener::process_new_data ()
             {
                 if (last_sequence != c_SequenceNumber_Unknown && ch.sequenceNumber > last_sequence + 1)
                 {
-                    EPROSIMA_LOG_WARNING(RTPS_READER, "GAP (" << last_sequence + 1 << " - " << ch.sequenceNumber - 1 << ")"
-                                                              << " detected on datasharing writer " << pool->writer());
+                    logWarning(RTPS_READER, "GAP (" << last_sequence + 1 << " - " << ch.sequenceNumber - 1 << ")"
+                                                    << " detected on datasharing writer " << pool->writer());
                     reader_->processGapMsg(pool->writer(), last_sequence + 1, SequenceNumberSet_t(ch.sequenceNumber));
                 }
 
                 if (last_sequence == c_SequenceNumber_Unknown && ch.sequenceNumber > SequenceNumber_t(0, 1))
                 {
-                    EPROSIMA_LOG_INFO(RTPS_READER, "First change with SN " << ch.sequenceNumber
-                                                                           << " detected on datasharing writer " <<
+                    logInfo(RTPS_READER, "First change with SN " << ch.sequenceNumber
+                                                                 << " detected on datasharing writer " <<
                             pool->writer());
                     reader_->processGapMsg(pool->writer(), SequenceNumber_t(0, 1), SequenceNumberSet_t(
                                 ch.sequenceNumber));
                 }
 
-                EPROSIMA_LOG_INFO(RTPS_READER, "New data found on writer " << pool->writer()
-                                                                           << " with SN " << ch.sequenceNumber);
+                logInfo(RTPS_READER, "New data found on writer " << pool->writer()
+                                                                 << " with SN " << ch.sequenceNumber);
 
                 if (reader_->processDataMsg(&ch))
                 {
@@ -212,7 +220,7 @@ bool DataSharingListener::add_datasharing_writer(
 
     if (writer_is_matched(writer_guid))
     {
-        EPROSIMA_LOG_INFO(RTPS_READER, "Attempting to add existing datasharing writer " << writer_guid);
+        logInfo(RTPS_READER, "Attempting to add existing datasharing writer " << writer_guid);
         return false;
     }
 
@@ -223,7 +231,7 @@ bool DataSharingListener::add_datasharing_writer(
         if (0 >= reader_history_max_samples ||
                 reader_history_max_samples >= static_cast<int32_t>(pool->history_size()))
         {
-            EPROSIMA_LOG_WARNING(RTPS_READER,
+            logWarning(RTPS_READER,
                     "Reader " << reader_->getGuid() << " was configured to have a large history (" <<
                     reader_history_max_samples << " max samples), but the history size used with writer " <<
                     writer_guid << " will be " << pool->history_size() << " max samples.");
