@@ -69,7 +69,7 @@ ReturnCode_t DynamicPubSubType::SetDynamicType(
     }
     else
     {
-        logError(DYN_TYPES, "Error Setting the dynamic type. There is already a registered type");
+        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error Setting the dynamic type. There is already a registered type");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -85,7 +85,7 @@ ReturnCode_t DynamicPubSubType::SetDynamicType(
     }
     else
     {
-        logError(DYN_TYPES, "Error Setting the dynamic type. There is already a registered type");
+        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error Setting the dynamic type. There is already a registered type");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -108,16 +108,15 @@ bool DynamicPubSubType::deserialize(
     eprosima::fastcdr::FastBuffer fastbuffer((char*)payload->data, payload->length); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
+                                              // Deserialize encapsulation.
+    deser.read_encapsulation();
+    payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
 
     try
     {
-        // Deserialize encapsulation.
-        deser.read_encapsulation();
-        payload->encapsulation = deser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-        //Deserialize the object:
-        ((DynamicData*)data)->deserialize(deser);
+        ((DynamicData*)data)->deserialize(deser); //Deserialize the object:
     }
-    catch (eprosima::fastcdr::exception::Exception& /*exception*/)
+    catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
     {
         return false;
     }
@@ -185,13 +184,14 @@ bool DynamicPubSubType::serialize(
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
     payload->encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
 
+    // Serialize encapsulation
+    ser.serialize_encapsulation();
+
     try
     {
-        // Serialize encapsulation
-        ser.serialize_encapsulation();
         ((DynamicData*)data)->serialize(ser); // Serialize the object:
     }
-    catch (eprosima::fastcdr::exception::Exception& /*exception*/)
+    catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
     {
         return false;
     }

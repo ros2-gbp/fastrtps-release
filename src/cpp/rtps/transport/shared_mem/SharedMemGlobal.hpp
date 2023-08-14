@@ -206,7 +206,6 @@ public:
                 std::shared_ptr<SharedMemSegment> port_segment;
                 PortNode* node;
                 MultiProducerConsumerRingBuffer<BufferDescriptor>* buffer;
-                BufferDescriptor last_checked_buffer[PortNode::LISTENERS_STATUS_SIZE];
             };
 
             static const std::shared_ptr<WatchTask>& get()
@@ -268,48 +267,30 @@ public:
             }
 
             bool update_status_all_listeners(
-                    PortContext& port_context)
+                    PortNode* port_node)
             {
                 uint32_t listeners_found = 0;
-
-                auto port_node = port_context.node;
 
                 for (uint32_t i = 0; i < PortNode::LISTENERS_STATUS_SIZE; i++)
                 {
                     auto& status = port_node->listeners_status[i];
-                    auto& last_checked_buffer = port_context.last_checked_buffer[i];
 
                     if (status.is_in_use)
                     {
                         listeners_found++;
-                        // Check if a listener is processing first
-                        if (status.is_processing)
+                        // Check only currently waiting listeners
+                        if (status.is_waiting)
                         {
-                            if ((last_checked_buffer.validity_id == status.descriptor.validity_id) &&
-                                    (last_checked_buffer.source_segment_id == status.descriptor.source_segment_id) &&
-                                    (last_checked_buffer.buffer_node_offset == status.descriptor.buffer_node_offset))
-
+                            if (status.counter != status.last_verified_counter)
+                            {
+                                status.last_verified_counter = status.counter;
+                            }
+                            else             // Counter is freeze => this listener is blocked!!!
                             {
                                 return false;
                             }
-                            last_checked_buffer = status.descriptor;
                         }
-                        else
-                        {
-                            last_checked_buffer = BufferDescriptor{};
-                            // Check if it is waiting next
-                            if (status.is_waiting)
-                            {
-                                if (status.counter != status.last_verified_counter)
-                                {
-                                    status.last_verified_counter = status.counter;
-                                }
-                                else             // Counter is frozen => this listener is blocked!!!
-                                {
-                                    return false;
-                                }
-                            }
-                        }
+
                         if (listeners_found == port_node->num_listeners)
                         {
                             break;
@@ -352,7 +333,7 @@ public:
                             // Check again, there can be races before locking the mutex.
                             if (timeout_elapsed(now, *(*port_it)))
                             {
-                                if (!update_status_all_listeners(*(*port_it)))
+                                if (!update_status_all_listeners((*port_it)->node))
                                 {
                                     (*port_it)->node->is_port_ok = false;
                                 }
@@ -364,8 +345,8 @@ public:
                         {
                             (*port_it)->node->is_port_ok = false;
 
-                            logWarning(RTPS_TRANSPORT_SHM, "Port " << (*port_it)->node->port_id
-                                                                   << ": " << e.what());
+                            EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "Port " << (*port_it)->node->port_id
+                                                                             << ": " << e.what());
 
                             // Remove the port from watch
                             port_it = watched_ports_.erase(port_it);
@@ -461,7 +442,7 @@ public:
             node_->ref_counter.fetch_add(1);
 
             auto port_context = std::make_shared<Port::WatchTask::PortContext>();
-            *port_context = {port_segment_, node_, buffer_.get(), { BufferDescriptor{} } };
+            *port_context = {port_segment_, node_, buffer_.get()};
             Port::WatchTask::get()->add_port(std::move(port_context));
         }
 
@@ -479,7 +460,7 @@ public:
                     // recursive lock of port_mutex in create_port()
                     if (node_->is_port_ok)
                     {
-                        std::unique_ptr<SharedMemSegment::named_mutex> port_mutex =
+                        deleted_unique_ptr<SharedMemSegment::named_mutex> port_mutex =
                                 SharedMemSegment::try_open_and_lock_named_mutex(segment_name + "_mutex");
 
                         std::unique_lock<SharedMemSegment::named_mutex> port_lock(*port_mutex, std::adopt_lock);
@@ -504,8 +485,8 @@ public:
                         node_->is_port_ok = false;
                     }
 
-                    logWarning(RTPS_TRANSPORT_SHM, THREADID << segment_name.c_str()
-                                                            << e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, THREADID << segment_name.c_str()
+                                                                      << e.what());
                 }
             }
         }
@@ -626,14 +607,6 @@ public:
             return node_->is_port_ok;
         }
 
-        /**
-         * Checks if a port is OK and is opened for reading with listeners active
-         */
-        inline bool port_has_listeners() const
-        {
-            return node_->is_port_ok && node_->is_opened_for_reading && node_->num_listeners > 0;
-        }
-
         inline uint32_t port_id() const
         {
             return node_->port_id;
@@ -670,19 +643,12 @@ public:
         void close_listener(
                 std::atomic<bool>* is_listener_closed)
         {
-            try
             {
-                {
-                    std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
-                    is_listener_closed->exchange(true);
-                }
-                node_->empty_cv.notify_all();
-            }
-            catch (const boost::interprocess::interprocess_exception& /*e*/)
-            {
-                // Timeout when locking
+                std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
+                is_listener_closed->exchange(true);
             }
 
+            node_->empty_cv.notify_all();
         }
 
         /**
@@ -789,25 +755,17 @@ public:
         bool get_and_remove_blocked_processing(
                 BufferDescriptor& buffer_descriptor)
         {
-            try
+            std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
+            for (uint32_t i = 0; i < PortNode::LISTENERS_STATUS_SIZE; i++)
             {
-                std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
-                for (uint32_t i = 0; i < PortNode::LISTENERS_STATUS_SIZE; i++)
+                if (node_->listeners_status[i].is_in_use &&
+                        node_->listeners_status[i].is_processing)
                 {
-                    if (node_->listeners_status[i].is_in_use &&
-                            node_->listeners_status[i].is_processing)
-                    {
-                        buffer_descriptor = node_->listeners_status[i].descriptor;
-                        listener_processing_stop(i);
-                        return true;
-                    }
+                    buffer_descriptor = node_->listeners_status[i].descriptor;
+                    listener_processing_stop(i);
+                    return true;
                 }
             }
-            catch (const boost::interprocess::interprocess_exception& /*e*/)
-            {
-                // Timeout when locking
-            }
-
             return false;
         }
 
@@ -820,17 +778,10 @@ public:
                 uint32_t listener_index,
                 const BufferDescriptor& buffer_descriptor)
         {
-            try
-            {
-                std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
+            std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
 
-                node_->listeners_status[listener_index].descriptor = buffer_descriptor;
-                node_->listeners_status[listener_index].is_processing = true;
-            }
-            catch (const boost::interprocess::interprocess_exception& /*e*/)
-            {
-                // Timeout when locking
-            }
+            node_->listeners_status[listener_index].descriptor = buffer_descriptor;
+            node_->listeners_status[listener_index].is_processing = true;
         }
 
         /**
@@ -840,16 +791,9 @@ public:
         void listener_processing_stop(
                 uint32_t listener_index)
         {
-            try
-            {
-                std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
+            std::lock_guard<SharedMemSegment::mutex> lock(node_->empty_cv_mutex);
 
-                node_->listeners_status[listener_index].is_processing = false;
-            }
-            catch (const boost::interprocess::interprocess_exception& /*e*/)
-            {
-                // Timeout when locking
-            }
+            node_->listeners_status[listener_index].is_processing = false;
         }
 
         /**
@@ -1040,10 +984,10 @@ private:
 
         auto port_segment_name = domain_name_ + "_port" + std::to_string(port_id);
 
-        logInfo(RTPS_TRANSPORT_SHM, THREADID << "Opening "
-                                             << port_segment_name);
+        EPROSIMA_LOG_INFO(RTPS_TRANSPORT_SHM, THREADID << "Opening "
+                                                       << port_segment_name);
 
-        std::unique_ptr<SharedMemSegment::named_mutex> port_mutex =
+        deleted_unique_ptr<SharedMemSegment::named_mutex> port_mutex =
                 SharedMemSegment::open_or_create_and_lock_named_mutex(port_segment_name + "_mutex");
 
         std::unique_lock<SharedMemSegment::named_mutex> port_lock(*port_mutex, std::adopt_lock);
@@ -1056,8 +1000,8 @@ private:
             }
             catch (std::exception& e)
             {
-                logError(RTPS_TRANSPORT_SHM, THREADID << "Port "
-                                                      << port_id << " failed unlock_read_locks " << e.what());
+                EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, THREADID << "Port "
+                                                                << port_id << " failed unlock_read_locks " << e.what());
             }
         }
 
@@ -1065,8 +1009,8 @@ private:
         {
             if (Port::is_zombie(port_id, domain_name_))
             {
-                logWarning(RTPS_TRANSPORT_SHM, THREADID << "Port "
-                                                        << port_id << " Zombie. Reset the port");
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, THREADID << "Port "
+                                                                  << port_id << " Zombie. Reset the port");
 
                 SharedMemSegment::remove(port_segment_name.c_str());
 
@@ -1100,13 +1044,13 @@ private:
             }
             catch (std::exception&)
             {
-                logWarning(RTPS_TRANSPORT_SHM, THREADID << "Port "
-                                                        << port_id << " Couldn't find port_node ");
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, THREADID << "Port "
+                                                                  << port_id << " Couldn't find port_node ");
 
                 SharedMemSegment::remove(port_segment_name.c_str());
 
-                logWarning(RTPS_TRANSPORT_SHM, THREADID << "Port "
-                                                        << port_id << " Removed.");
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, THREADID << "Port "
+                                                                  << port_id << " Removed.");
 
                 throw;
             }
@@ -1138,8 +1082,8 @@ private:
                     port_node->is_opened_read_exclusive |= (open_mode == Port::OpenMode::ReadExclusive);
                     port_node->is_opened_for_reading |= (open_mode != Port::OpenMode::Write);
 
-                    logInfo(RTPS_TRANSPORT_SHM, THREADID << "Port "
-                                                         << port_node->port_id << " (" << port_node->uuid.to_string() <<
+                    EPROSIMA_LOG_INFO(RTPS_TRANSPORT_SHM, THREADID << "Port "
+                                                                   << port_node->port_id << " (" << port_node->uuid.to_string() <<
                             ") Opened" << Port::open_mode_to_string(open_mode));
                 }
             }
@@ -1151,13 +1095,13 @@ private:
 
                 auto port_uuid = port_node->uuid.to_string();
 
-                logWarning(RTPS_TRANSPORT_SHM, THREADID << "Existing Port "
-                                                        << port_id << " (" << port_uuid << ") NOT Healthy.");
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, THREADID << "Existing Port "
+                                                                  << port_id << " (" << port_uuid << ") NOT Healthy.");
 
                 SharedMemSegment::remove(port_segment_name.c_str());
 
-                logWarning(RTPS_TRANSPORT_SHM, THREADID << "Port "
-                                                        << port_id << " (" << port_uuid << ") Removed.");
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, THREADID << "Port "
+                                                                  << port_id << " (" << port_uuid << ") Removed.");
 
                 throw;
             }
@@ -1179,8 +1123,8 @@ private:
             }
             catch (std::exception& e)
             {
-                logWarning(RTPS_TRANSPORT_SHM, "Failed to create port segment " << port_segment_name
-                                                                                << ": " << e.what());
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "Failed to create port segment " << port_segment_name
+                                                                                          << ": " << e.what());
             }
 
             if (port_segment)
@@ -1200,8 +1144,8 @@ private:
                 {
                     SharedMemSegment::remove(port_segment_name.c_str());
 
-                    logError(RTPS_TRANSPORT_SHM, "Failed init_port " << port_segment_name
-                                                                     << ": " << e.what());
+                    EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed init_port " << port_segment_name
+                                                                               << ": " << e.what());
 
                     throw;
                 }
@@ -1280,9 +1224,9 @@ private:
             port->lock_read_shared();
         }
 
-        logInfo(RTPS_TRANSPORT_SHM, THREADID << "Port "
-                                             << port_node->port_id << " (" << port_node->uuid.to_string()
-                                             << Port::open_mode_to_string(open_mode) << ") Created.");
+        EPROSIMA_LOG_INFO(RTPS_TRANSPORT_SHM, THREADID << "Port "
+                                                       << port_node->port_id << " (" << port_node->uuid.to_string()
+                                                       << Port::open_mode_to_string(open_mode) << ") Created.");
 
         return port;
     }

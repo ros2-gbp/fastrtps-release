@@ -35,41 +35,18 @@ bool check_shared_file (
     bool result;
     std::stringstream file_name;
     std::fstream file_stream;
-
+#if ANDROID
+    file_name << "/data/local/tmp/" << shared_dir << "/fast_datasharing_" << guid.guidPrefix << "_" << guid.entityId;
+#else
     file_name << shared_dir << "/fast_datasharing_" << guid.guidPrefix << "_" << guid.entityId;
+#endif // if ANDROID
     file_stream.open(file_name.str(), std::ios::in);
     result = file_stream.is_open();
     file_stream.close();
     return result;
 }
 
-class DDSDataSharing : public testing::TestWithParam<bool>
-{
-public:
-
-    void SetUp() override
-    {
-        if (GetParam())
-        {
-            LibrarySettingsAttributes library_settings;
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_FULL;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
-        }
-    }
-
-    void TearDown() override
-    {
-        if (GetParam())
-        {
-            LibrarySettingsAttributes library_settings;
-            library_settings.intraprocess_delivery = IntraprocessDeliveryType::INTRAPROCESS_OFF;
-            xmlparser::XMLProfileManager::library_settings(library_settings);
-        }
-    }
-
-};
-
-TEST_P(DDSDataSharing, BasicCommunication)
+TEST(DDSDataSharing, BasicCommunication)
 {
     PubSubReader<FixedSizedPubSubType> reader(TEST_TOPIC_NAME);
     PubSubWriter<FixedSizedPubSubType> writer(TEST_TOPIC_NAME);
@@ -185,7 +162,7 @@ TEST(DDSDataSharing, TransientReader)
 }
 
 
-TEST_P(DDSDataSharing, BestEffortDirtyPayloads)
+TEST(DDSDataSharing, BestEffortDirtyPayloads)
 {
     // The writer's pool is smaller than the reader history.
     // The number of samples is larger than the pool size, so some payloads get reused
@@ -247,7 +224,7 @@ TEST_P(DDSDataSharing, BestEffortDirtyPayloads)
     ASSERT_FALSE(check_shared_file(".", writer.datawriter_guid()));
 }
 
-TEST_P(DDSDataSharing, ReliableDirtyPayloads)
+TEST(DDSDataSharing, ReliableDirtyPayloads)
 {
     // The writer's pool is smaller than the reader history.
     // The number of samples is larger than the pool size, so some payloads get rused
@@ -627,7 +604,7 @@ TEST(DDSDataSharing, DataSharingReader_CommonDomainWriters)
 }
 
 
-TEST_P(DDSDataSharing, DataSharingPoolError)
+TEST(DDSDataSharing, DataSharingPoolError)
 {
     PubSubWriter<Data1mbPubSubType> writer_datasharing(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbPubSubType> writer_auto(TEST_TOPIC_NAME);
@@ -677,7 +654,7 @@ TEST_P(DDSDataSharing, DataSharingPoolError)
 }
 
 
-TEST_P(DDSDataSharing, DataSharingDefaultDirectory)
+TEST(DDSDataSharing, DataSharingDefaultDirectory)
 {
     // Since the default directory heavily depends on the system,
     // we are not checking the creation of the files in this case,
@@ -930,18 +907,3 @@ TEST(DDSDataSharing, acknack_reception_when_get_unread_count)
     ASSERT_FALSE(check_shared_file(".", reader.datareader_guid()));
     ASSERT_FALSE(check_shared_file(".", writer.datawriter_guid()));
 }
-
-#ifdef INSTANTIATE_TEST_SUITE_P
-#define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_SUITE_P(x, y, z, w)
-#else
-#define GTEST_INSTANTIATE_TEST_MACRO(x, y, z, w) INSTANTIATE_TEST_CASE_P(x, y, z, w)
-#endif // ifdef INSTANTIATE_TEST_SUITE_P
-
-GTEST_INSTANTIATE_TEST_MACRO(DDSDataSharing,
-        DDSDataSharing,
-        testing::Values(false, true),
-        [](const testing::TestParamInfo<DDSDataSharing::ParamType>& info)
-        {
-            bool intraprocess = info.param;
-            return intraprocess ? "Intraprocess_and_datasharing" : "Datasharing_only";
-        });

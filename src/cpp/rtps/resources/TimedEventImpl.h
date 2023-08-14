@@ -26,7 +26,11 @@
 #include <fastdds/rtps/resources/TimedEvent.h>
 
 #include <atomic>
+#include <thread>
+#include <memory>
 #include <functional>
+#include <mutex>
+#include <condition_variable>
 
 namespace eprosima {
 namespace fastrtps {
@@ -87,8 +91,9 @@ public:
      */
     double getIntervalMsec()
     {
-        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(interval_microsec_.load());
-        return static_cast<double>(ms.count());
+        std::unique_lock<std::mutex> lock(mutex_);
+        auto total_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(interval_microsec_);
+        return static_cast<double>(total_milliseconds.count());
     }
 
     /*!
@@ -97,9 +102,11 @@ public:
      */
     double getRemainingTimeMilliSec()
     {
-        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            next_trigger_time_.load() - std::chrono::steady_clock::now());
-        return static_cast<double>(ms.count());
+        std::unique_lock<std::mutex> lock(mutex_);
+        return static_cast<double>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                next_trigger_time_ - std::chrono::steady_clock::now()).
+            count());
     }
 
     /*!
@@ -108,6 +115,7 @@ public:
      */
     std::chrono::steady_clock::time_point next_trigger_time()
     {
+        std::unique_lock<std::mutex> lock(mutex_);
         return next_trigger_time_;
     }
 
@@ -146,16 +154,19 @@ public:
 private:
 
     //! Expiration time in microseconds of the event.
-    std::atomic<std::chrono::microseconds> interval_microsec_;
+    std::chrono::microseconds interval_microsec_;
 
     //! Next time this event should be triggered
-    std::atomic<std::chrono::steady_clock::time_point> next_trigger_time_;
+    std::chrono::steady_clock::time_point next_trigger_time_;
 
     //! User function to be called when this event is triggered
     Callback callback_;
 
     //! Current state of this event
     std::atomic<StateCode> state_;
+
+    //! Protects interval_microsec_ and next_trigger_time_
+    std::mutex mutex_;
 };
 
 } // namespace rtps

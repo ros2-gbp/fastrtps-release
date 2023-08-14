@@ -237,6 +237,16 @@ public:
      */
     uint32_t builtin_endpoints() const;
 
+    /**
+     * Returns whether a mangled GUID is the same as the original.
+     * @param adjusted Mangled GUID prefix
+     * @param original Original GUID prefix candidate to compare
+     * @return true when @c adjusted corresponds to @c original
+     */
+    bool check_guid_comes_from(
+            const GUID_t& adjusted,
+            const GUID_t& original) const;
+
     RTPSParticipantImpl* participant() const
     {
         return participant_;
@@ -340,8 +350,7 @@ private:
         AUTHENTICATION_REQUEST_NOT_SEND,
         AUTHENTICATION_WAITING_REQUEST,
         AUTHENTICATION_WAITING_REPLY,
-        AUTHENTICATION_WAITING_FINAL,
-        AUTHENTICATION_NOT_AVAILABLE
+        AUTHENTICATION_WAITING_FINAL
     };
 
     class DiscoveredParticipantInfo
@@ -359,7 +368,6 @@ private:
                 , auth_status_(auth_status)
                 , expected_sequence_number_(0)
                 , change_sequence_number_(SequenceNumber_t::unknown())
-                , handshake_requests_sent_(0)
             {
             }
 
@@ -386,8 +394,6 @@ private:
 
             EventUniquePtr event_;
 
-            uint32_t handshake_requests_sent_;
-
         private:
 
             AuthenticationInfo(
@@ -397,9 +403,6 @@ private:
     public:
 
         typedef std::unique_ptr<AuthenticationInfo> AuthUniquePtr;
-
-        static constexpr uint32_t INITIAL_RESEND_HANDSHAKE_MILLISECS = 125;
-        static constexpr uint32_t MAX_HANDSHAKE_REQUESTS = 5;
 
         DiscoveredParticipantInfo(
                 AuthenticationStatus auth_status,
@@ -485,18 +488,10 @@ private:
             return participant_data_;
         }
 
-        AuthenticationStatus get_auth_status() const
-        {
-            std::lock_guard<std::mutex> g(mtx_);
-            if (auth_.get() != nullptr)
-            {
-                return auth_->auth_status_;
-            }
-            else
-            {
-                return AUTHENTICATION_NOT_AVAILABLE;
-            }
-        }
+        bool check_guid_comes_from(
+                Authentication* const auth_plugin,
+                const GUID_t& adjusted,
+                const GUID_t& original);
 
     private:
 
@@ -686,14 +681,16 @@ private:
      * @param participant_data ParticipantProxyData& exchange partner
      * @param remote_participant_info DiscoveredParticipantInfo::AuthUniquePtr& exchange partner authorization data
      * @param message_identity MessageIdentity&& identifies the message to process
-     * @param message HandshakeMessageToken&& required by the protocol
+     * @param message_in HandshakeMessageToken&& required by the protocol
+     * @param notify_part_authorized [out] Whether to notify afterwards if Authentication was successfulful
      * @return true on success
      */
     bool on_process_handshake(
             const ParticipantProxyData& participant_data,
             DiscoveredParticipantInfo::AuthUniquePtr& remote_participant_info,
             MessageIdentity&& message_identity,
-            HandshakeMessageToken&& message);
+            HandshakeMessageToken&& message_in,
+            bool& notify_part_authorized);
 
     ParticipantGenericMessage generate_authentication_message(
             const MessageIdentity& related_message_identity,
@@ -716,23 +713,30 @@ private:
             const GUID_t& source_endpoint_key,
             ParticipantCryptoTokenSeq& crypto_tokens) const;
 
+    /**
+     * Performs cryptography by exchanging secrets
+     * if ok, participant is authorized
+     *
+     * @param participant_data ParticipantProxyData& exchange partner
+     * @param remote_participant_info DiscoveredParticipantInfo::AuthUniquePtr& exchange partner authorization data
+     * @param shared_secret_handle shared secret key
+     * @return true on success
+     */
     bool participant_authorized(
             const ParticipantProxyData& participant_data,
             const DiscoveredParticipantInfo::AuthUniquePtr& remote_participant_info,
             std::shared_ptr<SecretHandle>& shared_secret_handle);
 
+    /**
+     * Notifies above remote endpoints and participants listener
+     * that a participant was authorized
+     * @param participant_data ParticipantProxyData& remote partner
+     */
+    void notify_participant_authorized(
+            const ParticipantProxyData& participant_data);
+
     void resend_handshake_message_token(
             const GUID_t& remote_participant_key) const;
-
-    /**
-     * Determines de action to do when validation process fails
-     * @param participant_data ParticipantProxyData& exchange partner
-     * @param exception Exception to generate (if any)
-     * @return true if this participant should be considered as authenticated
-     */
-    void on_validation_failed(
-            const ParticipantProxyData& participant_data,
-            const SecurityException& exception) const;
 
     RTPSParticipantImpl* participant_;
     StatelessWriter* participant_stateless_message_writer_;

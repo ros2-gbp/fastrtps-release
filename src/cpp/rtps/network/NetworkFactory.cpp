@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <fastdds/rtps/network/NetworkFactory.h>
+#include <rtps/network/NetworkFactory.h>
 
 #include <limits>
 #include <utility>
@@ -34,36 +34,10 @@ namespace rtps {
 
 using SendResourceList = fastdds::rtps::SendResourceList;
 
-NetworkFactory::NetworkFactory(
-        const RTPSParticipantAttributes& PParam)
+NetworkFactory::NetworkFactory()
     : maxMessageSizeBetweenTransports_(std::numeric_limits<uint32_t>::max())
     , minSendBufferSize_(std::numeric_limits<uint32_t>::max())
 {
-    const std::string* enforce_metatraffic = nullptr;
-    enforce_metatraffic = PropertyPolicyHelper::find_property(PParam.properties, "fastdds.shm.enforce_metatraffic");
-    if (enforce_metatraffic)
-    {
-        if (*enforce_metatraffic == "unicast")
-        {
-            enforce_shm_unicast_metatraffic_ = true;
-            enforce_shm_multicast_metatraffic_ = false;
-        }
-        else if (*enforce_metatraffic == "all")
-        {
-            enforce_shm_unicast_metatraffic_ = true;
-            enforce_shm_multicast_metatraffic_ = true;
-        }
-        else if (*enforce_metatraffic == "none")
-        {
-            enforce_shm_unicast_metatraffic_ = false;
-            enforce_shm_multicast_metatraffic_ = false;
-        }
-        else
-        {
-            logWarning(RTPS_NETWORK, "Unrecognized value '" << *enforce_metatraffic << "'" <<
-                    " for 'fastdds.shm.enforce_metatraffic'. Using default value: 'none'");
-        }
-    }
 }
 
 bool NetworkFactory::build_send_resources(
@@ -272,9 +246,9 @@ bool NetworkFactory::getDefaultMetatrafficMulticastLocators(
 
     for (auto& transport : mRegisteredTransports)
     {
-        // For better fault-tolerance reasons, SHM metatraffic is avoided if it is already provided
+        // For better fault-tolerance reasons, SHM multicast metatraffic is avoided if it is already provided
         // by another transport
-        if (enforce_shm_multicast_metatraffic_ || transport->kind() != LOCATOR_KIND_SHM)
+        if (transport->kind() != LOCATOR_KIND_SHM)
         {
             result |= transport->getDefaultMetatrafficMulticastLocators(locators, metatraffic_multicast_port);
         }
@@ -312,28 +286,10 @@ bool NetworkFactory::getDefaultMetatrafficUnicastLocators(
         uint32_t metatraffic_unicast_port) const
 {
     bool result = false;
-
-    TransportInterface* shm_transport = nullptr;
-
     for (auto& transport : mRegisteredTransports)
     {
-        // For better fault-tolerance reasons, SHM metatraffic is avoided if it is already provided
-        // by another transport
-        if (enforce_shm_unicast_metatraffic_ || transport->kind() != LOCATOR_KIND_SHM)
-        {
-            result |= transport->getDefaultMetatrafficUnicastLocators(locators, metatraffic_unicast_port);
-        }
-        else
-        {
-            shm_transport = transport.get();
-        }
+        result |= transport->getDefaultMetatrafficUnicastLocators(locators, metatraffic_unicast_port);
     }
-
-    if (locators.size() == 0 && shm_transport)
-    {
-        result |= shm_transport->getDefaultMetatrafficUnicastLocators(locators, metatraffic_unicast_port);
-    }
-
     return result;
 }
 
@@ -421,7 +377,7 @@ uint16_t NetworkFactory::calculate_well_known_port(
 
     if (port > 65535)
     {
-        logError(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
+        EPROSIMA_LOG_ERROR(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
                 << "too much participants created or portBase is too high.");
         std::cout << "Calculated port number is too high. Probably the domainId is over 232, there are "
                   << "too much participants created or portBase is too high." << std::endl;

@@ -24,7 +24,6 @@
 #include <fastrtps/fastrtps_dll.h>
 
 #include <bitset>
-#include <cstdint>
 #include <sstream>
 
 //!Alias of size_t(16)

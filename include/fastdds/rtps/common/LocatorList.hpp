@@ -96,6 +96,8 @@ class LocatorList
 {
 public:
 
+    using value_type = typename std::vector<Locator>::value_type;
+
     /// Constructor
     RTPS_DllAPI LocatorList()
     {
@@ -378,6 +380,21 @@ public:
         this->m_locators.swap(locatorList.m_locators);
     }
 
+    // Check if there are specific transport locators associated
+    // the template parameter is the locator kind (e.g. LOCATOR_KIND_UDPv4)
+    template<int kind> bool has_kind() const
+    {
+        for (auto& loc : m_locators)
+        {
+            if ( kind == loc.kind )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 private:
 
     std::vector<Locator> m_locators;
@@ -456,7 +473,7 @@ inline std::istream& operator >>(
         catch (std::ios_base::failure& )
         {
             locList.clear();
-            logWarning(LOCATOR_LIST, "Error deserializing LocatorList");
+            EPROSIMA_LOG_WARNING(LOCATOR_LIST, "Error deserializing LocatorList");
         }
 
         input.exceptions(excp_mask);

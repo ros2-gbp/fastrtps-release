@@ -110,7 +110,7 @@ private:
                     std::memory_order_relaxed))
             {
             }
-            logWarning(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
+            EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
             return (s.processing_count == 0);
         }
 
@@ -260,8 +260,8 @@ public:
         }
         catch (const std::exception& e)
         {
-            logError(RTPS_TRANSPORT_SHM, "Failed to create Shared Memory Manager for domain " << domain_name
-                                                                                              << ": " <<
+            EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to create Shared Memory Manager for domain " << domain_name
+                                                                                                        << ": " <<
                     e.what());
             return std::shared_ptr<SharedMemManager>();
         }
@@ -380,8 +380,8 @@ public:
             }
             catch (const std::exception& e)
             {
-                logError(RTPS_TRANSPORT_SHM, "Failed to create segment " << segment_name_
-                                                                         << ": " << e.what());
+                EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to create segment " << segment_name_
+                                                                                   << ": " << e.what());
 
                 throw;
             }
@@ -414,7 +414,7 @@ public:
 
             if (overflows_count_)
             {
-                logWarning(RTPS_TRANSPORT_SHM,
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM,
                         "Segment " << segment_id_.to_string().c_str()
                                    << " closed. It had " << "overflows_count "
                                    << overflows_count_);
@@ -662,7 +662,7 @@ public:
                 }
                 catch (const std::exception& e)
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, e.what());
                 }
             }
         }
@@ -718,9 +718,7 @@ public:
                         throw std::runtime_error("");
                     }
 
-                    // Read and pop descriptor
                     SharedMemGlobal::BufferDescriptor buffer_descriptor = head_cell->data();
-                    global_port_->pop(*global_listener_, was_cell_freed);
 
                     auto segment = shared_mem_manager_->find_segment(buffer_descriptor.source_segment_id);
                     auto buffer_node =
@@ -731,6 +729,9 @@ public:
                     buffer_ref = std::make_shared<SharedMemBuffer>(segment, buffer_descriptor.source_segment_id,
                                     buffer_node,
                                     buffer_descriptor.validity_id);
+
+                    // If the cell has been read by all listeners
+                    global_port_->pop(*global_listener_, was_cell_freed);
 
                     if (buffer_ref)
                     {
@@ -765,8 +766,9 @@ public:
                 }
                 else
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, "SHM Listener on port " << global_port_->port_id() << " failure: "
-                                                                           << e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM,
+                            "SHM Listener on port " << global_port_->port_id() << " failure: "
+                                                    << e.what());
 
                     regenerate_port();
                 }
@@ -782,9 +784,10 @@ public:
 
         void regenerate_port()
         {
-            auto new_port = global_port_;
-            shared_mem_manager_->regenerate_port(new_port, new_port->open_mode());
-            auto new_listener = std::make_shared<Listener>(shared_mem_manager_, new_port);
+            auto new_port = shared_mem_manager_->regenerate_port(global_port_, global_port_->open_mode());
+
+            auto new_listener = new_port->create_listener();
+
             *this = std::move(*new_listener);
         }
 
@@ -840,25 +843,12 @@ public:
         }
 
         /**
-         * Checks if a port is OK and opened for reading with listeners active
-         */
-        bool has_listeners() const
-        {
-            return global_port_->port_has_listeners();
-        }
-
-        /**
          * Try to enqueue a buffer in the port.
-         * @param[in, out] buffer reference to the SHM buffer to push to
-         * @param[out] is_port_ok true if the port is ok
          * @returns false If the port's queue is full so buffer couldn't be enqueued.
          */
         bool try_push(
-                const std::shared_ptr<Buffer>& buffer,
-                bool& is_port_ok)
+                const std::shared_ptr<Buffer>& buffer)
         {
-            is_port_ok = true;
-
             assert(std::dynamic_pointer_cast<SharedMemBuffer>(buffer));
 
             SharedMemBuffer* shared_mem_buffer = std::static_pointer_cast<SharedMemBuffer>(buffer).get();
@@ -888,11 +878,10 @@ public:
 
                 if (!global_port_->is_port_ok())
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, "SHM Port " << global_port_->port_id() << " failure: "
-                                                               << e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "SHM Port " << global_port_->port_id() << " failure: "
+                                                                         << e.what());
 
                     regenerate_port();
-                    is_port_ok = false;
                     ret = false;
                 }
                 else
@@ -942,7 +931,9 @@ public:
         void regenerate_port()
         {
             recover_blocked_processing();
-            shared_mem_manager_->regenerate_port(global_port_, open_mode_);
+            auto new_port = shared_mem_manager_->regenerate_port(global_port_, open_mode_);
+
+            *this = std::move(*new_port);
         }
 
         SharedMemManager* shared_mem_manager_;
@@ -1026,11 +1017,11 @@ public:
 
 private:
 
-    void regenerate_port(
-            std::shared_ptr<SharedMemGlobal::Port>& port,
+    std::shared_ptr<Port> regenerate_port(
+            std::shared_ptr<SharedMemGlobal::Port> port,
             SharedMemGlobal::Port::OpenMode open_mode)
     {
-        port = global_segment_.regenerate_port(port, open_mode);
+        return std::make_shared<Port>(this, global_segment_.regenerate_port(port, open_mode), open_mode);
     }
 
     /**

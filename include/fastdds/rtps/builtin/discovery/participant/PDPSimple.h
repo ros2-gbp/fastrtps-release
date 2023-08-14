@@ -100,13 +100,11 @@ public:
             ParticipantProxyData* pdata) override;
 
     /**
-     * Override to match additional endpoints to PDP. Like EDP or WLP.
-     * @param pdata Pointer to the ParticipantProxyData object.
-     * @param notify_secure_endpoints Whether to try notifying secure endpoints.
+     * This method notifies EDP and WLP of the existence of a new participant.
+     * @param pdata
      */
     void notifyAboveRemoteEndpoints(
-            const ParticipantProxyData& pdata,
-            bool notify_secure_endpoints) override;
+            const ParticipantProxyData& pdata) override;
 
     /**
      * Activate a new Remote Endpoint that has been statically discovered.
@@ -118,6 +116,8 @@ public:
             const GUID_t& pguid,
             int16_t userDefinedId,
             EndpointKind_t kind);
+
+    void update_builtin_locators() override;
 
 private:
 

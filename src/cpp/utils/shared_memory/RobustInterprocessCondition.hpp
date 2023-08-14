@@ -20,6 +20,8 @@
 #include <boost/interprocess/sync/interprocess_semaphore.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
 
+#include "BoostAtExitRegistry.hpp"
+
 namespace eprosima {
 namespace fastdds {
 namespace rtps {
@@ -369,7 +371,7 @@ private:
 
             // timed_wait (infin) is used, instead wait, because wait on semaphores could throw when
             // BOOST_INTERPROCESS_ENABLE_TIMEOUT_WHEN_LOCKING is set. We don't want that for our condition_variables
-            semaphores_pool_[sem_index].sem.timed_wait(boost::posix_time::ptime(boost::posix_time::pos_infin));
+            semaphores_pool_[sem_index].sem.timed_wait(boost::posix_time::pos_infin);
         }
 
         {

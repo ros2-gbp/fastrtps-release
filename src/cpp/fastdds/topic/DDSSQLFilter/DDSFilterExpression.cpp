@@ -27,10 +27,8 @@
 #include <fastrtps/types/DynamicData.h>
 #include <fastrtps/types/DynamicDataFactory.h>
 #include <fastrtps/types/DynamicTypePtr.h>
-
 #include <fastcdr/Cdr.h>
 #include <fastcdr/FastBuffer.h>
-#include <fastcdr/exceptions/Exception.h>
 
 #include "DDSFilterCondition.hpp"
 
@@ -61,7 +59,7 @@ bool DDSFilterExpression::evaluate(
         deser.read_encapsulation();
         dyn_data_->deserialize(deser);
     }
-    catch (eprosima::fastcdr::exception::Exception& /*exception*/)
+    catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
     {
         return false;
     }

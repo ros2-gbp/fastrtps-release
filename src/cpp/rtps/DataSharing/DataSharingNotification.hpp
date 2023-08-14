@@ -53,17 +53,10 @@ public:
      */
     inline void notify()
     {
-        try
-        {
-            std::unique_lock<Segment::mutex> lock(notification_->notification_mutex);
-            notification_->new_data.store(true);
-            lock.unlock();
-            notification_->notification_cv.notify_all();
-        }
-        catch (const boost::interprocess::interprocess_exception& /*e*/)
-        {
-            // Timeout when locking
-        }
+        std::unique_lock<Segment::mutex> lock(notification_->notification_mutex);
+        notification_->new_data.store(true);
+        lock.unlock();
+        notification_->notification_cv.notify_all();
     }
 
     /**
@@ -100,7 +93,7 @@ protected:
 
 #pragma warning(push)
 #pragma warning(disable:4324)
-    struct alignas (8) Notification
+    struct alignas (uint64_t) Notification
     {
         //! CV to wait for new notifications
         Segment::condition_variable notification_cv;
@@ -159,8 +152,8 @@ protected:
         }
         catch (const std::exception& e)
         {
-            logError(HISTORY_DATASHARING_LISTENER, "Failed to create segment " << segment_name_
-                                                                               << ": " << e.what());
+            EPROSIMA_LOG_ERROR(HISTORY_DATASHARING_LISTENER, "Failed to create segment " << segment_name_
+                                                                                         << ": " << e.what());
             return false;
         }
 
@@ -174,8 +167,8 @@ protected:
         {
             T::remove(segment_name_);
 
-            logError(HISTORY_DATASHARING_LISTENER, "Failed to create listener queue " << segment_name_
-                                                                                      << ": " << e.what());
+            EPROSIMA_LOG_ERROR(HISTORY_DATASHARING_LISTENER, "Failed to create listener queue " << segment_name_
+                                                                                                << ": " << e.what());
             return false;
         }
 
@@ -202,8 +195,8 @@ protected:
         }
         catch (const std::exception& e)
         {
-            logError(HISTORY_DATASHARING_LISTENER, "Failed to open segment " << segment_name_
-                                                                             << ": " << e.what());
+            EPROSIMA_LOG_ERROR(HISTORY_DATASHARING_LISTENER, "Failed to open segment " << segment_name_
+                                                                                       << ": " << e.what());
             return false;
         }
 
@@ -214,7 +207,7 @@ protected:
         {
             local_segment.reset();
 
-            logError(HISTORY_DATASHARING_LISTENER, "Failed to open listener queue " << segment_name_);
+            EPROSIMA_LOG_ERROR(HISTORY_DATASHARING_LISTENER, "Failed to open listener queue " << segment_name_);
             return false;
         }
 

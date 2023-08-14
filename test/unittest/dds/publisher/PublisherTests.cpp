@@ -76,7 +76,10 @@ public:
     std::function<uint32_t()> getSerializedSizeProvider(
             void* /*data*/) override
     {
-        return std::function<uint32_t()>();
+        return []()->uint32_t
+               {
+                   return 0;
+               };
     }
 
     void* createData() override
@@ -493,7 +496,6 @@ TEST(PublisherTests, CreateDataWriter)
     ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant), ReturnCode_t::RETCODE_OK);
 }
 
-
 void check_datawriter_with_profile (
         DataWriter* datawriter,
         const std::string& profile_name)
@@ -553,7 +555,7 @@ void check_datawriter_with_profile (
 
 TEST(PublisherTests, CreateDataWriterWithProfile)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
     DomainParticipant* participant =
             DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     Publisher* publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT);
@@ -581,7 +583,7 @@ TEST(PublisherTests, CreateDataWriterWithProfile)
 TEST(PublisherTests, CreateDataWriterWithProfileFromString)
 {
 
-    std::ifstream t("test_xml_profiles_for_string.xml");
+    std::ifstream t("test_xml_for_string_profile.xml");
     std::stringstream buffer;
     buffer << t.rdbuf();
 
@@ -612,7 +614,7 @@ TEST(PublisherTests, CreateDataWriterWithProfileFromString)
 
 TEST(PublisherTests, GetDataWriterProfileQos)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
     DomainParticipant* participant =
             DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);

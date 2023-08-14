@@ -354,9 +354,14 @@ public:
     void update_nack_supression_interval(
             const Duration_t& interval);
 
-    LocatorSelectorEntry* locator_selector_entry()
+    LocatorSelectorEntry* general_locator_selector_entry()
     {
-        return locator_info_.locator_selector_entry();
+        return locator_info_.general_locator_selector_entry();
+    }
+
+    LocatorSelectorEntry* async_locator_selector_entry()
+    {
+        return locator_info_.async_locator_selector_entry();
     }
 
     RTPSMessageSenderInterface* message_sender()
@@ -399,6 +404,20 @@ public:
     {
         active_ = active;
     }
+
+    /**
+     * @brief Check if the sequence number given has been delivered at least once to the transport layer.
+     *
+     * @param seq_number Sequence number of the change to check.
+     * @param found The sequence number has been found in the list of changes pending to be sent/ack.
+     *              This flag allows to differentiate the case when the change is not found from the one that is found
+     *              but it has not been delivered yet.
+     * @return true if the change has been delivered.
+     * @return false otherwise.
+     */
+    bool has_been_delivered(
+            const SequenceNumber_t& seq_number,
+            bool& found) const;
 
 private:
 

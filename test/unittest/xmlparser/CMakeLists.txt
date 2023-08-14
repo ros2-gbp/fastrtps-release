@@ -19,50 +19,56 @@ if(WIN32)
         )
 endif()
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_duration.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_duration.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_duration_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_duration_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_root_library_settings.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_root_library_settings.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_root_library_settings_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_root_library_settings_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_profiles.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_profiles.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_security_profiles.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_security_profiles.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_deprecated.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_deprecated.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_profiles_rooted.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_profiles_rooted.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_security_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_security_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_stdouterr.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/log_stdouterr.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_rooted_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_rooted_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_stdouterr_wrong_property_name.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/log_stdouterr_wrong_property_name.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_xml_rooted_deprecated.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_rooted_deprecated.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_stdouterr_wrong_property_value.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/log_stdouterr_wrong_property_value.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_stdouterr_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/log_stdouterr_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_stdouterr_two_thresholds.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/log_stdouterr_two_thresholds.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_stdouterr_wrong_property_name_profile_invalid.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/log_stdouterr_wrong_property_name_profile_invalid.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_def_file.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/log_def_file.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_stdouterr_wrong_property_value_profile_invalid.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/log_stdouterr_wrong_property_value_profile_invalid.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_inactive.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/log_inactive.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_stdouterr_two_thresholds_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/log_stdouterr_two_thresholds_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_node_file_append.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/log_node_file_append.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_def_file_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/log_def_file_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tls_config.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/tls_config.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_inactive_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/log_inactive_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/UDP_transport_descriptors_config.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/UDP_transport_descriptors_config.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/log_node_file_append_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/log_node_file_append_profile.xml
     COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/SHM_transport_descriptors_config.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/SHM_transport_descriptors_config.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tls_config_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/tls_config_profile.xml
+    COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/UDP_transport_descriptors_config_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/UDP_transport_descriptors_config_profile.xml
+    COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/SHM_transport_descriptors_config_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/SHM_transport_descriptors_config_profile.xml
     COPYONLY)
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/regressions" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -114,6 +120,14 @@ if(TINYXML2_SOURCE_DIR)
         )
 endif()
 
+if(ANDROID)
+    if (ANDROID_NATIVE_API_LEVEL LESS 24)
+        list(APPEND XMLPROFILEPARSER_SOURCE
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
+endif()
+
 # Only include tinyxml2 headers manually if the associated config predates the use of CMake targets
 if(TINYXML2_INCLUDE_DIR)
     include_directories(${TINYXML2_INCLUDE_DIR})
@@ -137,6 +151,7 @@ target_include_directories(XMLProfileParserTests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPv6TransportDescriptor
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${Asio_INCLUDE_DIR}
+    $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
 
 target_link_libraries(XMLProfileParserTests GTest::gmock
@@ -145,6 +160,9 @@ target_link_libraries(XMLProfileParserTests GTest::gmock
     ${TINYXML2_LIBRARY}
     fastcdr
     )
+if(QNX)
+    target_link_libraries(XMLProfileParserTests socket)
+endif()
 add_gtest(XMLProfileParserTests SOURCES XMLProfileParserTests.cpp)
 ###################################  XMLProfileParserTests  ####################################################
 
@@ -195,6 +213,7 @@ set(XMLPARSER_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypesBase.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/BuiltinAnnotationsTypeObject.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     )
 
@@ -203,6 +222,14 @@ if(TINYXML2_SOURCE_DIR)
     list(APPEND XMLPARSER_SOURCE
         ${TINYXML2_SOURCE_DIR}/tinyxml2.cpp
         )
+endif()
+
+if(ANDROID)
+    if (ANDROID_NATIVE_API_LEVEL LESS 24)
+        list(APPEND XMLPARSER_SOURCE
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
 endif()
 
 add_executable(XMLParserTests ${XMLPARSER_SOURCE})
@@ -222,7 +249,9 @@ target_include_directories(XMLParserTests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/SharedMemTransportDescriptor
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_BINARY_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src/cpp
     ${Asio_INCLUDE_DIR}
+    $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
 
 target_link_libraries(XMLParserTests GTest::gtest
@@ -231,6 +260,9 @@ target_link_libraries(XMLParserTests GTest::gtest
     ${TINYXML2_LIBRARY}
     fastcdr
     )
+if(QNX)
+    target_link_libraries(XMLParserTests socket)
+endif()
 add_gtest(XMLParserTests SOURCES XMLParserTests.cpp XMLElementParserTests.cpp)
 ######################################  XMLParserTests  ########################################################
 
@@ -240,6 +272,14 @@ set(XMLTREE_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/string_convert.cpp
     )
 
+if(ANDROID)
+    if (ANDROID_NATIVE_API_LEVEL LESS 24)
+        list(APPEND XMLTREE_SOURCE
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
+endif()
+
 add_executable(XMLTreeTests ${XMLTREE_SOURCE})
 target_compile_definitions(XMLTreeTests PRIVATE FASTRTPS_NO_LIB
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -248,6 +288,7 @@ target_compile_definitions(XMLTreeTests PRIVATE FASTRTPS_NO_LIB
 target_include_directories(XMLTreeTests PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_BINARY_DIR}/include
+    $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
 
 target_link_libraries(XMLTreeTests GTest::gtest
@@ -305,6 +346,7 @@ set(XMLENDPOINTPARSERTESTS_SOURCE
 
     # locators
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     )
 
@@ -313,6 +355,14 @@ if(TINYXML2_SOURCE_DIR)
     list(APPEND XMLENDPOINTPARSERTESTS_SOURCE
         ${TINYXML2_SOURCE_DIR}/tinyxml2.cpp
         )
+endif()
+
+if(ANDROID)
+    if (ANDROID_NATIVE_API_LEVEL LESS 24)
+        list(APPEND XMLENDPOINTPARSERTESTS_SOURCE
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
 endif()
 
 add_executable(XMLEndpointParserTests ${XMLENDPOINTPARSERTESTS_SOURCE})
@@ -333,7 +383,9 @@ target_include_directories(XMLEndpointParserTests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/WriterProxyData
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_BINARY_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src/cpp
     ${Asio_INCLUDE_DIR}
+    $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
 
 target_link_libraries(XMLEndpointParserTests GTest::gtest
@@ -342,4 +394,14 @@ target_link_libraries(XMLEndpointParserTests GTest::gtest
     ${TINYXML2_LIBRARY}
     fastcdr
     )
+if(QNX)
+    target_link_libraries(XMLEndpointParserTests socket)
+endif()
 add_gtest(XMLEndpointParserTests SOURCES XMLEndpointParserTests.cpp)
+
+if(ANDROID)
+    set_property(TARGET XMLEndpointParserTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET XMLParserTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET XMLProfileParserTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET XMLTreeTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

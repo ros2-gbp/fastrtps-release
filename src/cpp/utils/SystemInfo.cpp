@@ -14,23 +14,43 @@
 
 #include "SystemInfo.hpp"
 
-#include <sys/stat.h>
+#ifdef __unix__
+#   include <sys/file.h>
+#   include <unistd.h>
+#endif // ifdef __unix__
+
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <pwd.h>
-#include <unistd.h>
+#include <sys/stat.h>
 #endif // _WIN32
 
 #include <fstream>
 #include <string>
+#include <chrono>
+#include <iomanip>
+#include <time.h>
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <fastrtps/types/TypesBase.h>
 
 namespace eprosima {
 
 using ReturnCode_t = fastrtps::types::ReturnCode_t;
+
+SystemInfo::SystemInfo()
+{
+    // From ctime(3) linux man page:
+    // According to POSIX.1-2004, localtime() is required to behave as though tzset(3) was called, while
+    // localtime_r() does not have this requirement. For portable code tzset(3) should be called before
+    // localtime_r().
+#if (_POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) || \
+    defined(_POSIX_SOURCE) || defined(__unix__)
+    tzset();
+#endif // if (_POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) ||
+       // defined(_POSIX_SOURCE) || defined(__unix__)
+}
 
 ReturnCode_t SystemInfo::get_env(
         const std::string& env_name,
@@ -133,6 +153,53 @@ bool SystemInfo::file_exists(
     return (stat(filename.c_str(), &s) == 0 && s.st_mode & S_IFREG);
 }
 
+bool SystemInfo::wait_for_file_closure(
+        const std::string& filename,
+        const std::chrono::seconds timeout)
+{
+    auto start = std::chrono::system_clock::now();
+
+#ifdef _MSC_VER
+    std::ofstream os;
+    do
+    {
+        // MSVC specific
+        os.open(filename, std::ios::out | std::ios::app, _SH_DENYWR);
+        if (!os.is_open()
+                // If the file is lock-opened in an external editor do not hang
+                && (std::chrono::system_clock::now() - start) < timeout )
+        {
+            std::this_thread::yield();
+        }
+        else
+        {
+            break;
+        }
+    }
+    while (true);
+#elif __unix__
+    int fd = open(filename.c_str(), O_WRONLY);
+
+    while (flock(fd, LOCK_EX | LOCK_NB)
+            // If the file is lock-opened in an external editor do not hang
+            && (std::chrono::system_clock::now() - start) < timeout )
+    {
+        std::this_thread::yield();
+    }
+
+    flock(fd, LOCK_UN | LOCK_NB);
+    close(fd);
+#else
+    // plain wait
+    std::this_thread::sleep_for(timeout);
+    // avoid unused warning
+    (void)start;
+    (void)filename;
+#endif // ifdef _MSC_VER
+
+    return std::chrono::system_clock::now() - start < timeout;
+}
+
 ReturnCode_t SystemInfo::set_environment_file()
 {
     return SystemInfo::get_env(FASTDDS_ENVIRONMENT_FILE_ENV_VAR, SystemInfo::environment_file_);
@@ -175,6 +242,33 @@ void SystemInfo::stop_watching_file(
     handle.reset();
 #endif // if defined(_WIN32) || defined(__unix__)
     static_cast<void>(handle);
+}
+
+std::string SystemInfo::get_timestamp(
+        const char* format)
+{
+    std::stringstream stream;
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::chrono::system_clock::duration tp = now.time_since_epoch();
+    tp -= std::chrono::duration_cast<std::chrono::seconds>(tp);
+    auto ms = static_cast<unsigned>(tp / std::chrono::milliseconds(1));
+
+#if defined(_WIN32)
+    struct tm timeinfo;
+    localtime_s(&timeinfo, &now_c);
+    //#elif defined(__clang__) && !defined(std::put_time) // TODO arm64 doesn't seem to support std::put_time
+    //    (void)now_c;
+    //    (void)ms;
+#elif (_POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) || \
+    defined(_POSIX_SOURCE) || defined(__unix__)
+    std::tm timeinfo;
+    localtime_r(&now_c, &timeinfo);
+#else
+    std::tm timeinfo = *localtime(&now_c);
+#endif // if defined(_WIN32)
+    stream << std::put_time(&timeinfo, format) << "." << std::setw(3) << std::setfill('0') << ms;
+    return stream.str();
 }
 
 std::string SystemInfo::environment_file_;

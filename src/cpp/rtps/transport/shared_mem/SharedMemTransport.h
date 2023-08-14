@@ -247,8 +247,6 @@ private:
             const std::shared_ptr<SharedMemManager::Buffer>& buffer,
             const Locator& remote_locator);
 
-    void cleanup_output_ports();
-
     std::shared_ptr<SharedMemManager::Port> find_port(
             uint32_t port_id);
 

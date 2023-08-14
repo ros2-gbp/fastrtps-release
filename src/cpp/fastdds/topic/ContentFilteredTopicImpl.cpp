@@ -20,16 +20,14 @@
 
 #include <algorithm>
 
-#include <fastdds/core/policy/ParameterList.hpp>
 #include <fastdds/dds/core/policy/ParameterTypes.hpp>
-#include <fastdds/dds/domain/DomainParticipant.hpp>
-#include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
+#include <fastrtps/utils/md5.h>
+
+#include <fastdds/core/policy/ParameterList.hpp>
 #include <fastdds/rtps/messages/CDRMessage.h>
 #include <fastdds/subscriber/DataReaderImpl.hpp>
 #include <fastdds/topic/ContentFilterUtils.hpp>
-
-#include <fastrtps/types/TypesBase.h>
-#include <fastrtps/utils/md5.h>
+#include <fastdds/topic/TopicProxy.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -58,19 +56,9 @@ ReturnCode_t ContentFilteredTopicImpl::set_expression_parameters(
         const char* new_expression,
         const std::vector<std::string>& new_expression_parameters)
 {
-    TopicImpl* topic_impl = dynamic_cast<TopicImpl*>(related_topic->get_impl());
+    TopicProxy* topic_impl = dynamic_cast<TopicProxy*>(related_topic->get_impl());
     assert(nullptr != topic_impl);
     const TypeSupport& type = topic_impl->get_type();
-
-    DomainParticipantQos pqos;
-    related_topic->get_participant()->get_qos(pqos);
-    if (new_expression_parameters.size() > pqos.allocation().content_filter.expression_parameters.maximum )
-    {
-        logError(CONTENT_FILTERED_TOPIC, "Number of expression parameters exceeds maximum allocation limit: "
-                << new_expression_parameters.size() << " > "
-                << pqos.allocation().content_filter.expression_parameters.maximum);
-        return ReturnCode_t::RETCODE_BAD_PARAMETER;
-    }
 
     LoanableSequence<const char*>::size_type n_params;
     n_params = static_cast<LoanableSequence<const char*>::size_type>(new_expression_parameters.size());
