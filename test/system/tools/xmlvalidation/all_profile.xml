@@ -644,21 +644,11 @@
                     <kind>EXCLUSIVE</kind>
                 </ownership>
 
-                <ownershipStrength>
-                    <value>50</value>
-                </ownershipStrength>
-
                 <latencyBudget>
                     <duration>
                         <sec>1</sec>
                     </duration>
                 </latencyBudget>
-
-                <disable_heartbeat_piggyback>true</disable_heartbeat_piggyback>
-
-                <publishMode>
-                    <kind>ASYNCHRONOUS</kind>
-                </publishMode>
 
                 <disablePositiveAcks>
                     <enabled>true</enabled>
