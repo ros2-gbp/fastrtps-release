@@ -17,7 +17,6 @@
  *
  */
 
-
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -131,8 +130,8 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     , m_att(PParam)
     , m_guid(guidP, c_EntityId_RTPSParticipant)
     , mp_builtinProtocols(nullptr)
-    , mp_ResourceSemaphore(new Semaphore(0))
     , IdCounter(0)
+    , m_network_Factory(PParam)
     , type_check_fn_(nullptr)
     , client_override_(false)
     , internal_metatraffic_locators_(false)
@@ -145,6 +144,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     , mp_mutex(new std::recursive_mutex())
     , is_intraprocess_only_(should_be_intraprocess_only(PParam))
     , has_shm_transport_(false)
+    , match_local_endpoints_(should_match_local_endpoints(PParam))
 {
     if (c_GuidPrefix_Unknown != persistence_guid)
     {
@@ -211,7 +211,6 @@ RTPSParticipantImpl::RTPSParticipantImpl(
         default:
             break;
     }
-
 
     // User defined transports
     for (const auto& transportDescriptor : PParam.userTransports)
@@ -408,7 +407,6 @@ RTPSParticipantImpl::RTPSParticipantImpl(
         flow_controller_factory_.register_flow_controller(*flow_controller_desc.get());
     }
 
-
 #if HAVE_SECURITY
     if (m_security_manager.is_security_active())
     {
@@ -514,7 +512,6 @@ RTPSParticipantImpl::~RTPSParticipantImpl()
     }
     m_receiverResourcelist.clear();
 
-    delete mp_ResourceSemaphore;
     delete mp_userParticipant;
     mp_userParticipant = nullptr;
     send_resource_list_.clear();
@@ -736,6 +733,11 @@ bool RTPSParticipantImpl::create_writer(
         return false;
     }
 
+    // Use participant's external locators if writer has none
+    // WARNING: call before createAndAssociateReceiverswithEndpoint, as the latter intentionally clears external
+    // locators list when using unique_flows feature
+    setup_external_locators(SWriter);
+
 #if HAVE_SECURITY
     if (!is_builtin)
     {
@@ -865,6 +867,11 @@ bool RTPSParticipantImpl::create_reader(
     {
         return false;
     }
+
+    // Use participant's external locators if reader has none
+    // WARNING: call before createAndAssociateReceiverswithEndpoint, as the latter intentionally clears external
+    // locators list when using unique_flows feature
+    setup_external_locators(SReader);
 
 #if HAVE_SECURITY
 
@@ -1484,7 +1491,6 @@ bool RTPSParticipantImpl::updateLocalReader(
  *
  */
 
-
 bool RTPSParticipantImpl::existsEntityId(
         const EntityId_t& ent,
         EndpointKind_t kind) const
@@ -1659,6 +1665,17 @@ bool RTPSParticipantImpl::createSendResources(
     }
 
     return true;
+}
+
+void RTPSParticipantImpl::setup_external_locators(
+        Endpoint* endpoint)
+{
+    auto& attributes = endpoint->getAttributes();
+    if (attributes.external_unicast_locators.empty())
+    {
+        // Take external locators from the participant.
+        attributes.external_unicast_locators = m_att.default_external_unicast_locators;
+    }
 }
 
 bool RTPSParticipantImpl::createReceiverResources(
@@ -2014,22 +2031,6 @@ bool RTPSParticipantImpl::newRemoteEndpointDiscovered(
     }
 
     return false;
-}
-
-void RTPSParticipantImpl::ResourceSemaphorePost()
-{
-    if (mp_ResourceSemaphore != nullptr)
-    {
-        mp_ResourceSemaphore->post();
-    }
-}
-
-void RTPSParticipantImpl::ResourceSemaphoreWait()
-{
-    if (mp_ResourceSemaphore != nullptr)
-    {
-        mp_ResourceSemaphore->wait();
-    }
 }
 
 void RTPSParticipantImpl::assert_remote_participant_liveliness(
@@ -2685,6 +2686,34 @@ void RTPSParticipantImpl::set_enabled_statistics_writers_mask(
 }
 
 #endif // FASTDDS_STATISTICS
+
+bool RTPSParticipantImpl::should_match_local_endpoints(
+        const RTPSParticipantAttributes& att)
+{
+    bool should_match_local_endpoints = true;
+
+    const std::string* ignore_local_endpoints = PropertyPolicyHelper::find_property(att.properties,
+                    "fastdds.ignore_local_endpoints");
+    if (nullptr != ignore_local_endpoints)
+    {
+        if (0 == ignore_local_endpoints->compare("true"))
+        {
+            should_match_local_endpoints = false;
+        }
+        else if (0 == ignore_local_endpoints->compare("false"))
+        {
+            should_match_local_endpoints = true;
+        }
+        else
+        {
+            should_match_local_endpoints = true;
+            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+                    "Unkown value '" << *ignore_local_endpoints <<
+                    "' for property 'fastdds.ignore_local_endpoints'. Setting value to 'true'");
+        }
+    }
+    return should_match_local_endpoints;
+}
 
 } /* namespace rtps */
 } /* namespace fastrtps */
