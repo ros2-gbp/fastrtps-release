@@ -1,6 +1,21 @@
 Forthcoming
 -----------
 
+Version 2.10.2
+--------------
+
+* Shared memory improvements.
+* Data-sharing improvements.
+* Improve performance of intraprocess plus data-sharing.
+* Added participant property to configure SHM transport metatraffic behavior.
+  No metatraffic over SHM transport by default.
+* Added Participant ignore local endpoints feature.
+* `DomainParticipantListener::on_participant_discovery` changed behavior (fix ABI break in 2.10.0).
+* Improve content filter expression parameters checks and verbosity.
+* Support new endpoint QoS XML tags.
+* Allow participant profiles with no rtps tag.
+
+
 Version 2.10.1
 --------------
 
@@ -17,7 +32,7 @@ Version 2.10.0
 * Added ignore RTPS entity API in RTPSParticipant (ABI break on RTPS layer).
 * Overload `PDP::removeWriterProxyData` and `PDP::removeReaderProxyData` (ABI break on RTPS layer).
 * Overload RTPS discovery callbacks in RTPSParticipantListener (ABI break on RTPS layer).
-* Overload DDS discovery callbacks in DomainParticipantListener (ABI break on DDS layer). 
+* Overload DDS discovery callbacks in DomainParticipantListener (ABI break on DDS layer).
 * Added on_incompatible_type to RTPS listeners (ABI break on RTPS layer).
 * Added support for QNX 7.1 build.
 
