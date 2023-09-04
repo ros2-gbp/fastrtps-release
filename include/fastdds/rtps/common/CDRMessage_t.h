@@ -96,11 +96,7 @@ struct RTPS_DllAPI CDRMessage_t final
             const SerializedPayload_t& payload)
         : wraps(true)
     {
-        msg_endian = LITTLEEND;
-        if (payload.encapsulation == PL_CDR_BE || payload.encapsulation == CDR_BE)
-        {
-            msg_endian = BIGEND;
-        }
+        msg_endian = payload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
         pos = payload.pos;
         length = payload.length;
         buffer = payload.data;

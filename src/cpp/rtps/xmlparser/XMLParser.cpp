@@ -1771,64 +1771,39 @@ XMLP_ret XMLParser::fillDataNode(
     addAllAttributes(p_profile, participant_node);
 
     uint8_t ident = 1;
-    tinyxml2::XMLElement* p_element;
+    tinyxml2::XMLElement* p_element = p_profile->FirstChildElement(DOMAIN_ID);
+    if (nullptr != p_element)
+    {
+        // domainId - uint32Type
+        if (XMLP_ret::XML_OK != getXMLUint(p_element, &participant_node.get()->domainId, ident))
+        {
+            return XMLP_ret::XML_ERROR;
+        }
+    }
+
+    p_element = p_profile->FirstChildElement(RTPS);
+    if (nullptr == p_element)
+    {
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Not found '" << RTPS << "' tag");
+        return XMLP_ret::XML_ERROR;
+    }
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
-    std::set<std::string> tags_present;
 
-    /*
-     * The only allowed elements are <domainId> and <rtps>
-     *   - The min occurrences of <domainId> are 0, and its max is 1; look for it.
-     *   - The min occurrences of <rtps> are 0, and its max is 1; look for it.
-     */
-    for (p_element = p_profile->FirstChildElement(); p_element != nullptr; p_element = p_element->NextSiblingElement())
-    {
-        name = p_element->Name();
-        if (tags_present.count(name) != 0)
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'participant'. Tag: " << name);
-            return XMLP_ret::XML_ERROR;
-        }
-        tags_present.emplace(name);
+    std::unordered_map<std::string, bool> tags_present;
 
-        if (strcmp(p_element->Name(), DOMAIN_ID) == 0)
-        {
-            // domainId - uint32Type
-            if (XMLP_ret::XML_OK != getXMLUint(p_element, &participant_node.get()->domainId, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(p_element->Name(), RTPS) == 0)
-        {
-            p_aux0 = p_element;
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Found incorrect tag '" << p_element->Name() << "'");
-            return XMLP_ret::XML_ERROR;
-        }
-    }
-    tags_present.clear();
-
-    // <rtps> is not present, but that's OK
-    if (nullptr == p_aux0)
-    {
-        return XMLP_ret::XML_OK;
-    }
-
-    // Check contents of <rtps>
-    for (p_aux0 = p_aux0->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
+    for (p_aux0 = p_element->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
 
-        if (tags_present.count(name) != 0)
+        if (tags_present[name])
         {
             EPROSIMA_LOG_ERROR(XMLPARSER,
-                    "Duplicated element found in 'rtpsParticipantAttributesType'. Tag: " << name);
+                    "Duplicated element found in 'rtpsParticipantAttributesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
-        tags_present.emplace(name);
+        tags_present[name] = true;
 
         if (strcmp(name, ALLOCATION) == 0)
         {

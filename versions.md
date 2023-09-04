@@ -1,20 +1,25 @@
 Forthcoming
 -----------
 
-Version 2.10.2
+
+Version 2.11.2
 --------------
 
-* Shared memory improvements.
-* Data-sharing improvements.
-* Improve performance of intraprocess plus data-sharing.
 * Added participant property to configure SHM transport metatraffic behavior.
   No metatraffic over SHM transport by default.
-* Added Participant ignore local endpoints feature.
-* `DomainParticipantListener::on_participant_discovery` changed behavior (fix ABI break in 2.10.0).
-* Improve content filter expression parameters checks and verbosity.
-* Support new endpoint QoS XML tags.
-* Allow participant profiles with no rtps tag.
 
+Version 2.11.0
+--------------
+
+* Added Participant ignore local endpoints feature.
+* Remove `FASTDDS_STATIC` CMake option.
+  Please, use `BUILD_SHARED_LIBS=OFF` instead.
+* Fixed exported symbols on ContentFilteredTopic (ABI break)
+* Deprecated the DDS:Crypto:AES-GCM-GMAC plugin configuration through the DomainParticipant PropertyPolicyQos (security vulnerability).
+* `DomainParticipantListener::on_participant_discovery` changed behavior (fix API break in 2.10.0).
+* Included XML schema for static discovery profile configuration.
+* Extend DynamicDataHelper API providing `print` overload with `std::ostream` parameter (API extension in Dynamic Types).
+* TypeLookup Service configuration through XML.
 
 Version 2.10.1
 --------------
