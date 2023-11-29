@@ -56,8 +56,10 @@ set(XTYPES_TEST_SOURCE
     XTypesTests.cpp
     idl/TypesTypeObject.cxx
     idl/Types.cxx
+    idl/Typesv1.cxx
     idl/WideEnumTypeObject.cxx
     idl/WideEnum.cxx
+    idl/WideEnumv1.cxx
     ${XTYPES_SOURCE}
     )
 
@@ -72,7 +74,7 @@ endif()
 include_directories(mock/)
 
 add_executable(XTypesTests ${XTYPES_TEST_SOURCE})
-target_compile_definitions(XTypesTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(XTypesTests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>

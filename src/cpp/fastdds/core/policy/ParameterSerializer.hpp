@@ -507,13 +507,13 @@ inline bool ParameterSerializer<ParameterStatusInfo_t>::read_content_from_cdr_me
     }
     parameter.length = parameter_length;
     //octet status = msg.buffer[msg.pos + 3];
-    bool valid = true;
     fastrtps::rtps::octet tmp;
     //Remove the front three octets, take the fourth
+    bool valid = fastrtps::rtps::CDRMessage::readOctet(cdr_message, &tmp);
     valid &= fastrtps::rtps::CDRMessage::readOctet(cdr_message, &tmp);
     valid &= fastrtps::rtps::CDRMessage::readOctet(cdr_message, &tmp);
-    valid &= fastrtps::rtps::CDRMessage::readOctet(cdr_message, &tmp);
-    return fastrtps::rtps::CDRMessage::readOctet(cdr_message, &parameter.status);
+    valid &= fastrtps::rtps::CDRMessage::readOctet(cdr_message, &parameter.status);
+    return valid;
 }
 
 template<>
@@ -610,6 +610,28 @@ inline bool ParameterSerializer<ParameterBuiltinEndpointSet_t>::read_content_fro
     }
     parameter.length = parameter_length;
     return fastrtps::rtps::CDRMessage::readUInt32(cdr_message, &parameter.endpointSet);
+}
+
+template<>
+inline bool ParameterSerializer<ParameterNetworkConfigSet_t>::add_content_to_cdr_message(
+        const ParameterNetworkConfigSet_t& parameter,
+        fastrtps::rtps::CDRMessage_t* cdr_message)
+{
+    return fastrtps::rtps::CDRMessage::addUInt32(cdr_message, parameter.netconfigSet);
+}
+
+template<>
+inline bool ParameterSerializer<ParameterNetworkConfigSet_t>::read_content_from_cdr_message(
+        ParameterNetworkConfigSet_t& parameter,
+        fastrtps::rtps::CDRMessage_t* cdr_message,
+        const uint16_t parameter_length)
+{
+    if (parameter_length != PARAMETER_NETWORKCONFIGSET_LENGTH)
+    {
+        return false;
+    }
+    parameter.length = parameter_length;
+    return fastrtps::rtps::CDRMessage::readUInt32(cdr_message, &parameter.netconfigSet);
 }
 
 template<>

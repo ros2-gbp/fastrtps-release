@@ -19,6 +19,7 @@
 #include <security/cryptography/AESGCMGMAC_Transform.h>
 
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/common/CdrSerialization.hpp>
 #include <fastdds/rtps/messages/CDRMessage.h>
 
 #include <openssl/aes.h>
@@ -36,6 +37,15 @@
 #ifdef WIN32
 #undef max
 #endif // ifdef WIN32
+
+#if FASTCDR_VERSION_MAJOR == 1
+#define change_endianness changeEndianness
+#define get_serialized_data_length getSerializedDataLength
+#define get_state getState
+#define get_current_position getCurrentPosition
+#define get_buffer_pointer getBufferPointer
+#define set_state setState
+#endif // FASTCDR_VERSION_MAJOR == 1
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::rtps::security;
@@ -167,7 +177,7 @@ bool AESGCMGMAC_Transform::encode_serialized_payload(
     }
 
     // Store information in CDRMessage_t
-    output_payload.length = static_cast<uint32_t>(serializer.getSerializedDataLength());
+    output_payload.length = static_cast<uint32_t>(serializer.get_serialized_data_length());
 
     return true;
 }
@@ -229,31 +239,31 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
 
 #if FASTDDS_IS_BIG_ENDIAN_TARGET
     octet flags = 0x0;
-    serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+    serializer.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 #else
     octet flags = BIT(0);
-    serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+    serializer.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
 #endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
     //Header
     try
     {
         serializer << SEC_PREFIX << flags;
-        eprosima::fastcdr::Cdr::state length_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state length_state = serializer.get_state();
         uint16_t length = 0;
         serializer << length;
 
-        const char* length_position = serializer.getCurrentPosition();
+        const char* length_position = serializer.get_current_position();
 
         serialize_SecureDataHeader(serializer, keyMat.transformation_kind,
                 keyMat.sender_key_id, session_id, initialization_vector_suffix);
 
-        eprosima::fastcdr::Cdr::state current_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
         //TODO(Ricardo) fastcdr functinality: length substracting two Cdr::state.
-        length =  static_cast<uint16_t>(serializer.getCurrentPosition() - length_position);
-        serializer.setState(length_state);
+        length =  static_cast<uint16_t>(serializer.get_current_position() - length_position);
+        serializer.set_state(length_state);
         serializer << length;
-        serializer.setState(current_state);
+        serializer.set_state(current_state);
     }
     catch (eprosima::fastcdr::exception::NotEnoughMemoryException& )
     {
@@ -283,11 +293,11 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
     try
     {
         serializer << SEC_POSTFIX << flags;
-        eprosima::fastcdr::Cdr::state length_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state length_state = serializer.get_state();
         uint16_t length = 0;
         serializer << length;
 
-        const char* length_position = serializer.getCurrentPosition();
+        const char* length_position = serializer.get_current_position();
 
         if (!serialize_SecureDataTag(serializer, keyMat.transformation_kind, session->session_id,
                 initialization_vector, receiving_datareader_crypto_list, update_specific_keys, tag, 0))
@@ -295,12 +305,12 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
             return false;
         }
 
-        eprosima::fastcdr::Cdr::state current_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
         //TODO(Ricardo) fastcdr functinality: length substracting two Cdr::state.
-        length =  static_cast<uint16_t>(serializer.getCurrentPosition() - length_position);
-        serializer.setState(length_state);
+        length =  static_cast<uint16_t>(serializer.get_current_position() - length_position);
+        serializer.set_state(length_state);
         serializer << length;
-        serializer.setState(current_state);
+        serializer.set_state(current_state);
     }
     catch (eprosima::fastcdr::exception::Exception&)
     {
@@ -308,8 +318,8 @@ bool AESGCMGMAC_Transform::encode_datawriter_submessage(
         return false;
     }
 
-    encoded_rtps_submessage.pos += static_cast<uint32_t>(serializer.getSerializedDataLength());
-    encoded_rtps_submessage.length += static_cast<uint32_t>(serializer.getSerializedDataLength());
+    encoded_rtps_submessage.pos += static_cast<uint32_t>(serializer.get_serialized_data_length());
+    encoded_rtps_submessage.length += static_cast<uint32_t>(serializer.get_serialized_data_length());
 
     return true;
 }
@@ -369,31 +379,31 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
 
 #if FASTDDS_IS_BIG_ENDIAN_TARGET
     octet flags = 0x0;
-    serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+    serializer.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 #else
     octet flags = BIT(0);
-    serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+    serializer.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
 #endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
     //Header
     try
     {
         serializer << SEC_PREFIX << flags;
-        eprosima::fastcdr::Cdr::state length_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state length_state = serializer.get_state();
         uint16_t length = 0;
         serializer << length;
 
-        const char* length_position = serializer.getCurrentPosition();
+        const char* length_position = serializer.get_current_position();
 
         serialize_SecureDataHeader(serializer, local_reader->EntityKeyMaterial.at(0).transformation_kind,
                 local_reader->EntityKeyMaterial.at(0).sender_key_id, session_id, initialization_vector_suffix);
 
-        eprosima::fastcdr::Cdr::state current_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
         //TODO(Ricardo) fastcdr functinality: length substracting two Cdr::state.
-        length =  static_cast<uint16_t>(serializer.getCurrentPosition() - length_position);
-        serializer.setState(length_state);
+        length =  static_cast<uint16_t>(serializer.get_current_position() - length_position);
+        serializer.set_state(length_state);
         serializer << length;
-        serializer.setState(current_state);
+        serializer.set_state(current_state);
     }
     catch (eprosima::fastcdr::exception::Exception&)
     {
@@ -424,11 +434,11 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
     try
     {
         serializer << SEC_POSTFIX << flags;
-        eprosima::fastcdr::Cdr::state length_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state length_state = serializer.get_state();
         uint16_t length = 0;
         serializer << length;
 
-        const char* length_position = serializer.getCurrentPosition();
+        const char* length_position = serializer.get_current_position();
 
         if (!serialize_SecureDataTag(serializer, local_reader->EntityKeyMaterial.at(0).transformation_kind,
                 session->session_id,
@@ -437,12 +447,12 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
             return false;
         }
 
-        eprosima::fastcdr::Cdr::state current_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
         //TODO(Ricardo) fastcdr functinality: length substracting two Cdr::state.
-        length =  static_cast<uint16_t>(serializer.getCurrentPosition() - length_position);
-        serializer.setState(length_state);
+        length =  static_cast<uint16_t>(serializer.get_current_position() - length_position);
+        serializer.set_state(length_state);
         serializer << length;
-        serializer.setState(current_state);
+        serializer.set_state(current_state);
     }
     catch (eprosima::fastcdr::exception::Exception&)
     {
@@ -450,8 +460,8 @@ bool AESGCMGMAC_Transform::encode_datareader_submessage(
         return false;
     }
 
-    encoded_rtps_submessage.pos += static_cast<uint32_t>(serializer.getSerializedDataLength());
-    encoded_rtps_submessage.length += static_cast<uint32_t>(serializer.getSerializedDataLength());
+    encoded_rtps_submessage.pos += static_cast<uint32_t>(serializer.get_serialized_data_length());
+    encoded_rtps_submessage.length += static_cast<uint32_t>(serializer.get_serialized_data_length());
 
     return true;
 }
@@ -510,31 +520,31 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
 
 #if FASTDDS_IS_BIG_ENDIAN_TARGET
     octet flags = 0x0;
-    serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+    serializer.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 #else
     octet flags = BIT(0);
-    serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+    serializer.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
 #endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
     //Header
     try
     {
         serializer << SRTPS_PREFIX << flags;
-        eprosima::fastcdr::Cdr::state length_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state length_state = serializer.get_state();
         uint16_t length = 0;
         serializer << length;
 
-        const char* length_position = serializer.getCurrentPosition();
+        const char* length_position = serializer.get_current_position();
 
         serialize_SecureDataHeader(serializer, local_participant->ParticipantKeyMaterial.transformation_kind,
                 local_participant->ParticipantKeyMaterial.sender_key_id, session_id, initialization_vector_suffix);
 
-        eprosima::fastcdr::Cdr::state current_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
         //TODO(Ricardo) fastcdr functinality: length substracting two Cdr::state.
-        length =  static_cast<uint16_t>(serializer.getCurrentPosition() - length_position);
-        serializer.setState(length_state);
+        length =  static_cast<uint16_t>(serializer.get_current_position() - length_position);
+        serializer.set_state(length_state);
         serializer << length;
-        serializer.setState(current_state);
+        serializer.set_state(current_state);
     }
     catch (eprosima::fastcdr::exception::Exception&)
     {
@@ -565,11 +575,11 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
     try
     {
         serializer << SRTPS_POSTFIX << flags;
-        eprosima::fastcdr::Cdr::state length_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state length_state = serializer.get_state();
         uint16_t length = 0;
         serializer << length;
 
-        const char* length_position = serializer.getCurrentPosition();
+        const char* length_position = serializer.get_current_position();
 
         if (!serialize_SecureDataTag(serializer, local_participant, initialization_vector, receiving_crypto_list,
                 update_specific_keys, tag))
@@ -577,12 +587,12 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
             return false;
         }
 
-        eprosima::fastcdr::Cdr::state current_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
         //TODO(Ricardo) fastcdr functinality: length substracting two Cdr::state.
-        length =  static_cast<uint16_t>(serializer.getCurrentPosition() - length_position);
-        serializer.setState(length_state);
+        length =  static_cast<uint16_t>(serializer.get_current_position() - length_position);
+        serializer.set_state(length_state);
         serializer << length;
-        serializer.setState(current_state);
+        serializer.set_state(current_state);
     }
     catch (eprosima::fastcdr::exception::Exception&)
     {
@@ -590,8 +600,8 @@ bool AESGCMGMAC_Transform::encode_rtps_message(
         return false;
     }
 
-    encoded_rtps_message.pos += static_cast<uint32_t>(serializer.getSerializedDataLength());
-    encoded_rtps_message.length += static_cast<uint32_t>(serializer.getSerializedDataLength());
+    encoded_rtps_message.pos += static_cast<uint32_t>(serializer.get_serialized_data_length());
+    encoded_rtps_message.length += static_cast<uint32_t>(serializer.get_serialized_data_length());
 
     return true;
 }
@@ -654,19 +664,19 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
 
         if (flags & BIT(0))
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
         }
         else
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
         }
 
         decoder >> length;
-        const char* const current_position = decoder.getCurrentPosition();
+        const char* const current_position = decoder.get_current_position();
 
         header = deserialize_SecureDataHeader(decoder);
 
-        if (length != (uint16_t)(decoder.getCurrentPosition() - current_position))
+        if (length != (uint16_t)(decoder.get_current_position() - current_position))
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Invalid length for SecureDataHeader");
             return false;
@@ -694,7 +704,7 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
 
     // Body
     uint32_t body_length = 0, body_align = 0;
-    eprosima::fastcdr::Cdr::state protected_body_state = decoder.getState();
+    eprosima::fastcdr::Cdr::state protected_body_state = decoder.get_state();
     bool is_encrypted = false;
 
     try
@@ -707,7 +717,7 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
         return false;
     }
 
-    eprosima::fastcdr::Cdr::state body_state = decoder.getState();
+    eprosima::fastcdr::Cdr::state body_state = decoder.get_state();
     decoder.jump(body_length + body_align);
 
     // Tag
@@ -725,11 +735,11 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
 
             if (flags & BIT(0))
             {
-                decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+                decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
             }
             else
             {
-                decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+                decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
             }
 
             decoder >> length;
@@ -737,8 +747,8 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
             body_length += body_align + 4;
 
             // Align submessage to 4.
-            body_align = static_cast<uint32_t>(decoder.alignment((decoder.getCurrentPosition() + length) -
-                    decoder.getBufferPointer(), sizeof(int32_t)));
+            body_align = static_cast<uint32_t>(decoder.alignment((decoder.get_current_position() + length) -
+                    decoder.get_buffer_pointer(), sizeof(int32_t)));
 
             body_length += length;
             decoder.jump(length + body_align);
@@ -756,15 +766,15 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
 
         if (flags & BIT(0))
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
         }
         else
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
         }
 
         decoder >> length;
-        const char* const current_position = decoder.getCurrentPosition();
+        const char* const current_position = decoder.get_current_position();
 
         SecurityException exception;
 
@@ -778,7 +788,7 @@ bool AESGCMGMAC_Transform::decode_rtps_message(
             return false;
         }
 
-        if (length != (uint16_t)(decoder.getCurrentPosition() - current_position))
+        if (length != (uint16_t)(decoder.get_current_position() - current_position))
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Invalid length for SecureDataTag");
             return false;
@@ -855,19 +865,19 @@ bool AESGCMGMAC_Transform::preprocess_secure_submsg(
 
         if (flags & BIT(0))
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
         }
         else
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
         }
 
         decoder >> length;
-        const char* const current_position = decoder.getCurrentPosition();
+        const char* const current_position = decoder.get_current_position();
 
         header = deserialize_SecureDataHeader(decoder);
 
-        if (length != (uint16_t)(decoder.getCurrentPosition() - current_position))
+        if (length != (uint16_t)(decoder.get_current_position() - current_position))
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Invalid length for SecureDataHeader");
             return false;
@@ -1015,19 +1025,19 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
 
         if (flags & BIT(0))
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
         }
         else
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
         }
 
         decoder >> length;
-        const char* const current_position = decoder.getCurrentPosition();
+        const char* const current_position = decoder.get_current_position();
 
         header = deserialize_SecureDataHeader(decoder);
 
-        if (length != (uint16_t)(decoder.getCurrentPosition() - current_position))
+        if (length != (uint16_t)(decoder.get_current_position() - current_position))
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Invalid length for SecureDataHeader");
             return false;
@@ -1059,7 +1069,7 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
 
     // Body
     uint32_t body_length = 0, body_align = 0;
-    eprosima::fastcdr::Cdr::state protected_body_state = decoder.getState();
+    eprosima::fastcdr::Cdr::state protected_body_state = decoder.get_state();
     bool is_encrypted = false;
 
     try
@@ -1072,7 +1082,7 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
         return false;
     }
 
-    eprosima::fastcdr::Cdr::state body_state = decoder.getState();
+    eprosima::fastcdr::Cdr::state body_state = decoder.get_state();
     decoder.jump(body_length + body_align);
 
     // Tag
@@ -1093,15 +1103,15 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
 
         if (flags & BIT(0))
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
         }
         else
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
         }
 
         decoder >> length;
-        const char* const current_position = decoder.getCurrentPosition();
+        const char* const current_position = decoder.get_current_position();
 
         SecurityException exception;
 
@@ -1114,7 +1124,7 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
             return false;
         }
 
-        if (length != (uint16_t)(decoder.getCurrentPosition() - current_position))
+        if (length != (uint16_t)(decoder.get_current_position() - current_position))
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Invalid length for SecureDataTag");
             return false;
@@ -1137,7 +1147,7 @@ bool AESGCMGMAC_Transform::decode_datawriter_submessage(
     }
 
     plain_rtps_submessage.length += length;
-    encoded_rtps_submessage.pos += static_cast<uint32_t>(decoder.getSerializedDataLength());
+    encoded_rtps_submessage.pos += static_cast<uint32_t>(decoder.get_serialized_data_length());
 
     return true;
 }
@@ -1195,19 +1205,19 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
 
         if (flags & BIT(0))
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
         }
         else
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
         }
 
         decoder >> length;
-        const char* const current_position = decoder.getCurrentPosition();
+        const char* const current_position = decoder.get_current_position();
 
         header = deserialize_SecureDataHeader(decoder);
 
-        if (length != (uint16_t)(decoder.getCurrentPosition() - current_position))
+        if (length != (uint16_t)(decoder.get_current_position() - current_position))
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Invalid length for SecureDataHeader");
             return false;
@@ -1239,7 +1249,7 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
 
     // Body
     uint32_t body_length = 0, body_align = 0;
-    eprosima::fastcdr::Cdr::state protected_body_state = decoder.getState();
+    eprosima::fastcdr::Cdr::state protected_body_state = decoder.get_state();
     bool is_encrypted = false;
 
     try
@@ -1252,7 +1262,7 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
         return false;
     }
 
-    eprosima::fastcdr::Cdr::state body_state = decoder.getState();
+    eprosima::fastcdr::Cdr::state body_state = decoder.get_state();
     decoder.jump(body_length + body_align);
 
     // Tag
@@ -1273,15 +1283,15 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
 
         if (flags & BIT(0))
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
         }
         else
         {
-            decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+            decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
         }
 
         decoder >> length;
-        const char* const current_position = decoder.getCurrentPosition();
+        const char* const current_position = decoder.get_current_position();
 
         SecurityException exception;
 
@@ -1294,7 +1304,7 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
             return false;
         }
 
-        if (length != (uint16_t)(decoder.getCurrentPosition() - current_position))
+        if (length != (uint16_t)(decoder.get_current_position() - current_position))
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Invalid length for SecureDataTag");
             return false;
@@ -1317,7 +1327,7 @@ bool AESGCMGMAC_Transform::decode_datareader_submessage(
     }
 
     plain_rtps_submessage.length += static_cast<uint32_t>(length);
-    encoded_rtps_submessage.pos += static_cast<uint32_t>(decoder.getSerializedDataLength());
+    encoded_rtps_submessage.pos += static_cast<uint32_t>(decoder.get_serialized_data_length());
 
     return true;
 }
@@ -1395,7 +1405,7 @@ bool AESGCMGMAC_Transform::decode_serialized_payload(
 
     // Body
     uint32_t body_length = 0, body_align = 0;
-    eprosima::fastcdr::Cdr::state protected_body_state = decoder.getState();
+    eprosima::fastcdr::Cdr::state protected_body_state = decoder.get_state();
     bool is_encrypted = false;
 
     try
@@ -1574,14 +1584,14 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
     if (!do_encryption)
     {
         // Auth only. SEC_BODY should not be created. Plain buffer should be copied instead.
-        if ((output_buffer.getBufferSize() - (serializer.getCurrentPosition() - serializer.getBufferPointer())) <
+        if ((output_buffer.getBufferSize() - (serializer.get_current_position() - serializer.get_buffer_pointer())) <
                 plain_buffer_len)
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Error in fastcdr trying to copy payload");
             EVP_CIPHER_CTX_free(e_ctx);
             return false;
         }
-        memcpy(serializer.getCurrentPosition(), plain_buffer, plain_buffer_len);
+        memcpy(serializer.get_current_position(), plain_buffer, plain_buffer_len);
         serializer.jump(plain_buffer_len);
 
         if (!EVP_EncryptUpdate(e_ctx, nullptr, &actual_size, plain_buffer, static_cast<int>(plain_buffer_len)))
@@ -1604,10 +1614,10 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
     {
 #if FASTDDS_IS_BIG_ENDIAN_TARGET
         octet flags = 0x0;
-        serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+        serializer.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 #else
         octet flags = BIT(0);
-        serializer.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+        serializer.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
 #endif // if FASTDDS_IS_BIG_ENDIAN_TARGET
 
         if (submessage)
@@ -1616,7 +1626,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
         }
 
         // Store current state to serialize sequence length at the end of the function
-        eprosima::fastcdr::Cdr::state sequence_length_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state sequence_length_state = serializer.get_state();
 
         if (submessage)
         {
@@ -1631,12 +1641,12 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
 
         //Cypher the plain rtps message -> SecureDataBody
 
-        unsigned char* output_buffer_raw = (unsigned char*)serializer.getCurrentPosition();
+        unsigned char* output_buffer_raw = (unsigned char*)serializer.get_current_position();
 
         // Check output_buffer contains enough memory to cypher.
         // - EVP_EncryptUpdate needs at maximum: plain_buffer_len + cipher_block_size - 1.
         // - EVP_EncryptFinal needs ad maximum cipher_block_size.
-        if ((output_buffer.getBufferSize() - (serializer.getCurrentPosition() - serializer.getBufferPointer())) <
+        if ((output_buffer.getBufferSize() - (serializer.get_current_position() - serializer.get_buffer_pointer())) <
                 (plain_buffer_len + (2 * cipher_block_size) - 1))
         {
             EPROSIMA_LOG_ERROR(SECURITY_CRYPTO, "Error in fastcdr trying to cipher payload");
@@ -1663,11 +1673,11 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
 
         serializer.jump(actual_size + final_size);
 
-        eprosima::fastcdr::Cdr::state current_state = serializer.getState();
+        eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
 
         // Serialize body sequence length;
         cnt_length = static_cast<uint32_t>(actual_size + final_size);
-        serializer.setState(sequence_length_state);
+        serializer.set_state(sequence_length_state);
         if (submessage)
         {
             uint16_t length = static_cast<uint16_t>(actual_size + final_size + sizeof(uint32_t));
@@ -1677,7 +1687,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
 
         serializer.serialize(cnt_length, eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
 
-        serializer.setState(current_state);
+        serializer.set_state(current_state);
 
     }
 
@@ -1689,7 +1699,8 @@ bool AESGCMGMAC_Transform::serialize_SecureDataBody(
     {
         // Align submessage to 4.
         size_t alignment =
-                serializer.alignment(serializer.getCurrentPosition() - serializer.getBufferPointer(), sizeof(int32_t));
+                serializer.alignment(serializer.get_current_position() - serializer.get_buffer_pointer(),
+                        sizeof(int32_t));
         for (size_t count = 0; count != alignment; ++count)
         {
             uint8_t c = 0;
@@ -1718,14 +1729,14 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
 
     // Align to 4.
     size_t alignment =
-            serializer.alignment(serializer.getCurrentPosition() - serializer.getBufferPointer(), sizeof(int32_t));
+            serializer.alignment(serializer.get_current_position() - serializer.get_buffer_pointer(), sizeof(int32_t));
     for (size_t count = 0; count != alignment; ++count)
     {
         uint8_t c = 0;
         serializer << c;
     }
 
-    eprosima::fastcdr::Cdr::state length_state = serializer.getState();
+    eprosima::fastcdr::Cdr::state length_state = serializer.get_state();
     uint32_t length = 0;
     serializer << length;
 
@@ -1807,17 +1818,17 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
             continue;
         }
         serializer << remote_entity->Remote2EntityKeyMaterial.at(0).receiver_specific_key_id;
-        EVP_CIPHER_CTX_ctrl(e_ctx, EVP_CTRL_GCM_GET_TAG, AES_BLOCK_SIZE, serializer.getCurrentPosition());
+        EVP_CIPHER_CTX_ctrl(e_ctx, EVP_CTRL_GCM_GET_TAG, AES_BLOCK_SIZE, serializer.get_current_position());
         serializer.jump(16);
         EVP_CIPHER_CTX_free(e_ctx);
 
         ++length;
     }
 
-    eprosima::fastcdr::Cdr::state current_state = serializer.getState();
-    serializer.setState(length_state);
+    eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
+    serializer.set_state(length_state);
     serializer.serialize(length, eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
-    serializer.setState(current_state);
+    serializer.set_state(current_state);
     return true;
 }
 
@@ -1831,7 +1842,7 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
 {
     serializer << tag.common_mac;
 
-    eprosima::fastcdr::Cdr::state length_state = serializer.getState();
+    eprosima::fastcdr::Cdr::state length_state = serializer.get_state();
     uint32_t length = 0;
     serializer << length;
 
@@ -1921,17 +1932,17 @@ bool AESGCMGMAC_Transform::serialize_SecureDataTag(
             continue;
         }
         serializer << remote_participant->Participant2ParticipantKeyMaterial.at(0).receiver_specific_key_id;
-        EVP_CIPHER_CTX_ctrl(e_ctx, EVP_CTRL_GCM_GET_TAG, AES_BLOCK_SIZE, serializer.getCurrentPosition());
+        EVP_CIPHER_CTX_ctrl(e_ctx, EVP_CTRL_GCM_GET_TAG, AES_BLOCK_SIZE, serializer.get_current_position());
         serializer.jump(16);
         EVP_CIPHER_CTX_free(e_ctx);
 
         ++length;
     }
 
-    eprosima::fastcdr::Cdr::state current_state = serializer.getState();
-    serializer.setState(length_state);
+    eprosima::fastcdr::Cdr::state current_state = serializer.get_state();
+    serializer.set_state(length_state);
     serializer.serialize(length, eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
-    serializer.setState(current_state);
+    serializer.set_state(current_state);
     return true;
 }
 
@@ -1957,8 +1968,8 @@ bool AESGCMGMAC_Transform::deserialize_SecureDataBody(
         octet* plain_buffer,
         uint32_t& plain_buffer_len)
 {
-    eprosima::fastcdr::Cdr::state current_state = decoder.getState();
-    decoder.setState(body_state);
+    eprosima::fastcdr::Cdr::state current_state = decoder.get_state();
+    decoder.set_state(body_state);
 
     bool do_encryption = (transformation_kind == c_transfrom_kind_aes128_gcm ||
             transformation_kind == c_transfrom_kind_aes256_gcm);
@@ -2011,7 +2022,7 @@ bool AESGCMGMAC_Transform::deserialize_SecureDataBody(
     }
 
     octet* output_buffer = do_encryption ? plain_buffer : nullptr;
-    unsigned char* input_buffer = (unsigned char*)decoder.getCurrentPosition();
+    unsigned char* input_buffer = (unsigned char*)decoder.get_current_position();
     if (!EVP_DecryptUpdate(d_ctx, output_buffer, &actual_size, input_buffer, protected_len))
     {
         EPROSIMA_LOG_WARNING(SECURITY_CRYPTO,
@@ -2044,10 +2055,11 @@ bool AESGCMGMAC_Transform::deserialize_SecureDataBody(
         memcpy(plain_buffer, input_buffer, plain_buffer_len);
     }
 
-    decoder.setState(current_state);
+    decoder.set_state(current_state);
 
     // Align submessage to 4.
-    size_t alignment = decoder.alignment(decoder.getCurrentPosition() - decoder.getBufferPointer(), sizeof(int32_t));
+    size_t alignment =
+            decoder.alignment(decoder.get_current_position() - decoder.get_buffer_pointer(), sizeof(int32_t));
     for (size_t count = 0; count != alignment; ++count)
     {
         uint8_t c = 0;
@@ -2071,19 +2083,19 @@ bool AESGCMGMAC_Transform::predeserialize_SecureDataBody(
 
     if (flags & BIT(0))
     {
-        decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
+        decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::LITTLE_ENDIANNESS);
     }
     else
     {
-        decoder.changeEndianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
+        decoder.change_endianness(eprosima::fastcdr::Cdr::Endianness::BIG_ENDIANNESS);
     }
 
     decoder >> body_length_short;
     body_length = body_length_short;
 
     // Align submessage to 4.
-    body_align = static_cast<uint32_t>(decoder.alignment((decoder.getCurrentPosition() + body_length) -
-            decoder.getBufferPointer(), sizeof(int32_t)));
+    body_align = static_cast<uint32_t>(decoder.alignment((decoder.get_current_position() + body_length) -
+            decoder.get_buffer_pointer(), sizeof(int32_t)));
 
     return (secure_submsg_id == SecureBodySubmessage);
 }

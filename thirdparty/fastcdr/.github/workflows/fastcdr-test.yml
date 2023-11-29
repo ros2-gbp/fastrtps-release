@@ -10,6 +10,9 @@ on:
     - cron: '0 0 * * *'
 
   push:
+    branches:
+      - master
+      - 1.0.x
 
   workflow_dispatch:
     inputs:
@@ -26,7 +29,8 @@ on:
 
   pull_request:
     branches:
-      - 'master'
+      - master
+      - 1.0.x
     paths-ignore:
       - '**.md'
       - '**.txt'
@@ -81,7 +85,7 @@ jobs:
         colcon build \
             --event-handlers=console_direct+ \
             --packages-select fastcdr \
-            --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DEPROSIMA_BUILD_TESTS=ON \
+            --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON \
             ${{ inputs.cmake_args }}
 
     - name: Run Tests
