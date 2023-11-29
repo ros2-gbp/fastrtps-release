@@ -66,7 +66,7 @@ namespace rtps {
 /**
  * Loops over all the readers in the vector, applying the given routine.
  * The loop continues until the result of the routine is true for any reader
- * or all readers have been processes.
+ * or all readers have been processed.
  * The returned value is true if the routine returned true at any point,
  * or false otherwise.
  */
@@ -533,44 +533,50 @@ bool StatefulWriter::intraprocess_heartbeat(
 }
 
 bool StatefulWriter::change_removed_by_history(
-        CacheChange_t* a_change)
+        CacheChange_t* a_change,
+        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
 {
+    bool ret_value = false;
     SequenceNumber_t sequence_number = a_change->sequenceNumber;
 
     std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
     EPROSIMA_LOG_INFO(RTPS_WRITER, "Change " << sequence_number << " to be removed.");
 
-    flow_controller_->remove_change(a_change);
-
-    // Take note of biggest removed sequence number to improve sending of gaps
-    if (sequence_number > biggest_removed_sequence_number_)
+    if (flow_controller_->remove_change(a_change, max_blocking_time))
     {
-        biggest_removed_sequence_number_ = sequence_number;
+
+        // Take note of biggest removed sequence number to improve sending of gaps
+        if (sequence_number > biggest_removed_sequence_number_)
+        {
+            biggest_removed_sequence_number_ = sequence_number;
+        }
+
+        // Invalidate CacheChange pointer in ReaderProxies.
+        for_matched_readers(matched_local_readers_, matched_datasharing_readers_, matched_remote_readers_,
+                [sequence_number](ReaderProxy* reader)
+                {
+                    reader->change_has_been_removed(sequence_number);
+                    return false;
+                }
+                );
+
+        // remove from datasharing pool history
+        if (is_datasharing_compatible())
+        {
+            auto pool = std::dynamic_pointer_cast<WriterPool>(payload_pool_);
+            assert (pool != nullptr);
+
+            pool->remove_from_shared_history(a_change);
+            EPROSIMA_LOG_INFO(RTPS_WRITER, "Removing shared cache change with SN " << a_change->sequenceNumber);
+        }
+
+        may_remove_change_ = 2;
+        may_remove_change_cond_.notify_one();
+
+        ret_value = true;
     }
 
-    // Invalidate CacheChange pointer in ReaderProxies.
-    for_matched_readers(matched_local_readers_, matched_datasharing_readers_, matched_remote_readers_,
-            [sequence_number](ReaderProxy* reader)
-            {
-                reader->change_has_been_removed(sequence_number);
-                return false;
-            }
-            );
-
-    // remove from datasharing pool history
-    if (is_datasharing_compatible())
-    {
-        auto pool = std::dynamic_pointer_cast<WriterPool>(payload_pool_);
-        assert (pool != nullptr);
-
-        pool->remove_from_shared_history(a_change);
-        EPROSIMA_LOG_INFO(RTPS_WRITER, "Removing shared cache change with SN " << a_change->sequenceNumber);
-    }
-
-    may_remove_change_ = 2;
-    may_remove_change_cond_.notify_one();
-
-    return true;
+    return ret_value;
 }
 
 void StatefulWriter::send_heartbeat_to_all_readers()
@@ -947,6 +953,17 @@ DeliveryRetCode StatefulWriter::deliver_sample_to_network(
         if (disable_positive_acks_ && last_sequence_number_ == SequenceNumber_t())
         {
             last_sequence_number_ = change->sequenceNumber;
+            if ( !(ack_event_->getRemainingTimeMilliSec() > 0))
+            {
+                // Restart ack_timer
+                auto source_timestamp = system_clock::time_point() + nanoseconds(change->sourceTimestamp.to_ns());
+                auto now = system_clock::now();
+                auto interval = source_timestamp - now + keep_duration_us_;
+                assert(interval.count() >= 0);
+
+                ack_event_->update_interval_millisec((double)duration_cast<milliseconds>(interval).count());
+                ack_event_->restart_timer(max_blocking_time);
+            }
         }
 
         // Restore in case a exception was launched by RTPSMessageGroup.
@@ -1606,6 +1623,24 @@ void StatefulWriter::updateAttributes(
         const WriterAttributes& att)
 {
     this->updateTimes(att.times);
+    if (this->get_disable_positive_acks())
+    {
+        this->updatePositiveAcks(att);
+    }
+}
+
+void StatefulWriter::updatePositiveAcks(
+        const WriterAttributes& att)
+{
+    std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
+    if (keep_duration_us_.count() != (att.keep_duration.to_ns() * 1e-3))
+    {
+        // Implicit conversion to microseconds
+        keep_duration_us_ = std::chrono::nanoseconds {att.keep_duration.to_ns()};
+    }
+    // Restart ack timer with new duration
+    ack_event_->update_interval_millisec(keep_duration_us_.count() * 1e-3);
+    ack_event_->restart_timer();
 }
 
 void StatefulWriter::updateTimes(
@@ -2024,26 +2059,40 @@ bool StatefulWriter::ack_timer_expired()
 
     while (interval.count() < 0)
     {
+        bool acks_flag = false;
         for_matched_readers(matched_local_readers_, matched_datasharing_readers_, matched_remote_readers_,
-                [this](ReaderProxy* reader)
+                [this, &acks_flag](ReaderProxy* reader)
                 {
                     if (reader->disable_positive_acks())
                     {
                         reader->acked_changes_set(last_sequence_number_ + 1);
+                        acks_flag = true;
                     }
                     return false;
                 }
                 );
-        last_sequence_number_++;
+        if (acks_flag)
+        {
+            check_acked_status();
+        }
 
-        // Get the next cache change from the history
         CacheChange_t* change;
+
+        // Skip removed changes until reaching the last change
+        do
+        {
+            last_sequence_number_++;
+        } while (!mp_history->get_change(
+            last_sequence_number_,
+            getGuid(),
+            &change) && last_sequence_number_ < next_sequence_number());
 
         if (!mp_history->get_change(
                     last_sequence_number_,
                     getGuid(),
                     &change))
         {
+            // Stop ack_timer
             return false;
         }
 

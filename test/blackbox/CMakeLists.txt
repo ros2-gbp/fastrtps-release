@@ -243,18 +243,26 @@ endif()
 file(GLOB RTPS_BLACKBOXTESTS_TEST_SOURCE "common/RTPSBlackboxTests*.cpp")
 set(RTPS_BLACKBOXTESTS_SOURCE ${RTPS_BLACKBOXTESTS_TEST_SOURCE}
     types/HelloWorld.cxx
+    types/HelloWorldv1.cxx
     types/HelloWorldPubSubTypes.cxx
+    types/HelloWorldTypeObject.cxx
     types/KeyedHelloWorld.cxx
+    types/KeyedHelloWorldv1.cxx
     types/KeyedHelloWorldPubSubTypes.cxx
     types/StringTest.cxx
+    types/StringTestv1.cxx
     types/StringTestPubSubTypes.cxx
     types/Data64kb.cxx
+    types/Data64kbv1.cxx
     types/Data64kbPubSubTypes.cxx
     types/Data1mb.cxx
+    types/Data1mbv1.cxx
     types/Data1mbPubSubTypes.cxx
     types/KeyedData1mb.cxx
+    types/KeyedData1mbv1.cxx
     types/KeyedData1mbPubSubTypes.cxx
     types/FixedSized.cxx
+    types/FixedSizedv1.cxx
     types/FixedSizedPubSubTypes.cxx
 
     utils/data_generators.cpp
@@ -278,23 +286,32 @@ add_blackbox_gtest(BlackboxTests_RTPS SOURCES ${RTPS_BLACKBOXTESTS_TEST_SOURCE} 
 file(GLOB BLACKBOXTESTS_TEST_SOURCE "common/BlackboxTests*.cpp")
 set(BLACKBOXTESTS_SOURCE ${BLACKBOXTESTS_TEST_SOURCE}
     types/HelloWorld.cxx
+    types/HelloWorldv1.cxx
     types/HelloWorldPubSubTypes.cxx
     types/HelloWorldTypeObject.cxx
     types/KeyedHelloWorld.cxx
+    types/KeyedHelloWorldv1.cxx
     types/KeyedHelloWorldPubSubTypes.cxx
     types/StringTest.cxx
+    types/StringTestv1.cxx
     types/StringTestPubSubTypes.cxx
     types/Data64kb.cxx
+    types/Data64kbv1.cxx
     types/Data64kbPubSubTypes.cxx
     types/Data1mb.cxx
+    types/Data1mbv1.cxx
     types/Data1mbPubSubTypes.cxx
     types/KeyedData1mb.cxx
+    types/KeyedData1mbv1.cxx
     types/KeyedData1mbPubSubTypes.cxx
     types/FixedSized.cxx
+    types/FixedSizedv1.cxx
     types/FixedSizedPubSubTypes.cxx
     types/TestIncludeRegression3361.cxx
+    types/TestIncludeRegression3361v1.cxx
     types/TestIncludeRegression3361TypeObject.cxx
     types/TestRegression3361.cxx
+    types/TestRegression3361v1.cxx
     types/TestRegression3361PubSubTypes.cxx
     types/TestRegression3361TypeObject.cxx
 
@@ -302,6 +319,7 @@ set(BLACKBOXTESTS_SOURCE ${BLACKBOXTESTS_TEST_SOURCE}
     utils/lambda_functions.cpp
     utils/print_functions.cpp
 
+    common/DatagramInjectionTransport.cpp
     common/TCPReqRepHelloWorldRequester.cpp
     common/TCPReqRepHelloWorldReplier.cpp
     )
@@ -338,6 +356,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/utils/check_guid.py
     ${CMAKE_CURRENT_BINARY_DIR}/check_guid.py)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/partitions_profile.xml
     ${CMAKE_CURRENT_BINARY_DIR}/partitions_profile.xml)
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/datagrams" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 if(FASTRTPS_API_TESTS)
     set(BLACKBOXTESTS_FASTRTPS_SOURCE
@@ -388,6 +407,7 @@ if(FASTDDS_PIM_API_TESTS)
 
         set(statistics_sources
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/types.cxx
+            ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/typesv1.cxx
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/typesPubSubTypes.cxx
             )
 

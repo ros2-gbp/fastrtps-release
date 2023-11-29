@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 3.22)
 
 project(fast-discovery-server VERSION 1.0.1 LANGUAGES CXX)
 
@@ -21,16 +21,7 @@ project(fast-discovery-server VERSION 1.0.1 LANGUAGES CXX)
 ###############################################################################
 
 if(NOT fastrtps_FOUND)
-    find_package(fastrtps REQUIRED)
-endif()
-
-# Check C++11
-include(CheckCXXCompilerFlag)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    check_cxx_compiler_flag(-std=c++11 SUPPORTS_CXX11)
-    if(NOT SUPPORTS_CXX11)
-        message(FATAL_ERROR "Compiler doesn't support C++11")
-    endif()
+    find_package(fastrtps 2.12 REQUIRED)
 endif()
 
 ###############################################################################

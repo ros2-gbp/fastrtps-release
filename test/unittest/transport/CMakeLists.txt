@@ -16,6 +16,7 @@ if(WIN32)
     add_definitions(
         -D_WIN32_WINNT=0x0601
         -D_CRT_SECURE_NO_WARNINGS
+        -DNOMINMAX
         )
 endif()
 
@@ -245,7 +246,7 @@ endif()
 include_directories(mock/)
 
 add_executable(UDPv4Tests ${UDPV4TESTS_SOURCE})
-target_compile_definitions(UDPv4Tests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(UDPv4Tests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -259,7 +260,10 @@ target_include_directories(UDPv4Tests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp
     $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
-target_link_libraries(UDPv4Tests GTest::gtest ${MOCKS})
+target_link_libraries(UDPv4Tests
+    fastcdr
+    GTest::gtest
+    ${MOCKS})
 if(QNX)
     target_link_libraries(UDPv4Tests socket)
 endif()
@@ -273,7 +277,7 @@ option(DISABLE_UDPV6_TESTS "Disable UDPv6 tests because fails in some systems" O
 
 if(NOT DISABLE_UDPV6_TESTS)
     add_executable(UDPv6Tests ${UDPV6TESTS_SOURCE})
-    target_compile_definitions(UDPv6Tests PRIVATE FASTRTPS_NO_LIB
+    target_compile_definitions(UDPv6Tests PRIVATE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -286,7 +290,10 @@ if(NOT DISABLE_UDPV6_TESTS)
         ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
         ${PROJECT_SOURCE_DIR}/src/cpp
         )
-    target_link_libraries(UDPv6Tests GTest::gtest ${MOCKS})
+    target_link_libraries(UDPv6Tests
+        fastcdr
+        GTest::gtest
+        ${MOCKS})
     if(QNX)
         target_link_libraries(UDPv6Tests socket)
     endif()
@@ -297,7 +304,7 @@ if(NOT DISABLE_UDPV6_TESTS)
     set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_UDP6)
 
     add_executable(TCPv6Tests ${TCPV6TESTS_SOURCE})
-    target_compile_definitions(TCPv6Tests PRIVATE FASTRTPS_NO_LIB
+    target_compile_definitions(TCPv6Tests PRIVATE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -313,7 +320,10 @@ if(NOT DISABLE_UDPV6_TESTS)
         ${PROJECT_SOURCE_DIR}/src/cpp
         $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
         )
-    target_link_libraries(TCPv6Tests GTest::gtest ${MOCKS}
+    target_link_libraries(TCPv6Tests
+        fastcdr
+        GTest::gtest
+        ${MOCKS}
         $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>)
     if(QNX)
         target_link_libraries(TCPv6Tests socket)
@@ -328,7 +338,7 @@ if(NOT DISABLE_UDPV6_TESTS)
 endif()
 
 add_executable(test_UDPv4Tests ${TEST_UDPV4TESTS_SOURCE})
-target_compile_definitions(test_UDPv4Tests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(test_UDPv4Tests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -344,7 +354,10 @@ target_include_directories(test_UDPv4Tests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp
     $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
-target_link_libraries(test_UDPv4Tests GTest::gtest ${MOCKS})
+target_link_libraries(test_UDPv4Tests
+    fastcdr
+    GTest::gtest
+    ${MOCKS})
 if(QNX)
     target_link_libraries(test_UDPv4Tests socket)
 endif()
@@ -357,7 +370,7 @@ add_gtest(test_UDPv4Tests SOURCES ${TEST_UDPV4TESTS_SOURCE})
 set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TEST_UDP4)
 
 add_executable(TCPv4Tests ${TCPV4TESTS_SOURCE})
-target_compile_definitions(TCPv4Tests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(TCPv4Tests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -373,7 +386,10 @@ target_include_directories(TCPv4Tests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp
     $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
-target_link_libraries(TCPv4Tests GTest::gtest ${MOCKS}
+target_link_libraries(TCPv4Tests
+    fastcdr
+    GTest::gtest
+    ${MOCKS}
     $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>)
 if(QNX)
     target_link_libraries(TCPv4Tests socket)
@@ -389,7 +405,7 @@ set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TCP4)
 if(IS_THIRDPARTY_BOOST_OK)
     add_executable(SharedMemTests ${SHAREDMEMTESTS_SOURCE})
 
-    target_compile_definitions(SharedMemTests PRIVATE FASTRTPS_NO_LIB
+    target_compile_definitions(SharedMemTests PRIVATE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
         $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
@@ -406,7 +422,11 @@ if(IS_THIRDPARTY_BOOST_OK)
         ${THIRDPARTY_BOOST_INCLUDE_DIR}
         $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
         )
-    target_link_libraries(SharedMemTests GTest::gtest ${MOCKS}
+    target_link_libraries(SharedMemTests
+        foonathan_memory
+        fastcdr
+        GTest::gtest
+        ${MOCKS}
         $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
         ${THIRDPARTY_BOOST_LINK_LIBS}
         eProsima_atomic
