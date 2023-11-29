@@ -19,11 +19,12 @@ endif()
 set(STATISTICS_RTPS_TESTS_SOURCE
     RTPSStatisticsTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/types.cxx
+    ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/typesv1.cxx
     )
 
 add_executable(RTPSStatisticsTests ${STATISTICS_RTPS_TESTS_SOURCE})
 
-target_compile_definitions(RTPSStatisticsTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(RTPSStatisticsTests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
