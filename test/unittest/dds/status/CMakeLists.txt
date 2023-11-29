@@ -111,6 +111,7 @@ if (FASTDDS_STATISTICS)
         ${PROJECT_SOURCE_DIR}/src/cpp/statistics/fastdds/domain/DomainParticipantImpl.cpp
         ${PROJECT_SOURCE_DIR}/src/cpp/statistics/fastdds/domain/DomainParticipantStatisticsListener.cpp
         ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/types.cxx
+        ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/typesv1.cxx
         ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/typesPubSubTypes.cxx
         )
 
@@ -143,7 +144,7 @@ if(ANDROID)
 endif()
 
 add_executable(ListenerTests ${LISTENERTESTS_SOURCE})
-target_compile_definitions(ListenerTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(ListenerTests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     ASIO_DISABLE_VISIBILITY
