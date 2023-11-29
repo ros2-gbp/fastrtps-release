@@ -92,6 +92,7 @@ public:
         if (writer_attr_.endpoint.durabilityKind == eprosima::fastrtps::rtps::VOLATILE)
         {
             history_->remove_change_g(change);
+            std::cout << "Change removed" << std::endl;
         }
     }
 
@@ -135,17 +136,29 @@ public:
             eprosima::fastrtps::rtps::CacheChange_t* ch = writer_->new_change([&]() -> uint32_t
                             {
                                 size_t current_alignment =  4 + magicword_.size() + 1;
+#if FASTCDR_VERSION_MAJOR == 1
                                 return (uint32_t)(current_alignment + type::getCdrSerializedSize(*it,
                                 current_alignment));
+#else
+                                eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastdds::rtps::
+                                        DEFAULT_XCDR_VERSION);
+                                return (uint32_t)(current_alignment +
+                                calculator.calculate_serialized_size(*it, current_alignment));
+#endif // FASTCDR_VERSION_MAJOR == 1
                             }
                             , eprosima::fastrtps::rtps::ALIVE);
 
             eprosima::fastcdr::FastBuffer buffer((char*)ch->serializedPayload.data, ch->serializedPayload.max_size);
-            eprosima::fastcdr::Cdr cdr(buffer);
+            eprosima::fastcdr::Cdr cdr(buffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
+                    eprosima::fastcdr::CdrVersion::DDS_CDR);
 
             cdr << magicword_;
             cdr << *it;
+#if FASTCDR_VERSION_MAJOR == 1
             ch->serializedPayload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
+#else
+            ch->serializedPayload.length = static_cast<uint32_t>(cdr.get_serialized_data_length());
+#endif // FASTCDR_VERSION_MAJOR == 1
 
             history_->add_change(ch);
             it = msgs.erase(it);
@@ -227,6 +240,13 @@ public:
             rattr.m_qos.m_reliability.kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
         }
 
+        // Check disable_positive_acks_ attribute
+        if (writer_attr_.disable_positive_acks)
+        {
+            rattr.m_qos.m_disablePositiveACKs.enabled = writer_attr_.disable_positive_acks;
+            rattr.m_qos.m_disablePositiveACKs.duration = writer_attr_.keep_duration;
+        }
+
         rattr.guid().guidPrefix.value[0] = guid.guidPrefix.value[0];
         rattr.guid().guidPrefix.value[1] = guid.guidPrefix.value[1];
         rattr.guid().guidPrefix.value[2] = guid.guidPrefix.value[2];
@@ -277,6 +297,28 @@ public:
     {
         writer_attr_.times.heartbeatPeriod.nanosec = nanosec;
         return *this;
+    }
+
+    RTPSAsSocketWriter& disable_positive_acks_seconds(
+            bool disable,
+            int32_t sec)
+    {
+        writer_attr_.disable_positive_acks = disable;
+        writer_attr_.keep_duration = eprosima::fastrtps::Duration_t(sec, 0);
+        return *this;
+    }
+
+    /*** Access RTPSWriter functions ***/
+    void updateAttributes(
+            const eprosima::fastrtps::rtps::WriterAttributes& att)
+    {
+        writer_->updateAttributes(att);
+        return;
+    }
+
+    bool get_disable_positive_acks()
+    {
+        return writer_->get_disable_positive_acks();
     }
 
 private:

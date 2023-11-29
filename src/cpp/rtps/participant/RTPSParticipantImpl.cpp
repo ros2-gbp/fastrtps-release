@@ -353,10 +353,10 @@ RTPSParticipantImpl::RTPSParticipantImpl(
         m_att.defaultMulticastLocatorList.clear();
     }
 
-    createReceiverResources(m_att.builtin.metatrafficMulticastLocatorList, true, false);
-    createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false);
-    createReceiverResources(m_att.defaultUnicastLocatorList, true, false);
-    createReceiverResources(m_att.defaultMulticastLocatorList, true, false);
+    createReceiverResources(m_att.builtin.metatrafficMulticastLocatorList, true, false, true);
+    createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false, true);
+    createReceiverResources(m_att.defaultUnicastLocatorList, true, false, true);
+    createReceiverResources(m_att.defaultMulticastLocatorList, true, false, true);
 
     namespace ExternalLocatorsProcessor = fastdds::rtps::ExternalLocatorsProcessor;
     ExternalLocatorsProcessor::set_listening_locators(m_att.builtin.metatraffic_external_unicast_locators,
@@ -416,6 +416,10 @@ RTPSParticipantImpl::RTPSParticipantImpl(
         }
     }
 #endif // if HAVE_SECURITY
+
+    // Copy NetworkFactory network_configuration to participant attributes prior to proxy creation
+    // NOTE: all transports already registered before
+    m_att.builtin.network_configuration = m_network_Factory.network_configuration();
 
     mp_builtinProtocols = new BuiltinProtocols();
 
@@ -1567,7 +1571,7 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
             }
 
             // Try creating receiver resources
-            if (createReceiverResources(attributes.unicastLocatorList, false, true))
+            if (createReceiverResources(attributes.unicastLocatorList, false, true, false))
             {
                 break;
             }
@@ -1596,8 +1600,8 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
             attributes.multicastLocatorList = m_att.defaultMulticastLocatorList;
             attributes.external_unicast_locators = m_att.default_external_unicast_locators;
         }
-        createReceiverResources(attributes.unicastLocatorList, false, true);
-        createReceiverResources(attributes.multicastLocatorList, false, true);
+        createReceiverResources(attributes.unicastLocatorList, false, true, true);
+        createReceiverResources(attributes.multicastLocatorList, false, true, true);
     }
 
     fastdds::rtps::ExternalLocatorsProcessor::set_listening_locators(attributes.external_unicast_locators,
@@ -1681,7 +1685,8 @@ void RTPSParticipantImpl::setup_external_locators(
 bool RTPSParticipantImpl::createReceiverResources(
         LocatorList_t& Locator_list,
         bool ApplyMutation,
-        bool RegisterReceiver)
+        bool RegisterReceiver,
+        bool log_when_creation_fails)
 {
     std::vector<std::shared_ptr<ReceiverResource>> newItemsBuffer;
     bool ret_val = Locator_list.empty();
@@ -1707,6 +1712,11 @@ bool RTPSParticipantImpl::createReceiverResources(
                 applyLocatorAdaptRule(*it_loc);
                 ret = m_network_Factory.BuildReceiverResources(*it_loc, newItemsBuffer, max_receiver_buffer_size);
             }
+        }
+
+        if (!ret && log_when_creation_fails)
+        {
+            EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT, "Could not create the specified receiver resource");
         }
 
         ret_val |= !newItemsBuffer.empty();
@@ -2278,9 +2288,10 @@ void RTPSParticipantImpl::set_check_type_function(
     type_check_fn_ = std::move(check_type);
 }
 
-std::unique_ptr<RTPSMessageGroup_t> RTPSParticipantImpl::get_send_buffer()
+std::unique_ptr<RTPSMessageGroup_t> RTPSParticipantImpl::get_send_buffer(
+        const std::chrono::steady_clock::time_point& max_blocking_time)
 {
-    return send_buffers_->get_buffer(this);
+    return send_buffers_->get_buffer(this, max_blocking_time);
 }
 
 void RTPSParticipantImpl::return_send_buffer(

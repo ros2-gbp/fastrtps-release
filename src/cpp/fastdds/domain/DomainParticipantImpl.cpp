@@ -1801,7 +1801,7 @@ ReturnCode_t DomainParticipantImpl::register_remote_type(
         // Move the filled vector to the map
         parent_requests_.emplace(std::make_pair(requestId, std::move(vector)));
 
-        return ReturnCode_t::RETCODE_OK;
+        return ReturnCode_t::RETCODE_NO_DATA;
     }
     return ReturnCode_t::RETCODE_PRECONDITION_NOT_MET;
 }
@@ -2240,6 +2240,8 @@ bool DomainParticipantImpl::can_qos_be_updated(
                 from.wire_protocol().builtin.typelookup_config.use_client) ||
                 !(to.wire_protocol().builtin.typelookup_config.use_server ==
                 from.wire_protocol().builtin.typelookup_config.use_server) ||
+                !(to.wire_protocol().builtin.network_configuration ==
+                from.wire_protocol().builtin.network_configuration) ||
                 !(to.wire_protocol().builtin.metatrafficUnicastLocatorList ==
                 from.wire_protocol().builtin.metatrafficUnicastLocatorList) ||
                 !(to.wire_protocol().builtin.metatrafficMulticastLocatorList ==

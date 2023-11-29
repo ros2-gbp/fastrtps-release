@@ -200,6 +200,21 @@ inline bool appendMsg(
  */
 /// @{
 
+template<typename T>
+inline bool addPrimitive(
+        CDRMessage_t* msg,
+        T value);
+
+inline bool hasSpace(
+        CDRMessage_t* msg,
+        const uint32_t length);
+
+inline void copyToBuffer(
+        CDRMessage_t* msg,
+        const octet* data,
+        const uint32_t length,
+        bool reverse = false);
+
 inline bool addData(
         CDRMessage_t*,
         const octet*,
@@ -311,6 +326,17 @@ inline bool addParticipantGenericMessage(
         const security::ParticipantGenericMessage& message);
 
 ///@}
+
+/**
+ * @brief Skip bytes in serialized buffer
+ *
+ * @param msg The CDR message
+ * @param length The number of bytes to skip
+ * @return true if skipped, false otherwise
+ */
+inline bool skip(
+        CDRMessage_t* msg,
+        uint32_t length);
 
 } /* namespace CDRMessage */
 
