@@ -87,25 +87,20 @@ public:
      * Transforms a remote locator into a locator optimized for local communications.
      *
      * If the remote locator corresponds to one of the local interfaces, it is converted
-     * to the corresponding local address if allowed by both local and remote transports.
+     * to the corresponding local address.
      *
      * @param [in]  remote_locator Locator to be converted.
      * @param [out] result_locator Converted locator.
-     * @param [in]  allowed_remote_localhost Whether localhost is allowed (and hence used) in the remote transport.
-     * @param [in]  allowed_local_localhost Whether localhost is allowed locally (by this or other transport).
      *
      * @return false if the input locator is not supported/allowed by this transport, true otherwise.
      */
     bool transform_remote_locator(
             const Locator& remote_locator,
-            Locator& result_locator,
-            bool allowed_remote_localhost,
-            bool allowed_local_localhost) const override;
+            Locator& result_locator) const override;
 
     /**
      * Blocking Send through the specified channel. In both modes, using a localLocator of 0.0.0.0 will
      * send through all whitelisted interfaces provided the channel is open.
-     *
      * @param send_buffer Slice into the raw data to send.
      * @param send_buffer_size Size of the raw data. It will be used as a bounds check for the previous argument.
      * It must not exceed the send_buffer_size fed to this class during construction.
@@ -117,8 +112,6 @@ public:
      * @param only_multicast_purpose multicast network interface
      * @param whitelisted network interface included in the user whitelist
      * @param max_blocking_time_point maximum blocking time.
-     *
-     * @pre Open the output channel of each remote locator by invoking \ref OpenOutputChannel function.
      */
     virtual bool send(
             const fastrtps::rtps::octet* send_buffer,
@@ -170,8 +163,6 @@ public:
     }
 
     void update_network_interfaces() override;
-
-    bool is_localhost_allowed() const override;
 
 protected:
 

@@ -114,7 +114,7 @@ public:
     {
         if (elements_ && !has_ownership_)
         {
-            EPROSIMA_LOG_WARNING(SUBSCRIBER, "Sequence destroyed with active loan");
+            logWarning(SUBSCRIBER, "Sequence destroyed with active loan");
             return;
         }
 

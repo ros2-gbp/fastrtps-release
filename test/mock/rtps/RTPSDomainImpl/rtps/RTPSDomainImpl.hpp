@@ -15,8 +15,6 @@
 #ifndef _RTPS_RTPSDOMAINIMPL_HPP_
 #define _RTPS_RTPSDOMAINIMPL_HPP_
 
-#include <memory>
-
 #include <fastdds/rtps/RTPSDomain.h>
 
 namespace eprosima {
@@ -33,12 +31,6 @@ class IChangePool;
 class RTPSDomainImpl
 {
 public:
-
-    static std::shared_ptr<RTPSDomainImpl> get_instance()
-    {
-        static std::shared_ptr<RTPSDomainImpl> instance = std::make_shared<RTPSDomainImpl>();
-        return instance;
-    }
 
     /**
      * Check whether intraprocess delivery should be used between two GUIDs.
@@ -61,12 +53,10 @@ public:
         return nullptr;
     }
 
-    static bool create_participant_guid(
+    static void create_participant_guid(
             int32_t& /*participant_id*/,
-            GUID_t& guid)
+            GUID_t& /*guid*/)
     {
-        guid.guidPrefix.value[11] = 1;
-        return true;
     }
 
     /**
@@ -93,15 +83,6 @@ public:
     {
         static_cast<void>(change_pool);
         return RTPSDomain::createRTPSWriter(p, entity_id, watt, payload_pool, hist, listen);
-    }
-
-    static RTPSParticipant* clientServerEnvironmentCreationOverride(
-            uint32_t domain_id,
-            bool enabled,
-            const RTPSParticipantAttributes& att,
-            RTPSParticipantListener* listen)
-    {
-        return RTPSDomain::createParticipant(domain_id, enabled, att, listen);
     }
 
 };

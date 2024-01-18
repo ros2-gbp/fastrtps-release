@@ -21,7 +21,7 @@
 
 // Include first possible mocks (depending on include on CMakeLists.txt)
 #include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
-#include <rtps/network/NetworkFactory.h>
+#include <fastrtps/rtps/network/NetworkFactory.h>
 #include <fastrtps/rtps/participant/RTPSParticipantListener.h>
 #include <fastrtps/rtps/reader/RTPSReader.h>
 #include <fastrtps/rtps/resources/ResourceEvent.h>
@@ -33,7 +33,6 @@
 
 #include <gmock/gmock.h>
 
-#include <atomic>
 #include <map>
 #include <sstream>
 
@@ -69,10 +68,10 @@ public:
             RTPSParticipant* participant,
             ParticipantDiscoveryInfo&& info) override
     {
-        onParticipantDiscovery_mock(participant, info);
+        onParticipantDiscovery(participant, info);
     }
 
-    MOCK_METHOD2(onParticipantDiscovery_mock, void (RTPSParticipant*, const ParticipantDiscoveryInfo&));
+    MOCK_METHOD2(onParticipantDiscovery, void (RTPSParticipant*, const ParticipantDiscoveryInfo&));
 
 #if HAVE_SECURITY
     void onParticipantAuthentication(
@@ -287,7 +286,7 @@ public:
     template <EndpointKind_t kind, octet no_key, octet with_key>
     static bool preprocess_endpoint_attributes(
             const EntityId_t&,
-            std::atomic<uint32_t>&,
+            uint32_t&,
             EndpointAttributes&,
             EntityId_t&)
     {
@@ -308,7 +307,7 @@ public:
         return f;
     }
 
-    MOCK_METHOD(bool, should_match_local_endpoints, ());
+    MOCK_METHOD(bool, ignore_participant, (const GuidPrefix_t&));
 
 private:
 

@@ -31,8 +31,6 @@
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
-#include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
-#include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
 #include <fastrtps/qos/QosPolicies.h>
 #include <fastrtps/utils/ProxyPool.hpp>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
@@ -90,7 +88,7 @@ public:
 
     /**
      * Constructor
-     * @param builtin Pointer to the BuiltinProtocols object.
+     * @param builtin Pointer to the BuiltinProcols object.
      * @param allocation Participant allocation parameters.
      */
     PDP(
@@ -138,15 +136,8 @@ public:
      */
     virtual void announceParticipantState(
             bool new_change,
-            bool dispose,
-            WriteParams& wparams) = 0;
-
-    /**
-     * \c announceParticipantState method without optional output parameter \c wparams .
-     */
-    virtual void announceParticipantState(
-            bool new_change,
-            bool dispose = false);
+            bool dispose = false,
+            WriteParams& wparams = WriteParams::WRITE_PARAM_DEFAULT) = 0;
 
     //!Stop the RTPSParticipantAnnouncement (only used in tests).
     virtual void stopParticipantAnnouncement();
@@ -232,43 +223,19 @@ public:
 
     /**
      * This method removes and deletes a ReaderProxyData object from its corresponding RTPSParticipant.
-     *
-     * @param[in] reader_guid GUID_t of the reader to remove.
+     * @param reader_guid GUID_t of the reader to remove.
      * @return true if found and deleted.
      */
     bool removeReaderProxyData(
             const GUID_t& reader_guid);
 
     /**
-     * This method removes and deletes a ReaderProxyData object from its corresponding RTPSParticipant.
-     *
-     * @param[in] reader_guid GUID_t of the reader to remove.
-     * @param[in] reason Why the reader is being removed (dropped, removed, or ignored)
-     * @return true if found and deleted.
-     */
-    bool removeReaderProxyData(
-            const GUID_t& reader_guid,
-            ReaderDiscoveryInfo::DISCOVERY_STATUS reason);
-
-    /**
      * This method removes and deletes a WriterProxyData object from its corresponding RTPSParticipant.
-     *
-     * @param[in] writer_guid GUID_t of the writer to remove.
+     * @param writer_guid GUID_t of the wtiter to remove.
      * @return true if found and deleted.
      */
     bool removeWriterProxyData(
             const GUID_t& writer_guid);
-
-    /**
-     * This method removes and deletes a WriterProxyData object from its corresponding RTPSParticipant.
-     *
-     * @param[in] writer_guid GUID_t of the writer to remove.
-     * @param[in] reason Why the writer is being removed (dropped, removed, or ignored)
-     * @return true if found and deleted.
-     */
-    bool removeWriterProxyData(
-            const GUID_t& writer_guid,
-            WriterDiscoveryInfo::DISCOVERY_STATUS reason);
 
     /**
      * Create the SPDP Writer and Reader
@@ -311,7 +278,7 @@ public:
     /**
      * This method removes a remote RTPSParticipant and all its writers and readers.
      * @param participant_guid GUID_t of the remote RTPSParticipant.
-     * @param reason Why the participant is being removed (dropped, removed, or ignored)
+     * @param reason Why the participant is being removed (dropped vs removed)
      * @return true if correct.
      */
     virtual bool remove_remote_participant(
@@ -328,9 +295,9 @@ public:
      * Get a pointer to the local RTPSParticipant ParticipantProxyData object.
      * @return Pointer to the local RTPSParticipant ParticipantProxyData object.
      */
-    ParticipantProxyData* getLocalParticipantProxyData()
+    ParticipantProxyData* getLocalParticipantProxyData() const
     {
-        return participant_proxies_.front();
+        return participant_proxies_.empty() ? nullptr : participant_proxies_.front();
     }
 
     /**
@@ -420,7 +387,15 @@ public:
         return temp_writer_proxies_;
     }
 
+    ReaderAttributes create_builtin_reader_attributes() const;
+
+    WriterAttributes create_builtin_writer_attributes() const;
+
 #if HAVE_SECURITY
+    void add_builtin_security_attributes(
+            ReaderAttributes& ratt,
+            WriterAttributes& watt) const;
+
     virtual bool pairing_remote_writer_with_local_reader_after_security(
             const GUID_t& local_reader,
             const WriterProxyData& remote_writer_data);
@@ -458,8 +433,6 @@ protected:
     ResourceLimitedVector<WriterProxyData*> writer_proxies_pool_;
     //!Variable to indicate if any parameter has changed.
     std::atomic_bool m_hasChangedLocalPDP;
-    //!Listener for the SPDP messages.
-    ReaderListener* mp_listener;
     //! ProxyPool for temporary reader proxies
     ProxyPool<ReaderProxyData> temp_reader_proxies_;
     //! ProxyPool for temporary writer proxies
@@ -531,6 +504,10 @@ protected:
      */
     virtual void update_builtin_locators() = 0;
 
+    void notify_and_maybe_ignore_new_participant(
+            ParticipantProxyData* pdata,
+            bool& should_be_ignored);
+
 private:
 
     //!TimedEvent to periodically resend the local RTPSParticipant information.
@@ -568,11 +545,6 @@ private:
      */
     void set_initial_announcement_interval();
 
-    /**
-     * Set to a Participant Proxy those properties from this participant that must be sent.
-     */
-    void set_external_participant_properties_(
-            ParticipantProxyData* participant_data);
 };
 
 

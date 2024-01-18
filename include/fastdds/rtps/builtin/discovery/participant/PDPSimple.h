@@ -77,19 +77,12 @@ public:
      * Force the sending of our local DPD to all remote RTPSParticipants and multicast Locators.
      * @param new_change If true a new change (with new seqNum) is created and sent; if false the last change is re-sent
      * @param dispose Sets change kind to NOT_ALIVE_DISPOSED_UNREGISTERED
-     * @param[in, out] wparams  allows to identify the change
+     * @param wparams allows to identify the change
      */
     void announceParticipantState(
             bool new_change,
-            bool dispose,
-            WriteParams& wparams) override;
-
-    /**
-     * \c announceParticipantState method without optional output parameter \c wparams .
-     */
-    void announceParticipantState(
-            bool new_change,
-            bool dispose = false) override;
+            bool dispose = false,
+            WriteParams& wparams = WriteParams::WRITE_PARAM_DEFAULT) override;
 
     /**
      * This method assigns remote endpoints to the builtin endpoints defined in this protocol. It also calls
@@ -138,6 +131,28 @@ private:
      * @return True if correct.
      */
     bool createPDPEndpoints() override;
+
+    bool create_dcps_participant_endpoints();
+
+    void match_pdp_remote_endpoints(
+            const ParticipantProxyData& pdata,
+            bool notify_secure_endpoints);
+
+    void assign_low_level_remote_endpoints(
+            const ParticipantProxyData& pdata,
+            bool notify_secure_endpoints);
+
+#if HAVE_SECURITY
+    bool create_dcps_participant_secure_endpoints();
+
+    bool pairing_remote_writer_with_local_reader_after_security(
+            const GUID_t& local_reader,
+            const WriterProxyData& remote_writer_data) override;
+
+    bool pairing_remote_reader_with_local_writer_after_security(
+            const GUID_t& local_reader,
+            const ReaderProxyData& remote_reader_data) override;
+#endif // HAVE_SECURITY
 
 };
 

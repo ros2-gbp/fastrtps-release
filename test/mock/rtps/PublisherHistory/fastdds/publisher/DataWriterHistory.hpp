@@ -71,13 +71,11 @@ public:
     DataWriterHistory(
             const TopicAttributes& topic_att,
             uint32_t payloadMaxSize,
-            MemoryManagementPolicy_t mempolicy,
-            std::function<void (const fastrtps::rtps::InstanceHandle_t&)> unack_sample_remove_functor)
+            MemoryManagementPolicy_t mempolicy)
         : WriterHistory(to_history_attributes(topic_att, payloadMaxSize, mempolicy))
         , history_qos_(topic_att.historyQos)
         , resource_limited_qos_(topic_att.resourceLimitsQos)
         , topic_att_(topic_att)
-        , unacknowledged_sample_removed_functor_(unack_sample_remove_functor)
     {
         if (resource_limited_qos_.max_instances == 0)
         {
@@ -135,7 +133,7 @@ public:
     {
         if (mp_writer == nullptr || mp_mutex == nullptr)
         {
-            EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a Writer with this History before using it");
+            logError(RTPS_HISTORY, "You need to create a Writer with this History before using it");
             return false;
         }
         std::lock_guard<RecursiveTimedMutex> guard(*this->mp_mutex);
@@ -298,9 +296,6 @@ private:
     ResourceLimitsQosPolicy resource_limited_qos_;
     //!Topic Attributes
     TopicAttributes topic_att_;
-
-    //! Unacknowledged sample removed functor
-    std::function<void (const fastrtps::rtps::InstanceHandle_t&)> unacknowledged_sample_removed_functor_;
 
     bool find_or_add_key(
             const InstanceHandle_t& instance_handle,

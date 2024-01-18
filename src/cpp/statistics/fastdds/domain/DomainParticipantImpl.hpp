@@ -47,6 +47,9 @@ using ReturnCode_t = eprosima::fastrtps::types::ReturnCode_t;
 namespace eprosima {
 namespace fastdds {
 namespace statistics {
+
+enum EventKind : uint32_t;
+
 namespace dds {
 
 class PublisherImpl;
@@ -57,10 +60,10 @@ public:
 
     /**
      * @brief This operation enables a Statistics DataWriter
-     *
-     * @param[in] topic_name Name of the topic associated to the Statistics DataWriter
-     * @param[in] dwqos DataWriterQos to be set
-     * @return RETCODE_BAD_PARAMETER if the topic name provided does not correspond to any Statistics DataWriter,
+     * @param topic_name Name of the topic associated to the Statistics DataWriter
+     * @param dwqos DataWriterQos to be set
+     * @return RETCODE_UNSUPPORTED if the FASTDDS_STATISTICS CMake option has not been set,
+     * RETCODE_BAD_PARAMETER if the topic name provided does not correspond to any Statistics DataWriter,
      * RETCODE_INCONSISTENT_POLICY if the DataWriterQos provided is inconsistent,
      * RETCODE_OK if the DataWriter has been created or if it has been created previously,
      * and RETCODE_ERROR otherwise
@@ -70,23 +73,8 @@ public:
             const efd::DataWriterQos& dwqos);
 
     /**
-     * @brief This operation enables a Statistics DataWriter from a provided XML defined profile
-     *
-     * @param[in] profile_name Name for the profile to be used to fill the QoS structure.
-     * @param[in] topic_name Name of the statistics topic to be enabled.
-     * @return RETCODE_BAD_PARAMETER if the topic name provided does not correspond to any Statistics DataWriter,
-     * RETCODE_INCONSISTENT_POLICY if the DataWriterQos provided is inconsistent,
-     * RETCODE_OK if the DataWriter has been created or if it has been created previously,
-     * and RETCODE_ERROR otherwise
-     */
-    ReturnCode_t enable_statistics_datawriter_with_profile(
-            const std::string& profile_name,
-            const std::string& topic_name);
-
-    /**
      * @brief This operation disables a Statistics DataWriter
-     *
-     * @param[in] topic_name Name of the topic associated to the Statistics DataWriter
+     * @param topic_name Name of the topic associated to the Statistics DataWriter
      * @return RETCODE_UNSUPPORTED if the FASTDDS_STATISTICS CMake option has not been set,
      * RETCODE_BAD_PARAMETER if the topic name provided does not correspond to any Statistics DataWriter,
      * RETCODE_OK if the DataWriter has been correctly deleted or does not exist,
@@ -97,7 +85,6 @@ public:
 
     /**
      * @brief This operation enables the DomainParticipantImpl
-     *
      * @return RETCODE_OK if successful
      */
     ReturnCode_t enable() override;
@@ -111,13 +98,6 @@ public:
      */
     static bool is_statistics_topic_name(
             const std::string& topic_name) noexcept;
-
-    /**
-     * @brief This override calls the parent method and returns builtin publishers to nullptr
-     *
-     * @return RETCODE_OK if successful
-     */
-    ReturnCode_t delete_contained_entities() override;
 
 protected:
 

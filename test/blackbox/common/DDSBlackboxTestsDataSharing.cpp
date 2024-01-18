@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "BlackboxTests.hpp"
+#include <fstream>
+#include <sstream>
+#include <thread>
+
+#include <gtest/gtest.h>
 
 #include <fastrtps/log/Log.h>
-
-#include "PubSubReader.hpp"
-#include "PubSubWriter.hpp"
 #include <fastrtps/transport/test_UDPv4TransportDescriptor.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
-#include <sstream>
-#include <fstream>
-#include <gtest/gtest.h>
+#include "BlackboxTests.hpp"
+#include "PubSubReader.hpp"
+#include "PubSubWriter.hpp"
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -35,11 +36,8 @@ bool check_shared_file (
     bool result;
     std::stringstream file_name;
     std::fstream file_stream;
-#if ANDROID
-    file_name << "/data/local/tmp/" << shared_dir << "/fast_datasharing_" << guid.guidPrefix << "_" << guid.entityId;
-#else
+
     file_name << shared_dir << "/fast_datasharing_" << guid.guidPrefix << "_" << guid.entityId;
-#endif // if ANDROID
     file_stream.open(file_name.str(), std::ios::in);
     result = file_stream.is_open();
     file_stream.close();

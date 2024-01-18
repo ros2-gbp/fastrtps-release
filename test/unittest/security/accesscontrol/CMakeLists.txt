@@ -58,7 +58,6 @@ add_executable(AccessControlTests ${COMMON_SOURCES_ACCESS_CONTROL_TEST_SOURCE}
     ${PROJECT_SOURCE_DIR}/src/cpp/security/accesscontrol/CommonParser.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/security/accesscontrol/GovernanceParser.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/security/accesscontrol/Permissions.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/security/accesscontrol/DistinguishedName.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/security/accesscontrol/PermissionsParser.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/security/artifact_providers/FileProvider.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/security/artifact_providers/Pkcs11Provider.cpp
@@ -100,9 +99,7 @@ target_link_libraries(AccessControlTests
     ${TINYXML2_LIBRARY}
     $<$<BOOL:${LibP11_FOUND}>:eProsima_p11>  # $<TARGET_NAME_IF_EXISTS:eProsima_p11>
     )
-if(QNX)
-    target_link_libraries(AccessControlTests socket)
-endif()
+
 if(MSVC OR MSVC_IDE)
     target_link_libraries(AccessControlTests ${PRIVACY} iphlpapi Shlwapi)
 endif()
@@ -111,58 +108,3 @@ endif()
 add_gtest(AccessControlTests
     SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AccessControlTests.cpp
     ENVIRONMENTS "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs")
-
-if(ANDROID)
-    set_property(TARGET AccessControlTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()
-
-####################################################################################################
-####################################################################################################
-# DistinguishedNameTests
-set(
-    DISTINGUISHEDNAME_TEST_NAME
-    "DistinguishedNameTests"
-)
-
-add_executable(
-    ${DISTINGUISHEDNAME_TEST_NAME}
-
-    # Log related files
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
-
-    # src files
-    ${PROJECT_SOURCE_DIR}/src/cpp/security/accesscontrol/DistinguishedName.cpp
-
-    # test files
-    ${CMAKE_CURRENT_SOURCE_DIR}/DistinguishedNameTests.cpp
-)
-
-target_compile_definitions(
-    ${DISTINGUISHEDNAME_TEST_NAME}
-    PRIVATE
-        $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-        $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-)
-
-target_include_directories(
-    ${DISTINGUISHEDNAME_TEST_NAME}
-    PRIVATE
-        ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_BINARY_DIR}/include
-        ${PROJECT_SOURCE_DIR}/src/cpp
-)
-
-target_link_libraries(
-    ${DISTINGUISHEDNAME_TEST_NAME}
-    GTest::gtest
-)
-
-add_gtest(
-    ${DISTINGUISHEDNAME_TEST_NAME}
-    SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/DistinguishedNameTests.cpp
-)

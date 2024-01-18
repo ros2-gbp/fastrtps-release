@@ -15,6 +15,8 @@
 #include "BlackboxTests.hpp"
 #include "TCPReqRepHelloWorldRequester.hpp"
 #include "TCPReqRepHelloWorldReplier.hpp"
+#include "PubSubReader.hpp"
+#include "PubSubWriter.hpp"
 
 #include <gtest/gtest.h>
 
@@ -23,10 +25,6 @@
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
-
-#if TLS_FOUND
-static const char* certs_path = nullptr;
-#endif // if TLS_FOUND
 
 enum communication_type
 {
@@ -43,10 +41,6 @@ public:
         use_ipv6 = std::get<1>(GetParam());
         if (use_ipv6)
         {
-#ifdef __APPLE__
-            // TODO: fix IPv6 issues related with zone ID
-            GTEST_SKIP() << "TCPv6 tests are disabled in Mac";
-#endif // ifdef __APPLE__
             test_transport_ = std::make_shared<TCPv6TransportDescriptor>();
         }
         else
@@ -420,61 +414,6 @@ TEST_P(TransportTCP, TCP_TLS)
     ASSERT_TRUE(replier.is_matched());
 }
 
-// Test successful removal of client after previously matched server is removed
-TEST_P(TransportTCP, TCP_TLS_client_disconnect_after_server)
-{
-    TCPReqRepHelloWorldRequester* requester = new TCPReqRepHelloWorldRequester();
-    TCPReqRepHelloWorldReplier* replier = new TCPReqRepHelloWorldReplier();
-
-    requester->init(0, 0, global_port, 5, certs_path);
-
-    ASSERT_TRUE(requester->isInitialized());
-
-    replier->init(4, 0, global_port, 5, certs_path);
-
-    ASSERT_TRUE(replier->isInitialized());
-
-    // Wait for discovery.
-    requester->wait_discovery();
-    replier->wait_discovery();
-
-    ASSERT_TRUE(requester->is_matched());
-    ASSERT_TRUE(replier->is_matched());
-
-    // Completely remove server prior to deleting client
-    delete replier;
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    delete requester;
-}
-
-// Test successful removal of server after previously matched client is removed
-// Issue -> https://eprosima.easyredmine.com/issues/16288
-TEST_P(TransportTCP, TCP_TLS_server_disconnect_after_client)
-{
-    TCPReqRepHelloWorldReplier* replier = new TCPReqRepHelloWorldReplier();
-    TCPReqRepHelloWorldRequester* requester = new TCPReqRepHelloWorldRequester();
-
-    requester->init(0, 0, global_port, 5, certs_path);
-
-    ASSERT_TRUE(requester->isInitialized());
-
-    replier->init(4, 0, global_port, 5, certs_path);
-
-    ASSERT_TRUE(replier->isInitialized());
-
-    // Wait for discovery.
-    requester->wait_discovery();
-    replier->wait_discovery();
-
-    ASSERT_TRUE(requester->is_matched());
-    ASSERT_TRUE(replier->is_matched());
-
-    // Completely remove client prior to deleting server
-    delete requester;
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    delete replier;
-}
-
 void tls_init()
 {
     certs_path = std::getenv("CERTS_PATH");
@@ -556,15 +495,6 @@ TEST_P(TransportTCP, TCPv4_copy)
     EXPECT_EQ(tcpv4_transport_copy, tcpv4_transport);
 }
 
-// Test get_WAN_address member function
-TEST_P(TransportTCP, TCPv4_get_WAN_address)
-{
-    // TCPv4TransportDescriptor
-    TCPv4TransportDescriptor tcpv4_transport;
-    tcpv4_transport.set_WAN_address("80.80.99.45");
-    ASSERT_EQ(tcpv4_transport.get_WAN_address(), "80.80.99.45");
-}
-
 // Test == operator for TCPv6
 TEST_P(TransportTCP, TCPv6_equal_operator)
 {
@@ -594,7 +524,7 @@ TEST_P(TransportTCP, TCPv6_equal_operator)
 // Test copy constructor and copy assignment for TCPv6
 TEST_P(TransportTCP, TCPv6_copy)
 {
-    // Change some varibles in order to check the non default cretion
+    // Change some varibles in order to check the non default creation
     TCPv6TransportDescriptor tcpv6_transport;
     tcpv6_transport.enable_tcp_nodelay = !tcpv6_transport.enable_tcp_nodelay; // change default value
     tcpv6_transport.max_logical_port = tcpv6_transport.max_logical_port + 10; // change default value
@@ -668,6 +598,66 @@ TEST(TransportTCP, Client_reconnection)
 
     delete replier;
     delete requester;
+}
+
+// Test copy constructor and copy assignment for TCPv4
+TEST_P(TransportTCP, TCPv4_autofill_port)
+{
+    PubSubReader<HelloWorldPubSubType> p1(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> p2(TEST_TOPIC_NAME);
+
+    // Add TCP Transport with listening port 0
+    auto p1_transport = std::make_shared<TCPv4TransportDescriptor>();
+    p1_transport->add_listener_port(0);
+    p1.disable_builtin_transport().add_user_transport_to_pparams(p1_transport);
+    p1.init();
+    ASSERT_TRUE(p1.isInitialized());
+
+    // Add TCP Transport with listening port different from 0
+    uint16_t port = 12345;
+    auto p2_transport = std::make_shared<TCPv4TransportDescriptor>();
+    p2_transport->add_listener_port(port);
+    p2.disable_builtin_transport().add_user_transport_to_pparams(p2_transport);
+    p2.init();
+    ASSERT_TRUE(p2.isInitialized());
+
+    LocatorList_t p1_locators;
+    p1.get_native_reader().get_listening_locators(p1_locators);
+    EXPECT_TRUE(IPLocator::getPhysicalPort(p1_locators.begin()[0]) != 0);
+
+    LocatorList_t p2_locators;
+    p2.get_native_reader().get_listening_locators(p2_locators);
+    EXPECT_TRUE(IPLocator::getPhysicalPort(p2_locators.begin()[0]) == port);
+}
+
+// Test copy constructor and copy assignment for TCPv6
+TEST_P(TransportTCP, TCPv6_autofill_port)
+{
+    PubSubReader<HelloWorldPubSubType> p1(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> p2(TEST_TOPIC_NAME);
+
+    // Add TCP Transport with listening port 0
+    auto p1_transport = std::make_shared<TCPv6TransportDescriptor>();
+    p1_transport->add_listener_port(0);
+    p1.disable_builtin_transport().add_user_transport_to_pparams(p1_transport);
+    p1.init();
+    ASSERT_TRUE(p1.isInitialized());
+
+    // Add TCP Transport with listening port different from 0
+    uint16_t port = 12345;
+    auto p2_transport = std::make_shared<TCPv6TransportDescriptor>();
+    p2_transport->add_listener_port(port);
+    p2.disable_builtin_transport().add_user_transport_to_pparams(p2_transport);
+    p2.init();
+    ASSERT_TRUE(p2.isInitialized());
+
+    LocatorList_t p1_locators;
+    p1.get_native_reader().get_listening_locators(p1_locators);
+    EXPECT_TRUE(IPLocator::getPhysicalPort(p1_locators.begin()[0]) != 0);
+
+    LocatorList_t p2_locators;
+    p2.get_native_reader().get_listening_locators(p2_locators);
+    EXPECT_TRUE(IPLocator::getPhysicalPort(p2_locators.begin()[0]) == port);
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P

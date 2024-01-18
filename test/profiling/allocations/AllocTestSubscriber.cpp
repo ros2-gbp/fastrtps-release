@@ -18,13 +18,17 @@
  */
 
 #include "AllocTestSubscriber.h"
-#include "AllocTestCommon.h"
-#include <fastrtps/participant/Participant.h>
+
+#include <thread>
+
 #include <fastrtps/attributes/ParticipantAttributes.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
-#include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/Domain.h>
+#include <fastrtps/participant/Participant.h>
+#include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include "AllocTestCommon.h"
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -42,7 +46,7 @@ bool AllocTestSubscriber::init(
 {
     m_profile = profile;
     m_outputFile = outputFile;
-    Domain::loadXMLProfilesFile("test_xml_profile.xml");
+    Domain::loadXMLProfilesFile("test_xml_profiles.xml");
 
     ParticipantAttributes participant_att;
     if (eprosima::fastrtps::xmlparser::XMLP_ret::XML_OK ==

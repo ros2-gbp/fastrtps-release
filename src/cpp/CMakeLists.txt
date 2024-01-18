@@ -75,9 +75,9 @@ set(${PROJECT_NAME}_source_files
     rtps/messages/submessages/DataMsg.hpp
     rtps/messages/submessages/GapMsg.hpp
     rtps/messages/submessages/HeartbeatMsg.hpp
-    rtps/network/ExternalLocatorsProcessor.cpp
     rtps/network/NetworkFactory.cpp
     rtps/network/ReceiverResource.cpp
+    rtps/attributes/RTPSParticipantAttributes.cpp
     rtps/participant/RTPSParticipant.cpp
     rtps/participant/RTPSParticipantImpl.cpp
     rtps/RTPSDomain.cpp
@@ -97,7 +97,6 @@ set(${PROJECT_NAME}_source_files
     fastdds/topic/ContentFilteredTopicImpl.cpp
     fastdds/topic/Topic.cpp
     fastdds/topic/TopicImpl.cpp
-    fastdds/topic/TopicProxyFactory.cpp
     fastdds/topic/TypeSupport.cpp
     fastdds/topic/qos/TopicQos.cpp
     fastdds/publisher/qos/DataWriterQos.cpp
@@ -110,7 +109,6 @@ set(${PROJECT_NAME}_source_files
     fastdds/subscriber/Subscriber.cpp
     fastdds/subscriber/DataReader.cpp
     fastdds/subscriber/DataReaderImpl.cpp
-    fastdds/subscriber/ReadCondition.cpp
     fastdds/subscriber/history/DataReaderHistory.cpp
     fastdds/domain/DomainParticipantFactory.cpp
     fastdds/domain/DomainParticipantImpl.cpp
@@ -261,7 +259,6 @@ if (FASTDDS_STATISTICS)
         statistics/rtps/writer/StatisticsWriterImpl.cpp
         statistics/types/typesPubSubTypes.cxx
         statistics/types/types.cxx
-        statistics/types/typesv1.cxx
         )
 
     list(APPEND ${PROJECT_NAME}_source_files
@@ -296,7 +293,6 @@ set(${PROJECT_NAME}_security_source_files
     rtps/builtin/discovery/participant/DS/PDPSecurityInitiatorListener.cpp
     security/authentication/PKIDH.cpp
     security/accesscontrol/Permissions.cpp
-    security/accesscontrol/DistinguishedName.cpp
     security/cryptography/AESGCMGMAC.cpp
     security/cryptography/AESGCMGMAC_KeyExchange.cpp
     security/cryptography/AESGCMGMAC_KeyFactory.cpp
@@ -340,8 +336,6 @@ if(SQLITE3_SUPPORT)
         ${${PROJECT_NAME}_sqlite3_source_files}
         )
     set(HAVE_SQLITE3 1)
-    # sqlite.c requires a C compiler
-    enable_language(C)
 else()
     set(HAVE_SQLITE3 0)
 endif()
@@ -399,8 +393,8 @@ if(NOT CMAKE_ATOMIC_LIB)
 endif()
 
 try_run(SM_RUN_RESULT SM_COMPILE_RESULT
-        "${PROJECT_BINARY_DIR}/shmtest"
-        "${PROJECT_SOURCE_DIR}/cmake/modules/check_shared_mutex_priority.cpp"
+        "${CMAKE_CURRENT_BINARY_DIR}/shmtest"
+        "${CMAKE_SOURCE_DIR}/cmake/modules/check_shared_mutex_priority.cpp"
         LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_ATOMIC_LIB}
         RUN_OUTPUT_VARIABLE SM_RUN_OUTPUT)
 
@@ -440,15 +434,12 @@ configure_file(${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/config.h.in
 
 #Create library
 add_library(${PROJECT_NAME} ${${PROJECT_NAME}_source_files})
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-    )
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
 option(INTERNAL_DEBUG "Activate developer debug messages" OFF)
 
-target_compile_definitions(${PROJECT_NAME}
-    PRIVATE
+target_compile_definitions(${PROJECT_NAME} PRIVATE
     ${PROJECT_NAME_UPPER}_SOURCE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
@@ -464,10 +455,6 @@ target_compile_definitions(${PROJECT_NAME}
     $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
     $<$<BOOL:${SHM_TRANSPORT_DEFAULT}>:SHM_TRANSPORT_BUILTIN> # Enable SHM as built-in transport
     $<$<BOOL:${STDOUTERR_LOG_CONSUMER}>:STDOUTERR_LOG_CONSUMER> # Enable StdoutErrConsumer as default LogConsumer
-    INTERFACE
-    $<$<BOOL:${WIN32}>:${PROJECT_NAME_UPPER}_NO_LIB>
-    PUBLIC
-    $<$<STREQUAL:$<TARGET_PROPERTY:${PROJECT_NAME},TYPE>,SHARED_LIBRARY>:${PROJECT_NAME_UPPER}_DYN_LINK>
     )
 
 # Define public headers
@@ -530,12 +517,12 @@ if(MSVC OR MSVC_IDE)
 
         # replace the values in the manifest template
         configure_file(
-            "${PROJECT_SOURCE_DIR}/cmake/packaging/windows/fastrtps.manifest.in"
-            "${PROJECT_BINARY_DIR}/fastrtps.manifest"
+            "${CMAKE_SOURCE_DIR}/cmake/packaging/windows/fastrtps.manifest.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest"
             @ONLY
             )
 
-        file(TO_NATIVE_PATH "${PROJECT_BINARY_DIR}/fastrtps.manifest" MANIFEST_FILE_PATH)
+        file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest" MANIFEST_FILE_PATH)
         target_link_options(${PROJECT_NAME} PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${MANIFEST_FILE_PATH}")
 
         unset(WINDOWS_SOURCE_DIR)
@@ -544,24 +531,23 @@ if(MSVC OR MSVC_IDE)
         unset(MANIFEST_FILE_PATH)
     endif()
 
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-        RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-        DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-        )
+    set_target_properties(${PROJECT_NAME} PROPERTIES RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+    set_target_properties(${PROJECT_NAME} PROPERTIES RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+    set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
     get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
     if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
         # Export symbols in DLL library
+        target_compile_definitions(${PROJECT_NAME} PUBLIC ${PROJECT_NAME_UPPER}_DYN_LINK)
         set_target_properties(${PROJECT_NAME} PROPERTIES
-            PDB_NAME_DEBUG ${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+            PDB_NAME_DEBUG "${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
             PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
             )
     else()
         # Rename the library to have a "lib" before.
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME lib${PROJECT_NAME})
         set_target_properties(${PROJECT_NAME} PROPERTIES
-            OUTPUT_NAME lib${PROJECT_NAME}
-            COMPILE_PDB_NAME_DEBUG lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+            COMPILE_PDB_NAME_DEBUG "lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
             COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
             )
     endif()
@@ -621,21 +607,23 @@ install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/fastdds/statistics
 
 # Install libraries
 
-install(TARGETS ${PROJECT_NAME} eProsima_atomic
-    EXPORT ${PROJECT_NAME}-targets
-    COMPONENT libraries
-    RUNTIME DESTINATION "${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
-    LIBRARY DESTINATION "${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
-    ARCHIVE DESTINATION "${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
-    )
-
 # Generate different target names depending on linking
 get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
 if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
-    set(FASTDDS_LINKING shared)
+    set(FASTDDS_LINKING dynamic)
 else()
     set(FASTDDS_LINKING static)
 endif()
+
+install(TARGETS ${PROJECT_NAME} eProsima_atomic
+    EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
+    RUNTIME DESTINATION ${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
+    LIBRARY DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
+    ARCHIVE DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
+    COMPONENT libraries
+    )
+
+export(TARGETS ${PROJECT_NAME} eProsima_atomic FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-${FASTDDS_LINKING}-targets.cmake)
 
 if(INSTALLER_PLATFORM)
     set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}-${INSTALLER_PLATFORM}/cmake)
@@ -643,9 +631,8 @@ else()
     set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}/cmake${MSVCARCH_DIR_EXTENSION_EXT})
 endif()
 
-install(EXPORT ${PROJECT_NAME}-targets
+install(EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
     DESTINATION ${INSTALL_DESTINATION_PATH}
-    FILE ${PROJECT_NAME}-${FASTDDS_LINKING}-targets.cmake
     COMPONENT cmake
     )
 
@@ -709,11 +696,7 @@ if(LINK_SSL)
             find_package(OpenSSL REQUIRED)\n\
         endfunction()"
         )
-        set(FASTRTPS_INSTALLER_OPT_DEPS "\
-        if (\${type} STREQUAL \"static\")\n\
-            find_fastdds_deployed_openssl()\n\
-        endif()")
-
+        set(FASTRTPS_INSTALLER_OPT_DEPS "find_fastdds_deployed_openssl()")
     elseif(WIN32)
         # windows from sources only requires OpenSSL on static libraries
         set(FASTRTPS_PACKAGE_WIN32_OPT_DEPS "find_package(OpenSSL REQUIRED)")

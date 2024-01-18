@@ -120,7 +120,7 @@ bool PDPServer::init(
     mp_EDP = new EDPServer(this, mp_RTPSParticipant, durability_);
     if (!mp_EDP->initEDP(m_discovery))
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Endpoint discovery configuration failed");
+        logError(RTPS_PDP_SERVER, "Endpoint discovery configuration failed");
         return false;
     }
 
@@ -134,13 +134,12 @@ bool PDPServer::init(
         {
             if (process_backup_discovery_database_restore(backup_json))
             {
-                EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "DiscoveryDataBase restored correctly");
+                logInfo(RTPS_PDP_SERVER, "DiscoveryDataBase restored correctly");
             }
         }
         else
         {
-            EPROSIMA_LOG_INFO(RTPS_PDP_SERVER,
-                    "Error reading backup file. Corrupted or unmissing file, restarting from scratch");
+            logInfo(RTPS_PDP_SERVER, "Error reading backup file. Corrupted or unmissing file, restarting from scratch");
         }
 
         discovery_db().backup_in_progress(false);
@@ -255,14 +254,14 @@ bool PDPServer::should_protect_discovery()
 
 bool PDPServer::create_secure_ds_pdp_endpoints()
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Beginning PDPServer Endpoints creation");
+    logInfo(RTPS_PDP_SERVER, "Beginning PDPServer Endpoints creation");
 
     auto endpoints = new fastdds::rtps::DiscoveryServerPDPEndpointsSecure();
     builtin_endpoints_.reset(endpoints);
 
     bool ret_val = create_ds_pdp_reliable_endpoints(*endpoints, true) && create_ds_pdp_best_effort_reader(*endpoints);
 
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "PDPServer Endpoints creation finished");
+    logInfo(RTPS_PDP_SERVER, "PDPServer Endpoints creation finished");
 
     return ret_val;
 }
@@ -270,8 +269,6 @@ bool PDPServer::create_secure_ds_pdp_endpoints()
 bool PDPServer::create_ds_pdp_best_effort_reader(
         DiscoveryServerPDPEndpointsSecure& endpoints)
 {
-    const RTPSParticipantAttributes& pattr = mp_RTPSParticipant->getRTPSParticipantAttributes();
-
     HistoryAttributes hatt;
     hatt.payloadMaxSize = mp_builtin->m_att.readerPayloadSize;
     hatt.initialReservedCaches = pdp_initial_reserved_caches;
@@ -283,14 +280,12 @@ bool PDPServer::create_ds_pdp_best_effort_reader(
     ratt.endpoint.endpointKind = READER;
     ratt.endpoint.multicastLocatorList = mp_builtin->m_metatrafficMulticastLocatorList;
     ratt.endpoint.unicastLocatorList = mp_builtin->m_metatrafficUnicastLocatorList;
-    ratt.endpoint.external_unicast_locators = mp_builtin->m_att.metatraffic_external_unicast_locators;
-    ratt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     ratt.endpoint.topicKind = WITH_KEY;
     // change depending of backup mode
     ratt.endpoint.durabilityKind = VOLATILE;
     ratt.endpoint.reliabilityKind = BEST_EFFORT;
 
-    endpoints.stateless_listener.reset(new PDPSecurityInitiatorListener(this,
+    endpoints.stateless_reader.listener_.reset(new PDPSecurityInitiatorListener(this,
             [this](const ParticipantProxyData& participant_data)
             {
                 auto endpoints = static_cast<fastdds::rtps::DiscoveryServerPDPEndpoints*>(builtin_endpoints_.get());
@@ -317,21 +312,15 @@ bool PDPServer::create_ds_pdp_best_effort_reader(
     // Create PDP Reader
     RTPSReader* reader = nullptr;
     if (mp_RTPSParticipant->createReader(&reader, ratt, endpoints.stateless_reader.history_.get(),
-            endpoints.stateless_listener.get(), c_EntityId_SPDPReader, true, false))
+            endpoints.stateless_reader.listener_.get(), c_EntityId_SPDPReader, true, false))
     {
         endpoints.stateless_reader.reader_ = dynamic_cast<fastrtps::rtps::StatelessReader*>(reader);
-
-        // Enable unknown clients to reach this reader
-        reader->enableMessagesFromUnkownWriters(true);
-
         mp_RTPSParticipant->set_endpoint_rtps_protection_supports(reader, false);
     }
     // Could not create PDP Reader, so return false
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "PDPServer security initiation Reader creation failed");
-
-        endpoints.stateless_listener.reset();
+        logError(RTPS_PDP_SERVER, "PDPServer security initiation Reader creation failed");
         endpoints.stateless_reader.release();
         return false;
     }
@@ -343,14 +332,14 @@ bool PDPServer::create_ds_pdp_best_effort_reader(
 
 bool PDPServer::create_ds_pdp_endpoints()
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Beginning PDPServer Endpoints creation");
+    logInfo(RTPS_PDP_SERVER, "Beginning PDPServer Endpoints creation");
 
     auto endpoints = new fastdds::rtps::DiscoveryServerPDPEndpoints();
     builtin_endpoints_.reset(endpoints);
 
     bool ret_val = create_ds_pdp_reliable_endpoints(*endpoints, false);
 
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "PDPServer Endpoints creation finished");
+    logInfo(RTPS_PDP_SERVER, "PDPServer Endpoints creation finished");
 
     return ret_val;
 }
@@ -359,8 +348,6 @@ bool PDPServer::create_ds_pdp_reliable_endpoints(
         DiscoveryServerPDPEndpoints& endpoints,
         bool secure)
 {
-    const RTPSParticipantAttributes& pattr = mp_RTPSParticipant->getRTPSParticipantAttributes();
-
     /***********************************
     * PDP READER
     ***********************************/
@@ -377,8 +364,6 @@ bool PDPServer::create_ds_pdp_reliable_endpoints(
     ratt.endpoint.endpointKind = READER;
     ratt.endpoint.multicastLocatorList = mp_builtin->m_metatrafficMulticastLocatorList;
     ratt.endpoint.unicastLocatorList = mp_builtin->m_metatrafficUnicastLocatorList;
-    ratt.endpoint.external_unicast_locators = mp_builtin->m_att.metatraffic_external_unicast_locators;
-    ratt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     ratt.endpoint.topicKind = WITH_KEY;
     // change depending of backup mode
     ratt.endpoint.durabilityKind = durability_;
@@ -400,7 +385,7 @@ bool PDPServer::create_ds_pdp_reliable_endpoints(
 #endif // HAVE_SQLITE3
 
     // PDP Listener
-    mp_listener = new PDPServerListener(this);
+    endpoints.reader.listener_.reset(new PDPServerListener(this));
 
     // Create PDP Reader
     RTPSReader* reader = nullptr;
@@ -409,8 +394,8 @@ bool PDPServer::create_ds_pdp_reliable_endpoints(
 #else
     EntityId_t reader_entity = c_EntityId_SPDPReader;
 #endif // if HAVE_SECURITY
-    if (mp_RTPSParticipant->createReader(&reader, ratt, endpoints.reader.history_.get(), mp_listener,
-            reader_entity, true, false))
+    if (mp_RTPSParticipant->createReader(&reader, ratt, endpoints.reader.history_.get(),
+            endpoints.reader.listener_.get(), reader_entity, true, false))
     {
         endpoints.reader.reader_ = dynamic_cast<fastrtps::rtps::StatefulReader*>(reader);
 
@@ -424,9 +409,7 @@ bool PDPServer::create_ds_pdp_reliable_endpoints(
     // Could not create PDP Reader, so return false
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "PDPServer Reader creation failed");
-        delete mp_listener;
-        mp_listener = nullptr;
+        logError(RTPS_PDP_SERVER, "PDPServer Reader creation failed");
         endpoints.reader.release();
         return false;
     }
@@ -459,8 +442,6 @@ bool PDPServer::create_ds_pdp_reliable_endpoints(
     watt.endpoint.topicKind = WITH_KEY;
     watt.endpoint.multicastLocatorList = mp_builtin->m_metatrafficMulticastLocatorList;
     watt.endpoint.unicastLocatorList = mp_builtin->m_metatrafficUnicastLocatorList;
-    watt.endpoint.external_unicast_locators = mp_builtin->m_att.metatraffic_external_unicast_locators;
-    watt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     watt.times.heartbeatPeriod = pdp_heartbeat_period;
     watt.times.nackResponseDelay = pdp_nack_response_delay;
     watt.times.nackSupressionDuration = pdp_nack_supression_duration;
@@ -508,7 +489,7 @@ bool PDPServer::create_ds_pdp_reliable_endpoints(
     // Could not create PDP Writer, so return false
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "PDPServer Writer creation failed");
+        logError(RTPS_PDP_SERVER, "PDPServer Writer creation failed");
         endpoints.writer.release();
         return false;
     }
@@ -547,7 +528,7 @@ void PDPServer::initializeParticipantProxyData(
             getRTPSParticipant()->getAttributes().builtin.discovery_config.discoveryProtocol !=
             DiscoveryProtocol_t::BACKUP)
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Using a PDP Server object with another user's settings");
+        logError(RTPS_PDP_SERVER, "Using a PDP Server object with another user's settings");
     }
 
     // A PDP server should always be provided with all EDP endpoints
@@ -572,7 +553,7 @@ void PDPServer::initializeParticipantProxyData(
 
     if (!(se.use_PublicationWriterANDSubscriptionReader && se.use_PublicationReaderANDSubscriptionWriter))
     {
-        EPROSIMA_LOG_WARNING(RTPS_PDP_SERVER, "SERVER or BACKUP PDP requires always all EDP endpoints creation.");
+        logWarning(RTPS_PDP_SERVER, "SERVER or BACKUP PDP requires always all EDP endpoints creation.");
     }
 
     // Set discovery server version property
@@ -621,8 +602,8 @@ void PDPServer::match_reliable_pdp_endpoints(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Participant " << pdata.m_guid.guidPrefix
-                                                           << " did not send information about builtin writers");
+        logError(RTPS_PDP_SERVER, "Participant " << pdata.m_guid.guidPrefix
+                                                 << " did not send information about builtin writers");
         return;
     }
 
@@ -654,8 +635,8 @@ void PDPServer::match_reliable_pdp_endpoints(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Participant " << pdata.m_guid.guidPrefix
-                                                           << " did not send information about builtin readers");
+        logError(RTPS_PDP_SERVER, "Participant " << pdata.m_guid.guidPrefix
+                                                 << " did not send information about builtin readers");
         return;
     }
 }
@@ -663,7 +644,7 @@ void PDPServer::match_reliable_pdp_endpoints(
 void PDPServer::assignRemoteEndpoints(
         ParticipantProxyData* pdata)
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Assigning remote endpoint for RTPSParticipant: " << pdata->m_guid.guidPrefix);
+    logInfo(RTPS_PDP_SERVER, "Assigning remote endpoint for RTPSParticipant: " << pdata->m_guid.guidPrefix);
 
     match_reliable_pdp_endpoints(*pdata);
 
@@ -736,7 +717,7 @@ void PDPServer::perform_builtin_endpoints_matching(
 void PDPServer::removeRemoteEndpoints(
         ParticipantProxyData* pdata)
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "For RTPSParticipant: " << pdata->m_guid);
+    logInfo(RTPS_PDP_SERVER, "For RTPSParticipant: " << pdata->m_guid);
     uint32_t endp = pdata->m_availableBuiltinEndpoints;
 
     auto endpoints = static_cast<fastdds::rtps::DiscoveryServerPDPEndpoints*>(builtin_endpoints_.get());
@@ -748,8 +729,8 @@ void PDPServer::removeRemoteEndpoints(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Participant " << pdata->m_guid.guidPrefix
-                                                           << " did not send information about builtin writers");
+        logError(RTPS_PDP_SERVER, "Participant " << pdata->m_guid.guidPrefix
+                                                 << " did not send information about builtin writers");
         return;
     }
 
@@ -760,8 +741,8 @@ void PDPServer::removeRemoteEndpoints(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Participant " << pdata->m_guid.guidPrefix
-                                                           << " did not send information about builtin readers");
+        logError(RTPS_PDP_SERVER, "Participant " << pdata->m_guid.guidPrefix
+                                                 << " did not send information about builtin readers");
         return;
     }
 }
@@ -818,7 +799,7 @@ void PDPServer::announceParticipantState(
 {
     if (enabled_)
     {
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER,
+        logInfo(RTPS_PDP_SERVER,
                 "Announcing Server " << mp_RTPSParticipant->getGuid() << " (new change: " << new_change << ")");
         CacheChange_t* change = nullptr;
 
@@ -889,7 +870,7 @@ void PDPServer::announceParticipantState(
                     }
                     else
                     {
-                        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Cannot serialize ParticipantProxyData.");
+                        logError(RTPS_PDP_SERVER, "Cannot serialize ParticipantProxyData.");
                         return;
                     }
 
@@ -927,7 +908,7 @@ void PDPServer::announceParticipantState(
                     else
                     {
                         // Already there, dispose
-                        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER,
+                        logError(RTPS_PDP_SERVER,
                                 "DiscoveryDatabase already initialized with local DATA(p) on creation");
                         writer.release_change(change);
                     }
@@ -949,7 +930,7 @@ void PDPServer::announceParticipantState(
                     // but the routine thread has not consumed it yet.
                     // This would happen when the routine thread is busy in initializing, i.e. it already has other
                     // DATA(P) to parse before the own one is inserted by update.
-                    EPROSIMA_LOG_WARNING(RTPS_PDP_SERVER, "Local Server DATA(p) uninitialized before local on announcement. "
+                    logWarning(RTPS_PDP_SERVER, "Local Server DATA(p) uninitialized before local on announcement. "
                             << "It will be sent in next announce iteration.");
                     return;
                 }
@@ -1008,7 +989,7 @@ void PDPServer::announceParticipantState(
             else
             {
                 // failed to create the disposal change
-                EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Server failed to create its DATA(Up)");
+                logError(RTPS_PDP_SERVER, "Server failed to create its DATA(Up)");
                 return;
             }
         }
@@ -1105,7 +1086,7 @@ bool PDPServer::remove_remote_participant(
 
 bool PDPServer::process_data_queues()
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "process_data_queues start");
+    logInfo(RTPS_PDP_SERVER, "process_data_queues start");
     discovery_db_.process_pdp_data_queue();
     return discovery_db_.process_edp_data_queue();
 }
@@ -1136,10 +1117,9 @@ bool PDPServer::server_update_routine()
     {
         discovery_db().unlock_incoming_data();
 
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "");
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "-------------------- Server routine start --------------------");
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER,
-                "-------------------- " << mp_RTPSParticipant->getGuid() << " --------------------");
+        logInfo(RTPS_PDP_SERVER, "");
+        logInfo(RTPS_PDP_SERVER, "-------------------- Server routine start --------------------");
+        logInfo(RTPS_PDP_SERVER, "-------------------- " << mp_RTPSParticipant->getGuid() << " --------------------");
 
         process_writers_acknowledgements();     // server + ddb(functor_with_ddb)
         process_data_queues();                  // all ddb
@@ -1149,10 +1129,9 @@ bool PDPServer::server_update_routine()
         process_to_send_lists();                // server + ddb(get_to_send, remove_to_send_this)
         pending_work = pending_ack();           // all server
 
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER,
-                "-------------------- " << mp_RTPSParticipant->getGuid() << " --------------------");
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "-------------------- Server routine end --------------------");
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "");
+        logInfo(RTPS_PDP_SERVER, "-------------------- " << mp_RTPSParticipant->getGuid() << " --------------------");
+        logInfo(RTPS_PDP_SERVER, "-------------------- Server routine end --------------------");
+        logInfo(RTPS_PDP_SERVER, "");
 
         // Lock new data to check emptyness and to do the dump of the backup in case it is empty
         discovery_db().lock_incoming_data();
@@ -1183,7 +1162,7 @@ void PDPServer::update_remote_servers_list()
     auto endpoints = static_cast<fastdds::rtps::DiscoveryServerPDPEndpoints*>(builtin_endpoints_.get());
     if (!endpoints->reader.reader_ || !endpoints->writer.writer_)
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Cannot update server list within an uninitialized Server");
+        logError(RTPS_PDP_SERVER, "Cannot update server list within an uninitialized Server");
         return;
     }
 
@@ -1212,7 +1191,7 @@ void PDPServer::update_remote_servers_list()
 
 bool PDPServer::process_writers_acknowledgements()
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "process_writers_acknowledgements start");
+    logInfo(RTPS_PDP_SERVER, "process_writers_acknowledgements start");
 
     auto endpoints = static_cast<fastdds::rtps::DiscoveryServerPDPEndpoints*>(builtin_endpoints_.get());
 
@@ -1260,7 +1239,7 @@ History::iterator PDPServer::process_change_acknowledgement(
     if (c->kind == fastrtps::rtps::ChangeKind_t::ALIVE)
     {
 
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Processing ack data alive " << c->instanceHandle);
+        logInfo(RTPS_PDP_SERVER, "Processing ack data alive " << c->instanceHandle);
 
         // If the change is a DATA(p), and it's the server's DATA(p), and the database knows that
         // it had been acked by all, then skip the change acked check for every reader proxy
@@ -1268,8 +1247,7 @@ History::iterator PDPServer::process_change_acknowledgement(
                 discovery_db_.guid_from_change(c) == mp_builtin->mp_participantImpl->getGuid() &&
                 discovery_db_.server_acked_by_all())
         {
-            EPROSIMA_LOG_INFO(RTPS_PDP_SERVER,
-                    "Server's DATA(p) already acked by all. Skipping check for every ReaderProxy");
+            logInfo(RTPS_PDP_SERVER, "Server's DATA(p) already acked by all. Skipping check for every ReaderProxy");
         }
         else
         {
@@ -1288,8 +1266,8 @@ History::iterator PDPServer::process_change_acknowledgement(
                 {
                     // Remove the entry from writer history, but do not release the cache.
                     // This CacheChange will only be released in the case that is substituted by a DATA(Up|Uw|Ur).
-                    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Removing change " << c->instanceHandle
-                                                                          << " from history as it has been acked for everyone");
+                    logInfo(RTPS_PDP_SERVER, "Removing change " << c->instanceHandle
+                                                                << " from history as it has been acked for everyone");
                     return writer_history->remove_change(cit, false);
                 }
             }
@@ -1318,7 +1296,7 @@ History::iterator PDPServer::process_change_acknowledgement(
 
 bool PDPServer::process_disposals()
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "process_disposals start");
+    logInfo(RTPS_PDP_SERVER, "process_disposals start");
 
     auto endpoints = static_cast<fastdds::rtps::DiscoveryServerPDPEndpoints*>(builtin_endpoints_.get());
     EDPServer* edp = static_cast<EDPServer*>(mp_EDP);
@@ -1328,8 +1306,8 @@ bool PDPServer::process_disposals()
     // Iterate over disposals
     for (auto change: disposals)
     {
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Process disposal change from: " << change->instanceHandle);
-        // No check is performed on whether the change is an actual disposal, leaving the responsibility of correctly
+        logInfo(RTPS_PDP_SERVER, "Process disposal change from: " << change->instanceHandle);
+        // No check is performed on whether the change is an actual disposal, leaving the responsability of correctly
         // populating the disposals list to discovery_db_.process_data_queue().
 
         // Get the identity of the participant from which the change came.
@@ -1360,7 +1338,7 @@ bool PDPServer::process_disposals()
                             change_guid_prefix);
             if (!edp->process_disposal(change, discovery_db_, change_guid_prefix, should_publish_disposal))
             {
-                EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER_DISPOSAL,
+                logError(RTPS_PDP_SERVER_DISPOSAL,
                         "Wrong DATA received from disposals " << change->instanceHandle);
             }
         }
@@ -1372,7 +1350,7 @@ bool PDPServer::process_disposals()
 
 bool PDPServer::process_changes_release()
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "process_changes_release start");
+    logInfo(RTPS_PDP_SERVER, "process_changes_release start");
     process_changes_release_(discovery_db_.changes_to_release());
     discovery_db_.clear_changes_to_release();
     return false;
@@ -1408,7 +1386,7 @@ void PDPServer::process_changes_release_(
 
                 if (!ret || !edp->process_and_release_change(ch, false))
                 {
-                    EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Wrong DATA received to remove from this participant: "
+                    logError(RTPS_PDP_SERVER, "Wrong DATA received to remove from this participant: "
                             << ch->instanceHandle);
                 }
             }
@@ -1435,7 +1413,7 @@ void PDPServer::process_changes_release_(
 
                 if (!ret || !edp->process_and_release_change(ch, true))
                 {
-                    EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Wrong DATA received to remove from this participant: "
+                    logError(RTPS_PDP_SERVER, "Wrong DATA received to remove from this participant: "
                             << ch->instanceHandle);
                 }
             }
@@ -1460,7 +1438,7 @@ bool PDPServer::announcement_from_same_participant_in_disposals(
 
 bool PDPServer::process_dirty_topics()
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "process_dirty_topics start");
+    logInfo(RTPS_PDP_SERVER, "process_dirty_topics start");
     return discovery_db_.process_dirty_topics();
 }
 
@@ -1476,24 +1454,23 @@ const RemoteServerList_t& PDPServer::servers()
 
 bool PDPServer::process_to_send_lists()
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "process_to_send_lists start");
+    logInfo(RTPS_PDP_SERVER, "process_to_send_lists start");
 
     if (discovery_db_.updates_since_last_checked() > 0)
     {
         // Process pdp_to_send_
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Processing pdp_to_send");
+        logInfo(RTPS_PDP_SERVER, "Processing pdp_to_send");
         auto endpoints = static_cast<fastdds::rtps::DiscoveryServerPDPEndpoints*>(builtin_endpoints_.get());
         process_to_send_list(discovery_db_.pdp_to_send(), endpoints->writer.writer_, endpoints->writer.history_.get());
     }
     else
     {
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER,
-                "Skiping sending PDP data because no entities have been discovered or updated");
+        logInfo(RTPS_PDP_SERVER, "Skiping sending PDP data because no entities have been discovered or updated");
     }
     discovery_db_.clear_pdp_to_send();
 
     // Process edp_publications_to_send_
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Processing edp_publications_to_send");
+    logInfo(RTPS_PDP_SERVER, "Processing edp_publications_to_send");
     EDPServer* edp = static_cast<EDPServer*>(mp_EDP);
     process_to_send_list(
         discovery_db_.edp_publications_to_send(),
@@ -1502,7 +1479,7 @@ bool PDPServer::process_to_send_lists()
     discovery_db_.clear_edp_publications_to_send();
 
     // Process edp_subscriptions_to_send_
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Processing edp_subscriptions_to_send");
+    logInfo(RTPS_PDP_SERVER, "Processing edp_subscriptions_to_send");
     process_to_send_list(
         discovery_db_.edp_subscriptions_to_send(),
         edp->subscriptions_writer_.first,
@@ -1526,7 +1503,7 @@ bool PDPServer::process_to_send_list(
         // Set change's writer GUID so it matches with this writer
         change->writerGUID = writer->getGuid();
         // Add DATA to writer's history.
-        EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Adding change from " << change->instanceHandle << " to history");
+        logInfo(RTPS_PDP_SERVER, "Adding change from " << change->instanceHandle << " to history");
         eprosima::fastrtps::rtps::WriteParams wp = change->write_params;
         history->add_change(change, wp);
     }
@@ -1578,11 +1555,11 @@ bool PDPServer::pending_ack()
             edp->publications_writer_.second->getHistorySize() > 0 ||
             edp->subscriptions_writer_.second->getHistorySize() > 0);
 
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "PDP writer history length " << endpoints->writer.history_->getHistorySize());
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER,
+    logInfo(RTPS_PDP_SERVER, "PDP writer history length " << endpoints->writer.history_->getHistorySize());
+    logInfo(RTPS_PDP_SERVER,
             "is server " << endpoints->writer.writer_->getGuid() << " acked by all? " <<
             discovery_db_.server_acked_by_all());
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Are there pending changes? " << ret);
+    logInfo(RTPS_PDP_SERVER, "Are there pending changes? " << ret);
     return ret;
 }
 
@@ -1669,7 +1646,7 @@ void PDPServer::send_announcement(
 
         if (!group.add_data(*change, false))
         {
-            EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error sending announcement from server to clients");
+            logError(RTPS_PDP_SERVER, "Error sending announcement from server to clients");
         }
     }
     else
@@ -1678,10 +1655,9 @@ void PDPServer::send_announcement(
         RTPSMessageGroup group(getRTPSParticipant(), &writer, &sender);
         if (!group.add_data(*change, false))
         {
-            EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error sending announcement from server to clients");
+            logError(RTPS_PDP_SERVER, "Error sending announcement from server to clients");
         }
     }
-
 }
 
 bool PDPServer::read_backup(
@@ -1727,7 +1703,7 @@ bool PDPServer::read_backup(
 bool PDPServer::process_backup_discovery_database_restore(
         nlohmann::json& j)
 {
-    EPROSIMA_LOG_INFO(RTPS_PDP_SERVER, "Restoring DiscoveryDataBase from backup");
+    logInfo(RTPS_PDP_SERVER, "Restoring DiscoveryDataBase from backup");
 
     // We need every listener to resend the changes of every entity (ALIVE) in the DDB, so the PaticipantProxy
     // is restored
@@ -1759,7 +1735,7 @@ bool PDPServer::process_backup_discovery_database_restore(
             // Reserve memory for new change. There will not be changes from own server
             if (!endpoints->reader.reader_->reserveCache(&change_aux, length))
             {
-                EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+                logError(RTPS_PDP_SERVER, "Error creating CacheChange");
                 // TODO release changes and exit
             }
 
@@ -1778,7 +1754,7 @@ bool PDPServer::process_backup_discovery_database_restore(
             {
                 change_aux->writerGUID = change_aux->write_params.sample_identity().writer_guid();
                 change_aux->sequenceNumber = change_aux->write_params.sample_identity().sequence_number();
-                mp_listener->onNewCacheChangeAdded(endpoints->reader.reader_, change_aux);
+                builtin_endpoints_->main_listener()->onNewCacheChangeAdded(endpoints->reader.reader_, change_aux);
             }
         }
 
@@ -1798,7 +1774,7 @@ bool PDPServer::process_backup_discovery_database_restore(
                 // Reserve memory for new change. There will not be changes from own server
                 if (!edp->publications_reader_.first->reserveCache(&change_aux, length))
                 {
-                    EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+                    logError(RTPS_PDP_SERVER, "Error creating CacheChange");
                     // TODO release changes and exit
                 }
             }
@@ -1837,7 +1813,7 @@ bool PDPServer::process_backup_discovery_database_restore(
                 // Reserve memory for new change. There will not be changes from own server
                 if (!edp->subscriptions_reader_.first->reserveCache(&change_aux, length))
                 {
-                    EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+                    logError(RTPS_PDP_SERVER, "Error creating CacheChange");
                     // TODO release changes and exit
                 }
             }
@@ -1864,7 +1840,7 @@ bool PDPServer::process_backup_discovery_database_restore(
     catch (std::ios_base::failure&)
     {
         // TODO clean changes in case it has been an error
-        EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "BACKUP CORRUPTED");
+        logError(DISCOVERY_DATABASE, "BACKUP CORRUPTED");
         return false;
     }
     return true;
@@ -1909,7 +1885,7 @@ bool PDPServer::process_backup_restore_queue(
     //                             },
     //                             &change_aux, length))
     //                 {
-    //                     EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+    //                     logError(RTPS_PDP_SERVER, "Error creating CacheChange");
     //                     // TODO release changes and exit
     //                 }
     //                 else
@@ -1923,7 +1899,7 @@ bool PDPServer::process_backup_restore_queue(
     //             {
     //                 if (!edp->publications_writer_.second->reserve_Cache(&change_aux, length))
     //                 {
-    //                     EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+    //                     logError(RTPS_PDP_SERVER, "Error creating CacheChange");
     //                     // TODO release changes and exit
     //                 }
     //                 else
@@ -1936,7 +1912,7 @@ bool PDPServer::process_backup_restore_queue(
     //             {
     //                 if (!edp->subscriptions_writer_.second->reserve_Cache(&change_aux, length))
     //                 {
-    //                     EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+    //                     logError(RTPS_PDP_SERVER, "Error creating CacheChange");
     //                     // TODO release changes and exit
     //                 }
     //                 else
@@ -1953,7 +1929,7 @@ bool PDPServer::process_backup_restore_queue(
     //             {
     //                 if (!endpoints->reader.history_->reserve_Cache(&change_aux, length))
     //                 {
-    //                     EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+    //                     logError(RTPS_PDP_SERVER, "Error creating CacheChange");
     //                     // TODO release changes and exit
     //                 }
     //                 else
@@ -1967,7 +1943,7 @@ bool PDPServer::process_backup_restore_queue(
     //             {
     //                 if (!edp->publications_reader_.second->reserve_Cache(&change_aux, length))
     //                 {
-    //                     EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+    //                     logError(RTPS_PDP_SERVER, "Error creating CacheChange");
     //                     // TODO release changes and exit
     //                 }
     //                 else
@@ -1980,7 +1956,7 @@ bool PDPServer::process_backup_restore_queue(
     //             {
     //                 if (!edp->subscriptions_reader_.second->reserve_Cache(&change_aux, length))
     //                 {
-    //                     EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "Error creating CacheChange");
+    //                     logError(RTPS_PDP_SERVER, "Error creating CacheChange");
     //                     // TODO release changes and exit
     //                 }
     //                 else
@@ -1995,7 +1971,7 @@ bool PDPServer::process_backup_restore_queue(
     // catch (std::ios_base::failure&)
     // {
     //     // TODO clean changes in case it has been an error
-    //     EPROSIMA_LOG_ERROR(DISCOVERY_DATABASE, "QUEUE BACKUP CORRUPTED");
+    //     logError(DISCOVERY_DATABASE, "QUEUE BACKUP CORRUPTED");
     //     return false;
     // }
     return true;
@@ -2003,7 +1979,7 @@ bool PDPServer::process_backup_restore_queue(
 
 void PDPServer::process_backup_store()
 {
-    EPROSIMA_LOG_INFO(DISCOVERY_DATABASE, "Dump DDB in json backup");
+    logInfo(DISCOVERY_DATABASE, "Dump DDB in json backup");
 
     // This will erase the last backup stored
     std::ofstream backup_json_file;

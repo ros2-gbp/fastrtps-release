@@ -47,13 +47,9 @@ target_compile_definitions(DDSSimpleCommunicationDynamicSubscriber PRIVATE
 target_link_libraries(DDSSimpleCommunicationDynamicSubscriber fastrtps fastcdr foonathan_memory ${CMAKE_DL_LIBS})
 
 # Standar tests
-set(COMMON_SOURCE
-    ${PROJECT_SOURCE_DIR}/test/blackbox/types/HelloWorld.cxx
-    ${PROJECT_SOURCE_DIR}/test/blackbox/types/HelloWorldv1.cxx
+set(COMMON_SOURCE ${PROJECT_SOURCE_DIR}/test/blackbox/types/HelloWorld.cxx
     ${PROJECT_SOURCE_DIR}/test/blackbox/types/HelloWorldPubSubTypes.cxx
-    ${PROJECT_SOURCE_DIR}/test/blackbox/types/HelloWorldTypeObject.cxx
     ${PROJECT_SOURCE_DIR}/test/blackbox/types/FixedSized.cxx
-    ${PROJECT_SOURCE_DIR}/test/blackbox/types/FixedSizedv1.cxx
     ${PROJECT_SOURCE_DIR}/test/blackbox/types/FixedSizedPubSubTypes.cxx
     )
 
@@ -100,8 +96,8 @@ target_link_libraries(DDSCommunicationPubSub fastrtps fastcdr foonathan_memory $
 # Dynamic types test
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/simple_communication_dynamic.py
     ${CMAKE_CURRENT_BINARY_DIR}/simple_communication_dynamic.py COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/example_type_profile.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/example_type_profile.xml COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/example_type.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/example_type.xml COPYONLY)
 
 # Standard tests
 
@@ -119,12 +115,12 @@ list(APPEND TEST_DEFINITIONS
 
 
 list(APPEND XML_CONFIGURATION_FILES
-    simple_reliable_profile.xml
-    simple_besteffort_profile.xml
-    simple_reliable_zerocopy_profile.xml
-    simple_besteffort_zerocopy_profile.xml
-    TCP_server_profile.xml
-    TCP_client_profile.xml
+    simple_reliable.xml
+    simple_besteffort.xml
+    simple_reliable_zerocopy.xml
+    simple_besteffort_zerocopy.xml
+    TCP_server.xml
+    TCP_client.xml
     )
 # Python file
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_build.py

@@ -19,10 +19,7 @@
         ::testing::UnitTest::GetInstance()->current_test_info()->test_case_name() + std::string( \
             "_") + ::testing::UnitTest::GetInstance()->current_test_info()->name())
 
-#if defined(__cplusplus_winrt)
-#define GET_PID GetCurrentProcessId
-#include <process.h>
-#elif defined(_WIN32)
+#if defined(_WIN32)
 #define GET_PID _getpid
 #include <process.h>
 #else
@@ -52,6 +49,7 @@ extern void blackbox_security_init();
 extern void tls_init();
 #endif // if TLS_FOUND
 
+extern const char* certs_path;
 extern uint16_t global_port;
 extern bool enable_datasharing;
 extern bool use_pull_mode;

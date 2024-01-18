@@ -52,10 +52,6 @@ public:
         }
         else
         {
-#ifdef __APPLE__
-            // TODO: fix IPv6 issues related with zone ID
-            GTEST_SKIP() << "UDPv6 tests are disabled in Mac";
-#endif // ifdef __APPLE__
             test_transport_ = std::make_shared<UDPv6TransportDescriptor>();
         }
     }
@@ -552,6 +548,7 @@ TEST(TransportUDP, DatagramInjection)
     ASSERT_FALSE(receivers.empty());
 
     deliver_datagram_from_file(receivers, "datagrams/16784.bin");
+    deliver_datagram_from_file(receivers, "datagrams/20140.bin");
 }
 
 // Test for ==operator UDPTransportDescriptor is not required as it is an abstract class and in UDPv4 is same method

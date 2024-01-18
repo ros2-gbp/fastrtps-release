@@ -371,7 +371,15 @@ inline std::ostream& operator <<(
     }
 
     // Stream port
-    output << "]:" << loc.port;
+    if (loc.kind == LOCATOR_KIND_TCPv4 || loc.kind == LOCATOR_KIND_TCPv6)
+    {
+        output << "]:" << std::to_string(IPLocator::getPhysicalPort(loc)) << "-" << std::to_string(IPLocator::getLogicalPort(
+                    loc));
+    }
+    else
+    {
+        output << "]:" << loc.port;
+    }
 
     return output;
 }
@@ -461,7 +469,7 @@ inline std::istream& operator >>(
                 if (addresses.first.empty())
                 {
                     loc.kind = LOCATOR_KIND_INVALID;
-                    EPROSIMA_LOG_WARNING(LOCATOR, "Error deserializing Locator");
+                    logWarning(LOCATOR, "Error deserializing Locator");
                     return input;
                 }
                 address = *addresses.first.begin();
@@ -473,7 +481,7 @@ inline std::istream& operator >>(
                 if (addresses.second.empty())
                 {
                     loc.kind = LOCATOR_KIND_INVALID;
-                    EPROSIMA_LOG_WARNING(LOCATOR, "Error deserializing Locator");
+                    logWarning(LOCATOR, "Error deserializing Locator");
                     return input;
                 }
                 address = *addresses.second.begin();
@@ -490,7 +498,7 @@ inline std::istream& operator >>(
         catch (std::ios_base::failure& )
         {
             loc.kind = LOCATOR_KIND_INVALID;
-            EPROSIMA_LOG_WARNING(LOCATOR, "Error deserializing Locator");
+            logWarning(LOCATOR, "Error deserializing Locator");
         }
 
         input.exceptions(excp_mask);

@@ -5,7 +5,7 @@ on:
       fastdds_branch:
         description: 'Branch or tag of Fast DDS repository (https://github.com/eProsima/Fast-DDS)'
         required: true
-        default: 'master'
+        default: '2.6.x'
       optional_cmake_args:
         description: 'Optional CMake Compilation Flags'
         required: false
@@ -17,7 +17,7 @@ on:
 
   push:
     branches:
-      - 'master'
+      - '2.6.x'
     paths-ignore:
       - '**.md'
       - '**.txt'
@@ -25,7 +25,7 @@ on:
 
   pull_request:
     branches:
-      - 'master'
+      - '2.6.x'
     paths-ignore:
       - '**.md'
       - '**.txt'
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     env:
-        FASTDDS_BRANCH: ${{ github.head_ref || github.event.inputs.fastdds_branch || 'master' }}
+        FASTDDS_BRANCH: ${{ github.head_ref || github.event.inputs.fastdds_branch || '2.6.x' }}
         TSAN_OPTIONS: second_deadlock_stack=1 history_size=7 memory_limit_mb=5000
         # GCC 11.3 (Ubuntu Jammy default) produces several false positives regarding timed synchronization protocols
         # These issues were fixed in GCC 12 so we upgrade to that version.
@@ -54,15 +54,24 @@ jobs:
         CXX: g++-12
 
     steps:
-      - uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
+      - name: Install wget
+        uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
         with:
           packages: wget
 
-      - uses: eProsima/eProsima-CI/ubuntu/install_python_packages@v0
-        with:
-          packages: vcstool
+      - name: Setup CCache
+        uses: eProsima/eProsima-CI/external/setup-ccache-action@v0
 
-      - uses: eProsima/eProsima-CI/ubuntu/get_file_from_repo@v0
+      - name: Install colcon
+        uses: eProsima/eProsima-CI/ubuntu/install_colcon@v0
+
+      - name: Install Python dependencies
+        uses: eProsima/eProsima-CI/ubuntu/install_python_packages@v0
+        with:
+          packages: vcstool setuptools gcovr tomark xmltodict jsondiff pandas
+
+      - name: Get fastrtps.repos file
+        uses: eProsima/eProsima-CI/ubuntu/get_file_from_repo@v0
         with:
           source_repository: eProsima/Fast-DDS
           source_repository_branch: ${{ env.FASTDDS_BRANCH }}
@@ -82,9 +91,6 @@ jobs:
 
       - name: Install apt packages
         uses: ./src/fastrtps/.github/actions/install-apt-packages
-
-      - name: Install Python packages
-        uses: ./src/fastrtps/.github/actions/install-python-packages
 
       - name: Install GTest
         uses: eProsima/eProsima-CI/ubuntu/install_gtest@v0

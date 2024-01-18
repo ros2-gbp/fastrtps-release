@@ -258,8 +258,8 @@ public:
         publisher_attr_.topic.topicKind =
                 type_.m_isGetKeyDefined ? ::eprosima::fastrtps::rtps::WITH_KEY : ::eprosima::fastrtps::rtps::NO_KEY;
 
-        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        // By default, memory mode is preallocated (the most restritive)
+        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         publisher_attr_.times.heartbeatPeriod.seconds = 0;
@@ -289,15 +289,32 @@ public:
     void init()
     {
         //Create participant
-        participant_attr_.domainId = (uint32_t)GET_PID() % 230;
-
         // Use local copies of attributes to catch #6507 issues with valgrind
         eprosima::fastrtps::ParticipantAttributes participant_attr;
         eprosima::fastrtps::PublisherAttributes publisher_attr;
-        participant_attr = participant_attr_;
-        publisher_attr = publisher_attr_;
 
-        participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
+        if (!xml_file_.empty())
+        {
+            eprosima::fastrtps::Domain::loadXMLProfilesFile(xml_file_);
+            if (!participant_profile_.empty())
+            {
+                // Need to specify ID in XML
+                participant_ = eprosima::fastrtps::Domain::createParticipant(participant_profile_,
+                                &participant_listener_);
+                ASSERT_NE(participant_, nullptr);
+                participant_attr = participant_->getAttributes();
+                publisher_attr = publisher_attr_;
+            }
+        }
+        if (participant_ == nullptr)
+        {
+            participant_attr_.domainId = (uint32_t)GET_PID() % 230;
+
+            participant_attr = participant_attr_;
+            publisher_attr = publisher_attr_;
+
+            participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
+        }
 
         if (participant_ != nullptr)
         {
@@ -726,6 +743,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports)
+    {
+        participant_attr_.rtps.setup_transports(transports);
+        return *this;
+    }
+
     PubSubWriter& disable_builtin_transport()
     {
         participant_attr_.rtps.useBuiltinTransports = false;
@@ -1003,14 +1027,14 @@ public:
     }
 
     PubSubWriter& property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy& property_policy)
+            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
     {
         participant_attr_.rtps.properties = property_policy;
         return *this;
     }
 
     PubSubWriter& entity_property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy& property_policy)
+            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
     {
         publisher_attr_.properties = property_policy;
         return *this;
@@ -1093,14 +1117,6 @@ public:
     {
         participant_attr_.rtps.builtin.discovery_config.initial_announcements.count = count;
         participant_attr_.rtps.builtin.discovery_config.initial_announcements.period = period;
-        return *this;
-    }
-
-    PubSubWriter& ownership_strength(
-            uint32_t strength)
-    {
-        publisher_attr_.qos.m_ownership.kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
-        publisher_attr_.qos.m_ownershipStrength.value = strength;
         return *this;
     }
 
@@ -1187,11 +1203,6 @@ public:
         return publisher_->updateAttributes(publisher_attr_);
     }
 
-    bool set_qos()
-    {
-        return publisher_->updateAttributes(publisher_attr_);
-    }
-
     bool remove_all_changes(
             size_t* number_of_changes_removed)
     {
@@ -1206,6 +1217,18 @@ public:
     unsigned int get_matched() const
     {
         return matched_;
+    }
+
+    void set_xml_filename(
+            const std::string& name)
+    {
+        xml_file_ = name;
+    }
+
+    void set_participant_profile(
+            const std::string& profile)
+    {
+        participant_profile_ = profile;
     }
 
     unsigned int missed_deadlines() const
@@ -1487,6 +1510,9 @@ private:
     std::map<std::string,  int> mapTopicCountList_;
     std::map<std::string,  int> mapPartitionCountList_;
     bool discovery_result_;
+
+    std::string xml_file_ = "";
+    std::string participant_profile_ = "";
 
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
 

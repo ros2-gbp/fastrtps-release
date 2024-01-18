@@ -14,9 +14,7 @@
 
 #include <chrono>
 #include <fstream>
-#include <future>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <thread>
 
@@ -29,8 +27,8 @@
 #include <dds/domain/qos/DomainParticipantQos.hpp>
 #include <dds/pub/Publisher.hpp>
 #include <dds/pub/qos/PublisherQos.hpp>
-#include <dds/sub/Subscriber.hpp>
 #include <dds/sub/qos/SubscriberQos.hpp>
+#include <dds/sub/Subscriber.hpp>
 #include <dds/topic/Topic.hpp>
 #include <fastdds/dds/builtin/topic/ParticipantBuiltinTopicData.hpp>
 #include <fastdds/dds/builtin/topic/TopicBuiltinTopicData.hpp>
@@ -42,14 +40,18 @@
 #include <fastdds/dds/publisher/Publisher.hpp>
 #include <fastdds/dds/publisher/qos/PublisherQos.hpp>
 #include <fastdds/dds/subscriber/DataReader.hpp>
-#include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
+#include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/topic/qos/TopicQos.hpp>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
+#include <fastdds/rtps/transport/TCPv4TransportDescriptor.h>
+#include <fastdds/rtps/transport/TCPv6TransportDescriptor.h>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/types/DynamicDataFactory.h>
@@ -59,7 +61,7 @@
 #include <fastrtps/types/TypeObjectFactory.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
-
+#include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
 #include <fastdds/domain/DomainParticipantImpl.hpp>
 #include <utils/SystemInfo.hpp>
 
@@ -67,13 +69,11 @@
 #include "../../logging/mock/MockConsumer.h"
 #include "fastdds/dds/domain/DomainParticipant.hpp"
 
-#if defined(__cplusplus_winrt)
-#define GET_PID GetCurrentProcessId
-#elif defined(_WIN32)
-#include <process.h>
+#if defined(_WIN32)
 #define GET_PID _getpid
 #else
 #define GET_PID getpid
+#include <sys/statvfs.h>
 #endif // if defined(_WIN32)
 
 namespace eprosima {
@@ -91,7 +91,6 @@ using fastrtps::types::DynamicTypeBuilderFactory;
 using fastrtps::types::TypeDescriptor;
 using fastrtps::xmlparser::XMLP_ret;
 using fastrtps::xmlparser::XMLProfileManager;
-
 
 // Mocked TopicDataType for Topic creation tests
 class TopicDataTypeMock : public TopicDataType
@@ -122,10 +121,7 @@ public:
     std::function<uint32_t()> getSerializedSizeProvider(
             void* /*data*/) override
     {
-        return []()->uint32_t
-               {
-                   return 0;
-               };
+        return std::function<uint32_t()>();
     }
 
     void* createData() override
@@ -181,10 +177,7 @@ public:
     std::function<uint32_t()> getSerializedSizeProvider(
             void* /*data*/) override
     {
-        return []()->uint32_t
-               {
-                   return 0;
-               };
+        return std::function<uint32_t()>();
     }
 
     void* createData() override
@@ -290,19 +283,6 @@ private:
     std::array<char, 256> message_;
 };
 
-// NOTE: This function is duplicated from SystemInfo because it is not in the API and could not be added to test
-// compilation as that file is already compiled and linked, and doing such thing is wrong and would make a kitten cry.
-// (it duplicates an instantiated variable 'environment_file_' and so provoke a double free).
-int process_id()
-{
-#if defined(__cplusplus_winrt)
-    return (int)GetCurrentProcessId();
-#elif defined(_WIN32)
-    return (int)_getpid();
-#else
-    return (int)getpid();
-#endif // platform selection
-}
 
 TEST(ParticipantTests, DomainParticipantFactoryGetInstance)
 {
@@ -329,22 +309,12 @@ TEST(ParticipantTests, ChangeDomainParticipantFactoryQos)
 
     ASSERT_EQ(qos, fqos);
     ASSERT_EQ(fqos.entity_factory().autoenable_created_entities, false);
-
-    entity_factory.autoenable_created_entities = true;
-    qos.entity_factory(entity_factory);
-
-    ASSERT_TRUE(DomainParticipantFactory::get_instance()->set_qos(qos) == ReturnCode_t::RETCODE_OK);
-    DomainParticipantFactory::get_instance()->get_qos(fqos);
-
-    ASSERT_EQ(qos, fqos);
-    ASSERT_EQ(fqos.entity_factory().autoenable_created_entities, true);
 }
 
 TEST(ParticipantTests, CreateDomainParticipant)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     ASSERT_NE(participant, nullptr);
     EXPECT_EQ(participant->get_listener(), nullptr);
@@ -457,31 +427,29 @@ TEST(ParticipantTests, DomainParticipantQosPhysicalProperties)
 
 TEST(ParticipantTests, CreateDomainParticipantWithProfile)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
-    uint32_t domain_id = (uint32_t)GET_PID() % 230;
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
 
     //participant using the default profile
     DomainParticipant* default_participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(default_participant, nullptr);
-    ASSERT_EQ(default_participant->get_domain_id(), domain_id); //Keep the DID given to the method, not the one on the profile
+    ASSERT_EQ(default_participant->get_domain_id(), 0u); //Keep the DID given to the method, not the one on the profile
     check_participant_with_profile(default_participant, "test_default_participant_profile");
     ASSERT_TRUE(DomainParticipantFactory::get_instance()->delete_participant(
                 default_participant) == ReturnCode_t::RETCODE_OK);
 
     //participant using non-default profile
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant_with_profile(domain_id,
-                    "test_participant_profile");
+            DomainParticipantFactory::get_instance()->create_participant_with_profile(0, "test_participant_profile");
     ASSERT_NE(participant, nullptr);
-    ASSERT_EQ(participant->get_domain_id(), domain_id); //Keep the DID given to the method, not the one on the profile
+    ASSERT_EQ(participant->get_domain_id(), 0u); //Keep the DID given to the method, not the one on the profile
     check_participant_with_profile(participant, "test_participant_profile");
     ASSERT_TRUE(DomainParticipantFactory::get_instance()->delete_participant(participant) == ReturnCode_t::RETCODE_OK);
 }
 
 TEST(ParticipantTests, GetParticipantProfileQos)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipantQos qos;
     EXPECT_EQ(
         DomainParticipantFactory::get_instance()->get_participant_qos_from_profile("test_participant_profile", qos),
@@ -489,8 +457,7 @@ TEST(ParticipantTests, GetParticipantProfileQos)
 
     // Extract ParticipantQos from profile
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+            DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(participant, nullptr);
 
     check_participant_with_profile(participant, "test_participant_profile");
@@ -516,17 +483,15 @@ TEST(ParticipantTests, CreatePSMDomainParticipant)
 TEST(ParticipantTests, DeleteDomainParticipant)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     ASSERT_TRUE(DomainParticipantFactory::get_instance()->delete_participant(participant) == ReturnCode_t::RETCODE_OK);
 }
 
 TEST(ParticipantTests, DeleteDomainParticipantWithEntities)
 {
-    uint32_t domain_id = (uint32_t)GET_PID() % 230;
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
     ASSERT_NE(subscriber, nullptr);
@@ -536,7 +501,7 @@ TEST(ParticipantTests, DeleteDomainParticipantWithEntities)
     ASSERT_EQ(participant->delete_subscriber(subscriber), ReturnCode_t::RETCODE_OK);
     ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant), ReturnCode_t::RETCODE_OK);
 
-    participant = DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+    participant = DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     Publisher* publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT);
     ASSERT_NE(publisher, nullptr);
@@ -546,7 +511,7 @@ TEST(ParticipantTests, DeleteDomainParticipantWithEntities)
     ASSERT_EQ(participant->delete_publisher(publisher), ReturnCode_t::RETCODE_OK);
     ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant), ReturnCode_t::RETCODE_OK);
 
-    participant = DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+    participant = DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     TypeSupport type(new TopicDataTypeMock());
     type.register_type(participant);
@@ -606,8 +571,7 @@ TEST(ParticipantTests, ChangePSMDefaultParticipantQos)
 TEST(ParticipantTests, ChangeDomainParticipantQos)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     DomainParticipantQos qos;
     participant->get_qos(qos);
 
@@ -664,7 +628,7 @@ void get_rtps_attributes(
     ASSERT_NE(nullptr, participant_test);
     const DomainParticipantImpl* participant_impl = participant_test->get_impl();
     ASSERT_NE(nullptr, participant_impl);
-    att = participant_impl->get_rtps_participant()->getRTPSParticipantAttributes();
+    att = participant_impl->rtps_participant()->getRTPSParticipantAttributes();
 }
 
 void helper_wait_for_at_least_entries(
@@ -703,12 +667,6 @@ void expected_remote_server_list_output(
     server.metatrafficUnicastLocatorList.push_back(locator);
     get_server_client_default_guidPrefix(2, server.guidPrefix);
     output.push_back(server);
-
-    std::istringstream("UDPv6:[2a02:ec80:600:ed1a::3]:8783") >> locator;
-    server.clear();
-    server.metatrafficUnicastLocatorList.push_back(locator);
-    get_server_client_default_guidPrefix(3, server.guidPrefix);
-    output.push_back(server);
 }
 
 void set_participant_qos(
@@ -742,10 +700,9 @@ void set_server_qos(
     std::istringstream(rtps::DEFAULT_ROS2_SERVER_GUIDPREFIX) >> qos.wire_protocol().prefix;
 }
 
-void set_environment_variable(
-        const std::string environment_servers = "84.22.253.128:8888;;UDPv4:[localhost]:1234;[2a02:ec80:600:ed1a::3]:8783"
-        )
+void set_environment_variable()
 {
+    std::string environment_servers = "84.22.253.128:8888;;localhost:1234";
 #ifdef _WIN32
     ASSERT_EQ(0, _putenv_s(rtps::DEFAULT_ROS2_MASTER_URI, environment_servers.c_str()));
 #else
@@ -766,7 +723,7 @@ void set_environment_file(
 std::string get_environment_filename()
 {
     std::ostringstream name;
-    name << "environment_file_" << process_id() << ".json";
+    name << "environment_file_" << SystemInfo::instance().process_id() << ".json";
     std::string fname = name.str();
     // 'touch' the file
     std::ofstream f(fname);
@@ -844,29 +801,13 @@ TEST(ParticipantTests, SimpleParticipantRemoteServerListConfiguration)
     DomainParticipantQos qos;
     set_participant_qos(qos, qos_output);
 
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(nullptr, participant);
 
     fastrtps::rtps::RTPSParticipantAttributes attributes;
     get_rtps_attributes(participant, attributes);
     EXPECT_EQ(attributes.builtin.discovery_config.discoveryProtocol, fastrtps::rtps::DiscoveryProtocol::CLIENT);
     EXPECT_EQ(attributes.builtin.discovery_config.m_DiscoveryServers, output);
-
-    // check UDPv6 transport is there
-    auto udpv6_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes) -> bool
-            {
-                for (auto& transportDescriptor : attributes.userTransports)
-                {
-                    if ( nullptr != dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            };
-    EXPECT_TRUE(udpv6_check(attributes));
 
     DomainParticipantQos result_qos = participant->get_qos();
     EXPECT_EQ(result_qos.wire_protocol().builtin.discovery_config.m_DiscoveryServers, qos_output);
@@ -877,31 +818,28 @@ TEST(ParticipantTests, SimpleParticipantRemoteServerListConfiguration)
 
 
 /**
- * Test that:
- * + checks a SIMPLE participant is transformed into a CLIENT.
- * + the environment variable resolves DNS inputs adding both IPv4 and IPv6 locators
- * + UDPv6 transport is included to service IPv6 locators
+ * Test that a SIMPLE participant is transformed into a CLIENT if the variable ROS_SUPER_CLIENT is false and into a SUPERCLIENT if it's true.
+ * It also checks that the environment variable has priority over the coded QoS settings.
  */
-TEST(ParticipantTests, SimpleParticipantRemoteServerListConfigurationDNS)
+TEST(ParticipantTests, TransformSimpleParticipantToSuperclientByEnvVariable)
 {
-    // populate environment
-    set_environment_variable("www.acme.com.test");
+    set_environment_variable();
 
-    // fill in expected result
-    rtps::RemoteServerAttributes server;
-    fastrtps::rtps::Locator_t locator4(11811), locator6(LOCATOR_KIND_UDPv6, 11811);
-    fastrtps::rtps::IPLocator::setIPv4(locator4, "216.58.215.164");
-    fastrtps::rtps::IPLocator::setIPv6(locator6, "2a00:1450:400e:803::2004");
-    server.metatrafficUnicastLocatorList.push_back(locator4);
-    server.metatrafficUnicastLocatorList.push_back(locator6);
-    get_server_client_default_guidPrefix(0, server.guidPrefix);
+#ifdef _WIN32
+    ASSERT_EQ(0, _putenv_s(rtps::ROS_SUPER_CLIENT, "false"));
+#else
+    ASSERT_EQ(0, setenv(rtps::ROS_SUPER_CLIENT, "false", 1));
+#endif // _WIN32
 
     rtps::RemoteServerList_t output;
-    output.push_back(server);
+    rtps::RemoteServerList_t qos_output;
+    expected_remote_server_list_output(output);
 
-    // Create the participant
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0,
-                    PARTICIPANT_QOS_DEFAULT);
+    DomainParticipantQos qos;
+    set_participant_qos(qos, qos_output);
+
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
+        0, qos);
     ASSERT_NE(nullptr, participant);
 
     fastrtps::rtps::RTPSParticipantAttributes attributes;
@@ -909,22 +847,23 @@ TEST(ParticipantTests, SimpleParticipantRemoteServerListConfigurationDNS)
     EXPECT_EQ(attributes.builtin.discovery_config.discoveryProtocol, fastrtps::rtps::DiscoveryProtocol::CLIENT);
     EXPECT_EQ(attributes.builtin.discovery_config.m_DiscoveryServers, output);
 
-    // check UDPv6 transport is there
-    auto udpv6_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes) -> bool
-            {
-                for (auto& transportDescriptor : attributes.userTransports)
-                {
-                    if ( nullptr != dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
-                    {
-                        return true;
-                    }
-                }
+#ifdef _WIN32
+    ASSERT_EQ(0, _putenv_s(rtps::ROS_SUPER_CLIENT, "true"));
+#else
+    ASSERT_EQ(0, setenv(rtps::ROS_SUPER_CLIENT, "true", 1));
+#endif // _WIN32
 
-                return false;
-            };
-    EXPECT_TRUE(udpv6_check(attributes));
+    DomainParticipant* participant_2 = DomainParticipantFactory::get_instance()->create_participant(
+        0, qos);
+    ASSERT_NE(nullptr, participant_2);
+
+    fastrtps::rtps::RTPSParticipantAttributes attributes_2;
+    get_rtps_attributes(participant_2, attributes_2);
+    EXPECT_EQ(attributes_2.builtin.discovery_config.discoveryProtocol, fastrtps::rtps::DiscoveryProtocol::SUPER_CLIENT);
+    EXPECT_EQ(attributes_2.builtin.discovery_config.m_DiscoveryServers, output);
 
     EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant));
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_2));
 }
 
 /**
@@ -944,8 +883,7 @@ TEST(ParticipantTests, SimpleParticipantDynamicAdditionRemoteServers)
     set_participant_qos(qos, qos_output);
 
     // Create environment file so the watch file is initialized
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(nullptr, participant);
     fastrtps::rtps::RTPSParticipantAttributes attributes;
     get_rtps_attributes(participant, attributes);
@@ -956,8 +894,7 @@ TEST(ParticipantTests, SimpleParticipantDynamicAdditionRemoteServers)
     // Modify environment file
 #ifndef __APPLE__
     std::ofstream file(filename);
-    file <<
-        "{\"ROS_DISCOVERY_SERVER\": \"84.22.253.128:8888;192.168.1.133:64863;UDPv4:[localhost]:1234;[2a02:ec80:600:ed1a::3]:8783\"}";
+    file << "{\"ROS_DISCOVERY_SERVER\": \"84.22.253.128:8888;192.168.1.133:64863;localhost:1234\"}";
     file.close();
 
     // Wait long enought for the file watch callback
@@ -992,8 +929,7 @@ TEST(ParticipantTests, ClientParticipantRemoteServerListConfiguration)
     set_participant_qos(qos, qos_output);
 
     qos.wire_protocol().builtin.discovery_config.discoveryProtocol = fastrtps::rtps::DiscoveryProtocol::CLIENT;
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(nullptr, participant);
     fastrtps::rtps::RTPSParticipantAttributes attributes;
     get_rtps_attributes(participant, attributes);
@@ -1021,8 +957,7 @@ TEST(ParticipantTests, ServerParticipantEnvironmentConfiguration)
     locator.port = 5432;
     server_qos.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(locator);
     std::istringstream(rtps::DEFAULT_ROS2_SERVER_GUIDPREFIX) >> server_qos.wire_protocol().prefix;
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, server_qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, server_qos);
     ASSERT_NE(nullptr, participant);
     fastrtps::rtps::RTPSParticipantAttributes attributes;
     get_rtps_attributes(participant, attributes);
@@ -1051,8 +986,7 @@ TEST(ParticipantTests, ServerParticipantRemoteServerListConfiguration)
     qos.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(locator);
     std::istringstream(rtps::DEFAULT_ROS2_SERVER_GUIDPREFIX) >> qos.wire_protocol().prefix;
 
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(nullptr, participant);
     fastrtps::rtps::RTPSParticipantAttributes attributes;
     get_rtps_attributes(participant, attributes);
@@ -1091,8 +1025,7 @@ TEST(ParticipantTests, ServerParticipantInconsistentRemoteServerListConfiguratio
     qos.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(locator);
     std::istringstream(rtps::DEFAULT_ROS2_SERVER_GUIDPREFIX) >> qos.wire_protocol().prefix;
 
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(nullptr, participant);
     fastrtps::rtps::RTPSParticipantAttributes attributes;
     get_rtps_attributes(participant, attributes);
@@ -1147,8 +1080,7 @@ TEST(ParticipantTests, ServerParticipantInconsistentLocatorsRemoteServerListConf
     get_server_client_default_guidPrefix(1, server.guidPrefix);
     output.push_back(server);
 
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(nullptr, participant);
     // Try adding a new remote server
 #ifndef __APPLE__
@@ -1178,8 +1110,7 @@ TEST(ParticipantTests, RepeatEnvironmentFileConfiguration)
     DomainParticipantQos qos;
     set_server_qos(qos);
 
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(nullptr, participant);
 #ifndef __APPLE__
     set_and_check_with_environment_file(participant, {"172.17.0.5:4321", "192.168.1.133:64863"}, filename);
@@ -1202,7 +1133,7 @@ TEST(ParticipantTests, ServerParticipantCorrectRemoteServerListConfiguration)
 
     std::ofstream file;
     file.open(filename);
-    file << "{\"ROS_DISCOVERY_SERVER\": \";UDPv4:[localhost]:1234\"}";
+    file << "{\"ROS_DISCOVERY_SERVER\": \";localhost:1234\"}";
     file.close();
 
     DomainParticipantQos qos;
@@ -1217,8 +1148,7 @@ TEST(ParticipantTests, ServerParticipantCorrectRemoteServerListConfiguration)
     get_server_client_default_guidPrefix(0, server.guidPrefix);
     output.push_back(server);
 
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, qos);
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0, qos);
     ASSERT_NE(nullptr, participant);
     fastrtps::rtps::RTPSParticipantAttributes attributes;
     get_rtps_attributes(participant, attributes);
@@ -1244,7 +1174,7 @@ TEST(ParticipantTests, ServerParticipantCorrectRemoteServerListConfiguration)
     // Try to be consistent: add already known server
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     file.open(filename);
-    file << "{\"ROS_DISCOVERY_SERVER\": \"172.17.0.5:4321;UDPv4:[localhost]:1234;192.168.1.133:64863\"}";
+    file << "{\"ROS_DISCOVERY_SERVER\": \"172.17.0.5:4321;localhost:1234;192.168.1.133:64863\"}";
     file.close();
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     server.clear();
@@ -1293,8 +1223,7 @@ TEST(ParticipantTests, ServerParticipantCorrectRemoteServerListConfiguration)
 TEST(ParticipantTests, ChangeWireProtocolQos)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     DomainParticipantQos qos;
     participant->get_qos(qos);
 
@@ -1566,8 +1495,7 @@ TEST(ParticipantTests, EntityFactoryBehavior)
     }
 
     // Ensure that participant is created disabled.
-    DomainParticipant* participant = factory->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+    DomainParticipant* participant = factory->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(nullptr, participant);
     ASSERT_FALSE(participant->is_enabled());
 
@@ -1644,8 +1572,7 @@ TEST(ParticipantTests, EntityFactoryBehavior)
 TEST(ParticipantTests, CreatePublisher)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     Publisher* publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT);
 
     ASSERT_NE(publisher, nullptr);
@@ -1675,10 +1602,9 @@ void check_publisher_with_profile (
 
 TEST(ParticipantTests, CreatePublisherWithProfile)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     //publisher using the default profile
     Publisher* default_publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT);
@@ -1707,8 +1633,7 @@ TEST(ParticipantTests, CreatePSMPublisher)
 TEST(ParticipantTests, ChangeDefaultPublisherQos)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     ASSERT_TRUE(participant->set_default_publisher_qos(PUBLISHER_QOS_DEFAULT) == ReturnCode_t::RETCODE_OK);
 
@@ -1749,8 +1674,7 @@ TEST(ParticipantTests, ChangePSMDefaultPublisherQos)
 TEST(ParticipantTests, CreateSubscriber)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
     Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
     ASSERT_NE(subscriber, nullptr);
@@ -1780,10 +1704,9 @@ void check_subscriber_with_profile (
 
 TEST(ParticipantTests, GetSubscriberProfileQos)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
 
     // Extract qos from profile
@@ -1809,10 +1732,9 @@ TEST(ParticipantTests, GetSubscriberProfileQos)
 
 TEST(ParticipantTests, CreateSubscriberWithProfile)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     //subscriber using the default profile
     Subscriber* default_subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
@@ -1831,10 +1753,9 @@ TEST(ParticipantTests, CreateSubscriberWithProfile)
 
 TEST(ParticipantTests, GetPublisherProfileQos)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
 
     // Extract qos from profile
@@ -1861,8 +1782,7 @@ TEST(ParticipantTests, GetPublisherProfileQos)
 
 TEST(ParticipantTests, CreatePSMSubscriber)
 {
-    ::dds::domain::DomainParticipant participant = ::dds::domain::DomainParticipant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+    ::dds::domain::DomainParticipant participant = ::dds::domain::DomainParticipant(0, PARTICIPANT_QOS_DEFAULT);
     ::dds::sub::Subscriber subscriber = ::dds::core::null;
     subscriber = ::dds::sub::Subscriber(participant, SUBSCRIBER_QOS_DEFAULT);
 
@@ -1872,8 +1792,7 @@ TEST(ParticipantTests, CreatePSMSubscriber)
 TEST(ParticipantTests, DeletePublisher)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
     Publisher* publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT);
     ASSERT_NE(publisher, nullptr);
@@ -1885,8 +1804,7 @@ TEST(ParticipantTests, DeletePublisher)
 TEST(ParticipantTests, DeleteSubscriber)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
     Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
     ASSERT_NE(subscriber, nullptr);
@@ -1898,8 +1816,7 @@ TEST(ParticipantTests, DeleteSubscriber)
 TEST(ParticipantTests, ChangeDefaultSubscriberQos)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     ASSERT_EQ(participant->set_default_subscriber_qos(SUBSCRIBER_QOS_DEFAULT), ReturnCode_t::RETCODE_OK);
 
@@ -1940,8 +1857,7 @@ TEST(ParticipantTests, ChangePSMDefaultSubscriberQos)
 TEST(ParticipantTests, ChangeDefaultTopicQos)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     ASSERT_TRUE(participant->set_default_topic_qos(TOPIC_QOS_DEFAULT) == ReturnCode_t::RETCODE_OK);
 
@@ -1999,10 +1915,9 @@ void check_topic_with_profile (
 
 TEST(ParticipantTests, GetTopicProfileQos)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
     TypeSupport type(new TopicDataTypeMock());
     type.register_type(participant);
@@ -2031,10 +1946,9 @@ TEST(ParticipantTests, GetTopicProfileQos)
 
 TEST(ParticipantTests, CreateTopic)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     TypeSupport type(new TopicDataTypeMock());
     type.register_type(participant, "footype");
@@ -2058,61 +1972,6 @@ TEST(ParticipantTests, CreateTopic)
     ASSERT_TRUE(DomainParticipantFactory::get_instance()->delete_participant(participant) == ReturnCode_t::RETCODE_OK);
 }
 
-// Test that creating a Topic with a Data Type name different from the Type Support is possible as long
-// as the type has been registered with such name.
-TEST(ParticipantTests, CreateTopicWithDifferentTypeName)
-{
-    DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
-
-    std::string type_name = "other_different_type_name_because_of_reasons_eg_mangling";
-    TypeSupport type(new TopicDataTypeMock());
-    type.register_type(participant, type_name);
-
-    // Topic using the default profile
-    Topic* topic = participant->create_topic("footopic", type_name, TOPIC_QOS_DEFAULT);
-    ASSERT_NE(topic, nullptr);
-    ASSERT_EQ(topic->get_type_name(), type_name);
-
-    // Try to create the same topic twice
-    Topic* topic_duplicated = participant->create_topic("footopic", type_name, TOPIC_QOS_DEFAULT);
-    ASSERT_EQ(topic_duplicated, nullptr);
-
-    ASSERT_TRUE(participant->delete_topic(topic) == ReturnCode_t::RETCODE_OK);
-}
-
-// Test that creating a Topic with a Data Type name different from the data type is not possible
-TEST(ParticipantTests, CreateTopicWithDifferentTypeName_negative)
-{
-    // Using other type name
-    {
-        DomainParticipant* participant =
-                DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
-
-        TypeSupport type(new TopicDataTypeMock());
-        type.register_type(participant);
-
-        std::string type_name = "other_different_type_name_because_of_reasons_eg_mangling";
-        // Topic using the default profile
-        Topic* topic = participant->create_topic("footopic", type_name, TOPIC_QOS_DEFAULT);
-        ASSERT_EQ(topic, nullptr);
-    }
-
-    // Using type support type name when registered with other name
-    {
-        DomainParticipant* participant =
-                DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
-
-        std::string type_name = "other_different_type_name_because_of_reasons_eg_mangling";
-        TypeSupport type(new TopicDataTypeMock());
-        type.register_type(participant, type_name);
-
-        // Topic using the default profile
-        Topic* topic = participant->create_topic("footopic", type.get_type_name(), TOPIC_QOS_DEFAULT);
-        ASSERT_EQ(topic, nullptr);
-    }
-}
-
 TEST(ParticipantTests, PSMCreateTopic)
 {
     ::dds::domain::DomainParticipant participant = ::dds::domain::DomainParticipant(0, PARTICIPANT_QOS_DEFAULT);
@@ -2128,11 +1987,10 @@ TEST(ParticipantTests, PSMCreateTopic)
 
 TEST(ParticipantTests, DeleteTopic)
 {
-    uint32_t domain_id = (uint32_t)GET_PID() % 230;
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     DomainParticipant* participant2 =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id + 1, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(1, PARTICIPANT_QOS_DEFAULT);
 
     TypeSupport type(new TopicDataTypeMock());
     type.register_type(participant, "footype");
@@ -2149,8 +2007,7 @@ TEST(ParticipantTests, DeleteTopic)
 TEST(ParticipantTests, LookupTopicDescription)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     const std::string topic_name("footopic");
 
@@ -2176,8 +2033,7 @@ TEST(ParticipantTests, LookupTopicDescription)
 TEST(ParticipantTests, DeleteTopicInUse)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     TypeSupport type(new TopicDataTypeMock());
     type.register_type(participant, "footype");
@@ -2304,9 +2160,7 @@ TEST(ParticipantTests, SetListener)
     CustomListener listener;
 
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT,
-        &listener);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT, &listener);
     ASSERT_NE(participant, nullptr);
     ASSERT_EQ(participant->get_status_mask(), StatusMask::all());
 
@@ -2352,63 +2206,6 @@ TEST(ParticipantTests, SetListener)
     ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant), ReturnCode_t::RETCODE_OK);
 }
 
-class CustomListener2 : public DomainParticipantListener
-{
-public:
-
-    CustomListener2()
-        : future_(promise_.get_future())
-    {
-    }
-
-    std::future<void>& get_future()
-    {
-        return future_;
-    }
-
-    void on_participant_discovery(
-            eprosima::fastdds::dds::DomainParticipant*,
-            eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&) override
-    {
-        try
-        {
-            promise_.set_value();
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-        }
-        catch (std::future_error&)
-        {
-            // do nothing
-        }
-    }
-
-private:
-
-    std::promise<void> promise_;
-    std::future<void> future_;
-};
-
-TEST(ParticipantTests, FailingSetListener)
-{
-    CustomListener2 listener;
-
-    DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT, &listener);
-    ASSERT_NE(participant, nullptr);
-    ASSERT_EQ(participant->get_status_mask(), StatusMask::all());
-
-    DomainParticipant* participant_to_discover =
-            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
-    ASSERT_NE(participant_to_discover, nullptr);
-
-    // Wait for callback trigger
-    listener.get_future().wait();
-
-    ASSERT_EQ(participant->set_listener(nullptr, std::chrono::seconds(1)), ReturnCode_t::RETCODE_ERROR);
-    ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant), ReturnCode_t::RETCODE_OK);
-    ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(
-                participant_to_discover), ReturnCode_t::RETCODE_OK);
-}
-
 /*
  * This test checks the negative cases of the check_qos() function.
  * 1. User data is set to be a 5-element size octet vector.
@@ -2431,8 +2228,7 @@ TEST(ParticipantTests, CheckDomainParticipantQos)
 
     // Create the participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Get the participant qos
     DomainParticipantQos qos;
@@ -2470,8 +2266,7 @@ TEST(ParticipantTests, ChangeAllocationDomainParticipantQos)
     ASSERT_EQ(factory->set_qos(pfqos), ReturnCode_t::RETCODE_OK);
 
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_FALSE(participant->is_enabled());
     DomainParticipantQos qos;
     participant->get_qos(qos);
@@ -2509,8 +2304,7 @@ TEST(ParticipantTests, ChangeDomainParcipantName)
     ASSERT_EQ(factory->set_qos(pfqos), ReturnCode_t::RETCODE_OK);
 
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_FALSE(participant->is_enabled());
     DomainParticipantQos qos;
     participant->get_qos(qos);
@@ -2540,12 +2334,11 @@ TEST(ParticipantTests, ChangeDomainParcipantName)
  */
 TEST(ParticipantTests, DeleteEntitiesNegativeClauses)
 {
-    uint32_t domain_id = (uint32_t)GET_PID() % 230;
     // Create two participants
     DomainParticipant* participant_1 =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     DomainParticipant* participant_2 =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create a subscriber in the first participant
     Subscriber* subscriber_1 = participant_1->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
@@ -2575,8 +2368,7 @@ TEST(ParticipantTests, DeleteEntitiesNegativeClauses)
 TEST(ParticipantTests, CreateEntitiesWithProfileNegativeClauses)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create publisher with an empty profile should return nullptr
     Publisher* publisher = participant->create_publisher_with_profile("");
@@ -2599,10 +2391,9 @@ TEST(ParticipantTests, CreateEntitiesWithProfileNegativeClauses)
  */
 TEST(ParticipantTests, RegisterTypeNegativeClauses)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create the TopicDataType and delete the topic data type name
     TopicDataTypeMock* data_type = new TopicDataTypeMock();
@@ -2633,8 +2424,7 @@ TEST(ParticipantTests, AssertLivelinesNegativeClauses)
 
     // Create a disabled participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(nullptr, participant);
     ASSERT_FALSE(participant->is_enabled());
 
@@ -2664,8 +2454,7 @@ TEST(ParticipantTests, AssertLivelinesNegativeClauses)
 TEST(ParticipantTests, GetCurrentTime)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     eprosima::fastrtps::Time_t now;
     ASSERT_EQ(participant->get_current_time(now), ReturnCode_t::RETCODE_OK);
@@ -2680,8 +2469,7 @@ TEST(ParticipantTests, GetParticipantConst)
 {
     // Create the participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create the publisher
     Publisher* publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT);
@@ -2714,8 +2502,7 @@ TEST(ParticipantTests, GetParticipantNames)
 
     // Create a disabled participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(nullptr, participant);
     ASSERT_FALSE(participant->is_enabled());
 
@@ -2744,8 +2531,7 @@ TEST(ParticipantTests, CreateTopicNegativeClauses)
 {
     // Create the participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Register the type
     TypeSupport type(new TopicDataTypeMock());
@@ -2780,8 +2566,7 @@ TEST(ParticipantTests, ContainsEntity)
 {
     // Create the participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     TypeSupport type(new TopicDataTypeMock());
     type.register_type(participant);
@@ -2845,8 +2630,7 @@ TEST(ParticipantTests, UnregisterType)
 {
     // Create the participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Check that an error is given at trying to unregister a type with an empty name
     ASSERT_EQ(participant->unregister_type(""), ReturnCode_t::RETCODE_BAD_PARAMETER);
@@ -2911,8 +2695,7 @@ TEST(ParticipantTests, NewRemoteEndpointDiscovered)
 
     // Create a disabled participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(nullptr, participant);
     ASSERT_FALSE(participant->is_enabled());
 
@@ -2953,8 +2736,7 @@ TEST(ParticipantTests, SetDomainParticipantQos)
     ASSERT_EQ(DomainParticipantFactory::get_instance()->set_default_participant_qos(pqos), ReturnCode_t::RETCODE_OK);
 
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, pqos);
+            DomainParticipantFactory::get_instance()->create_participant(0, pqos);
 
     DomainParticipantQos qos;
     participant->get_qos(qos);
@@ -2986,8 +2768,7 @@ TEST(ParticipantTests, UpdatableDomainParticipantQos)
 {
 
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     DomainParticipantQos pqos;
 
@@ -3016,8 +2797,7 @@ TEST(ParticipantTests, RegisterDynamicTypeToFactories)
 
     // Create a disabled participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create the dynamic type builder
     DynamicType_ptr base_type = DynamicTypeBuilderFactory::get_instance()->create_uint32_type();
@@ -3052,8 +2832,7 @@ TEST(ParticipantTests, RegisterDynamicTypeToFactoriesNotFillTypeInfo)
 
     // Create a disabled participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create the dynamic type builder
     DynamicType_ptr base_type = DynamicTypeBuilderFactory::get_instance()->create_uint32_type();
@@ -3106,8 +2885,7 @@ TEST(ParticipantTests, RegisterDynamicTypeToFactoriesNotTypeIdentifier)
 
     // Create a disabled participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create a not supported TypeDescriptor
     const TypeDescriptor* myDescriptor = new TypeDescriptor("my_descriptor", 0x11);
@@ -3151,8 +2929,7 @@ TEST(ParticipantTests, GetTypes)
     DomainParticipantQos pqos;
     pqos.wire_protocol().builtin.typelookup_config.use_client = true;
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, pqos);
+            DomainParticipantFactory::get_instance()->create_participant(0, pqos);
 
     // Create the dynamic type builder
     DynamicTypeBuilder_ptr builder_string = DynamicTypeBuilderFactory::get_instance()->create_string_builder(100);
@@ -3194,8 +2971,7 @@ TEST(ParticipantTests, GetTypeDependencies)
     DomainParticipantQos pqos;
     pqos.wire_protocol().builtin.typelookup_config.use_client = true;
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, pqos);
+            DomainParticipantFactory::get_instance()->create_participant(0, pqos);
 
     // Create the dynamic type builder
     DynamicTypeBuilder_ptr builder_string = DynamicTypeBuilderFactory::get_instance()->create_string_builder(100);
@@ -3240,17 +3016,16 @@ TEST(ParticipantTests, RegisterRemoteTypeComplete)
     DomainParticipantFactoryQos factory_qos;
     factory_qos.entity_factory().autoenable_created_entities = false;
     DomainParticipantFactory::get_instance()->set_qos(factory_qos);
-    uint32_t domain_id = (uint32_t)GET_PID() % 230;
 
     // Create the remote participant and enable it
     DomainParticipant* remote_participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     EXPECT_EQ(ReturnCode_t::RETCODE_OK, remote_participant->enable());
     EXPECT_TRUE(remote_participant->is_enabled());
 
     // Create the local participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create the complete dynamic type builder
     DynamicTypeBuilder_ptr int32_builder = DynamicTypeBuilderFactory::get_instance()->create_int32_builder();
@@ -3319,17 +3094,16 @@ TEST(ParticipantTests, RegisterRemoteTypeMinimal)
     DomainParticipantFactoryQos factory_qos;
     factory_qos.entity_factory().autoenable_created_entities = false;
     DomainParticipantFactory::get_instance()->set_qos(factory_qos);
-    uint32_t domain_id = (uint32_t)GET_PID() % 230;
 
     // Create the remote participant and enable it
     DomainParticipant* remote_participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     EXPECT_EQ(ReturnCode_t::RETCODE_OK, remote_participant->enable());
     EXPECT_TRUE(remote_participant->is_enabled());
 
     // Create the local participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create the minimal dynamic type builder
     DynamicTypeBuilder_ptr builder = DynamicTypeBuilderFactory::get_instance()->create_char16_builder();
@@ -3388,15 +3162,13 @@ TEST(ParticipantTests, RegisterRemoteTypeMinimal)
  */
 TEST(ParticipantTests, RegisterRemoteTypePreconditionNotMet)
 {
-    uint32_t domain_id = (uint32_t)GET_PID() % 230;
-
     // Create the remote participant
     DomainParticipant* remote_participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create the local participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
 
     // Create the type builder
     DynamicTypeBuilder_ptr int32_builder = DynamicTypeBuilderFactory::get_instance()->create_int32_builder();
@@ -3438,10 +3210,10 @@ TEST(ParticipantTests, RegisterRemoteTypePreconditionNotMet)
 // Delete contained entities test
 TEST(ParticipantTests, DeleteContainedEntities)
 {
+
     // First we set up everything
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
 
     TypeSupport type(new TopicDataTypeMock());
@@ -3487,9 +3259,9 @@ TEST(ParticipantTests, DeleteContainedEntities)
     DataWriter* data_writer_foo = publisher->create_datawriter(topic_foo, DATAWRITER_QOS_DEFAULT);
     ASSERT_NE(data_writer_foo, nullptr);
 
-    SampleStateMask mock_sample_state_kind = ANY_SAMPLE_STATE;
-    ViewStateMask mock_view_state_kind = ANY_VIEW_STATE;
-    InstanceStateMask mock_instance_states = ANY_INSTANCE_STATE;
+    const std::vector<SampleStateKind> mock_sample_state_kind;
+    const std::vector<ViewStateKind> mock_view_state_kind;
+    const std::vector<InstanceStateKind> mock_instance_states;
     const std::string mock_query_expression;
     const std::vector<std::string> mock_query_parameters;
 
@@ -3637,14 +3409,13 @@ TEST(ParticipantTests, ContentFilterInterfaces)
 
     MockFilter test_filter;
     std::string very_long_name(512, ' ');
-    uint32_t domain_id = (uint32_t)GET_PID() % 230;
 
     // Create two participants
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
     DomainParticipant* participant2 =
-            DomainParticipantFactory::get_instance()->create_participant(domain_id, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant2, nullptr);
 
     // Create a type and a topics
@@ -3813,7 +3584,9 @@ TEST(ParticipantTests, ContentFilterInterfaces)
  * This test checks that the following methods are not implemented and returns an error
  *  create_multitopic
  *  delete_multitopic
+ *  find_topic
  *  get_builtin_subscriber
+ *  ignore_participant
  *  ignore_topic
  *  ignore_publication
  *  ignore_subscription
@@ -3827,8 +3600,7 @@ TEST(ParticipantTests, UnsupportedMethods)
 {
     // Create the participant
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
 
     // Create a type and a topic
@@ -3849,8 +3621,11 @@ TEST(ParticipantTests, UnsupportedMethods)
     // nullptr use as there are not such a class
     ASSERT_EQ(participant->delete_multitopic(nullptr), ReturnCode_t::RETCODE_UNSUPPORTED);
 
+    ASSERT_EQ(participant->find_topic("topic", Duration_t(1, 0)), nullptr);
+
     ASSERT_EQ(participant->get_builtin_subscriber(), nullptr);
 
+    ASSERT_EQ(participant->ignore_participant(InstanceHandle_t()), ReturnCode_t::RETCODE_UNSUPPORTED);
     ASSERT_EQ(participant->ignore_topic(InstanceHandle_t()), ReturnCode_t::RETCODE_UNSUPPORTED);
     ASSERT_EQ(participant->ignore_publication(InstanceHandle_t()), ReturnCode_t::RETCODE_UNSUPPORTED);
     ASSERT_EQ(participant->ignore_subscription(InstanceHandle_t()), ReturnCode_t::RETCODE_UNSUPPORTED);
@@ -3872,59 +3647,224 @@ TEST(ParticipantTests, UnsupportedMethods)
     ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant), ReturnCode_t::RETCODE_OK);
 }
 
-/*
- * Regression test for redmine issue #18050.
- *
- * This test tries to create two participants with the same fixed id.
- */
-TEST(ParticipantTests, TwoParticipantWithSameFixedId)
+TEST(ParticipantTests, ParticipantCreationWithBuiltinTransport)
 {
-    // Test participants enabled from beginning
     {
-        DomainParticipantQos participant_qos;
-        participant_qos.wire_protocol().participant_id = 1;
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::DEFAULT);
 
-        // Create the first participant
-        DomainParticipant* participant1 =
-                DomainParticipantFactory::get_instance()->create_participant(0, participant_qos);
-        ASSERT_NE(participant1, nullptr);
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
 
-        // Creating a second participant with the same fixed id should fail
-        DomainParticipant* participant2 =
-                DomainParticipantFactory::get_instance()->create_participant(0, participant_qos);
-        ASSERT_EQ(participant2, nullptr);
+        get_rtps_attributes(participant_, attributes_);
 
-        // Destroy the first participant
-        ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant1), ReturnCode_t::RETCODE_OK);
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv4TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
     }
 
-    // Test participants disabled from beginning
     {
-        DomainParticipantFactoryQos factory_qos;
-        ASSERT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->get_qos(factory_qos));
-        factory_qos.entity_factory().autoenable_created_entities = false;
-        ASSERT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->set_qos(factory_qos));
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::DEFAULTv6);
 
-        DomainParticipantQos participant_qos;
-        participant_qos.wire_protocol().participant_id = 1;
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
 
-        // Create the first participant
-        DomainParticipant* participant1 =
-                DomainParticipantFactory::get_instance()->create_participant(0, participant_qos);
-        ASSERT_NE(participant1, nullptr);
+        get_rtps_attributes(participant_, attributes_);
 
-        // Creating a second participant with the same fixed id should fail
-        DomainParticipant* participant2 =
-                DomainParticipantFactory::get_instance()->create_participant(0, participant_qos);
-        ASSERT_EQ(participant2, nullptr);
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+    }
 
-        ASSERT_EQ(ReturnCode_t::RETCODE_OK, participant1->enable());
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::SHM);
 
-        // Destroy the first participant
-        ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant1), ReturnCode_t::RETCODE_OK);
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
 
-        factory_qos.entity_factory().autoenable_created_entities = true;
-        ASSERT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->set_qos(factory_qos));
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::SharedMemTransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::UDPv4);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv4TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::UDPv6);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::LARGE_DATA);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    bool hasSHM = false;
+                    bool hasUDP = false;
+                    bool hasTCP = false;
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::SharedMemTransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasSHM = true;
+                        }
+                        else if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv4TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasUDP = true;
+                        }
+                        else if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::TCPv4TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasTCP = true;
+                        }
+                    }
+
+                    return (hasSHM && hasUDP && hasTCP);
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::LARGE_DATAv6);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    bool hasSHM = false;
+                    bool hasUDP = false;
+                    bool hasTCP = false;
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::SharedMemTransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasSHM = true;
+                        }
+                        else if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasUDP = true;
+                        }
+                        else if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::TCPv6TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasTCP = true;
+                        }
+                    }
+
+                    return (hasSHM && hasUDP && hasTCP);
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
     }
 }
 

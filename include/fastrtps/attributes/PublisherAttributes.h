@@ -21,14 +21,13 @@
 
 #include <fastdds/rtps/resources/ResourceManagement.h>
 
-#include <fastdds/rtps/attributes/ExternalLocators.hpp>
-#include <fastdds/rtps/attributes/PropertyPolicy.h>
-#include <fastdds/rtps/attributes/WriterAttributes.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/Time_t.h>
+#include <fastdds/rtps/attributes/WriterAttributes.h>
 #include <fastdds/rtps/flowcontrol/ThroughputControllerDescriptor.h>
 #include <fastrtps/attributes/TopicAttributes.h>
 #include <fastrtps/qos/WriterQos.h>
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -41,9 +40,16 @@ class PublisherAttributes
 {
 public:
 
-    PublisherAttributes() = default;
+    PublisherAttributes()
+        : historyMemoryPolicy(rtps::PREALLOCATED_MEMORY_MODE)
+        , m_userDefinedID(-1)
+        , m_entityID(-1)
+    {
+    }
 
-    virtual ~PublisherAttributes() = default;
+    virtual ~PublisherAttributes()
+    {
+    }
 
     bool operator ==(
             const PublisherAttributes& b) const
@@ -60,41 +66,32 @@ public:
                (this->properties == b.properties);
     }
 
-    //! Topic Attributes for the Publisher
+    //!Topic Attributes for the Publisher
     TopicAttributes topic;
 
-    //! QOS for the Publisher
+    //!QOS for the Publisher
     WriterQos qos;
 
-    //! Writer Attributes
+    //!Writer Attributes
     rtps::WriterTimes times;
 
-    //! Unicast locator list
+    //!Unicast locator list
     rtps::LocatorList_t unicastLocatorList;
 
-    //! Multicast locator list
+    //!Multicast locator list
     rtps::LocatorList_t multicastLocatorList;
 
-    //! Remote locator list
+    //!Remote locator list
     rtps::LocatorList_t remoteLocatorList;
 
-    //! The collection of external locators to use for communication.
-    fastdds::rtps::ExternalLocators external_unicast_locators;
-
-    //! Whether locators that don't match with the announced locators should be kept.
-    bool ignore_non_matching_locators = false;
-
-    //! Throughput controller
+    //!Throughput controller
     rtps::ThroughputControllerDescriptor throughputController;
 
-    //! Underlying History memory policy
-    rtps::MemoryManagementPolicy_t historyMemoryPolicy =
-            rtps::MemoryManagementPolicy_t::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+    //!Underlying History memory policy
+    rtps::MemoryManagementPolicy_t historyMemoryPolicy;
 
-    //! Properties
+    //!Properties
     rtps::PropertyPolicy properties;
-
-    //! Allocation limits on the matched subscribers collections
     ResourceLimitedContainerConfig matched_subscriber_allocation;
 
     /**
@@ -137,13 +134,13 @@ public:
 
 private:
 
-    //! User Defined ID, used for StaticEndpointDiscovery, default value -1.
-    int16_t m_userDefinedID = -1;
-    //! Entity ID, if the user want to specify the EntityID of the enpoint, default value -1.
-    int16_t m_entityID = -1;
+    //!User Defined ID, used for StaticEndpointDiscovery, default value -1.
+    int16_t m_userDefinedID;
+    //!Entity ID, if the user want to specify the EntityID of the enpoint, default value -1.
+    int16_t m_entityID;
 };
 
 } // namespace fastrtps
-} // namespace eprosima
+} /* namespace eprosima */
 
 #endif /* PUBLISHERATTRIBUTES_H_ */

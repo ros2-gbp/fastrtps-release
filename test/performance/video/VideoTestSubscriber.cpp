@@ -17,13 +17,16 @@
  *
  */
 
-#include "VideoTestSubscriber.hpp"
-#include <fastdds/dds/log/Log.hpp>
-#include "fastrtps/log/Colors.h"
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <numeric>
 #include <cmath>
 #include <fstream>
+#include <numeric>
+#include <thread>
+
+#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/log/Colors.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include "VideoTestSubscriber.hpp"
 
 using namespace eprosima;
 using namespace eprosima::fastrtps;
@@ -249,7 +252,7 @@ void VideoTestSubscriber::DataSubListener::onSubscriptionMatched(
     std::unique_lock<std::mutex> lock(mp_up->mutex_);
     if (info.status == MATCHED_MATCHING)
     {
-        EPROSIMA_LOG_INFO(VideoTest, "Data Sub Matched ");
+        logInfo(VideoTest, "Data Sub Matched ");
         std::cout << "Data Sub Matched " << std::endl;
         ++mp_up->disc_count_;
     }
@@ -272,7 +275,7 @@ void VideoTestSubscriber::CommandPubListener::onPublicationMatched(
 
     if (info.status == MATCHED_MATCHING)
     {
-        EPROSIMA_LOG_INFO(VideoTest, "Command Pub Matched ");
+        logInfo(VideoTest, "Command Pub Matched ");
         std::cout << "Command Pub Matched " << std::endl;
         ++mp_up->disc_count_;
     }
@@ -294,7 +297,7 @@ void VideoTestSubscriber::CommandSubListener::onSubscriptionMatched(
     std::unique_lock<std::mutex> lock(mp_up->mutex_);
     if (info.status == MATCHED_MATCHING)
     {
-        EPROSIMA_LOG_INFO(VideoTest, "Command Sub Matched ");
+        logInfo(VideoTest, "Command Sub Matched ");
         std::cout << "Command Sub Matched " << std::endl;
         ++mp_up->disc_count_;
     }

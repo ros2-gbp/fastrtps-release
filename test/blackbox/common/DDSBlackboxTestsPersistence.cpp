@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "BlackboxTests.hpp"
+#include <thread>
 
-#include "PubSubReader.hpp"
-#include "PubSubWriter.hpp"
-#include "ReqRepAsReliableHelloWorldRequester.hpp"
-#include "ReqRepAsReliableHelloWorldReplier.hpp"
+#include <gtest/gtest.h>
+
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 #include <fastrtps/log/Log.h>
 
-#include <gtest/gtest.h>
+#include "BlackboxTests.hpp"
+#include "PubSubReader.hpp"
+#include "PubSubWriter.hpp"
+#include "ReqRepAsReliableHelloWorldReplier.hpp"
+#include "ReqRepAsReliableHelloWorldRequester.hpp"
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -397,7 +399,7 @@ TEST_P(PersistenceLargeData, PubSubAsReliablePubPersistentWithStaticDiscovery)
             .history_kind(eprosima::fastrtps::KEEP_ALL_HISTORY_QOS)
             .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
             .make_persistent(db_file_name(), "78.73.69.74.65.72.5f.70.65.72.73.5f|67.75.69.1")
-            .static_discovery("file://PubSubWriterPersistence_static_disc.xml")
+            .static_discovery("file://PubSubWriterPersistence.xml")
             .unicastLocatorList(WriterUnicastLocators)
             .multicastLocatorList(WriterMulticastLocators)
             .setPublisherIDs(1, 2)
@@ -425,7 +427,7 @@ TEST_P(PersistenceLargeData, PubSubAsReliablePubPersistentWithStaticDiscovery)
             .history_depth(10)
             .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
             .make_persistent(db_file_name(), "78.73.69.74.65.72.5f.70.65.72.73.5f|67.75.69.3")
-            .static_discovery("file://PubSubReaderPersistence_static_disc.xml")
+            .static_discovery("file://PubSubReaderPersistence.xml")
             .unicastLocatorList(ReaderUnicastLocators)
             .multicastLocatorList(ReaderMulticastLocators)
             .setSubscriberIDs(3, 4)

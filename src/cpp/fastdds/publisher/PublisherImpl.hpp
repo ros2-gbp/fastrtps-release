@@ -105,15 +105,13 @@ public:
             Topic* topic,
             const DataWriterQos& qos,
             DataWriterListener* listener,
-            const StatusMask& mask = StatusMask::all(),
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
+            const StatusMask& mask = StatusMask::all());
 
     DataWriter* create_datawriter_with_profile(
             Topic* topic,
             const std::string& profile_name,
             DataWriterListener* listener,
-            const StatusMask& mask = StatusMask::all(),
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
+            const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_datawriter(
             const DataWriter* writer);
@@ -257,8 +255,7 @@ protected:
             const TypeSupport& type,
             Topic* topic,
             const DataWriterQos& qos,
-            DataWriterListener* listener,
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool);
+            DataWriterListener* listener);
 
     static void set_qos(
             PublisherQos& to,

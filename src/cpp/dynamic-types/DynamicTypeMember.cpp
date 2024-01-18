@@ -39,8 +39,7 @@ DynamicTypeMember::DynamicTypeMember(
     descriptor_.set_id(id);
 }
 
-DynamicTypeMember::DynamicTypeMember(
-        const DynamicTypeMember* other)
+DynamicTypeMember::DynamicTypeMember(const DynamicTypeMember* other)
     : parent_(other->parent_)
     , id_(other->id_)
 {
@@ -52,8 +51,7 @@ DynamicTypeMember::~DynamicTypeMember()
     parent_ = nullptr;
 }
 
-ReturnCode_t DynamicTypeMember::apply_annotation(
-        AnnotationDescriptor& descriptor)
+ReturnCode_t DynamicTypeMember::apply_annotation(AnnotationDescriptor& descriptor)
 {
     // Update the annotations on the member Dynamic Type.
     return descriptor_.apply_annotation(descriptor);
@@ -68,8 +66,7 @@ ReturnCode_t DynamicTypeMember::apply_annotation(
     return descriptor_.apply_annotation(annotation_name, key, value);
 }
 
-bool DynamicTypeMember::equals(
-        const DynamicTypeMember* other) const
+bool DynamicTypeMember::equals(const DynamicTypeMember* other) const
 {
     if (other != nullptr && descriptor_.annotation_.size() == other->descriptor_.annotation_.size())
     {
@@ -117,8 +114,7 @@ std::vector<uint64_t> DynamicTypeMember::get_union_labels() const
     return descriptor_.get_union_labels();
 }
 
-ReturnCode_t DynamicTypeMember::get_descriptor(
-        MemberDescriptor* descriptor) const
+ReturnCode_t DynamicTypeMember::get_descriptor(MemberDescriptor* descriptor) const
 {
     if (descriptor != nullptr)
     {
@@ -127,7 +123,7 @@ ReturnCode_t DynamicTypeMember::get_descriptor(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error getting MemberDescriptor, invalid input descriptor");
+        logError(DYN_TYPES, "Error getting MemberDescriptor, invalid input descriptor");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -152,14 +148,12 @@ bool DynamicTypeMember::is_default_union_value() const
     return descriptor_.is_default_union_value();
 }
 
-void DynamicTypeMember::set_index(
-        uint32_t index)
+void DynamicTypeMember::set_index(uint32_t index)
 {
     descriptor_.set_index(index);
 }
 
-void DynamicTypeMember::set_parent(
-        DynamicType* pType)
+void DynamicTypeMember::set_parent(DynamicType* pType)
 {
     parent_ = pType;
 }

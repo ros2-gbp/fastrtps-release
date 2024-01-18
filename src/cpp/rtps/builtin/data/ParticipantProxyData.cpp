@@ -19,24 +19,26 @@
 
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 
-#include <chrono>
-#include <mutex>
-
 #include <fastdds/dds/log/Log.hpp>
+
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
-#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
+#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
+#include <fastdds/rtps/network/NetworkFactory.h>
 #include <fastdds/rtps/resources/TimedEvent.h>
 #include <fastrtps/utils/TimeConversion.h>
 
 #include <fastdds/core/policy/ParameterList.hpp>
 #include <fastdds/core/policy/QosPoliciesSerializer.hpp>
-#include <rtps/network/NetworkFactory.h>
+#include <fastrtps_deprecated/participant/ParticipantImpl.h>
 #include <rtps/transport/shared_mem/SHMLocator.hpp>
 
 #include "ProxyDataFilters.hpp"
 #include "ProxyHashTables.hpp"
+
+#include <mutex>
+#include <chrono>
 
 using namespace eprosima::fastrtps;
 using ParameterList = eprosima::fastdds::dds::ParameterList;
@@ -51,7 +53,6 @@ ParticipantProxyData::ParticipantProxyData(
     , m_VendorId(c_VendorId_Unknown)
     , m_expectsInlineQos(false)
     , m_availableBuiltinEndpoints(0)
-    , m_networkConfiguration(0)
     , metatraffic_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
     , default_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
     , m_manualLivelinessCount ()
@@ -76,7 +77,6 @@ ParticipantProxyData::ParticipantProxyData(
     , m_VendorId(pdata.m_VendorId)
     , m_expectsInlineQos(pdata.m_expectsInlineQos)
     , m_availableBuiltinEndpoints(pdata.m_availableBuiltinEndpoints)
-    , m_networkConfiguration(pdata.m_networkConfiguration)
     , metatraffic_locators(pdata.metatraffic_locators)
     , default_locators(pdata.default_locators)
     , m_manualLivelinessCount ()
@@ -105,7 +105,7 @@ ParticipantProxyData::ParticipantProxyData(
 
 ParticipantProxyData::~ParticipantProxyData()
 {
-    EPROSIMA_LOG_INFO(RTPS_PARTICIPANT, m_guid);
+    logInfo(RTPS_PARTICIPANT, m_guid);
 
     // delete all reader proxies
     if (m_readers)
@@ -154,9 +154,6 @@ uint32_t ParticipantProxyData::get_serialized_size(
 
     // PID_PARTICIPANT_GUID
     ret_val += 4 + PARAMETER_GUID_LENGTH;
-
-    // PID_NETWORK_CONFIGURATION_SET
-    ret_val += 4 + PARAMETER_NETWORKCONFIGSET_LENGTH;
 
     // PID_METATRAFFIC_MULTICAST_LOCATOR
     ret_val += static_cast<uint32_t>((4 + PARAMETER_LOCATOR_LENGTH) * metatraffic_locators.multicast.size());
@@ -258,14 +255,6 @@ bool ParticipantProxyData::writeToCDRMessage(
     {
         ParameterGuid_t p(fastdds::dds::PID_PARTICIPANT_GUID, PARAMETER_GUID_LENGTH, m_guid);
         if (!fastdds::dds::ParameterSerializer<ParameterGuid_t>::add_to_cdr_message(p, msg))
-        {
-            return false;
-        }
-    }
-    {
-        ParameterNetworkConfigSet_t p(fastdds::dds::PID_NETWORK_CONFIGURATION_SET, PARAMETER_NETWORKCONFIGSET_LENGTH);
-        p.netconfigSet = m_networkConfiguration;
-        if (!fastdds::dds::ParameterSerializer<ParameterNetworkConfigSet_t>::add_to_cdr_message(p, msg))
         {
             return false;
         }
@@ -387,8 +376,14 @@ bool ParticipantProxyData::readFromCDRMessage(
         const NetworkFactory& network,
         bool is_shm_transport_available)
 {
-    auto param_process = [this, &network, &is_shm_transport_available](
-        CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
+    bool are_shm_metatraffic_locators_present = false;
+    bool are_shm_default_locators_present = false;
+    bool is_shm_transport_possible = false;
+
+    auto param_process = [this, &network, &is_shm_transport_possible,
+                    &are_shm_metatraffic_locators_present,
+                    &are_shm_default_locators_present,
+                    &is_shm_transport_available](CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
                 switch (pid)
                 {
@@ -459,18 +454,6 @@ bool ParticipantProxyData::readFromCDRMessage(
                         m_key = p.guid;
                         break;
                     }
-                    case fastdds::dds::PID_NETWORK_CONFIGURATION_SET:
-                    {
-                        ParameterNetworkConfigSet_t p(pid, plength);
-                        if (!fastdds::dds::ParameterSerializer<ParameterNetworkConfigSet_t>::read_from_cdr_message(p,
-                                msg, plength))
-                        {
-                            return false;
-                        }
-
-                        m_networkConfiguration = p.netconfigSet;
-                        break;
-                    }
                     case fastdds::dds::PID_METATRAFFIC_MULTICAST_LOCATOR:
                     {
                         ParameterLocator_t p(pid, plength);
@@ -481,11 +464,13 @@ bool ParticipantProxyData::readFromCDRMessage(
                         }
 
                         Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration))
+                        if (network.transform_remote_locator(p.locator, temp_locator))
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                metatraffic_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_metatraffic_locators_present,
+                                &metatraffic_locators,
                                 temp_locator,
                                 false);
                         }
@@ -501,11 +486,13 @@ bool ParticipantProxyData::readFromCDRMessage(
                         }
 
                         Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration))
+                        if (network.transform_remote_locator(p.locator, temp_locator))
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                metatraffic_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_metatraffic_locators_present,
+                                &metatraffic_locators,
                                 temp_locator,
                                 true);
                         }
@@ -521,11 +508,13 @@ bool ParticipantProxyData::readFromCDRMessage(
                         }
 
                         Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration))
+                        if (network.transform_remote_locator(p.locator, temp_locator))
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                default_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &default_locators,
                                 temp_locator,
                                 true);
                         }
@@ -541,11 +530,13 @@ bool ParticipantProxyData::readFromCDRMessage(
                         }
 
                         Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration))
+                        if (network.transform_remote_locator(p.locator, temp_locator))
                         {
                             ProxyDataFilters::filter_locators(
                                 is_shm_transport_available,
-                                default_locators,
+                                &is_shm_transport_possible,
+                                &are_shm_default_locators_present,
+                                &default_locators,
                                 temp_locator,
                                 false);
                         }
@@ -619,7 +610,7 @@ bool ParticipantProxyData::readFromCDRMessage(
 
                         identity_token_ = std::move(p.token);
 #else
-                        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT, "Received PID_IDENTITY_TOKEN but security is disabled");
+                        logWarning(RTPS_PARTICIPANT, "Received PID_IDENTITY_TOKEN but security is disabled");
 #endif // if HAVE_SECURITY
                         break;
                     }
@@ -635,8 +626,7 @@ bool ParticipantProxyData::readFromCDRMessage(
 
                         permissions_token_ = std::move(p.token);
 #else
-                        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
-                                "Received PID_PERMISSIONS_TOKEN but security is disabled");
+                        logWarning(RTPS_PARTICIPANT, "Received PID_PERMISSIONS_TOKEN but security is disabled");
 #endif // if HAVE_SECURITY
                         break;
                     }
@@ -654,7 +644,7 @@ bool ParticipantProxyData::readFromCDRMessage(
                         security_attributes_ = p.security_attributes;
                         plugin_security_attributes_ = p.plugin_security_attributes;
 #else
-                        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
+                        logWarning(RTPS_PARTICIPANT,
                                 "Received PID_PARTICIPANT_SECURITY_INFO but security is disabled");
 #endif // if HAVE_SECURITY
                         break;
@@ -689,7 +679,6 @@ void ParticipantProxyData::clear()
     m_VendorId = c_VendorId_Unknown;
     m_expectsInlineQos = false;
     m_availableBuiltinEndpoints = 0;
-    m_networkConfiguration = 0;
     metatraffic_locators.unicast.clear();
     metatraffic_locators.multicast.clear();
     default_locators.unicast.clear();
@@ -719,7 +708,6 @@ void ParticipantProxyData::copy(
     m_VendorId[0] = pdata.m_VendorId[0];
     m_VendorId[1] = pdata.m_VendorId[1];
     m_availableBuiltinEndpoints = pdata.m_availableBuiltinEndpoints;
-    m_networkConfiguration = pdata.m_networkConfiguration;
     metatraffic_locators = pdata.metatraffic_locators;
     default_locators = pdata.default_locators;
     m_participantName = pdata.m_participantName;
@@ -805,7 +793,7 @@ void ParticipantProxyData::set_persistence_guid(
     {
         if (!it->modify(persistent_guid))
         {
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Failed to change property <"
+            logError(RTPS_PARTICIPANT, "Failed to change property <"
                     << it->first() << " | " << it->second() << "> to <"
                     << persistent_guid.first << " | " << persistent_guid.second << ">");
         }

@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/common/CdrSerialization.hpp>
-#include <fastdds/rtps/common/SerializedPayload.h>
-#include <fastrtps/types/AnnotationDescriptor.h>
-#include <fastrtps/types/DynamicType.h>
-#include <fastrtps/types/DynamicTypeBuilder.h>
 #include <fastrtps/types/DynamicTypeBuilderFactory.h>
-#include <fastrtps/types/DynamicTypeMember.h>
-#include <fastrtps/types/DynamicTypePtr.h>
-#include <fastrtps/types/MemberDescriptor.h>
-#include <fastrtps/types/TypeDescriptor.h>
-#include <fastrtps/types/TypeNamesGenerator.h>
-#include <fastrtps/types/TypeObject.h>
+#include <fastrtps/types/DynamicTypeBuilder.h>
 #include <fastrtps/types/TypeObjectFactory.h>
+#include <fastrtps/types/TypeDescriptor.h>
+#include <fastrtps/types/TypeObject.h>
+#include <fastrtps/types/DynamicType.h>
+#include <fastrtps/types/DynamicTypePtr.h>
+#include <fastrtps/types/DynamicTypeMember.h>
+#include <fastrtps/types/MemberDescriptor.h>
+#include <fastrtps/types/TypeNamesGenerator.h>
+#include <fastrtps/types/AnnotationDescriptor.h>
+#include <fastdds/dds/log/Log.hpp>
+
+#include <fastdds/rtps/common/SerializedPayload.h>
 #include <fastrtps/utils/md5.h>
 #include <fastrtps/utils/string_convert.hpp>
+#include <fastcdr/FastBuffer.h>
+#include <fastcdr/Cdr.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -165,7 +167,7 @@ DynamicType_ptr DynamicTypeBuilderFactory::create_type(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error building type, invalid input descriptor");
+        logError(DYN_TYPES, "Error building type, invalid input descriptor");
         return DynamicType_ptr(nullptr);
     }
 }
@@ -180,7 +182,7 @@ DynamicType_ptr DynamicTypeBuilderFactory::create_type(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error building type, invalid input parameter");
+        logError(DYN_TYPES, "Error building type, invalid input parameter");
         return DynamicType_ptr(nullptr);
     }
 }
@@ -198,12 +200,12 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_alias_builder(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating alias type, Error creating dynamic type");
+            logError(DYN_TYPES, "Error creating alias type, Error creating dynamic type");
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating alias type, base_type must be valid");
+        logError(DYN_TYPES, "Error creating alias type, base_type must be valid");
     }
     return nullptr;
 }
@@ -233,7 +235,7 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_alias_builder(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating alias type, base_type must be valid");
+        logError(DYN_TYPES, "Error creating alias type, base_type must be valid");
     }
     return nullptr;
 }
@@ -251,12 +253,12 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_array_builder(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating array, error creating dynamic type");
+            logError(DYN_TYPES, "Error creating array, error creating dynamic type");
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating array, element_type must be valid");
+        logError(DYN_TYPES, "Error creating array, element_type must be valid");
     }
     return nullptr;
 }
@@ -288,7 +290,7 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_array_builder(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating array, element_type must be valid");
+        logError(DYN_TYPES, "Error creating array, element_type must be valid");
     }
     return nullptr;
 }
@@ -315,8 +317,7 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_bitmask_builder(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES,
-                "Error creating bitmask, length exceeds the maximum value '" << MAX_BITMASK_LENGTH << "'");
+        logError(DYN_TYPES, "Error creating bitmask, length exceeds the maximum value '" << MAX_BITMASK_LENGTH << "'");
     }
     return nullptr;
 }
@@ -483,12 +484,12 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_map_builder(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating map, Error creating dynamic types.");
+            logError(DYN_TYPES, "Error creating map, Error creating dynamic types.");
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating map, element_type and key_element_type must be valid.");
+        logError(DYN_TYPES, "Error creating map, element_type and key_element_type must be valid.");
     }
     return nullptr;
 }
@@ -521,7 +522,7 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_map_builder(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating map, element_type and key_element_type must be valid.");
+        logError(DYN_TYPES, "Error creating map, element_type and key_element_type must be valid.");
     }
     return nullptr;
 }
@@ -539,12 +540,12 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_sequence_builder(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating sequence, error creating dynamic type.");
+            logError(DYN_TYPES, "Error creating sequence, error creating dynamic type.");
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating sequence, element_type must be valid.");
+        logError(DYN_TYPES, "Error creating sequence, element_type must be valid.");
     }
     return nullptr;
 }
@@ -572,7 +573,7 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_sequence_builder(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating sequence, element_type must be valid.");
+        logError(DYN_TYPES, "Error creating sequence, element_type must be valid.");
     }
     return nullptr;
 }
@@ -618,7 +619,7 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_child_struct_builder(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating child struct, invalid input type.");
+        logError(DYN_TYPES, "Error creating child struct, invalid input type.");
         return nullptr;
     }
 }
@@ -659,13 +660,12 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_custom_builder(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES,
-                    "Error creating type, unsupported type kind: " << static_cast<uint32_t>(kind));
+            logError(DYN_TYPES, "Error creating type, unsupported type kind: " << static_cast<uint32_t>(kind));
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating type, invalid input descriptor.");
+        logError(DYN_TYPES, "Error creating type, invalid input descriptor.");
     }
     return nullptr;
 }
@@ -681,7 +681,7 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_builder_copy(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating type, invalid input type.");
+        logError(DYN_TYPES, "Error creating type, invalid input type.");
     }
     return nullptr;
 }
@@ -731,13 +731,13 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_union_builder(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES, "Error building Union, Error creating discriminator type");
+            logError(DYN_TYPES, "Error building Union, Error creating discriminator type");
             return nullptr;
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error building Union, invalid discriminator type");
+        logError(DYN_TYPES, "Error building Union, invalid discriminator type");
         return nullptr;
     }
 }
@@ -758,7 +758,7 @@ DynamicTypeBuilder* DynamicTypeBuilderFactory::create_union_builder(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error building Union, invalid discriminator type");
+        logError(DYN_TYPES, "Error building Union, invalid discriminator type");
         return nullptr;
     }
 }
@@ -803,7 +803,7 @@ ReturnCode_t DynamicTypeBuilderFactory::delete_builder(
         }
         else
         {
-            EPROSIMA_LOG_WARNING(DYN_TYPES, "The given type has been deleted previously.");
+            logWarning(DYN_TYPES, "The given type has been deleted previously.");
             return ReturnCode_t::RETCODE_ALREADY_DELETED;
         }
 #else
@@ -1003,7 +1003,7 @@ void DynamicTypeBuilderFactory::build_type_identifier(
             {
                 // Need to be registered as TypeObject first
                 // and return them as EK_MINIMAL or EK_COMPLETE
-                EPROSIMA_LOG_INFO(DYN_TYPE_FACTORY, "Complex types must be built from CompleteTypeObjects.");
+                logInfo(DYN_TYPE_FACTORY, "Complex types must be built from CompleteTypeObjects.");
             }
             break;
         }
@@ -1476,23 +1476,17 @@ void DynamicTypeBuilderFactory::build_alias_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.complete().alias_type(), current_alignment) + 4));
+                    CompleteAliasType::getCdrSerializedSize(object.complete().alias_type()) + 4));
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
         // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
         eprosima::fastcdr::Cdr ser(
             fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-            eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
 
-        ser << object;
-#if FASTCDR_VERSION_MAJOR == 1
+        object.serialize(ser);
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -1536,23 +1530,17 @@ void DynamicTypeBuilderFactory::build_alias_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_MINIMAL);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.minimal().alias_type(), current_alignment) + 4));
+                    MinimalAliasType::getCdrSerializedSize(object.minimal().alias_type()) + 4));
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
         // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
         eprosima::fastcdr::Cdr ser(
             fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-            eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
 
-        ser << object;
-#if FASTCDR_VERSION_MAJOR == 1
+        object.serialize(ser);
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -1602,24 +1590,17 @@ void DynamicTypeBuilderFactory::build_enum_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.complete().enumerated_type(),
-                    current_alignment) + 4));
+                    CompleteEnumeratedType::getCdrSerializedSize(object.complete().enumerated_type()) + 4));
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
         // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
         eprosima::fastcdr::Cdr ser(
             fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-            eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
 
-        ser << object;
-#if FASTCDR_VERSION_MAJOR == 1
+        object.serialize(ser);
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -1652,24 +1633,17 @@ void DynamicTypeBuilderFactory::build_enum_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_MINIMAL);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.minimal().enumerated_type(),
-                    current_alignment) + 4));
+                    MinimalEnumeratedType::getCdrSerializedSize(object.minimal().enumerated_type()) + 4));
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
         // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
         eprosima::fastcdr::Cdr ser(
             fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-            eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
 
-        ser << object;
-#if FASTCDR_VERSION_MAJOR == 1
+        object.serialize(ser);
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -1733,8 +1707,8 @@ void DynamicTypeBuilderFactory::build_struct_type_code(
                     TypeObjectFactory::get_instance()->get_type_identifier_trying_complete(member->type_->get_name());
             if (typeId == nullptr)
             {
-                EPROSIMA_LOG_ERROR(DYN_TYPES, "Member " << member->get_name() << " of struct "
-                                                        << descriptor->get_name() << " failed.");
+                logError(DYN_TYPES, "Member " << member->get_name() << " of struct "
+                                              << descriptor->get_name() << " failed.");
             }
             else
             {
@@ -1761,27 +1735,21 @@ void DynamicTypeBuilderFactory::build_struct_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.complete().struct_type(), current_alignment) + 4));
+                    CompleteStructType::getCdrSerializedSize(object.complete().struct_type()) + 4));
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
 
         eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+                eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
         // Serialize encapsulation
 
         for (CompleteStructMember& st : object.complete().struct_type().member_seq())
         {
             ser << st;
         }
-#if FASTCDR_VERSION_MAJOR == 1
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -1831,8 +1799,8 @@ void DynamicTypeBuilderFactory::build_struct_type_code(
                     TypeObjectFactory::get_instance()->get_type_identifier(member->type_->get_name());
             if (typeId == nullptr)
             {
-                EPROSIMA_LOG_ERROR(DYN_TYPES, "Member " << member->get_name()
-                                                        << " of struct " << descriptor->get_name() << " failed.");
+                logError(DYN_TYPES, "Member " << member->get_name()
+                                              << " of struct " << descriptor->get_name() << " failed.");
             }
             else
             {
@@ -1858,27 +1826,21 @@ void DynamicTypeBuilderFactory::build_struct_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_MINIMAL);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.minimal().struct_type(), current_alignment) + 4));
+                    MinimalStructType::getCdrSerializedSize(object.minimal().struct_type()) + 4));
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
 
         eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+                eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
         // Serialize encapsulation
 
         for (MinimalStructMember& st : object.minimal().struct_type().member_seq())
         {
             ser << st;
         }
-#if FASTCDR_VERSION_MAJOR == 1
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -1957,8 +1919,8 @@ void DynamicTypeBuilderFactory::build_union_type_code(
                     TypeObjectFactory::get_instance()->get_type_identifier_trying_complete(member->type_->get_name());
             if (typeId == nullptr)
             {
-                EPROSIMA_LOG_ERROR(DYN_TYPES, "Member " << member->get_name()
-                                                        << " of union " << descriptor->get_name() << " failed.");
+                logError(DYN_TYPES, "Member " << member->get_name()
+                                              << " of union " << descriptor->get_name() << " failed.");
             }
             else
             {
@@ -1979,22 +1941,17 @@ void DynamicTypeBuilderFactory::build_union_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_MINIMAL);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.complete().union_type(), current_alignment) + 4));
+                    CompleteUnionType::getCdrSerializedSize(object.complete().union_type()) + 4));
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
         // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
-        eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+        eprosima::fastcdr::Cdr ser(
+            fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
 
-        ser << object;
-#if FASTCDR_VERSION_MAJOR == 1
+        object.serialize(ser);
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -2061,8 +2018,8 @@ void DynamicTypeBuilderFactory::build_union_type_code(
                     TypeObjectFactory::get_instance()->get_type_identifier(member->type_->get_name());
             if (typeId == nullptr)
             {
-                EPROSIMA_LOG_ERROR(DYN_TYPES, "Member " << member->get_name()
-                                                        << " of union " << descriptor->get_name() << " failed.");
+                logError(DYN_TYPES, "Member " << member->get_name()
+                                              << " of union " << descriptor->get_name() << " failed.");
             }
             else
             {
@@ -2085,22 +2042,17 @@ void DynamicTypeBuilderFactory::build_union_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_MINIMAL);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.minimal().union_type(), current_alignment) + 4));
+                    MinimalUnionType::getCdrSerializedSize(object.minimal().union_type()) + 4));
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
         // Fixed endian (Page 221, EquivalenceHash definition of Extensible and Dynamic Topic Types for DDS document)
-        eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+        eprosima::fastcdr::Cdr ser(
+            fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
+            eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
 
-        ser << object;
-#if FASTCDR_VERSION_MAJOR == 1
+        object.serialize(ser);
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -2165,27 +2117,21 @@ void DynamicTypeBuilderFactory::build_bitset_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.complete().bitset_type(), current_alignment) + 4));
+                    CompleteBitsetType::getCdrSerializedSize(object.complete().bitset_type()) + 4));
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
 
         eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+                eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
         // Serialize encapsulation
 
         for (CompleteBitfield& st : object.complete().bitset_type().field_seq())
         {
             ser << st;
         }
-#if FASTCDR_VERSION_MAJOR == 1
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -2236,27 +2182,21 @@ void DynamicTypeBuilderFactory::build_bitset_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.minimal().bitset_type(), current_alignment) + 4));
+                    MinimalBitsetType::getCdrSerializedSize(object.minimal().bitset_type()) + 4));
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
 
         eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+                eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
         // Serialize encapsulation
 
         for (MinimalBitfield& st : object.minimal().bitset_type().field_seq())
         {
             ser << st;
         }
-#if FASTCDR_VERSION_MAJOR == 1
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -2308,27 +2248,21 @@ void DynamicTypeBuilderFactory::build_bitmask_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.complete().bitmask_type(), current_alignment) + 4));
+                    CompleteBitmaskType::getCdrSerializedSize(object.complete().bitmask_type()) + 4));
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
 
         eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+                eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
         // Serialize encapsulation
 
         for (CompleteBitflag& st : object.complete().bitmask_type().flag_seq())
         {
             ser << st;
         }
-#if FASTCDR_VERSION_MAJOR == 1
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -2365,27 +2299,21 @@ void DynamicTypeBuilderFactory::build_bitmask_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.minimal().bitmask_type(), current_alignment) + 4));
+                    MinimalBitmaskType::getCdrSerializedSize(object.minimal().bitmask_type()) + 4));
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
 
         eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+                eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
         // Serialize encapsulation
 
         for (MinimalBitflag& st : object.minimal().bitmask_type().flag_seq())
         {
             ser << st;
         }
-#if FASTCDR_VERSION_MAJOR == 1
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -2427,8 +2355,8 @@ void DynamicTypeBuilderFactory::build_annotation_type_code(
                     TypeObjectFactory::get_instance()->get_type_identifier(member->type_->get_name());
             if (typeId == nullptr)
             {
-                EPROSIMA_LOG_ERROR(DYN_TYPES, "Member " << member->get_name()
-                                                        << " of annotation " << descriptor->get_name() << " failed.");
+                logError(DYN_TYPES, "Member " << member->get_name()
+                                              << " of annotation " << descriptor->get_name() << " failed.");
             }
             else
             {
@@ -2444,28 +2372,21 @@ void DynamicTypeBuilderFactory::build_annotation_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.complete().annotation_type(),
-                    current_alignment) + 4));
+                    CompleteAnnotationType::getCdrSerializedSize(object.complete().annotation_type()) + 4));
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
 
         eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+                eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
         // Serialize encapsulation
 
         for (CompleteAnnotationParameter& st : object.complete().annotation_type().member_seq())
         {
             ser << st;
         }
-#if FASTCDR_VERSION_MAJOR == 1
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -2499,8 +2420,8 @@ void DynamicTypeBuilderFactory::build_annotation_type_code(
                     TypeObjectFactory::get_instance()->get_type_identifier(member->type_->get_name());
             if (typeId == nullptr)
             {
-                EPROSIMA_LOG_ERROR(DYN_TYPES, "Member " << member->get_name()
-                                                        << " of annotation " << descriptor->get_name() << " failed.");
+                logError(DYN_TYPES, "Member " << member->get_name()
+                                              << " of annotation " << descriptor->get_name() << " failed.");
             }
             else
             {
@@ -2514,28 +2435,21 @@ void DynamicTypeBuilderFactory::build_annotation_type_code(
         TypeIdentifier identifier;
         identifier._d(EK_COMPLETE);
 
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         eprosima::fastrtps::rtps::SerializedPayload_t payload(static_cast<uint32_t>(
-                    calculator.calculate_serialized_size(object.minimal().annotation_type(),
-                    current_alignment) + 4));
+                    MinimalAnnotationType::getCdrSerializedSize(object.minimal().annotation_type()) + 4));
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fastbuffer((char*) payload.data, payload.max_size);
 
         eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::LITTLE_ENDIANNESS,
-                eprosima::fastcdr::CdrVersion::XCDRv1); // Object that serializes the data.
-        payload.encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
+                eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
+        payload.encapsulation = CDR_LE;
         // Serialize encapsulation
 
         for (MinimalAnnotationParameter& st : object.minimal().annotation_type().member_seq())
         {
             ser << st;
         }
-#if FASTCDR_VERSION_MAJOR == 1
         payload.length = (uint32_t)ser.getSerializedDataLength(); //Get the serialized length
-#else
-        payload.length = (uint32_t)ser.get_serialized_data_length(); //Get the serialized length
-#endif // FASTCDR_VERSION_MAJOR == 1
         MD5 objectHash;
         objectHash.update((char*)payload.data, payload.length);
         objectHash.finalize();
@@ -2659,12 +2573,12 @@ DynamicType_ptr DynamicTypeBuilderFactory::create_alias_type(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating alias type, Error creating dynamic type");
+            logError(DYN_TYPES, "Error creating alias type, Error creating dynamic type");
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating alias type, base_type must be valid");
+        logError(DYN_TYPES, "Error creating alias type, base_type must be valid");
     }
     return DynamicType_ptr(nullptr);
 }
@@ -2691,7 +2605,7 @@ DynamicType_ptr DynamicTypeBuilderFactory::create_alias_type(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error creating alias type, base_type must be valid");
+        logError(DYN_TYPES, "Error creating alias type, base_type must be valid");
     }
     return DynamicType_ptr(nullptr);
 }
@@ -2818,8 +2732,7 @@ DynamicType_ptr DynamicTypeBuilderFactory::create_bitset_type(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES,
-                "Error creating bitmask, length exceeds the maximum value '" << MAX_BITMASK_LENGTH << "'");
+        logError(DYN_TYPES, "Error creating bitmask, length exceeds the maximum value '" << MAX_BITMASK_LENGTH << "'");
     }
     return DynamicType_ptr(nullptr);
 }

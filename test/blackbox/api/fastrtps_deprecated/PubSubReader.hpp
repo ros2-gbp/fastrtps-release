@@ -268,8 +268,8 @@ public:
         subscriber_attr_.topic.topicKind =
                 type_.m_isGetKeyDefined ? ::eprosima::fastrtps::rtps::WITH_KEY : ::eprosima::fastrtps::rtps::NO_KEY;
 
-        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
-        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        // By default, memory mode is preallocated (the most restritive)
+        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 
         // By default, heartbeat period delay is 100 milliseconds.
         subscriber_attr_.times.heartbeatResponseDelay.seconds = 0;
@@ -291,15 +291,33 @@ public:
 
     void init()
     {
-        participant_attr_.domainId = (uint32_t)GET_PID() % 230;
-
+        //Create participant
         // Use local copies of attributes to catch #6507 issues with valgrind
         eprosima::fastrtps::ParticipantAttributes participant_attr;
         eprosima::fastrtps::SubscriberAttributes subscriber_attr;
-        participant_attr = participant_attr_;
-        subscriber_attr = subscriber_attr_;
 
-        participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
+        if (!xml_file_.empty())
+        {
+            eprosima::fastrtps::Domain::loadXMLProfilesFile(xml_file_);
+            if (!participant_profile_.empty())
+            {
+                // Need to specify ID in XML
+                participant_ = eprosima::fastrtps::Domain::createParticipant(participant_profile_,
+                                &participant_listener_);
+                ASSERT_NE(participant_, nullptr);
+                participant_attr = participant_->getAttributes();
+                subscriber_attr = subscriber_attr_;
+            }
+        }
+        if (participant_ == nullptr)
+        {
+            participant_attr_.domainId = (uint32_t)GET_PID() % 230;
+
+            participant_attr = participant_attr_;
+            subscriber_attr = subscriber_attr_;
+
+            participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
+        }
 
         if (participant_ != nullptr)
         {
@@ -342,7 +360,7 @@ public:
     }
 
     void startReception(
-            const std::list<type>& msgs)
+            std::list<type>& msgs)
     {
         mutex_.lock();
         total_msgs_ = msgs;
@@ -538,8 +556,7 @@ public:
         return ret_value;
     }
 
-    void wait_writer_undiscovery(
-            unsigned int matched = 0)
+    void wait_writer_undiscovery()
     {
         std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
@@ -547,7 +564,7 @@ public:
 
         cvDiscovery_.wait(lock, [&]()
                 {
-                    return matched_ <= matched;
+                    return matched_ == 0;
                 });
 
         std::cout << "Reader removal finished..." << std::endl;
@@ -710,6 +727,13 @@ public:
             const int32_t depth)
     {
         subscriber_attr_.topic.historyQos.depth = depth;
+        return *this;
+    }
+
+    PubSubReader& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports)
+    {
+        participant_attr_.rtps.setup_transports(transports);
         return *this;
     }
 
@@ -1079,12 +1103,6 @@ public:
         return *this;
     }
 
-    PubSubReader& ownership_exclusive()
-    {
-        subscriber_attr_.qos.m_ownership.kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
-        return *this;
-    }
-
     PubSubReader& load_participant_attr(
             const std::string& xml)
     {
@@ -1298,6 +1316,18 @@ public:
         return matched_;
     }
 
+    void set_xml_filename(
+            const std::string& name)
+    {
+        xml_file_ = name;
+    }
+
+    void set_participant_profile(
+            const std::string& profile)
+    {
+        participant_profile_ = profile;
+    }
+
     const eprosima::fastrtps::rtps::GUID_t& participant_guid() const
     {
         return participant_guid_;
@@ -1405,9 +1435,12 @@ private:
     std::atomic<bool> receiving_;
     type_support type_;
     std::map<eprosima::fastrtps::rtps::InstanceHandle_t, eprosima::fastrtps::rtps::SequenceNumber_t> last_seq;
-    std::atomic<size_t> current_processed_count_;
-    std::atomic<size_t> number_samples_expected_;
+    size_t current_processed_count_;
+    size_t number_samples_expected_;
     bool discovery_result_;
+
+    std::string xml_file_ = "";
+    std::string participant_profile_ = "";
 
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
     std::function<bool(const eprosima::fastrtps::rtps::WriterDiscoveryInfo& info)> onEndpointDiscovery_;

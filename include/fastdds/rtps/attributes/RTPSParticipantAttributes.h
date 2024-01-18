@@ -19,32 +19,29 @@
 #ifndef _FASTDDS_RTPSPARTICIPANTPARAMETERS_H_
 #define _FASTDDS_RTPSPARTICIPANTPARAMETERS_H_
 
-#include <fastdds/rtps/attributes/ExternalLocators.hpp>
-#include <fastdds/rtps/attributes/PropertyPolicy.h>
-#include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
-#include <fastdds/rtps/attributes/ServerAttributes.h>
+#include <fastdds/rtps/common/Time_t.h>
+#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/PortParameters.h>
-#include <fastdds/rtps/common/Time_t.h>
-#include <fastdds/rtps/common/Types.h>
-#include <fastdds/rtps/flowcontrol/FlowControllerDescriptor.hpp>
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastdds/rtps/flowcontrol/ThroughputControllerDescriptor.h>
-#include <fastdds/rtps/resources/ResourceManagement.h>
 #include <fastdds/rtps/transport/TransportInterface.h>
+#include <fastdds/rtps/resources/ResourceManagement.h>
 #include <fastrtps/utils/fixed_size_string.hpp>
+#include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
+#include <fastdds/rtps/attributes/ServerAttributes.h>
+#include <fastdds/rtps/flowcontrol/FlowControllerDescriptor.hpp>
 
 #include <memory>
 #include <sstream>
 
 namespace eprosima {
-
 namespace fastdds {
-
 namespace rtps {
 
 /**
  * Struct to define participant types to set participant type parameter property
- *@ingroup DISCOVERY_MODULE
+ * @ingroup DISCOVERY_MODULE
  */
 struct ParticipantType
 {
@@ -58,14 +55,13 @@ struct ParticipantType
     static constexpr const char* UNKNOWN = "UNKNOWN";
 };
 
-} /* namespace rtps */
-} /* namespace fastdds */
+}  // namespace rtps
+}  // namespace fastdds
 
 namespace fastrtps {
 namespace rtps {
 
-
-//!PDP subclass choice
+//! PDP subclass choice
 typedef enum DiscoveryProtocol
 {
     NONE,
@@ -128,7 +124,7 @@ inline std::ostream& operator <<(
     return output;
 }
 
-//!Filtering flags when discovering participants
+//! Filtering flags when discovering participants
 typedef enum ParticipantFilteringFlags : uint32_t
 {
     NO_FILTER = 0,
@@ -376,23 +372,17 @@ public:
     //! Discovery protocol related attributes
     DiscoverySettings discovery_config;
 
-    //! Indicates to use the WriterLiveliness protocol.
+    //!Indicates to use the WriterLiveliness protocol.
     bool use_WriterLivelinessProtocol = true;
 
-    //! TypeLookup Service settings
+    //!TypeLookup Service settings
     TypeLookupSettings typelookup_config;
 
-    //! Network Configuration
-    NetworkConfigSet_t network_configuration;
-
-    //! Metatraffic Unicast Locator List
+    //!Metatraffic Unicast Locator List
     LocatorList_t metatrafficUnicastLocatorList;
 
-    //! Metatraffic Multicast Locator List.
+    //!Metatraffic Multicast Locator List.
     LocatorList_t metatrafficMulticastLocatorList;
-
-    //! The collection of external locators to use for communication on metatraffic topics.
-    fastdds::rtps::ExternalLocators metatraffic_external_unicast_locators;
 
     //! Initial peers.
     LocatorList_t initialPeersList;
@@ -414,7 +404,7 @@ public:
     //! Mutation tries if the port is being used.
     uint32_t mutation_tries = 100u;
 
-    //! Set to true to avoid multicast traffic on builtin endpoints
+    //!Set to true to avoid multicast traffic on builtin endpoints
     bool avoid_builtin_multicast = true;
 
     BuiltinAttributes() = default;
@@ -428,10 +418,8 @@ public:
                (this->use_WriterLivelinessProtocol == b.use_WriterLivelinessProtocol) &&
                (typelookup_config.use_client == b.typelookup_config.use_client) &&
                (typelookup_config.use_server == b.typelookup_config.use_server) &&
-               (this->network_configuration == b.network_configuration) &&
                (this->metatrafficUnicastLocatorList == b.metatrafficUnicastLocatorList) &&
                (this->metatrafficMulticastLocatorList == b.metatrafficMulticastLocatorList) &&
-               (this->metatraffic_external_unicast_locators == b.metatraffic_external_unicast_locators) &&
                (this->initialPeersList == b.initialPeersList) &&
                (this->readerHistoryMemoryPolicy == b.readerHistoryMemoryPolicy) &&
                (this->readerPayloadSize == b.readerPayloadSize) &&
@@ -445,7 +433,7 @@ public:
 
 /**
  * Class RTPSParticipantAttributes used to define different aspects of a RTPSParticipant.
- *@ingroup RTPS_ATTRIBUTES_MODULE
+ * @ingroup RTPS_ATTRIBUTES_MODULE
  */
 class RTPSParticipantAttributes
 {
@@ -453,18 +441,9 @@ class RTPSParticipantAttributes
 
 public:
 
-    RTPSParticipantAttributes()
-    {
-        setName("RTPSParticipant");
-        sendSocketBufferSize = 0;
-        listenSocketBufferSize = 0;
-        participantID = -1;
-        useBuiltinTransports = true;
-    }
+    RTPSParticipantAttributes() = default;
 
-    virtual ~RTPSParticipantAttributes()
-    {
-    }
+    virtual ~RTPSParticipantAttributes() = default;
 
     bool operator ==(
             const RTPSParticipantAttributes& b) const
@@ -472,8 +451,6 @@ public:
         return (this->name == b.name) &&
                (this->defaultUnicastLocatorList == b.defaultUnicastLocatorList) &&
                (this->defaultMulticastLocatorList == b.defaultMulticastLocatorList) &&
-               (this->default_external_unicast_locators == b.default_external_unicast_locators) &&
-               (this->ignore_non_matching_locators == b.ignore_non_matching_locators) &&
                (this->sendSocketBufferSize == b.sendSocketBufferSize) &&
                (this->listenSocketBufferSize == b.listenSocketBufferSize) &&
                (this->builtin == b.builtin) &&
@@ -488,6 +465,14 @@ public:
     }
 
     /**
+     * Provides a way of easily configuring transport related configuration on certain pre-defined scenarios.
+     *
+     * @param transports Defines the transport configuration scenario to setup.
+     */
+    RTPS_DllAPI void setup_transports(
+            fastdds::rtps::BuiltinTransports transports);
+
+    /**
      * Default list of Unicast Locators to be used for any Endpoint defined inside this RTPSParticipant in the case
      * that it was defined with NO UnicastLocators. At least ONE locator should be included in this list.
      */
@@ -495,30 +480,20 @@ public:
 
     /**
      * Default list of Multicast Locators to be used for any Endpoint defined inside this RTPSParticipant in the
-     * case that it was defined with NO MulticastLocators. This is usually left empty.
+     * case that it was defined with NO UnicastLocators. This is usually left empty.
      */
     LocatorList_t defaultMulticastLocatorList;
-
-    /**
-     * The collection of external locators to use for communication on user created topics.
-     */
-    fastdds::rtps::ExternalLocators default_external_unicast_locators;
-
-    /**
-     * Whether locators that don't match with the announced locators should be kept.
-     */
-    bool ignore_non_matching_locators = false;
 
     /*!
      * @brief Send socket buffer size for the send resource. Zero value indicates to use default system buffer size.
      * Default value: 0.
      */
-    uint32_t sendSocketBufferSize;
+    uint32_t sendSocketBufferSize = 0;
 
     /*! Listen socket buffer for all listen resources. Zero value indicates to use default system buffer size.
      * Default value: 0.
      */
-    uint32_t listenSocketBufferSize;
+    uint32_t listenSocketBufferSize = 0;
 
     //! Optionally allows user to define the GuidPrefix_t
     GuidPrefix_t prefix;
@@ -532,14 +507,14 @@ public:
     //! Builtin parameters.
     BuiltinAttributes builtin;
 
-    //! Port Parameters
+    //!Port Parameters
     PortParameters port;
 
-    //! User Data of the participant
+    //!User Data of the participant
     std::vector<octet> userData;
 
     //! Participant ID
-    int32_t participantID;
+    int32_t participantID = -1;
 
     /**
      * @brief Throughput controller parameters. Leave default for uncontrolled flow.
@@ -548,11 +523,11 @@ public:
      */
     ThroughputControllerDescriptor throughputController;
 
-    //! User defined transports to use alongside or in place of builtins.
+    //!User defined transports to use alongside or in place of builtins.
     std::vector<std::shared_ptr<fastdds::rtps::TransportDescriptorInterface>> userTransports;
 
-    //! Set as false to disable the default UDPv4 implementation.
-    bool useBuiltinTransports;
+    //! Set as false to disable the creation of the default transports.
+    bool useBuiltinTransports = true;
 
     //! Holds allocation limits affecting collections managed by a participant.
     RTPSParticipantAllocationAttributes allocation;
@@ -560,14 +535,14 @@ public:
     //! Property policies
     PropertyPolicy properties;
 
-    //! Set the name of the participant.
+    //!Set the name of the participant.
     inline void setName(
             const char* nam)
     {
         name = nam;
     }
 
-    //! Get the name of the participant.
+    //!Get the name of the participant.
     inline const char* getName() const
     {
         return name.c_str();
@@ -579,11 +554,11 @@ public:
 private:
 
     //! Name of the participant.
-    string_255 name;
+    string_255 name{"RTPSParticipant"};
 };
 
-} /* namespace rtps */
-} /* namespace fastrtps */
-} /* namespace eprosima */
+}  // namespace rtps
+}  // namespace fastrtps
+}  // namespace eprosima
 
-#endif /* _FASTDDS_RTPSPARTICIPANTPARAMETERS_H_ */
+#endif  // _FASTDDS_RTPSPARTICIPANTPARAMETERS_H_

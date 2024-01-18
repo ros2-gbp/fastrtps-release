@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/sh
 
 ## Copyright 2018-2019 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 ##

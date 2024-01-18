@@ -13,26 +13,23 @@
 // limitations under the License.
 
 #include <atomic>
+#include <thread>
 
 #include <gtest/gtest.h>
 
 #include <fastdds/dds/subscriber/DataReader.hpp>
-#include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
-
+#include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/rtps/transport/test_UDPv4TransportDescriptor.h>
-
 #include <fastrtps/attributes/LibrarySettingsAttributes.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
-
-#include "BlackboxTests.hpp"
-
-#include "PubSubReader.hpp"
-#include "PubSubWriter.hpp"
 
 #include "../types/HelloWorldTypeObject.h"
 #include "../types/TestRegression3361PubSubTypes.h"
 #include "../types/TestRegression3361TypeObject.h"
+#include "BlackboxTests.hpp"
+#include "PubSubReader.hpp"
+#include "PubSubWriter.hpp"
 
 namespace eprosima {
 namespace fastdds {
@@ -597,12 +594,6 @@ TEST(DDSContentFilter, CorrectlyHandleAliasOtherHeader)
         throw std::runtime_error("Failed to register type");
     }
 
-    auto sub = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT, nullptr);
-    if (sub == nullptr)
-    {
-        throw std::runtime_error("Failed to create subscriber");
-    }
-
     auto topic = participant->create_topic("TestTopic", type->getName(), TOPIC_QOS_DEFAULT);
     if (topic == nullptr)
     {
@@ -616,6 +607,10 @@ TEST(DDSContentFilter, CorrectlyHandleAliasOtherHeader)
         "FilteredTestTopic", topic, expression, parameters);
 
     EXPECT_NE(nullptr, filtered_topic);
+
+    participant->delete_contentfilteredtopic(filtered_topic);
+    participant->delete_topic(topic);
+    dpf->delete_participant(participant);
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P

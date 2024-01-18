@@ -112,22 +112,6 @@ public:
 
     static XMLP_ret propertiesPolicy_wrapper(
             tinyxml2::XMLElement* elem,
-            OwnershipQosPolicy& ownershipQos,
-            uint8_t ident)
-    {
-        return getXMLOwnershipQos(elem, ownershipQos, ident);
-    }
-
-    static XMLP_ret propertiesPolicy_wrapper(
-            tinyxml2::XMLElement* elem,
-            OwnershipStrengthQosPolicy& ownershipStrengthQos,
-            uint8_t ident)
-    {
-        return getXMLOwnershipStrengthQos(elem, ownershipStrengthQos, ident);
-    }
-
-    static XMLP_ret propertiesPolicy_wrapper(
-            tinyxml2::XMLElement* elem,
             PropertyPolicy& propertiesPolicy,
             uint8_t ident)
     {
@@ -148,6 +132,14 @@ public:
             uint8_t ident)
     {
         return getXMLTransports(elem, transports, ident);
+    }
+
+    static XMLP_ret getXMLBuiltinTransports_wrapper(
+            tinyxml2::XMLElement* elem,
+            eprosima::fastdds::rtps::BuiltinTransports* bt,
+            uint8_t ident)
+    {
+        return getXMLBuiltinTransports(elem, bt, ident);
     }
 
     static XMLP_ret getXMLguidPrefix_wrapper(
@@ -220,14 +212,6 @@ public:
             uint8_t ident)
     {
         return getXMLBuiltinAttributes(elem, builtin, ident);
-    }
-
-    static XMLP_ret getXMLTypeLookupSettings_wrapper(
-            tinyxml2::XMLElement* elem,
-            TypeLookupSettings& settings,
-            uint8_t ident)
-    {
-        return getXMLTypeLookupSettings(elem, settings, ident);
     }
 
     static XMLP_ret getXMLThroughputController_wrapper(

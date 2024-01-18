@@ -17,9 +17,8 @@
 
 #include <functional>
 
+#include <fastrtps/rtps/network/ReceiverResource.h>
 #include <fastrtps/rtps/messages/MessageReceiver.h>
-
-#include <rtps/network/ReceiverResource.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -30,6 +29,11 @@ class MockMessageReceiver;
 class MockReceiverResource : public ReceiverResource
 {
 public:
+
+    bool is_valid() const
+    {
+        return mValid;
+    }
 
     virtual void OnDataReceived(
             const octet*,

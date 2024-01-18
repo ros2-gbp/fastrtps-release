@@ -324,11 +324,6 @@ protected:
             rtps::MemoryManagementPolicy_t& historyMemoryPolicy,
             uint8_t ident);
 
-    static XMLP_ret getXMLExternalLocatorList(
-            tinyxml2::XMLElement* elem,
-            fastdds::rtps::ExternalLocators& external_locators,
-            uint8_t ident);
-
     RTPS_DllAPI static XMLP_ret getXMLLocatorList(
             tinyxml2::XMLElement* elem,
             rtps::LocatorList_t& locatorList,
@@ -514,11 +509,6 @@ protected:
             rtps::DiscoverySettings& settings,
             uint8_t ident);
 
-    RTPS_DllAPI static XMLP_ret getXMLTypeLookupSettings(
-            tinyxml2::XMLElement* elem,
-            rtps::TypeLookupSettings& settings,
-            uint8_t ident);
-
     RTPS_DllAPI static XMLP_ret getXMLInitialAnnouncementsConfig(
             tinyxml2::XMLElement* elem,
             rtps::InitialAnnouncementConfig& config,
@@ -607,6 +597,11 @@ protected:
     RTPS_DllAPI static XMLP_ret getXMLSubscriberAttributes(
             tinyxml2::XMLElement* elem,
             SubscriberAttributes& subscriber,
+            uint8_t ident);
+
+    RTPS_DllAPI static XMLP_ret getXMLBuiltinTransports(
+            tinyxml2::XMLElement* elem,
+            eprosima::fastdds::rtps::BuiltinTransports* bt,
             uint8_t ident);
 };
 

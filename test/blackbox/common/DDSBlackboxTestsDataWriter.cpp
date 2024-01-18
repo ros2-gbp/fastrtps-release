@@ -199,88 +199,6 @@ TEST_P(DDSDataWriter, GetKeyValue)
     EXPECT_EQ(valid_data.key(), data.key());
 }
 
-TEST_P(DDSDataWriter, WithTimestampOperations)
-{
-    using namespace eprosima::fastdds::dds;
-
-    // Test variables
-    eprosima::fastrtps::Time_t ts;
-
-    KeyedHelloWorld valid_data;
-    valid_data.key(27);
-    valid_data.index(1);
-    valid_data.message("HelloWorld");
-
-    // Create and initialize reader
-    PubSubReader<KeyedHelloWorldPubSubType> reader(TEST_TOPIC_NAME);
-    reader.durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .history_depth(10)
-            .init();
-    ASSERT_TRUE(reader.isInitialized());
-    DataReader& datareader = reader.get_native_reader();
-
-    // Create and initialize writer
-    PubSubWriter<KeyedHelloWorldPubSubType> writer(TEST_TOPIC_NAME);
-    writer.durability_kind(eprosima::fastrtps::TRANSIENT_LOCAL_DURABILITY_QOS)
-            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
-            .history_depth(10)
-            .init();
-    ASSERT_TRUE(writer.isInitialized());
-    DataWriter& datawriter = writer.get_native_writer();
-    DataWriterQos qos = datawriter.get_qos();
-    qos.writer_data_lifecycle().autodispose_unregistered_instances = false;
-    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.set_qos(qos));
-
-    // Wait discovery, since we are going to unregister an instance
-    reader.wait_discovery();
-    writer.wait_discovery();
-
-    ts.seconds = 0;
-    ts.nanosec = 1;
-    // Register with custom timestamp
-    EXPECT_NE(HANDLE_NIL, datawriter.register_instance_w_timestamp(&valid_data, ts));
-    // TODO(MiguelCompay): Remove the following line when register_instance operation gets propagated to the reader.
-    // See redmine issue #14494
-    ts.nanosec--;
-    // Write with custom timestamp
-    ts.nanosec++;
-    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.write_w_timestamp(&valid_data, HANDLE_NIL, ts));
-    // Dispose with custom timestamp
-    ts.nanosec++;
-    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.dispose_w_timestamp(&valid_data, HANDLE_NIL, ts));
-    // Write with custom timestamp
-    ts.nanosec++;
-    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.write_w_timestamp(&valid_data, HANDLE_NIL, ts));
-    // Unregister with custom timestamp
-    ts.nanosec++;
-    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datawriter.unregister_instance_w_timestamp(&valid_data, HANDLE_NIL, ts));
-
-    // Wait and take all data
-    auto num_samples = ts.nanosec;
-    while (num_samples != datareader.get_unread_count())
-    {
-        EXPECT_TRUE(datareader.wait_for_unread_message({ 10, 0 }));
-    }
-
-    FASTDDS_CONST_SEQUENCE(DataSeq, KeyedHelloWorld);
-    SampleInfoSeq infos;
-    DataSeq datas;
-    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datareader.take(datas, infos));
-
-    // Check received timestamps
-    ts.seconds = 0;
-    ts.nanosec = 1;
-    EXPECT_EQ(static_cast<decltype(num_samples)>(infos.length()), num_samples);
-    for (SampleInfoSeq::size_type n = 0; n < infos.length(); ++n)
-    {
-        EXPECT_EQ(ts, infos[n].source_timestamp);
-        ts.nanosec++;
-    }
-
-    EXPECT_EQ(ReturnCode_t::RETCODE_OK, datareader.return_loan(datas, infos));
-}
-
 /**
  * Regression test for EasyRedmine issue https://eprosima.easyredmine.com/issues/17961
  *
@@ -367,6 +285,49 @@ TEST(DDSDataWriter, OfferedDeadlineMissedListener)
                         return deadline_called.load();
                     });
     ASSERT_TRUE(ret);
+}
+
+/**
+ * Regression test for EasyRedmine issue https://eprosima.easyredmine.com/issues/20059
+ *
+ * The test creates a writer and reader that communicate with transient_local reliable QoS.
+ * The issue corresponds to a race condition involving writer's history destruction and heartbeat delivery, so in order
+ * to increment the probability of occurrence a high history depth and heartbeat frequency are used.
+ *
+ * Note:
+ *   - Only affects TRANSPORT case (UDP or SHM communication, data_sharing and intraprocess disabled)
+ *   - Destruction order matters: writer must be destroyed before reader (otherwise heartbeats would no be sent while
+ *     destroying the writer)
+ */
+TEST(DDSDataWriter, HeartbeatWhileDestruction)
+{
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+
+    // Force writer to be destroyed before reader, so they are still matched, and heartbeats are sent while writer is destroyed
+    {
+        PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+
+        // A high number of samples increases the probability of the data race to occur
+        size_t n_samples = 1000;
+
+        reader.reliability(RELIABLE_RELIABILITY_QOS).durability_kind(TRANSIENT_LOCAL_DURABILITY_QOS).init();
+        ASSERT_TRUE(reader.isInitialized());
+
+        writer.reliability(RELIABLE_RELIABILITY_QOS).durability_kind(TRANSIENT_LOCAL_DURABILITY_QOS).history_kind(
+            KEEP_LAST_HISTORY_QOS).history_depth(static_cast<int32_t>(n_samples)).heartbeat_period_seconds(0).
+                heartbeat_period_nanosec(
+            20 * 1000).init();
+        ASSERT_TRUE(writer.isInitialized());
+
+        reader.wait_discovery();
+        writer.wait_discovery();
+
+        auto data = default_helloworld_data_generator(n_samples);
+        reader.startReception(data);
+        writer.send(data);
+
+        EXPECT_TRUE(data.empty());
+    }
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P

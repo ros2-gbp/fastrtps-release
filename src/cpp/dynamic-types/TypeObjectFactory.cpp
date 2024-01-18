@@ -12,22 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <sstream>
-
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/common/CdrSerialization.hpp>
-#include <fastrtps/types/AnnotationDescriptor.h>
-#include <fastrtps/types/BuiltinAnnotationsTypeObject.h>
+#include <fastrtps/types/TypeObjectFactory.h>
+#include <fastrtps/types/TypeDescriptor.h>
+#include <fastrtps/types/MemberDescriptor.h>
 #include <fastrtps/types/DynamicTypeBuilderFactory.h>
 #include <fastrtps/types/DynamicTypeBuilder.h>
 #include <fastrtps/types/DynamicTypeBuilderPtr.h>
 #include <fastrtps/types/DynamicType.h>
 #include <fastrtps/types/DynamicTypeMember.h>
-#include <fastrtps/types/MemberDescriptor.h>
-#include <fastrtps/types/TypeDescriptor.h>
 #include <fastrtps/types/TypeNamesGenerator.h>
-#include <fastrtps/types/TypeObjectFactory.h>
+#include <fastrtps/types/BuiltinAnnotationsTypeObject.h>
+#include <fastrtps/types/AnnotationDescriptor.h>
 #include <fastrtps/utils/md5.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <sstream>
 
 namespace eprosima {
 namespace fastrtps {
@@ -314,10 +312,8 @@ void TypeObjectFactory::fill_minimal_information(
     }
     else
     {
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         info->minimal().typeid_with_size().typeobject_serialized_size(
-            static_cast<uint32_t>(calculator.calculate_serialized_size(*obj, current_alignment)));
+            static_cast<uint32_t>(TypeObject::getCdrSerializedSize(*obj)));
     }
 
     switch (ident->_d())
@@ -584,10 +580,8 @@ void TypeObjectFactory::fill_complete_information(
     }
     else
     {
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         info->complete().typeid_with_size().typeobject_serialized_size(
-            static_cast<uint32_t>(calculator.calculate_serialized_size(*obj, current_alignment)));
+            static_cast<uint32_t>(TypeObject::getCdrSerializedSize(*obj)));
     }
 
     switch (ident->_d())
@@ -1905,7 +1899,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                 const TypeIdentifier* auxMem = get_stored_type_identifier(&member->common().member_type_id());
                 if (auxMem == nullptr)
                 {
-                    EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Struct) auxMem is nullptr, but original member has "
+                    logWarning(DYNAMIC_TYPES, "(Struct) auxMem is nullptr, but original member has "
                             << (int)member->common().member_type_id()._d());
                 }
                 MemberDescriptor memDesc;
@@ -1937,7 +1931,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                     const TypeIdentifier* anno_id = get_stored_type_identifier(&annotation.annotation_typeid());
                     if (anno_id == nullptr)
                     {
-                        EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
+                        logWarning(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
                             << (int)annotation.annotation_typeid()._d());
                     }
                     AnnotationDescriptor anno_desc;
@@ -2012,7 +2006,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                 const TypeIdentifier* auxMem = get_primitive_type_identifier(member->common().holder_type());
                 if (auxMem == nullptr)
                 {
-                    EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Bitset) auxMem is nullptr, but original member has "
+                    logWarning(DYNAMIC_TYPES, "(Bitset) auxMem is nullptr, but original member has "
                             << (int)member->common().holder_type());
                 }
                 MemberDescriptor memDesc;
@@ -2028,7 +2022,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
             }
             return bitsetType->build();
 
-            //EPROSIMA_LOG_ERROR(XTYPES, "Bitset isn't supported by DynamicType");
+            //logError(XTYPES, "Bitset isn't supported by DynamicType");
             //return nullptr;
         }
         case TK_UNION:
@@ -2050,7 +2044,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                 const TypeIdentifier* auxMem = get_stored_type_identifier(&member->common().type_id());
                 if (auxMem == nullptr)
                 {
-                    EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Union) auxMem is nullptr, but original member has "
+                    logWarning(DYNAMIC_TYPES, "(Union) auxMem is nullptr, but original member has "
                             << (int)member->common().type_id()._d());
                 }
                 MemberDescriptor memDesc;
@@ -2093,7 +2087,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                 const TypeIdentifier* aux_mem = get_stored_type_identifier(&member.common().member_type_id());
                 if (aux_mem == nullptr)
                 {
-                    EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Annotation) aux_mem is nullptr, but original member has "
+                    logWarning(DYNAMIC_TYPES, "(Annotation) aux_mem is nullptr, but original member has "
                             << (int)member.common().member_type_id()._d());
                 }
 
@@ -2129,7 +2123,7 @@ void TypeObjectFactory::apply_type_annotations(
         const TypeIdentifier* anno_id = get_stored_type_identifier(&annotation.annotation_typeid());
         if (anno_id == nullptr)
         {
-            EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
+            logWarning(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
                     << (int)annotation.annotation_typeid()._d());
         }
         AnnotationDescriptor anno_desc;
@@ -2154,7 +2148,7 @@ void TypeObjectFactory::apply_member_annotations(
         const TypeIdentifier* anno_id = get_stored_type_identifier(&annotation.annotation_typeid());
         if (anno_id == nullptr)
         {
-            EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
+            logWarning(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
                     << (int)annotation.annotation_typeid()._d());
         }
         AnnotationDescriptor anno_desc;

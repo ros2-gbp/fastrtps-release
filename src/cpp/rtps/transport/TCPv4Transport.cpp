@@ -81,16 +81,16 @@ TCPv4Transport::TCPv4Transport(
         interface_whitelist_.emplace_back(ip::address_v4::from_string(interface));
     }
 
-    for (uint16_t port : configuration_.listening_ports)
+    for (uint16_t& port : configuration_.listening_ports)
     {
         Locator locator(LOCATOR_KIND_TCPv4, port);
-        create_acceptor_socket(locator);
+        port = create_acceptor_socket(locator);
     }
 
 #if !TLS_FOUND
     if (descriptor.apply_security)
     {
-        EPROSIMA_LOG_ERROR(RTCP_TLS, "Trying to use TCP Transport with TLS but TLS was not found.");
+        logError(RTCP_TLS, "Trying to use TCP Transport with TLS but TLS was not found.");
     }
 #endif // if !TLS_FOUND
 }
