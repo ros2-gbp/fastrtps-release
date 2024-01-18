@@ -1,6 +1,15 @@
 Forthcoming
 -----------
 
+Version 2.6.7
+-------------
+
+* Added the possibility to define a listening port equal to 0 in TCP Transport
+* Added support for TCP to Fast DDS CLI and environment variable
+* Added configuration of builtin transports through DomainParticipantQos, environment
+  variable and XML.
+* Enabled secure communications on Discovery Server
+
 Version 2.6.6
 -------------
 

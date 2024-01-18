@@ -230,6 +230,8 @@ public:
         return true;
     }
 
+    MOCK_METHOD0(pdp, PDP * ());
+
     MOCK_METHOD0(pdpsimple, PDPSimple * ());
 
     MockParticipantListener* getListener()
@@ -304,6 +306,8 @@ public:
     {
         return f;
     }
+
+    MOCK_METHOD(bool, ignore_participant, (const GuidPrefix_t&));
 
 private:
 
