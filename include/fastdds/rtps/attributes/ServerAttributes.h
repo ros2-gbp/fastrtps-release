@@ -24,6 +24,8 @@
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/common/Locator.h>
 
+#include <algorithm>
+#include <iterator>
 #include <list>
 
 namespace eprosima {
@@ -100,14 +102,69 @@ public:
 
     // Live participant proxy reference
     const fastrtps::rtps::ParticipantProxyData* proxy{};
+
+    // Check if there are specific transport locators associated
+    // the template parameter is the locator kind (e.g. LOCATOR_KIND_UDPv4)
+    template<int kind> bool requires_transport() const
+    {
+        return metatrafficUnicastLocatorList.has_kind<kind>() ||
+               metatrafficMulticastLocatorList.has_kind<kind>();
+    }
+
 };
 
 typedef std::list<RemoteServerAttributes> RemoteServerList_t;
 
-// port use if the ros environment variable doesn't specified one
+template<class charT>
+struct server_ostream_separators
+{
+    static const charT* list_separator;
+    static const charT* locator_separator;
+};
+
+#ifndef _MSC_VER
+template<> const char* server_ostream_separators<char>::list_separator;
+template<> const wchar_t* server_ostream_separators<wchar_t>::list_separator;
+
+template<> const char* server_ostream_separators<char>::locator_separator;
+template<> const wchar_t* server_ostream_separators<wchar_t>::locator_separator;
+#endif // _MSC_VER
+
+template<class charT>
+std::basic_ostream<charT>& operator <<(
+        std::basic_ostream<charT>& output,
+        const RemoteServerAttributes& sa)
+{
+    typename std::basic_ostream<charT>::sentry s(output);
+    output << sa.guidPrefix;
+    if (!sa.metatrafficUnicastLocatorList.empty())
+    {
+        output << server_ostream_separators<charT>::locator_separator << sa.metatrafficUnicastLocatorList;
+    }
+    if (!sa.metatrafficMulticastLocatorList.empty())
+    {
+        output << server_ostream_separators<charT>::locator_separator << sa.metatrafficUnicastLocatorList;
+    }
+    return output;
+}
+
+template<class charT>
+std::basic_ostream<charT>& operator <<(
+        std::basic_ostream<charT>& output,
+        const RemoteServerList_t& list)
+{
+    typename std::basic_ostream<charT>::sentry s(output);
+    std::ostream_iterator<RemoteServerAttributes> os_iterator(output, server_ostream_separators<charT>::list_separator);
+    std::copy(list.begin(), list.end(), os_iterator);
+    return output;
+}
+
+// port used if the ros environment variable doesn't specified one
 constexpr uint16_t DEFAULT_ROS2_SERVER_PORT = 11811;
 // default server base guidPrefix
 const char* const DEFAULT_ROS2_SERVER_GUIDPREFIX = "44.53.00.5f.45.50.52.4f.53.49.4d.41";
+// port used by default for tcp transport
+constexpr uint16_t DEFAULT_TCP_SERVER_PORT = 42100;
 
 /* Environment variable to specify a semicolon-separated list of UDPv4 locators (ip:port) that define remote server
  * locators.
@@ -123,6 +180,15 @@ const char* const DEFAULT_ROS2_SERVER_GUIDPREFIX = "44.53.00.5f.45.50.52.4f.53.4
  */
 const char* const DEFAULT_ROS2_MASTER_URI = "ROS_DISCOVERY_SERVER";
 
+/* Environment variable to transform a SIMPLE participant in a SUPER CLIENT.
+ * If the participant is not SIMPLE, the variable doesn't have any effects.
+ * The variable can assume the following values:
+ *    - FALSE, false, False, 0
+ *    - TRUE, true, True, 1
+ * If the variable is not set, the program will behave like the variable is set to false.
+ */
+const char* const ROS_SUPER_CLIENT = "ROS_SUPER_CLIENT";
+
 /**
  * Retrieves a semicolon-separated list of locators from a string, and
  * populates a RemoteServerList_t mapping list position to default guid.
@@ -131,7 +197,7 @@ const char* const DEFAULT_ROS2_MASTER_URI = "ROS_DISCOVERY_SERVER";
  * @return true if parsing succeeds, false otherwise (or if the list is empty)
  */
 RTPS_DllAPI bool load_environment_server_info(
-        std::string list,
+        const std::string& list,
         RemoteServerList_t& attributes);
 
 /**
@@ -157,6 +223,12 @@ RTPS_DllAPI bool load_environment_server_info(
 RTPS_DllAPI const std::string& ros_discovery_server_env();
 
 /**
+ * Get the value of environment variable ROS_SUPER_CLIENT
+ * @return The value of environment variable ROS_SUPER_CLIENT. False if the variable is not defined.
+ */
+RTPS_DllAPI bool ros_super_client_env();
+
+/**
  * Returns the guidPrefix associated to the given server id
  * @param[in] id of the default server whose guidPrefix we want to retrieve
  * @param[out] guid reference to the guidPrefix to modify
@@ -178,9 +250,11 @@ using fastdds::rtps::RemoteServerList_t;
 using fastdds::rtps::DEFAULT_ROS2_SERVER_PORT;
 using fastdds::rtps::DEFAULT_ROS2_SERVER_GUIDPREFIX;
 using fastdds::rtps::DEFAULT_ROS2_MASTER_URI;
+using fastdds::rtps::ROS_SUPER_CLIENT;
 using fastdds::rtps::load_environment_server_info;
 using fastdds::rtps::ros_discovery_server_env;
 using fastdds::rtps::get_server_client_default_guidPrefix;
+using fastdds::rtps::ros_super_client_env;
 
 } // fastrtps
 } // rtps

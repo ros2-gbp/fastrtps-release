@@ -298,6 +298,71 @@ void EDPSimple::processPersistentData(
     // We don't need to awake the server thread because we are in it
 }
 
+EDPSimple::t_p_StatefulWriter EDPSimple::get_builtin_writer_history_pair_by_entity(
+        const EntityId_t& entity_id)
+{
+    t_p_StatefulWriter ret{nullptr, nullptr};
+
+    if (entity_id == c_EntityId_SEDPPubWriter)
+    {
+        ret = publications_writer_;
+
+    }
+    else if (entity_id == c_EntityId_SEDPSubWriter)
+    {
+        ret = subscriptions_writer_;
+    }
+#if HAVE_SECURITY
+    else if (entity_id == sedp_builtin_publications_secure_writer)
+    {
+        ret = publications_secure_writer_;
+    }
+    else if (entity_id == sedp_builtin_subscriptions_secure_writer)
+    {
+        ret = subscriptions_secure_writer_;
+    }
+#endif // HAVE_SECURITY
+    else
+    {
+        logError(RTPS_EDP, "Could not find the requested writer builtin endpoint");
+    }
+
+    return ret;
+}
+
+EDPSimple::t_p_StatefulReader EDPSimple::get_builtin_reader_history_pair_by_entity(
+        const EntityId_t& entity_id)
+{
+    t_p_StatefulReader ret{nullptr, nullptr};
+
+    if (entity_id == c_EntityId_SEDPPubReader || entity_id == c_EntityId_SEDPPubWriter)
+    {
+        ret = publications_reader_;
+    }
+    else if (entity_id == c_EntityId_SEDPSubReader || entity_id == c_EntityId_SEDPSubWriter)
+    {
+        ret = subscriptions_reader_;
+    }
+#if HAVE_SECURITY
+    else if (entity_id == sedp_builtin_publications_secure_reader ||
+            entity_id == sedp_builtin_publications_secure_writer)
+    {
+        ret = publications_secure_reader_;
+    }
+    else if (entity_id == sedp_builtin_subscriptions_secure_reader ||
+            entity_id == sedp_builtin_subscriptions_secure_writer)
+    {
+        ret = subscriptions_secure_reader_;
+    }
+#endif // HAVE_SECURITY
+    else
+    {
+        logError(RTPS_EDP, "Could not find the requested reader builtin endpoint");
+    }
+
+    return ret;
+}
+
 void EDPSimple::set_builtin_reader_history_attributes(
         HistoryAttributes& attributes)
 {
@@ -317,84 +382,21 @@ void EDPSimple::set_builtin_writer_history_attributes(
 void EDPSimple::set_builtin_reader_attributes(
         ReaderAttributes& attributes)
 {
-    // Matched writers will depend on total number of participants
-    attributes.matched_writers_allocation =
-            mp_PDP->getRTPSParticipant()->getRTPSParticipantAttributes().allocation.participants;
-
-    // As participants allocation policy includes the local participant, one has to be substracted
-    if (attributes.matched_writers_allocation.initial > 1)
-    {
-        attributes.matched_writers_allocation.initial--;
-    }
-    if ((attributes.matched_writers_allocation.maximum > 1) &&
-            (attributes.matched_writers_allocation.maximum < std::numeric_limits<size_t>::max()))
-    {
-        attributes.matched_writers_allocation.maximum--;
-    }
-
-    // Locators are copied from the local participant metatraffic locators
-    attributes.endpoint.unicastLocatorList.clear();
-    for (const Locator_t& loc : this->mp_PDP->getLocalParticipantProxyData()->metatraffic_locators.unicast)
-    {
-        attributes.endpoint.unicastLocatorList.push_back(loc);
-    }
-    attributes.endpoint.multicastLocatorList.clear();
-    for (const Locator_t& loc : this->mp_PDP->getLocalParticipantProxyData()->metatraffic_locators.multicast)
-    {
-        attributes.endpoint.multicastLocatorList.push_back(loc);
-    }
+    attributes = mp_PDP->create_builtin_reader_attributes();
 
     // Timings are configured using EDP default values
     attributes.times.heartbeatResponseDelay = edp_heartbeat_response_delay;
-
-    // EDP endpoints are always reliable, transsient local, keyed topics
-    attributes.endpoint.reliabilityKind = RELIABLE;
-    attributes.endpoint.durabilityKind = TRANSIENT_LOCAL;
-    attributes.endpoint.topicKind = WITH_KEY;
-
-    // Built-in EDP readers never expect inline qos
-    attributes.expectsInlineQos = false;
 }
 
 void EDPSimple::set_builtin_writer_attributes(
         WriterAttributes& attributes)
 {
-    // Matched readers will depend on total number of participants
-    attributes.matched_readers_allocation =
-            mp_PDP->getRTPSParticipant()->getRTPSParticipantAttributes().allocation.participants;
-
-    // As participants allocation policy includes the local participant, one has to be substracted
-    if (attributes.matched_readers_allocation.initial > 1)
-    {
-        attributes.matched_readers_allocation.initial--;
-    }
-    if ((attributes.matched_readers_allocation.maximum > 1) &&
-            (attributes.matched_readers_allocation.maximum < std::numeric_limits<size_t>::max()))
-    {
-        attributes.matched_readers_allocation.maximum--;
-    }
-
-    // Locators are copied from the local participant metatraffic locators
-    attributes.endpoint.unicastLocatorList.clear();
-    for (const Locator_t& loc : this->mp_PDP->getLocalParticipantProxyData()->metatraffic_locators.unicast)
-    {
-        attributes.endpoint.unicastLocatorList.push_back(loc);
-    }
-    attributes.endpoint.multicastLocatorList.clear();
-    for (const Locator_t& loc : this->mp_PDP->getLocalParticipantProxyData()->metatraffic_locators.multicast)
-    {
-        attributes.endpoint.multicastLocatorList.push_back(loc);
-    }
+    attributes = mp_PDP->create_builtin_writer_attributes();
 
     // Timings are configured using EDP default values
     attributes.times.heartbeatPeriod = edp_heartbeat_period;
     attributes.times.nackResponseDelay = edp_nack_response_delay;
     attributes.times.nackSupressionDuration = edp_nack_supression_duration;
-
-    // EDP endpoints are always reliable, transsient local, keyed topics
-    attributes.endpoint.reliabilityKind = RELIABLE;
-    attributes.endpoint.durabilityKind = TRANSIENT_LOCAL;
-    attributes.endpoint.topicKind = WITH_KEY;
 }
 
 bool EDPSimple::createSEDPEndpoints()
@@ -466,34 +468,7 @@ bool EDPSimple::create_sedp_secure_endpoints()
     set_builtin_writer_history_attributes(writer_history_att);
     set_builtin_reader_attributes(ratt);
     set_builtin_writer_attributes(watt);
-
-    const security::ParticipantSecurityAttributes& part_attr = mp_RTPSParticipant->security_attributes();
-
-    ratt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
-    ratt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
-
-    watt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
-    watt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
-
-    if (part_attr.is_discovery_protected)
-    {
-        security::PluginParticipantSecurityAttributes plugin_part_attr(part_attr.plugin_participant_attributes);
-
-        if (plugin_part_attr.is_discovery_encrypted)
-        {
-            ratt.endpoint.security_attributes().plugin_endpoint_attributes |=
-                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
-            watt.endpoint.security_attributes().plugin_endpoint_attributes |=
-                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
-        }
-        if (plugin_part_attr.is_discovery_origin_authenticated)
-        {
-            ratt.endpoint.security_attributes().plugin_endpoint_attributes |=
-                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
-            watt.endpoint.security_attributes().plugin_endpoint_attributes |=
-                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
-        }
-    }
+    mp_PDP->add_builtin_security_attributes(ratt, watt);
 
     if (m_discovery.discovery_config.m_simpleEDP.enable_builtin_secure_publications_writer_and_subscriptions_reader)
     {
