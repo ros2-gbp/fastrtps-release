@@ -470,23 +470,26 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_client_verifies)
     TCPv4TransportDescriptor recvDescriptor;
     recvDescriptor.add_listener_port(g_default_port);
     recvDescriptor.apply_security = true;
-    recvDescriptor.tls_config.password = "test";
-    recvDescriptor.tls_config.cert_chain_file = "server.pem";
-    recvDescriptor.tls_config.private_key_file = "server.pem";
-    recvDescriptor.tls_config.tmp_dh_file = "dh2048.pem";
+    recvDescriptor.tls_config.password = "fastddspwd";
+    recvDescriptor.tls_config.cert_chain_file = "fastdds.crt";
+    recvDescriptor.tls_config.private_key_file = "fastdds.key";
+    recvDescriptor.tls_config.tmp_dh_file = "dh_params.pem";
+    recvDescriptor.tls_config.verify_mode = TLSVerifyMode::VERIFY_PEER;
     recvDescriptor.tls_config.add_option(TLSOptions::DEFAULT_WORKAROUNDS);
     recvDescriptor.tls_config.add_option(TLSOptions::SINGLE_DH_USE);
-    //recvDescriptor.tls_config.add_option(TLSOptions::NO_COMPRESSION);
     recvDescriptor.tls_config.add_option(TLSOptions::NO_SSLV2);
-    //recvDescriptor.tls_config.add_option(TLSOptions::NO_SSLV3);
+    recvDescriptor.tls_config.add_option(TLSOptions::NO_COMPRESSION);
     TCPv4Transport receiveTransportUnderTest(recvDescriptor);
     receiveTransportUnderTest.init();
 
     TCPv4TransportDescriptor sendDescriptor;
     sendDescriptor.apply_security = true;
-    //sendDescriptor.tls_config.password = "test";
-    sendDescriptor.tls_config.verify_file = "ca.pem";
+    sendDescriptor.tls_config.verify_file = "ca.crt";
     sendDescriptor.tls_config.verify_mode = TLSVerifyMode::VERIFY_PEER;
+    recvDescriptor.tls_config.add_option(TLSOptions::DEFAULT_WORKAROUNDS);
+    sendDescriptor.tls_config.add_option(TLSOptions::SINGLE_DH_USE);
+    sendDescriptor.tls_config.add_option(TLSOptions::NO_SSLV2);
+    recvDescriptor.tls_config.add_option(TLSOptions::NO_COMPRESSION);
     TCPv4Transport sendTransportUnderTest(sendDescriptor);
     sendTransportUnderTest.init();
 
@@ -565,8 +568,7 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_server_verifies)
     recvDescriptor.add_listener_port(g_default_port);
     recvDescriptor.apply_security = true;
     recvDescriptor.tls_config.handshake_role = TLSHSRole::CLIENT;
-    recvDescriptor.tls_config.password = "test";
-    recvDescriptor.tls_config.verify_file = "maincacert.pem";
+    recvDescriptor.tls_config.verify_file = "ca.crt";
     recvDescriptor.tls_config.verify_mode = TLSVerifyMode::VERIFY_PEER;
     recvDescriptor.tls_config.add_option(TLSOptions::DEFAULT_WORKAROUNDS);
     recvDescriptor.tls_config.add_option(TLSOptions::SINGLE_DH_USE);
@@ -578,10 +580,10 @@ TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_server_verifies)
     TCPv4TransportDescriptor sendDescriptor;
     sendDescriptor.apply_security = true;
     sendDescriptor.tls_config.handshake_role = TLSHSRole::SERVER;
-    sendDescriptor.tls_config.password = "test";
-    sendDescriptor.tls_config.cert_chain_file = "server.pem";
-    sendDescriptor.tls_config.private_key_file = "server.pem";
-    sendDescriptor.tls_config.tmp_dh_file = "dh2048.pem";
+    sendDescriptor.tls_config.password = "fastddspwd";
+    sendDescriptor.tls_config.cert_chain_file = "fastdds.crt";
+    sendDescriptor.tls_config.private_key_file = "fastdds.key";
+    sendDescriptor.tls_config.tmp_dh_file = "dh_params.pem";
     sendDescriptor.tls_config.verify_mode = TLSVerifyMode::VERIFY_PEER | TLSVerifyMode::VERIFY_FAIL_IF_NO_PEER_CERT;
     sendDescriptor.tls_config.add_option(TLSOptions::DEFAULT_WORKAROUNDS);
     sendDescriptor.tls_config.add_option(TLSOptions::SINGLE_DH_USE);
@@ -1506,6 +1508,44 @@ TEST_F(TCPv4Tests, header_read_interrumption)
     // Should get stuck in receive_header until channel is disabled
     transportUnderTest.Receive(rtcp_manager, channel, buffer, receive_buffer_capacity, receive_buffer_size, locator);
     thread.join();
+}
+
+// This test verifies that the autofill port feature correctly sets an automatic port when
+// the descriptors's port is set to 0.
+TEST_F(TCPv4Tests, autofill_port)
+{
+    // Check normal port assignation
+    TCPv4TransportDescriptor test_descriptor;
+    test_descriptor.add_listener_port(g_default_port);
+    TCPv4Transport transportUnderTest(test_descriptor);
+    transportUnderTest.init();
+
+    EXPECT_TRUE(transportUnderTest.configuration()->listening_ports[0] == g_default_port);
+
+    // Check default port assignation
+    TCPv4TransportDescriptor test_descriptor_autofill;
+    test_descriptor_autofill.add_listener_port(0);
+    TCPv4Transport transportUnderTest_autofill(test_descriptor_autofill);
+    transportUnderTest_autofill.init();
+
+    EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports[0] != 0);
+    EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports.size() == 1);
+
+    uint16_t port = 12345;
+    TCPv4TransportDescriptor test_descriptor_multiple_autofill;
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    test_descriptor_multiple_autofill.add_listener_port(port);
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    TCPv4Transport transportUnderTest_multiple_autofill(test_descriptor_multiple_autofill);
+    transportUnderTest_multiple_autofill.init();
+
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[0] != 0);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[1] == port);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[2] != 0);
+    EXPECT_TRUE(
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[0] !=
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[2]);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports.size() == 3);
 }
 
 void TCPv4Tests::HELPER_SetDescriptorDefaults()

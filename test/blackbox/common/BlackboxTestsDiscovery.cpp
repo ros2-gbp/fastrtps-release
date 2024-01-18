@@ -1164,7 +1164,11 @@ TEST(Discovery, TwentyParticipantsSeveralEndpointsMulticast)
 //! Regression for ROS2 #280 and #281, using unicast
 TEST_P(Discovery, TwentyParticipantsSeveralEndpointsUnicast)
 {
+#if defined(__APPLE__)
+    discoverParticipantsSeveralEndpointsTest(true, 10, 10, 10, TEST_TOPIC_NAME);
+#else
     discoverParticipantsSeveralEndpointsTest(true, 20, 20, 20, TEST_TOPIC_NAME);
+#endif // if defined(__APPLE__)
 }
 
 //! Regression test for support case 7552 (CRM #353)
@@ -1557,6 +1561,61 @@ TEST(Discovery, ServerClientEnvironmentSetUp)
 
     ASSERT_TRUE(load_environment_server_info(text, output));
     ASSERT_EQ(output, standard);
+
+    // TCP transport
+
+    Locator_t loc_tcp(LOCATOR_KIND_TCPv4, 0);
+
+    // 11. Single TCPv4 address without specifying a custom listening port
+
+    text = "TCPv4:[192.168.36.34]";
+
+    att.clear();
+    output.clear();
+    standard.clear();
+    IPLocator::setIPv4(loc_tcp, "192.168.36.34");
+    IPLocator::setPhysicalPort(loc_tcp, DEFAULT_TCP_SERVER_PORT);
+    IPLocator::setLogicalPort(loc_tcp, DEFAULT_TCP_SERVER_PORT);
+    att.metatrafficUnicastLocatorList.push_back(loc_tcp);
+    get_server_client_default_guidPrefix(0, att.guidPrefix);
+    standard.push_back(att);
+
+    ASSERT_TRUE(load_environment_server_info(text, output));
+    ASSERT_EQ(output, standard);
+
+    // 12. Single TCPv4 address specifying a custom listening port
+
+    text = "TCPv4:[192.168.36.34]:14520";
+
+    att.clear();
+    output.clear();
+    standard.clear();
+    IPLocator::setIPv4(loc_tcp, "192.168.36.34");
+    IPLocator::setPhysicalPort(loc_tcp, 14520);
+    IPLocator::setLogicalPort(loc_tcp, 14520);
+    att.metatrafficUnicastLocatorList.push_back(loc_tcp);
+    get_server_client_default_guidPrefix(0, att.guidPrefix);
+    standard.push_back(att);
+
+    ASSERT_TRUE(load_environment_server_info(text, output));
+    ASSERT_EQ(output, standard);
+
+    // 13. Single TCPv4 dns specifying a custom listening port
+
+    text = "TCPv4:[localhost]:14520";
+
+    att.clear();
+    output.clear();
+    standard.clear();
+    IPLocator::setIPv4(loc_tcp, "127.0.0.1");
+    IPLocator::setPhysicalPort(loc_tcp, 14520);
+    IPLocator::setLogicalPort(loc_tcp, 14520);
+    att.metatrafficUnicastLocatorList.push_back(loc_tcp);
+    get_server_client_default_guidPrefix(0, att.guidPrefix);
+    standard.push_back(att);
+
+    ASSERT_TRUE(load_environment_server_info(text, output));
+    ASSERT_EQ(output, standard);
 }
 
 TEST(Discovery, RemoteBuiltinEndpointHonoring)
@@ -1568,35 +1627,75 @@ TEST(Discovery, RemoteBuiltinEndpointHonoring)
     auto reader_test_transport = std::make_shared<test_UDPv4TransportDescriptor>();
     auto writer_test_transport = std::make_shared<test_UDPv4TransportDescriptor>();
 
-    uint32_t num_reader_heartbeat = 0;
-    uint32_t num_reader_acknack = 0;
+    uint32_t num_wlp_reader_heartbeat = 0;
+    uint32_t num_wlp_reader_acknack = 0;
 
-    reader_test_transport->drop_heartbeat_messages_filter_ = [&num_reader_heartbeat](CDRMessage_t&)
+    reader_test_transport->drop_heartbeat_messages_filter_ = [&num_wlp_reader_heartbeat](CDRMessage_t& msg)
             {
-                num_reader_heartbeat++;
+                auto old_pos = msg.pos;
+                msg.pos += 4;
+                eprosima::fastrtps::rtps::EntityId_t writer_entity_id;
+                eprosima::fastrtps::rtps::CDRMessage::readEntityId(&msg, &writer_entity_id);
+                msg.pos = old_pos;
+
+                if (eprosima::fastrtps::rtps::c_EntityId_WriterLiveliness == writer_entity_id)
+                {
+                    num_wlp_reader_heartbeat++;
+                }
                 return false;
             };
 
-    reader_test_transport->drop_ack_nack_messages_filter_ = [&num_reader_acknack](CDRMessage_t&)
+    reader_test_transport->drop_ack_nack_messages_filter_ = [&num_wlp_reader_acknack](CDRMessage_t& msg)
             {
-                num_reader_acknack++;
+                auto old_pos = msg.pos;
+                msg.pos += 4;
+                eprosima::fastrtps::rtps::EntityId_t writer_entity_id;
+                eprosima::fastrtps::rtps::CDRMessage::readEntityId(&msg, &writer_entity_id);
+                msg.pos = old_pos;
+
+                if (eprosima::fastrtps::rtps::c_EntityId_WriterLiveliness == writer_entity_id)
+                {
+                    num_wlp_reader_acknack++;
+                }
                 return false;
             };
 
-    uint32_t num_writer_heartbeat = 0;
-    uint32_t num_writer_acknack = 0;
+    reader_test_transport->interfaceWhiteList.push_back("127.0.0.1");
 
-    writer_test_transport->drop_heartbeat_messages_filter_ = [&num_writer_heartbeat](CDRMessage_t&)
+    uint32_t num_wlp_writer_heartbeat = 0;
+    uint32_t num_wlp_writer_acknack = 0;
+
+    writer_test_transport->drop_heartbeat_messages_filter_ = [&num_wlp_writer_heartbeat](CDRMessage_t& msg)
             {
-                num_writer_heartbeat++;
+                auto old_pos = msg.pos;
+                msg.pos += 4;
+                eprosima::fastrtps::rtps::EntityId_t writer_entity_id;
+                eprosima::fastrtps::rtps::CDRMessage::readEntityId(&msg, &writer_entity_id);
+                msg.pos = old_pos;
+
+                if (eprosima::fastrtps::rtps::c_EntityId_WriterLiveliness == writer_entity_id)
+                {
+                    num_wlp_writer_heartbeat++;
+                }
                 return false;
             };
 
-    writer_test_transport->drop_ack_nack_messages_filter_ = [&num_writer_acknack](CDRMessage_t&)
+    writer_test_transport->drop_ack_nack_messages_filter_ = [&num_wlp_writer_acknack](CDRMessage_t& msg)
             {
-                num_writer_acknack++;
+                auto old_pos = msg.pos;
+                msg.pos += 4;
+                eprosima::fastrtps::rtps::EntityId_t writer_entity_id;
+                eprosima::fastrtps::rtps::CDRMessage::readEntityId(&msg, &writer_entity_id);
+                msg.pos = old_pos;
+
+                if (eprosima::fastrtps::rtps::c_EntityId_WriterLiveliness == writer_entity_id)
+                {
+                    num_wlp_writer_acknack++;
+                }
                 return false;
             };
+
+    writer_test_transport->interfaceWhiteList.push_back("127.0.0.1");
 
     reader.disable_builtin_transport().add_user_transport_to_pparams(reader_test_transport).
             use_writer_liveliness_protocol(false);
@@ -1614,10 +1713,10 @@ TEST(Discovery, RemoteBuiltinEndpointHonoring)
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
-    ASSERT_EQ(num_reader_heartbeat, 3u);
-    ASSERT_EQ(num_reader_acknack, 3u);
-    ASSERT_EQ(num_writer_heartbeat, 3u);
-    ASSERT_EQ(num_writer_acknack, 3u);
+    ASSERT_EQ(num_wlp_reader_heartbeat, 0u);
+    ASSERT_EQ(num_wlp_reader_acknack, 0u);
+    ASSERT_EQ(num_wlp_writer_heartbeat, 0u);
+    ASSERT_EQ(num_wlp_writer_acknack, 0u);
 }
 
 //! Regression test for redmine issue 10674

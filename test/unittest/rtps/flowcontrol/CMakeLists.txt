@@ -34,7 +34,7 @@ set(FLOWCONTROLLERFACTORYTESTS_SOURCE
     )
 
 add_executable(FlowControllerFactoryTests ${FLOWCONTROLLERFACTORYTESTS_SOURCE})
-target_compile_definitions(FlowControllerFactoryTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(FlowControllerFactoryTests PRIVATE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
@@ -44,7 +44,10 @@ target_include_directories(FlowControllerFactoryTests PRIVATE
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
     )
-target_link_libraries(FlowControllerFactoryTests GTest::gmock)
+target_link_libraries(FlowControllerFactoryTests
+    fastcdr
+    GTest::gmock
+    )
 if(MSVC OR MSVC_IDE)
     target_link_libraries(FlowControllerFactoryTests ${PRIVACY}
         iphlpapi Shlwapi
@@ -62,7 +65,7 @@ set(FLOWCONTROLLERPUBLISHMODESTESTS_SOURCE
     )
 
 add_executable(FlowControllerPublishModesTests ${FLOWCONTROLLERPUBLISHMODESTESTS_SOURCE})
-target_compile_definitions(FlowControllerPublishModesTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(FlowControllerPublishModesTests PRIVATE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
@@ -72,7 +75,10 @@ target_include_directories(FlowControllerPublishModesTests PRIVATE
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
     )
-target_link_libraries(FlowControllerPublishModesTests GTest::gmock)
+target_link_libraries(FlowControllerPublishModesTests
+    fastcdr
+    GTest::gmock
+    )
 if(MSVC OR MSVC_IDE)
     target_link_libraries(FlowControllerPublishModesTests ${PRIVACY}
         iphlpapi Shlwapi
@@ -86,7 +92,7 @@ set(FLOWCONTROLLERSCHEDULERSTESTS_SOURCE
     )
 
 add_executable(FlowControllerSchedulersTests ${FLOWCONTROLLERSCHEDULERSTESTS_SOURCE})
-target_compile_definitions(FlowControllerSchedulersTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(FlowControllerSchedulersTests PRIVATE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
@@ -96,7 +102,10 @@ target_include_directories(FlowControllerSchedulersTests PRIVATE
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
     )
-target_link_libraries(FlowControllerSchedulersTests GTest::gmock)
+target_link_libraries(FlowControllerSchedulersTests
+    fastcdr
+    GTest::gmock
+    )
 if(MSVC OR MSVC_IDE)
     target_link_libraries(FlowControllerSchedulersTests ${PRIVACY}
         iphlpapi Shlwapi
