@@ -26,6 +26,7 @@
 #include <sstream>
 
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
 #include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
@@ -58,6 +59,8 @@
 #include <rtps/history/BasicPayloadPool.hpp>
 #include <rtps/persistence/PersistenceService.h>
 #include <statistics/rtps/GuidUtils.hpp>
+#include <utils/SystemInfo.hpp>
+#include <utils/string_utilities.hpp>
 
 namespace eprosima {
 namespace fastrtps {
@@ -66,6 +69,35 @@ namespace rtps {
 using UDPv4TransportDescriptor = fastdds::rtps::UDPv4TransportDescriptor;
 using TCPTransportDescriptor = fastdds::rtps::TCPTransportDescriptor;
 using SharedMemTransportDescriptor = fastdds::rtps::SharedMemTransportDescriptor;
+using BuiltinTransports = fastdds::rtps::BuiltinTransports;
+
+/**
+ * Parse the environment variable specifying the transports to instantiate
+ */
+static BuiltinTransports get_builtin_transports_from_env_var()
+{
+    static constexpr const char* env_var_name = "FASTDDS_BUILTIN_TRANSPORTS";
+
+    BuiltinTransports ret_val = BuiltinTransports::DEFAULT;
+    std::string env_value;
+    if (SystemInfo::get_env(env_var_name, env_value) == ReturnCode_t::RETCODE_OK)
+    {
+        if (!get_element_enum_value(env_value.c_str(), ret_val,
+                "NONE", BuiltinTransports::NONE,
+                "DEFAULT", BuiltinTransports::DEFAULT,
+                "DEFAULTv6", BuiltinTransports::DEFAULTv6,
+                "SHM", BuiltinTransports::SHM,
+                "UDPv4", BuiltinTransports::UDPv4,
+                "UDPv6", BuiltinTransports::UDPv6,
+                "LARGE_DATA", BuiltinTransports::LARGE_DATA,
+                "LARGE_DATAv6", BuiltinTransports::LARGE_DATAv6))
+        {
+            logError(RTPS_PARTICIPANT, "Wrong value '" << env_value << "' for environment variable '" <<
+                    env_var_name << "'. Leaving as DEFAULT");
+        }
+    }
+    return ret_val;
+}
 
 static EntityId_t TrustedWriter(
         const EntityId_t& reader)
@@ -146,37 +178,15 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     {
         m_persistence_guid = GUID_t(persistence_guid, c_EntityId_RTPSParticipant);
     }
-    // Builtin transports by default
-    if (PParam.useBuiltinTransports)
-    {
-        UDPv4TransportDescriptor descriptor;
-        descriptor.sendBufferSize = m_att.sendSocketBufferSize;
-        descriptor.receiveBufferSize = m_att.listenSocketBufferSize;
-        if (is_intraprocess_only())
-        {
-            // Avoid multicast leaving the host for intraprocess-only participants
-            descriptor.TTL = 0;
-        }
-        m_network_Factory.RegisterTransport(&descriptor, &m_att.properties);
 
-#ifdef SHM_TRANSPORT_BUILTIN
-        if (!is_intraprocess_only())
-        {
-            SharedMemTransportDescriptor shm_transport;
-            // We assume (Linux) UDP doubles the user socket buffer size in kernel, so
-            // the equivalent segment size in SHM would be socket buffer size x 2
-            auto segment_size_udp_equivalent =
-                    std::max(m_att.sendSocketBufferSize, m_att.listenSocketBufferSize) * 2;
-            shm_transport.segment_size(segment_size_udp_equivalent);
-            // Use same default max_message_size on both UDP and SHM
-            shm_transport.max_message_size(descriptor.max_message_size());
-            has_shm_transport_ |= m_network_Factory.RegisterTransport(&shm_transport);
-        }
-#endif // ifdef SHM_TRANSPORT_BUILTIN
+    // Setup builtin transports
+    if (m_att.useBuiltinTransports)
+    {
+        m_att.setup_transports(get_builtin_transports_from_env_var());
     }
 
     // BACKUP servers guid is its persistence one
-    if (PParam.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
+    if (m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
     {
         m_persistence_guid = m_guid;
     }
@@ -187,14 +197,14 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     guid_str_ = guid_sstr.str();
 
     // Client-server discovery protocol requires that every TCP transport has a listening port
-    switch (PParam.builtin.discovery_config.discoveryProtocol)
+    switch (m_att.builtin.discovery_config.discoveryProtocol)
     {
         case DiscoveryProtocol::BACKUP:
         case DiscoveryProtocol::CLIENT:
         case DiscoveryProtocol::SERVER:
         case DiscoveryProtocol::SUPER_CLIENT:
             // Verify if listening ports are provided
-            for (auto& transportDescriptor : PParam.userTransports)
+            for (auto& transportDescriptor : m_att.userTransports)
             {
                 TCPTransportDescriptor* pT = dynamic_cast<TCPTransportDescriptor*>(transportDescriptor.get());
                 if (pT && pT->listening_ports.empty())
@@ -210,7 +220,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
 
 
     // User defined transports
-    for (const auto& transportDescriptor : PParam.userTransports)
+    for (const auto& transportDescriptor : m_att.userTransports)
     {
         if (m_network_Factory.RegisterTransport(transportDescriptor.get(), &m_att.properties))
         {
@@ -335,7 +345,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     // Start security
     if (!m_security_manager.init(
                 security_attributes_,
-                PParam.properties))
+                m_att.properties))
     {
         // Participant will be deleted, no need to allocate buffers or create builtin endpoints
         return;
@@ -349,10 +359,10 @@ RTPSParticipantImpl::RTPSParticipantImpl(
         m_att.defaultMulticastLocatorList.clear();
     }
 
-    createReceiverResources(m_att.builtin.metatrafficMulticastLocatorList, true, false);
-    createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false);
-    createReceiverResources(m_att.defaultUnicastLocatorList, true, false);
-    createReceiverResources(m_att.defaultMulticastLocatorList, true, false);
+    createReceiverResources(m_att.builtin.metatrafficMulticastLocatorList, true, false, true);
+    createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false, true);
+    createReceiverResources(m_att.defaultUnicastLocatorList, true, false, true);
+    createReceiverResources(m_att.defaultMulticastLocatorList, true, false, true);
 
     // Check metatraffic multicast port
     if (0 < m_att.builtin.metatrafficMulticastLocatorList.size() &&
@@ -382,12 +392,12 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     flow_controller_factory_.init(this);
 
     // Support old API
-    if (PParam.throughputController.bytesPerPeriod != UINT32_MAX && PParam.throughputController.periodMillisecs != 0)
+    if (m_att.throughputController.bytesPerPeriod != UINT32_MAX && m_att.throughputController.periodMillisecs != 0)
     {
         fastdds::rtps::FlowControllerDescriptor old_descriptor;
         old_descriptor.name = guid_str_.c_str();
-        old_descriptor.max_bytes_per_period = PParam.throughputController.bytesPerPeriod;
-        old_descriptor.period_ms = PParam.throughputController.periodMillisecs;
+        old_descriptor.max_bytes_per_period = m_att.throughputController.bytesPerPeriod;
+        old_descriptor.period_ms = m_att.throughputController.periodMillisecs;
         flow_controller_factory_.register_flow_controller(old_descriptor);
     }
 
@@ -1257,6 +1267,7 @@ void RTPSParticipantImpl::update_attributes(
     }
 
     auto pdp = mp_builtinProtocols->mp_PDP;
+
     // Check if there are changes
     if (patt.builtin.discovery_config.m_DiscoveryServers != m_att.builtin.discovery_config.m_DiscoveryServers
             || patt.userData != m_att.userData
@@ -1265,6 +1276,16 @@ void RTPSParticipantImpl::update_attributes(
         update_pdp = true;
         std::vector<GUID_t> modified_servers;
         LocatorList_t modified_locators;
+
+        // Update RTPSParticipantAttributes member
+        m_att.userData = patt.userData;
+
+        // If there's no PDP don't process Discovery-related attributes.
+        if (!pdp)
+        {
+            return;
+        }
+
         // Check that the remote servers list is consistent: all the already known remote servers must be included in
         // the list and either new remote servers are added or remote server listening locator is modified.
         for (auto existing_server : m_att.builtin.discovery_config.m_DiscoveryServers)
@@ -1305,9 +1326,6 @@ void RTPSParticipantImpl::update_attributes(
                 return;
             }
         }
-
-        // Update RTPSParticipantAttributes member
-        m_att.userData = patt.userData;
 
         {
             std::lock_guard<std::recursive_mutex> lock(*pdp->getMutex());
@@ -1355,22 +1373,17 @@ void RTPSParticipantImpl::update_attributes(
                     {
                         if (server_it->guidPrefix == incoming_server.guidPrefix)
                         {
-                            bool modified_locator = false;
                             // Check if the listening locators have been modified
                             for (auto guid : modified_servers)
                             {
                                 if (guid == incoming_server.GetParticipant())
                                 {
-                                    modified_locator = true;
                                     server_it->metatrafficUnicastLocatorList =
                                             incoming_server.metatrafficUnicastLocatorList;
                                     break;
                                 }
                             }
-                            if (false == modified_locator)
-                            {
-                                break;
-                            }
+                            break;
                         }
                     }
                     if (server_it == m_att.builtin.discovery_config.m_DiscoveryServers.end())
@@ -1380,7 +1393,10 @@ void RTPSParticipantImpl::update_attributes(
                 }
 
                 // Update the servers list in builtin protocols
-                mp_builtinProtocols->m_DiscoveryServers = m_att.builtin.discovery_config.m_DiscoveryServers;
+                {
+                    std::unique_lock<eprosima::shared_mutex> disc_lock(mp_builtinProtocols->getDiscoveryMutex());
+                    mp_builtinProtocols->m_DiscoveryServers = m_att.builtin.discovery_config.m_DiscoveryServers;
+                }
 
                 // Notify PDPServer
                 if (m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SERVER ||
@@ -1516,7 +1532,7 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
             }
 
             // Try creating receiver resources
-            if (createReceiverResources(pend->getAttributes().unicastLocatorList, false, true))
+            if (createReceiverResources(pend->getAttributes().unicastLocatorList, false, true, false))
             {
                 break;
             }
@@ -1544,8 +1560,8 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
             pend->getAttributes().unicastLocatorList = m_att.defaultUnicastLocatorList;
             pend->getAttributes().multicastLocatorList = m_att.defaultMulticastLocatorList;
         }
-        createReceiverResources(pend->getAttributes().unicastLocatorList, false, true);
-        createReceiverResources(pend->getAttributes().multicastLocatorList, false, true);
+        createReceiverResources(pend->getAttributes().unicastLocatorList, false, true, true);
+        createReceiverResources(pend->getAttributes().multicastLocatorList, false, true, true);
     }
 
     // Associate the Endpoint with ReceiverControlBlock
@@ -1615,7 +1631,8 @@ bool RTPSParticipantImpl::createSendResources(
 bool RTPSParticipantImpl::createReceiverResources(
         LocatorList_t& Locator_list,
         bool ApplyMutation,
-        bool RegisterReceiver)
+        bool RegisterReceiver,
+        bool log_when_creation_fails)
 {
     std::vector<std::shared_ptr<ReceiverResource>> newItemsBuffer;
     bool ret_val = Locator_list.empty();
@@ -1641,6 +1658,11 @@ bool RTPSParticipantImpl::createReceiverResources(
                 applyLocatorAdaptRule(*it_loc);
                 ret = m_network_Factory.BuildReceiverResources(*it_loc, newItemsBuffer, max_receiver_buffer_size);
             }
+        }
+
+        if (!ret && log_when_creation_fails)
+        {
+            logWarning(RTPS_PARTICIPANT, "Could not create the specified receiver resource");
         }
 
         ret_val |= !newItemsBuffer.empty();
@@ -2046,7 +2068,7 @@ bool RTPSParticipantImpl::pairing_remote_reader_with_local_writer_after_security
 {
     bool return_value;
 
-    return_value = mp_builtinProtocols->mp_PDP->getEDP()->pairing_remote_reader_with_local_writer_after_security(
+    return_value = mp_builtinProtocols->mp_PDP->pairing_remote_reader_with_local_writer_after_security(
         local_writer, remote_reader_data);
     if (!return_value && mp_builtinProtocols->mp_WLP != nullptr)
     {
@@ -2063,7 +2085,7 @@ bool RTPSParticipantImpl::pairing_remote_writer_with_local_reader_after_security
 {
     bool return_value;
 
-    return_value = mp_builtinProtocols->mp_PDP->getEDP()->pairing_remote_writer_with_local_reader_after_security(
+    return_value = mp_builtinProtocols->mp_PDP->pairing_remote_writer_with_local_reader_after_security(
         local_reader, remote_writer_data);
     if (!return_value && mp_builtinProtocols->mp_WLP != nullptr)
     {
@@ -2121,6 +2143,11 @@ bool RTPSParticipantImpl::is_security_enabled_for_reader(
 }
 
 #endif // if HAVE_SECURITY
+
+PDP* RTPSParticipantImpl::pdp()
+{
+    return mp_builtinProtocols->mp_PDP;
+}
 
 PDPSimple* RTPSParticipantImpl::pdpsimple()
 {
