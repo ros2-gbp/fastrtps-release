@@ -16,6 +16,7 @@ if(WIN32)
     add_definitions(
         -D_WIN32_WINNT=0x0601
         -D_CRT_SECURE_NO_WARNINGS
+        -DNOMINMAX
         )
 endif()
 
@@ -31,12 +32,14 @@ if(TLS_FOUND)
         ${CMAKE_CURRENT_BINARY_DIR}/mainsubcert.pem COPYONLY)
     configure_file(${PROJECT_SOURCE_DIR}/test/certs/mainsubkey.pem
         ${CMAKE_CURRENT_BINARY_DIR}/mainsubkey.pem COPYONLY)
-    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/ca.pem
-        ${CMAKE_CURRENT_BINARY_DIR}/ca.pem COPYONLY)
-    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/server.pem
-        ${CMAKE_CURRENT_BINARY_DIR}/server.pem COPYONLY)
-    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/dh2048.pem
-        ${CMAKE_CURRENT_BINARY_DIR}/dh2048.pem COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/certs/ca.crt
+        ${CMAKE_CURRENT_BINARY_DIR}/ca.crt COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/certs/fastdds.crt
+        ${CMAKE_CURRENT_BINARY_DIR}/fastdds.crt COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/certs/fastdds.key
+        ${CMAKE_CURRENT_BINARY_DIR}/fastdds.key COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/unittest/transport/certs/dh_params.pem
+        ${CMAKE_CURRENT_BINARY_DIR}/dh_params.pem COPYONLY)
     #configure_file(${PROJECT_SOURCE_DIR}/test/certs/governance_helloworld_all_enable.smime
     #    ${CMAKE_CURRENT_BINARY_DIR}/governance_helloworld_all_enable.smime COPYONLY)
     #configure_file(${PROJECT_SOURCE_DIR}/test/certs/permissions_helloworld.smime
@@ -217,7 +220,7 @@ set(SHAREDMEMTESTS_SOURCE
 include_directories(mock/)
 
 add_executable(UDPv4Tests ${UDPV4TESTS_SOURCE})
-target_compile_definitions(UDPv4Tests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(UDPv4Tests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -241,7 +244,7 @@ option(DISABLE_UDPV6_TESTS "Disable UDPv6 tests because fails in some systems" O
 
 if(NOT DISABLE_UDPV6_TESTS)
     add_executable(UDPv6Tests ${UDPV6TESTS_SOURCE})
-    target_compile_definitions(UDPv6Tests PRIVATE FASTRTPS_NO_LIB
+    target_compile_definitions(UDPv6Tests PRIVATE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -262,7 +265,7 @@ if(NOT DISABLE_UDPV6_TESTS)
     set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_UDP6)
 
     add_executable(TCPv6Tests ${TCPV6TESTS_SOURCE})
-    target_compile_definitions(TCPv6Tests PRIVATE FASTRTPS_NO_LIB
+    target_compile_definitions(TCPv6Tests PRIVATE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -289,7 +292,7 @@ if(NOT DISABLE_UDPV6_TESTS)
 endif()
 
 add_executable(test_UDPv4Tests ${TEST_UDPV4TESTS_SOURCE})
-target_compile_definitions(test_UDPv4Tests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(test_UDPv4Tests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -314,7 +317,7 @@ add_gtest(test_UDPv4Tests SOURCES ${TEST_UDPV4TESTS_SOURCE})
 set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TEST_UDP4)
 
 add_executable(TCPv4Tests ${TCPV4TESTS_SOURCE})
-target_compile_definitions(TCPv4Tests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(TCPv4Tests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -342,7 +345,7 @@ set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TCP4)
 if(IS_THIRDPARTY_BOOST_OK)
     add_executable(SharedMemTests ${SHAREDMEMTESTS_SOURCE})
 
-    target_compile_definitions(SharedMemTests PRIVATE FASTRTPS_NO_LIB
+    target_compile_definitions(SharedMemTests PRIVATE
         BOOST_ASIO_STANDALONE
         ASIO_STANDALONE
         $<$<BOOL:${WIN32}>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
@@ -358,7 +361,11 @@ if(IS_THIRDPARTY_BOOST_OK)
         ${PROJECT_SOURCE_DIR}/src/cpp
         ${THIRDPARTY_BOOST_INCLUDE_DIR}
         )
-    target_link_libraries(SharedMemTests GTest::gtest ${MOCKS}
+    target_link_libraries(SharedMemTests
+        foonathan_memory
+        fastcdr
+        GTest::gtest
+        ${MOCKS}
         $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>
         ${THIRDPARTY_BOOST_LINK_LIBS}
         eProsima_atomic
