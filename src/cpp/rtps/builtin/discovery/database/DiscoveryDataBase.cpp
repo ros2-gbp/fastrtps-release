@@ -69,6 +69,23 @@ void DiscoveryDataBase::add_server(
     servers_.insert(server);
 }
 
+void DiscoveryDataBase::remove_related_alive_from_history_nts(
+        fastrtps::rtps::WriterHistory* writer_history,
+        const fastrtps::rtps::GuidPrefix_t& entity_guid_prefix)
+{
+    // Iterate over changes in writer_history
+    for (auto chit = writer_history->changesBegin(); chit != writer_history->changesEnd();)
+    {
+        // Remove all DATA whose original sender was entity_guid_prefix from writer_history
+        if (entity_guid_prefix == guid_from_change(*chit).guidPrefix)
+        {
+            chit = writer_history->remove_change(chit, false);
+            continue;
+        }
+        chit++;
+    }
+}
+
 std::vector<fastrtps::rtps::CacheChange_t*> DiscoveryDataBase::clear()
 {
     // Cannot clear an enabled database, since there could be inconsistencies after the process
@@ -1622,6 +1639,10 @@ bool DiscoveryDataBase::server_acked_by_my_servers()
 
     // Find the server's participant and check whether all its servers have ACKed the server's DATA(p)
     auto this_server = participants_.find(server_guid_prefix_);
+
+    // check it is always there
+    assert(this_server != participants_.end());
+
     for (auto prefix : servers_)
     {
         if (!this_server->second.is_matched(prefix))

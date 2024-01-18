@@ -891,6 +891,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports)
+    {
+        participant_qos_.setup_transports(transports);
+        return *this;
+    }
+
     PubSubWriter& disable_builtin_transport()
     {
         participant_qos_.transport().use_builtin_transports = false;
@@ -1331,6 +1338,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& guid_prefix(
+            const eprosima::fastrtps::rtps::GuidPrefix_t& prefix)
+    {
+        participant_qos_.wire_protocol().prefix = prefix;
+        return *this;
+    }
+
     PubSubWriter& participant_id(
             int32_t participantId)
     {
@@ -1393,6 +1407,22 @@ public:
         publisher_qos_.partition().clear();
         publisher_qos_.partition().push_back(partition.c_str());
         return (ReturnCode_t::RETCODE_OK == publisher_->set_qos(publisher_qos_));
+    }
+
+    bool set_qos()
+    {
+        return (ReturnCode_t::RETCODE_OK == datawriter_->set_qos(datawriter_qos_));
+    }
+
+    bool set_qos(
+            const eprosima::fastdds::dds::DataWriterQos& att)
+    {
+        return (ReturnCode_t::RETCODE_OK == datawriter_->set_qos(att));
+    }
+
+    eprosima::fastdds::dds::DataWriterQos get_qos()
+    {
+        return (datawriter_->get_qos());
     }
 
     bool remove_all_changes(

@@ -295,6 +295,7 @@ set(BLACKBOXTESTS_SOURCE ${BLACKBOXTESTS_TEST_SOURCE}
     utils/lambda_functions.cpp
     utils/print_functions.cpp
 
+    common/DatagramInjectionTransport.cpp
     common/TCPReqRepHelloWorldRequester.cpp
     common/TCPReqRepHelloWorldReplier.cpp
     )
@@ -304,6 +305,7 @@ set(DDS_BLACKBOXTESTS_SOURCE
     ${DDS_BLACKBOXTESTS_TEST_SOURCE}
     ${BLACKBOXTESTS_SOURCE}
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/ServerAttributes.cpp
     )
 
 # Prepare static discovery xml file for blackbox tests.
@@ -334,12 +336,16 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/utils/check_guid.py
     ${CMAKE_CURRENT_BINARY_DIR}/check_guid.py)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/partitions.xml
     ${CMAKE_CURRENT_BINARY_DIR}/partitions.xml)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/builtin_transports_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/builtin_transports_profile.xml)
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/datagrams" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 if(FASTRTPS_API_TESTS)
     set(BLACKBOXTESTS_FASTRTPS_SOURCE
         ${BLACKBOXTESTS_SOURCE}
         api/fastrtps_deprecated/ReqRepHelloWorldRequester.cpp
         api/fastrtps_deprecated/ReqRepHelloWorldReplier.cpp
+        ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/ServerAttributes.cpp
         )
 
     add_executable(BlackboxTests_FastRTPS ${BLACKBOXTESTS_FASTRTPS_SOURCE})
@@ -360,7 +366,7 @@ if(FASTRTPS_API_TESTS)
         GTest::gtest
         $<$<BOOL:${LibP11_FOUND}>:eProsima_p11>  # $<TARGET_NAME_IF_EXISTS:eProsima_p11>
         )
-       
+
     add_blackbox_gtest(BlackboxTests_FastRTPS SOURCES ${BLACKBOXTESTS_TEST_SOURCE}
         ENVIRONMENTS "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs"
         "TOPIC_RANDOM_NUMBER=${TOPIC_RANDOM_NUMBER}"
