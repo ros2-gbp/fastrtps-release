@@ -1618,6 +1618,81 @@ TEST_F(TCPv4Tests, header_read_interrumption)
     thread.join();
 }
 
+// This test verifies that the autofill port feature correctly sets an automatic port when
+// the descriptors's port is set to 0.
+TEST_F(TCPv4Tests, autofill_port)
+{
+    // Check normal port assignation
+    TCPv4TransportDescriptor test_descriptor;
+    test_descriptor.add_listener_port(g_default_port);
+    TCPv4Transport transportUnderTest(test_descriptor);
+    transportUnderTest.init();
+
+    EXPECT_TRUE(transportUnderTest.configuration()->listening_ports[0] == g_default_port);
+
+    // Check default port assignation
+    TCPv4TransportDescriptor test_descriptor_autofill;
+    test_descriptor_autofill.add_listener_port(0);
+    TCPv4Transport transportUnderTest_autofill(test_descriptor_autofill);
+    transportUnderTest_autofill.init();
+
+    EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports[0] != 0);
+    EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports.size() == 1);
+
+    uint16_t port = 12345;
+    TCPv4TransportDescriptor test_descriptor_multiple_autofill;
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    test_descriptor_multiple_autofill.add_listener_port(port);
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    TCPv4Transport transportUnderTest_multiple_autofill(test_descriptor_multiple_autofill);
+    transportUnderTest_multiple_autofill.init();
+
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[0] != 0);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[1] == port);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[2] != 0);
+    EXPECT_TRUE(
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[0] !=
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[2]);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports.size() == 3);
+}
+
+// This test verifies server's channel resources mapping keys uniqueness, where keys are clients locators.
+// Clients typically communicated its PID as its locator port. When having several clients in the same
+// process this lead to overwriting server's channel resources map elements.
+TEST_F(TCPv4Tests, client_announced_local_port_uniqueness)
+{
+    TCPv4TransportDescriptor recvDescriptor;
+    recvDescriptor.add_listener_port(g_default_port);
+    MockTCPv4Transport receiveTransportUnderTest(recvDescriptor);
+    receiveTransportUnderTest.init();
+
+    TCPv4TransportDescriptor sendDescriptor_1;
+    TCPv4Transport sendTransportUnderTest_1(sendDescriptor_1);
+    sendTransportUnderTest_1.init();
+
+    TCPv4TransportDescriptor sendDescriptor_2;
+    TCPv4Transport sendTransportUnderTest_2(sendDescriptor_2);
+    sendTransportUnderTest_2.init();
+
+    Locator_t outputLocator;
+    outputLocator.kind = LOCATOR_KIND_TCPv4;
+    IPLocator::setIPv4(outputLocator, 127, 0, 0, 1);
+    outputLocator.port = g_default_port;
+    IPLocator::setLogicalPort(outputLocator, 7410);
+
+    SendResourceList send_resource_list_1;
+    ASSERT_TRUE(sendTransportUnderTest_1.OpenOutputChannel(send_resource_list_1, outputLocator));
+    ASSERT_FALSE(send_resource_list_1.empty());
+
+    SendResourceList send_resource_list_2;
+    ASSERT_TRUE(sendTransportUnderTest_2.OpenOutputChannel(send_resource_list_2, outputLocator));
+    ASSERT_FALSE(send_resource_list_2.empty());
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    ASSERT_EQ(receiveTransportUnderTest.get_channel_resources().size(), 2);
+}
+
 void TCPv4Tests::HELPER_SetDescriptorDefaults()
 {
     descriptor.add_listener_port(g_default_port);

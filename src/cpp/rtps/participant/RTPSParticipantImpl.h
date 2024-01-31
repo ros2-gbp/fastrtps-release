@@ -356,6 +356,17 @@ public:
             uint32_t length);
 
 #if HAVE_SECURITY
+    uint32_t calculate_extra_size_for_rtps_message()
+    {
+        uint32_t ret_val = 0u;
+        if (security_attributes_.is_rtps_protected)
+        {
+            ret_val = m_security_manager.calculate_extra_size_for_rtps_message();
+        }
+
+        return ret_val;
+    }
+
     security::SecurityManager& security_manager()
     {
         return m_security_manager;
@@ -981,11 +992,13 @@ public:
      * @param Locator_list - Locator list to be used to create the ReceiverResources
      * @param ApplyMutation - True if we want to create a Resource with a "similar" locator if the one we provide is unavailable
      * @param RegisterReceiver - True if we want the receiver to be registered. Useful for receivers created after participant is enabled.
+     * @param log_when_creation_fails - True if a log warning shall be issued for each locator when a receiver resource cannot be created.
      */
     bool createReceiverResources(
             LocatorList_t& Locator_list,
             bool ApplyMutation,
-            bool RegisterReceiver);
+            bool RegisterReceiver,
+            bool log_when_creation_fails);
 
     void createSenderResources(
             const LocatorList_t& locator_list);

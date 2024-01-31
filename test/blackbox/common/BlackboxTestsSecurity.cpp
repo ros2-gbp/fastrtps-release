@@ -16,28 +16,29 @@
 
 #if HAVE_SECURITY
 
+#include <atomic>
+#include <algorithm>
+#include <fstream>
+#include <map>
+
+#include <gtest/gtest.h>
+
 #include "PubSubReader.hpp"
 #include "PubSubWriter.hpp"
 #include "PubSubWriterReader.hpp"
 #include "PubSubParticipant.hpp"
 
-#include <gtest/gtest.h>
-#include <fstream>
-#include <map>
-#include <algorithm>
-
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-#include <rtps/transport/test_UDPv4Transport.h>
-
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/common/EntityId_t.hpp>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include <rtps/transport/test_UDPv4Transport.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 using test_UDPv4Transport = eprosima::fastdds::rtps::test_UDPv4Transport;
 using test_UDPv4TransportDescriptor = eprosima::fastdds::rtps::test_UDPv4TransportDescriptor;
-
-static const char* certs_path = nullptr;
 
 enum communication_type
 {
@@ -88,6 +89,31 @@ public:
 
 };
 
+struct UDPMessageSender
+{
+    asio::io_service service;
+    asio::ip::udp::socket socket;
+
+    UDPMessageSender()
+        : service()
+        , socket(service)
+    {
+        socket.open(asio::ip::udp::v4());
+    }
+
+    void send(
+            const CDRMessage_t& msg,
+            const Locator_t& destination)
+    {
+        std::string addr = IPLocator::toIPv4string(destination);
+        unsigned short port = static_cast<unsigned short>(destination.port);
+        auto remote = asio::ip::udp::endpoint(asio::ip::address::from_string(addr), port);
+        asio::error_code ec;
+
+        socket.send_to(asio::buffer(msg.buffer, msg.length), remote, 0, ec);
+    }
+
+};
 
 class SecurityPkcs : public ::testing::Test
 {
@@ -441,9 +467,144 @@ TEST_P(Security, BuiltinAuthenticationPlugin_PKIDH_lossy_conditions)
 }
 
 // Regresion test for Refs #13295, github #2362
-TEST_P(Security, BuiltinAuthenticationPlugin_second_participant_creation_loop)
+TEST(Security, BuiltinAuthenticationPlugin_second_participant_creation_loop)
 {
     constexpr size_t n_loops = 101;
+
+    using Log = eprosima::fastdds::dds::Log;
+    using LogConsumer = eprosima::fastdds::dds::LogConsumer;
+
+    // A LogConsumer that just counts the number of entries consumed
+    struct TestConsumer : public LogConsumer
+    {
+        TestConsumer(
+                std::atomic_size_t& n_logs_ref)
+            : n_logs_(n_logs_ref)
+        {
+        }
+
+        void Consume(
+                const Log::Entry&) override
+        {
+            ++n_logs_;
+        }
+
+    private:
+
+        std::atomic_size_t& n_logs_;
+    };
+
+    // Counter for log entries
+    std::atomic<size_t>n_logs{};
+
+    // Prepare Log module to check that no SECURITY errors are produced
+    Log::SetCategoryFilter(std::regex("SECURITY"));
+    Log::SetVerbosity(Log::Kind::Error);
+    Log::ClearConsumers();
+    Log::RegisterConsumer(std::unique_ptr<LogConsumer>(new TestConsumer(n_logs)));
+
+    // Class to allow waiting for the authentication message to be sent
+    class AuthMessageSendStatus
+    {
+        bool message_sent_ = false;
+        std::mutex mutex_;
+        std::condition_variable cv_;
+
+    public:
+
+        void reset()
+        {
+            std::lock_guard < std::mutex> guard(mutex_);
+            message_sent_ = false;
+        }
+
+        void notify()
+        {
+            std::lock_guard<std::mutex> guard(mutex_);
+            message_sent_ = true;
+            cv_.notify_one();
+        }
+
+        void wait()
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]() -> bool
+                    {
+                        return message_sent_;
+                    });
+        }
+
+    };
+
+    // Prepare transport to check that the authentication message is sent
+    auto transport = std::make_shared<test_UDPv4TransportDescriptor>();
+    AuthMessageSendStatus auth_message_send_status;
+    transport->drop_data_messages_filter_ = [&auth_message_send_status](eprosima::fastrtps::rtps::CDRMessage_t& msg)
+            -> bool
+            {
+                auto old_pos = msg.pos;
+
+                // Jump to writer entity id
+                msg.pos += 2 + 2 + 4;
+
+                // Read writer entity id
+                eprosima::fastrtps::rtps::GUID_t writer_guid;
+                eprosima::fastrtps::rtps::CDRMessage::readEntityId(&msg, &writer_guid.entityId);
+                msg.pos = old_pos;
+
+                if (writer_guid.entityId == eprosima::fastrtps::rtps::participant_stateless_message_writer_entity_id)
+                {
+                    auth_message_send_status.notify();
+                }
+
+                return false;
+            };
+
+    // Prepare participant properties
+    PropertyPolicy property_policy;
+    property_policy.properties().emplace_back(Property("dds.sec.auth.plugin", "builtin.PKI-DH"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+            "file://" + std::string(certs_path) + "/maincacert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+            "file://" + std::string(certs_path) + "/mainpubcert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+            "file://" + std::string(certs_path) + "/mainpubkey.pem"));
+
+    // Create the participant being checked
+    PubSubReader<HelloWorldPubSubType> main_participant("HelloWorldTopic");
+    main_participant.disable_builtin_transport().add_user_transport_to_pparams(transport);
+    main_participant.property_policy(property_policy).init();
+    EXPECT_TRUE(main_participant.isInitialized());
+
+    // Perform a loop in which we create another participant, and destroy it just after it has been discovered.
+    // This is the best reproducer of the issue, as authentication messages should be sent when a remote participant
+    // is discovered.
+    for (size_t n = 1; n <= n_loops; ++n)
+    {
+        std::cout << "Iteration " << n << std::endl;
+
+        // Wait for undiscovery so we can wait for discovery below
+        EXPECT_TRUE(main_participant.wait_participant_undiscovery());
+        auth_message_send_status.reset();
+
+        // Create another participant with authentication enabled
+        PubSubParticipant<HelloWorldPubSubType> other_participant(0, 0, 0, 0);
+        EXPECT_TRUE(other_participant.property_policy(property_policy).init_participant());
+
+        // Wait for the main participant to send an authentication message to the other participant
+        auth_message_send_status.wait();
+
+        // The created participant gets out of scope here, and is destroyed
+    }
+
+    // No SECURITY error logs should have been produced
+    Log::Flush();
+    EXPECT_EQ(0u, n_logs);
+}
+
+TEST_P(Security, BuiltinAuthenticationPlugin_ensure_same_guid_reconnection)
+{
+    constexpr size_t n_loops = 10;
 
     using Log = eprosima::fastdds::dds::Log;
     using LogConsumer = eprosima::fastdds::dds::LogConsumer;
@@ -488,9 +649,12 @@ TEST_P(Security, BuiltinAuthenticationPlugin_second_participant_creation_loop)
             "file://" + std::string(certs_path) + "/mainpubkey.pem"));
 
     // Create the participant being checked
-    PubSubReader<HelloWorldPubSubType> main_participant("HelloWorldTopic");
+    PubSubWriter<HelloWorldPubSubType> main_participant("HelloWorldTopic");
     main_participant.property_policy(property_policy).init();
     EXPECT_TRUE(main_participant.isInitialized());
+
+    eprosima::fastrtps::rtps::GuidPrefix_t guid_prefix;
+    memset(guid_prefix.value, 0xBB, sizeof(guid_prefix.value));
 
     // Perform a loop in which we create another participant, and destroy it just after it has been discovered.
     // This is the best reproducer of the issue, as authentication messages should be sent when a remote participant
@@ -502,12 +666,14 @@ TEST_P(Security, BuiltinAuthenticationPlugin_second_participant_creation_loop)
         // Wait for undiscovery so we can wait for discovery below
         EXPECT_TRUE(main_participant.wait_participant_undiscovery());
 
-        // Create another participant with authentication enabled
-        PubSubParticipant<HelloWorldPubSubType> other_participant(0, 0, 0, 0);
-        EXPECT_TRUE(other_participant.property_policy(property_policy).init_participant());
+        // Create another participant with authentication enabled and custom GUID
+        PubSubReader<HelloWorldPubSubType> other_participant("HelloWorldTopic");
+        other_participant.property_policy(property_policy).guid_prefix(guid_prefix).init();
+        EXPECT_TRUE(other_participant.isInitialized());
 
-        // Wait for the new participant to be discovered by the main one
-        EXPECT_TRUE(main_participant.wait_participant_discovery());
+        // Wait for mutual discovery and authentication
+        main_participant.wait_discovery();
+        other_participant.wait_discovery();
 
         // The created participant gets out of scope here, and is destroyed
     }
@@ -3271,13 +3437,13 @@ TEST_F(SecurityPkcs, BuiltinAuthenticationAndAccessAndCryptoPlugin_pkcs11_key)
     }
 }
 
-static void BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(
+static void CommonPermissionsConfigure(
         PubSubReader<HelloWorldPubSubType>& reader,
         PubSubWriter<HelloWorldPubSubType>& writer,
-        const std::string& governance_file)
+        const std::string& governance_file,
+        const std::string& permissions_file)
 {
-    PropertyPolicy pub_property_policy, sub_property_policy;
-
+    PropertyPolicy sub_property_policy;
     sub_property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
             "builtin.PKI-DH"));
     sub_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
@@ -3295,14 +3461,10 @@ static void BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation
     sub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.governance",
             "file://" + std::string(certs_path) + "/" + governance_file));
     sub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.permissions",
-            "file://" + std::string(certs_path) + "/permissions.smime"));
+            "file://" + std::string(certs_path) + "/" + permissions_file));
+    reader.property_policy(sub_property_policy);
 
-    reader.history_depth(10).
-            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).
-            property_policy(sub_property_policy).init();
-
-    ASSERT_TRUE(reader.isInitialized());
-
+    PropertyPolicy pub_property_policy;
     pub_property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
             "builtin.PKI-DH"));
     pub_property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
@@ -3320,11 +3482,21 @@ static void BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation
     pub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.governance",
             "file://" + std::string(certs_path) + "/" + governance_file));
     pub_property_policy.properties().emplace_back(Property("dds.sec.access.builtin.Access-Permissions.permissions",
-            "file://" + std::string(certs_path) + "/permissions.smime"));
+            "file://" + std::string(certs_path) + "/" + permissions_file));
+    writer.property_policy(pub_property_policy);
+}
 
-    writer.history_depth(10).
-            property_policy(pub_property_policy).init();
+static void BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(
+        PubSubReader<HelloWorldPubSubType>& reader,
+        PubSubWriter<HelloWorldPubSubType>& writer,
+        const std::string& governance_file)
+{
+    CommonPermissionsConfigure(reader, writer, governance_file, "permissions.smime");
 
+    reader.history_depth(10).reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.history_depth(10).init();
     ASSERT_TRUE(writer.isInitialized());
 
     // Wait for authorization
@@ -3579,11 +3751,14 @@ TEST(Security, AllowUnauthenticatedParticipants_TwoSecureParticipantsWithDiffere
 
     ASSERT_TRUE(writer.isInitialized());
 
-    //! Wait enough time for the PKI requests to time out and give validation_failed (~15secs)
-    writer.wait_discovery(std::chrono::seconds(20));
+    //! Wait for the authorization to fail (~15secs)
+    writer.waitUnauthorized();
+
+    //! Wait for the discovery
+    writer.wait_discovery();
 
     //! check that the writer matches the reader because of having allow_unauthenticated_participants enabled
-    ASSERT_TRUE(writer.get_matched());
+    ASSERT_TRUE(writer.is_matched());
 
     //! Data is correctly sent and received
     auto data = default_helloworld_data_generator();
@@ -3659,13 +3834,66 @@ TEST(Security, AllowUnauthenticatedParticipants_TwoParticipantsDifferentCertific
 
     ASSERT_TRUE(writer.isInitialized());
 
-    //! Wait enough time for the PKI requests to time out and give validation_failed (~15secs)
-    writer.wait_discovery(std::chrono::seconds(20));
+    //! Wait for the authorization to fail (~15secs)
+    writer.waitUnauthorized();
+
+    //! Wait some time afterwards (this will time out)
+    writer.wait_discovery(std::chrono::seconds(1));
 
     //! check that the writer does not match the reader because of
     //! having read and write protection enabled
     //! despite allow_unauthenticated_participants is enabled
-    ASSERT_FALSE(writer.get_matched());
+    ASSERT_FALSE(writer.is_matched());
+}
+
+// Regresion test for redmine issue 20166
+TEST(Security, InANonSecureParticipantWithTwoSecureParticipantScenario_TheTwoSecureParticipantsCorrectlyCommunicate)
+{
+    // Create
+    PubSubReader<HelloWorldPubSubType> non_secure_reader("HelloWorldTopic");
+    PubSubReader<HelloWorldPubSubType> secure_reader("HelloWorldTopic");
+    PubSubWriter<HelloWorldPubSubType> secure_writer("HelloWorldTopic");
+
+    // Configure security
+    const std::string governance_file("governance_helloworld_all_enable.smime");
+    const std::string permissions_file("permissions_helloworld.smime");
+    CommonPermissionsConfigure(secure_reader, secure_writer, governance_file, permissions_file);
+
+    secure_writer.history_depth(10).
+            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+
+    ASSERT_TRUE(secure_writer.isInitialized());
+
+    non_secure_reader.history_depth(10).
+            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+
+    ASSERT_TRUE(non_secure_reader.isInitialized());
+
+    secure_reader.history_depth(10).
+            reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+
+    ASSERT_TRUE(secure_reader.isInitialized());
+
+    // Wait for the authorization
+    secure_reader.waitAuthorized();
+    secure_writer.waitAuthorized();
+
+    // Wait for discovery
+    secure_writer.wait_discovery(std::chrono::seconds(5));
+    secure_reader.wait_discovery(std::chrono::seconds(5));
+
+    // Data is correctly sent and received
+    auto data = default_helloworld_data_generator();
+
+    secure_reader.startReception(data);
+
+    secure_writer.send(data);
+
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+
+    secure_reader.block_for_all();
+    EXPECT_EQ(non_secure_reader.getReceivedCount(), 0u);
 }
 
 // *INDENT-OFF*
@@ -4373,6 +4601,220 @@ TEST_P(Security, BuiltinAuthenticationAndAccessAndCryptoPlugin_PermissionsEnable
 
     BuiltinAuthenticationAndAccessAndCryptoPlugin_Permissions_validation_ok_common(reader, writer, governance_file);
 }
+
+TEST(Security, MaliciousHeartbeatIgnore)
+{
+    PubSubWriter<HelloWorldPubSubType> writer("HelloWorldTopic_MaliciousHeartbeatIgnore");
+    PubSubReader<HelloWorldPubSubType> reader("HelloWorldTopic_MaliciousHeartbeatIgnore");
+
+    struct MaliciousHeartbeat
+    {
+        std::array<char, 4> rtps_id{{'R', 'T', 'P', 'S'}};
+        std::array<uint8_t, 2> protocol_version{{2, 3}};
+        std::array<uint8_t, 2> vendor_id{{0x01, 0x0F}};
+        GuidPrefix_t sender_prefix;
+
+        uint8_t submessage_id = 0x07;
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
+        uint8_t flags = 0;
+#else
+        uint8_t flags = 0x01;
+#endif  // FASTDDS_IS_BIG_ENDIAN_TARGET
+        uint16_t submessage_length = 4 + 4 + 8 + 8 + 4;
+        EntityId_t reader_id{};
+        EntityId_t writer_id{};
+        SequenceNumber_t first_sn{};
+        SequenceNumber_t last_sn{};
+        int32_t count = 0;
+    };
+
+    // Set custom transport on both participants
+    auto transport = std::make_shared<test_UDPv4TransportDescriptor>();
+    std::atomic<bool> avoid_sec_submessages{false};
+    transport->sub_messages_filter_ = [&avoid_sec_submessages](CDRMessage_t& msg) -> bool
+            {
+                return avoid_sec_submessages.load() && (0x30 == (msg.buffer[msg.pos] & 0xF0));
+            };
+
+    UDPMessageSender fake_msg_sender;
+
+    writer.disable_builtin_transport().add_user_transport_to_pparams(transport);
+    reader.disable_builtin_transport().add_user_transport_to_pparams(transport);
+
+    // Set custom reader locator so we can send malicious data to a known location
+    Locator_t reader_locator;
+    ASSERT_TRUE(IPLocator::setIPv4(reader_locator, "127.0.0.1"));
+    reader_locator.port = 7000;
+    reader.add_to_unicast_locator_list("127.0.0.1", 7000);
+
+    // Set common QoS
+    reader.history_depth(10).reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS);
+    writer.history_depth(10).reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS);
+
+    // Configure security
+    const std::string governance_file("governance_helloworld_all_enable.smime");
+    const std::string permissions_file("permissions_helloworld.smime");
+    CommonPermissionsConfigure(reader, writer, governance_file, permissions_file);
+
+    // Initialize and wait for discovery
+    reader.init();
+    ASSERT_TRUE(reader.isInitialized());
+    writer.init();
+    ASSERT_TRUE(writer.isInitialized());
+    reader.wait_discovery();
+    writer.wait_discovery();
+
+    // Disable secure submessages and send data
+    avoid_sec_submessages.store(true);
+    auto data = default_helloworld_data_generator();
+    reader.startReception(data);
+    writer.send(data);
+    ASSERT_TRUE(data.empty());
+
+    // Send malicious heartbeat
+    {
+        auto writer_guid = writer.datawriter_guid();
+
+        MaliciousHeartbeat hb{};
+        hb.sender_prefix = writer_guid.guidPrefix;
+        hb.writer_id = writer_guid.entityId;
+        hb.reader_id = EntityId_t::unknown();
+        hb.first_sn.low = 100;
+        hb.last_sn.low = 100;
+        hb.count = 100;
+
+        CDRMessage_t msg(0);
+        uint32_t msg_len = static_cast<uint32_t>(sizeof(hb));
+        msg.init(reinterpret_cast<octet*>(&hb), msg_len);
+        msg.length = msg_len;
+        msg.pos = msg_len;
+        fake_msg_sender.send(msg, reader_locator);
+    }
+
+    // Enable secure submessages
+    avoid_sec_submessages.store(false);
+    // Block reader until reception finished or timeout.
+    reader.block_for_all();
+}
+
+TEST_P(Security, MaliciousParticipantRemovalIgnore)
+{
+    PubSubWriter<HelloWorldPubSubType> writer("HelloWorldTopic_MaliciousParticipantRemovalIgnore");
+    PubSubReader<HelloWorldPubSubType> reader("HelloWorldTopic_MaliciousParticipantRemovalIgnore");
+
+    struct MaliciousParticipantRemoval
+    {
+        std::array<char, 4> rtps_id{ {'R', 'T', 'P', 'S'} };
+        std::array<uint8_t, 2> protocol_version{ {2, 3} };
+        std::array<uint8_t, 2> vendor_id{ {0x01, 0x0F} };
+        GuidPrefix_t sender_prefix{};
+
+        struct DataSubMsg
+        {
+            struct Header
+            {
+                uint8_t submessage_id = 0x15;
+#if FASTDDS_IS_BIG_ENDIAN_TARGET
+                uint8_t flags = 0x02;
+#else
+                uint8_t flags = 0x03;
+#endif  // FASTDDS_IS_BIG_ENDIAN_TARGET
+                uint16_t submessage_length = 2 + 2 + 4 + 4 + 8;
+                uint16_t extra_flags = 0;
+                uint16_t octets_to_inline_qos = 4 + 4 + 8;
+                EntityId_t reader_id{};
+                EntityId_t writer_id{};
+                SequenceNumber_t sn{};
+            };
+
+            struct InlineQos
+            {
+                struct KeyHash
+                {
+                    uint16_t pid = 0x0070;  // PID_KEY_HASH
+                    uint16_t plen = 16;
+                    GUID_t guid{};
+                };
+
+                struct StatusInfo
+                {
+                    uint16_t pid = 0x0071;  // PID_STATUS_INFO
+                    uint16_t plen = 4;
+                    uint8_t flags[4] = { 0x00, 0x00, 0x00, 0x03 };
+                };
+
+                struct Sentinel
+                {
+                    uint16_t pid = 0x0001;  // PID_SENTINEL
+                    uint16_t plen = 0;
+                };
+
+                KeyHash hash;
+                StatusInfo status;
+                Sentinel sentinel;
+            };
+
+            Header header;
+            InlineQos inline_qos;
+        }
+        data;
+    };
+
+    // Set common QoS
+    reader.history_depth(10).reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS);
+    writer.history_depth(10).reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS);
+
+    // Configure security
+    const std::string governance_file("governance_helloworld_all_enable.smime");
+    const std::string permissions_file("permissions_helloworld.smime");
+    CommonPermissionsConfigure(reader, writer, governance_file, permissions_file);
+
+    // Initialize and wait for authorization and discovery
+    reader.init();
+    ASSERT_TRUE(reader.isInitialized());
+    writer.init();
+    ASSERT_TRUE(writer.isInitialized());
+    reader.waitAuthorized();
+    writer.waitAuthorized();
+    reader.wait_discovery();
+    writer.wait_discovery();
+
+    // Send fake DATA(p[UD])
+    UDPMessageSender fake_msg_sender;
+    {
+        auto writer_guid = writer.datawriter_guid();
+        auto participant_guid = writer.participant_guid();
+        auto domain_id = static_cast<uint32_t>(GET_PID() % 230);
+
+        MaliciousParticipantRemoval packet{};
+        packet.sender_prefix = writer_guid.guidPrefix;
+        packet.data.header.submessage_length += sizeof(packet.data.inline_qos);
+        packet.data.header.writer_id = c_EntityId_SPDPWriter;
+        packet.data.header.reader_id = c_EntityId_SPDPReader;
+        packet.data.header.sn.low = 100;
+        packet.data.inline_qos.hash.guid = participant_guid;
+
+        Locator_t mcast_locator;
+        ASSERT_TRUE(IPLocator::setIPv4(mcast_locator, "239.255.0.1"));
+        mcast_locator.port = 7400 + 250 * domain_id;
+
+        CDRMessage_t msg(0);
+        uint32_t msg_len = static_cast<uint32_t>(sizeof(packet));
+        msg.init(reinterpret_cast<octet*>(&packet), msg_len);
+        msg.length = msg_len;
+        msg.pos = msg_len;
+        fake_msg_sender.send(msg, mcast_locator);
+    }
+
+    EXPECT_FALSE(reader.wait_participant_undiscovery(std::chrono::seconds(1)));
+
+    auto data = default_helloworld_data_generator();
+    reader.startReception(data);
+    writer.send(data);
+    ASSERT_TRUE(data.empty());
+    reader.block_for_all();
+}
+
 
 void blackbox_security_init()
 {

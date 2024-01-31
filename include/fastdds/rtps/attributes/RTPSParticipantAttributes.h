@@ -19,6 +19,7 @@
 #ifndef _FASTDDS_RTPSPARTICIPANTPARAMETERS_H_
 #define _FASTDDS_RTPSPARTICIPANTPARAMETERS_H_
 
+#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastdds/rtps/attributes/ExternalLocators.hpp>
 #include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
@@ -36,14 +37,12 @@
 #include <sstream>
 
 namespace eprosima {
-
 namespace fastdds {
-
 namespace rtps {
 
 /**
  * Struct to define participant types to set participant type parameter property
- *@ingroup DISCOVERY_MODULE
+ * @ingroup DISCOVERY_MODULE
  */
 struct ParticipantType
 {
@@ -57,14 +56,13 @@ struct ParticipantType
     static constexpr const char* UNKNOWN = "UNKNOWN";
 };
 
-} /* namespace rtps */
-} /* namespace fastdds */
+}  // namespace rtps
+}  // namespace fastdds
 
 namespace fastrtps {
 namespace rtps {
 
-
-//!PDP subclass choice
+//! PDP subclass choice
 typedef enum DiscoveryProtocol
 {
     NONE,
@@ -127,7 +125,7 @@ inline std::ostream& operator <<(
     return output;
 }
 
-//!Filtering flags when discovering participants
+//! Filtering flags when discovering participants
 typedef enum ParticipantFilteringFlags : uint32_t
 {
     NO_FILTER = 0,
@@ -440,7 +438,7 @@ public:
 
 /**
  * Class RTPSParticipantAttributes used to define different aspects of a RTPSParticipant.
- *@ingroup RTPS_ATTRIBUTES_MODULE
+ * @ingroup RTPS_ATTRIBUTES_MODULE
  */
 class RTPSParticipantAttributes
 {
@@ -448,18 +446,9 @@ class RTPSParticipantAttributes
 
 public:
 
-    RTPSParticipantAttributes()
-    {
-        setName("RTPSParticipant");
-        sendSocketBufferSize = 0;
-        listenSocketBufferSize = 0;
-        participantID = -1;
-        useBuiltinTransports = true;
-    }
+    RTPSParticipantAttributes() = default;
 
-    virtual ~RTPSParticipantAttributes()
-    {
-    }
+    virtual ~RTPSParticipantAttributes() = default;
 
     bool operator ==(
             const RTPSParticipantAttributes& b) const
@@ -481,6 +470,14 @@ public:
                (this->prefix == b.prefix) &&
                (this->flow_controllers == b.flow_controllers);
     }
+
+    /**
+     * Provides a way of easily configuring transport related configuration on certain pre-defined scenarios.
+     *
+     * @param transports Defines the transport configuration scenario to setup.
+     */
+    RTPS_DllAPI void setup_transports(
+            fastdds::rtps::BuiltinTransports transports);
 
     /**
      * Default list of Unicast Locators to be used for any Endpoint defined inside this RTPSParticipant in the case
@@ -508,12 +505,12 @@ public:
      * @brief Send socket buffer size for the send resource. Zero value indicates to use default system buffer size.
      * Default value: 0.
      */
-    uint32_t sendSocketBufferSize;
+    uint32_t sendSocketBufferSize = 0;
 
     /*! Listen socket buffer for all listen resources. Zero value indicates to use default system buffer size.
      * Default value: 0.
      */
-    uint32_t listenSocketBufferSize;
+    uint32_t listenSocketBufferSize = 0;
 
     //! Optionally allows user to define the GuidPrefix_t
     GuidPrefix_t prefix;
@@ -534,7 +531,7 @@ public:
     std::vector<octet> userData;
 
     //! Participant ID
-    int32_t participantID;
+    int32_t participantID = -1;
 
     /**
      * @brief Throughput controller parameters. Leave default for uncontrolled flow.
@@ -546,8 +543,8 @@ public:
     //! User defined transports to use alongside or in place of builtins.
     std::vector<std::shared_ptr<fastdds::rtps::TransportDescriptorInterface>> userTransports;
 
-    //! Set as false to disable the default UDPv4 implementation.
-    bool useBuiltinTransports;
+    //! Set as false to disable the creation of the default transports.
+    bool useBuiltinTransports = true;
 
     //! Holds allocation limits affecting collections managed by a participant.
     RTPSParticipantAllocationAttributes allocation;
@@ -574,11 +571,11 @@ public:
 private:
 
     //! Name of the participant.
-    string_255 name;
+    string_255 name{"RTPSParticipant"};
 };
 
-} /* namespace rtps */
-} /* namespace fastrtps */
-} /* namespace eprosima */
+}  // namespace rtps
+}  // namespace fastrtps
+}  // namespace eprosima
 
-#endif /* _FASTDDS_RTPSPARTICIPANTPARAMETERS_H_ */
+#endif  // _FASTDDS_RTPSPARTICIPANTPARAMETERS_H_

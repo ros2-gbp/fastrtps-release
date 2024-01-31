@@ -143,7 +143,7 @@ if(ANDROID)
 endif()
 
 add_executable(ListenerTests ${LISTENERTESTS_SOURCE})
-target_compile_definitions(ListenerTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(ListenerTests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     ASIO_DISABLE_VISIBILITY
@@ -160,6 +160,7 @@ target_include_directories(ListenerTests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSWriter
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSDomain
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSDomainImpl
+    ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantAttributes
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipant
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint

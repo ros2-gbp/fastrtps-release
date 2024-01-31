@@ -205,6 +205,16 @@ void TCPTransportInterface::clean()
         }
     }
 
+    if (initial_peer_local_locator_socket_)
+    {
+        if (initial_peer_local_locator_socket_->is_open())
+        {
+            initial_peer_local_locator_socket_->close();
+        }
+
+        initial_peer_local_locator_socket_.reset();
+    }
+
     if (io_service_thread_)
     {
         io_service_.stop();
@@ -252,9 +262,10 @@ void TCPTransportInterface::calculate_crc(
     header.crc = crc;
 }
 
-bool TCPTransportInterface::create_acceptor_socket(
+uint16_t TCPTransportInterface::create_acceptor_socket(
         const Locator& locator)
 {
+    uint16_t final_port = 0;
     try
     {
         if (is_interface_whitelist_empty())
@@ -264,16 +275,18 @@ bool TCPTransportInterface::create_acceptor_socket(
             {
                 std::shared_ptr<TCPAcceptorSecure> acceptor =
                         std::make_shared<TCPAcceptorSecure>(io_service_, this, locator);
-                acceptors_[locator] = acceptor;
+                acceptors_[acceptor->locator()] = acceptor;
                 acceptor->accept(this, ssl_context_);
+                final_port = static_cast<uint16_t>(acceptor->locator().port);
             }
             else
 #endif // if TLS_FOUND
             {
                 std::shared_ptr<TCPAcceptorBasic> acceptor =
                         std::make_shared<TCPAcceptorBasic>(io_service_, this, locator);
-                acceptors_[locator] = acceptor;
+                acceptors_[acceptor->locator()] = acceptor;
                 acceptor->accept(this);
+                final_port = static_cast<uint16_t>(acceptor->locator().port);
             }
 
             EPROSIMA_LOG_INFO(RTCP, " OpenAndBindInput (physical: " << IPLocator::getPhysicalPort(
@@ -291,16 +304,18 @@ bool TCPTransportInterface::create_acceptor_socket(
                 {
                     std::shared_ptr<TCPAcceptorSecure> acceptor =
                             std::make_shared<TCPAcceptorSecure>(io_service_, sInterface, locator);
-                    acceptors_[locator] = acceptor;
+                    acceptors_[acceptor->locator()] = acceptor;
                     acceptor->accept(this, ssl_context_);
+                    final_port = static_cast<uint16_t>(acceptor->locator().port);
                 }
                 else
 #endif // if TLS_FOUND
                 {
                     std::shared_ptr<TCPAcceptorBasic> acceptor =
                             std::make_shared<TCPAcceptorBasic>(io_service_, sInterface, locator);
-                    acceptors_[locator] = acceptor;
+                    acceptors_[acceptor->locator()] = acceptor;
                     acceptor->accept(this);
+                    final_port = static_cast<uint16_t>(acceptor->locator().port);
                 }
 
                 EPROSIMA_LOG_INFO(RTCP, " OpenAndBindInput (physical: " << IPLocator::getPhysicalPort(
@@ -324,7 +339,7 @@ bool TCPTransportInterface::create_acceptor_socket(
         return false;
     }
 
-    return true;
+    return final_port;
 }
 
 void TCPTransportInterface::fill_rtcp_header(
@@ -357,37 +372,46 @@ bool TCPTransportInterface::init(
         EPROSIMA_LOG_WARNING(TLS, "Error configuring TLS, using TCP transport without security");
     }
 
-    if (configuration()->sendBufferSize == 0 || configuration()->receiveBufferSize == 0)
+    /*
+       Open and bind a socket to obtain a unique port. This port is assigned to PDP passed locators.
+       Although real client socket local port will differ, this ensures uniqueness for server's channel
+       resources mapping (uses client locators as keys).
+       Open and bind a socket to obtain a unique port. This unique port is assigned to to PDP passed locators.
+       This process ensures uniqueness in the server's channel resources mapping, which uses client locators as keys.
+       Although differing from the real client socket local port, provides a reliable mapping mechanism.
+     */
+    initial_peer_local_locator_socket_ = std::unique_ptr<asio::ip::tcp::socket>(new asio::ip::tcp::socket(io_service_));
+    initial_peer_local_locator_socket_->open(generate_protocol());
+
+    // Binding to port 0 delegates the port selection to the system.
+    initial_peer_local_locator_socket_->bind(asio::ip::tcp::endpoint(generate_protocol(), 0));
+
+    ip::tcp::endpoint local_endpoint = initial_peer_local_locator_socket_->local_endpoint();
+    initial_peer_local_locator_port_ = local_endpoint.port();
+
+    // Check system buffer sizes.
+    if (configuration()->sendBufferSize == 0)
     {
-        // Check system buffer sizes.
-        ip::tcp::socket socket(io_service_);
-        socket.open(generate_protocol());
+        socket_base::send_buffer_size option;
+        initial_peer_local_locator_socket_->get_option(option);
+        set_send_buffer_size(option.value());
 
-        if (configuration()->sendBufferSize == 0)
+        if (configuration()->sendBufferSize < s_minimumSocketBuffer)
         {
-            socket_base::send_buffer_size option;
-            socket.get_option(option);
-            set_send_buffer_size(option.value());
-
-            if (configuration()->sendBufferSize < s_minimumSocketBuffer)
-            {
-                set_send_buffer_size(s_minimumSocketBuffer);
-            }
+            set_send_buffer_size(s_minimumSocketBuffer);
         }
+    }
 
-        if (configuration()->receiveBufferSize == 0)
+    if (configuration()->receiveBufferSize == 0)
+    {
+        socket_base::receive_buffer_size option;
+        initial_peer_local_locator_socket_->get_option(option);
+        set_receive_buffer_size(option.value());
+
+        if (configuration()->receiveBufferSize < s_minimumSocketBuffer)
         {
-            socket_base::receive_buffer_size option;
-            socket.get_option(option);
-            set_receive_buffer_size(option.value());
-
-            if (configuration()->receiveBufferSize < s_minimumSocketBuffer)
-            {
-                set_receive_buffer_size(s_minimumSocketBuffer);
-            }
+            set_receive_buffer_size(s_minimumSocketBuffer);
         }
-
-        socket.close();
     }
 
     if (configuration()->maxMessageSize > s_maximumMessageSize)
@@ -613,8 +637,10 @@ bool TCPTransportInterface::OpenOutputChannel(
         {
             TCPSenderResource* tcp_sender_resource = TCPSenderResource::cast(*this, sender_resource.get());
 
-            //TODO Review with wan ip.
-            if (tcp_sender_resource && physical_locator == tcp_sender_resource->channel()->locator())
+            if (tcp_sender_resource && (physical_locator == tcp_sender_resource->channel()->locator() ||
+                    (IPLocator::hasWan(locator) &&
+                    IPLocator::WanToLanLocator(physical_locator) ==
+                    tcp_sender_resource->channel()->locator())))
             {
                 // Look for an existing channel that matches this physical locator
                 auto existing_channel = channel_resources_.find(physical_locator);
@@ -625,7 +651,6 @@ bool TCPTransportInterface::OpenOutputChannel(
                 {
                     // Disconnect the old channel
                     tcp_sender_resource->channel()->disconnect();
-                    tcp_sender_resource->channel()->clear();
                     // Update sender resource with new channel
                     tcp_sender_resource->channel() = existing_channel->second;
                 }
@@ -1168,9 +1193,6 @@ bool TCPTransportInterface::send(
         //std::cout << "ChannelLocator: " << IPLocator::to_string(channel->locator()) << std::endl;
         //std::cout << "RemoteLocator: " << IPLocator::to_string(remote_locator) << std::endl;
 
-        EPROSIMA_LOG_WARNING(RTCP, "SEND [RTPS] Failed: Not connect: " << IPLocator::getLogicalPort(remote_locator) \
-                                                                       << " @ IP: " <<
-                IPLocator::toIPv4string(remote_locator));
         return false;
     }
 
@@ -1436,18 +1458,7 @@ bool TCPTransportInterface::fillMetatrafficUnicastLocator(
 {
     if (IPLocator::getPhysicalPort(locator.port) == 0)
     {
-        const TCPTransportDescriptor* config = configuration();
-        if (config != nullptr)
-        {
-            if (!config->listening_ports.empty())
-            {
-                IPLocator::setPhysicalPort(locator, *(config->listening_ports.begin()));
-            }
-            else
-            {
-                IPLocator::setPhysicalPort(locator, static_cast<uint16_t>(SystemInfo::instance().process_id()));
-            }
-        }
+        fill_local_physical_port(locator);
     }
 
     if (IPLocator::getLogicalPort(locator) == 0)
@@ -1505,18 +1516,7 @@ bool TCPTransportInterface::fillUnicastLocator(
 {
     if (IPLocator::getPhysicalPort(locator.port) == 0)
     {
-        const TCPTransportDescriptor* config = configuration();
-        if (config != nullptr)
-        {
-            if (!config->listening_ports.empty())
-            {
-                IPLocator::setPhysicalPort(locator, *(config->listening_ports.begin()));
-            }
-            else
-            {
-                IPLocator::setPhysicalPort(locator, static_cast<uint16_t>(SystemInfo::instance().process_id()));
-            }
-        }
+        fill_local_physical_port(locator);
     }
 
     if (IPLocator::getLogicalPort(locator) == 0)
@@ -1695,6 +1695,19 @@ std::string TCPTransportInterface::get_password() const
 void TCPTransportInterface::update_network_interfaces()
 {
     // TODO(jlbueno)
+}
+
+void TCPTransportInterface::fill_local_physical_port(
+        Locator& locator) const
+{
+    if (!configuration()->listening_ports.empty())
+    {
+        IPLocator::setPhysicalPort(locator, *(configuration()->listening_ports.begin()));
+    }
+    else
+    {
+        IPLocator::setPhysicalPort(locator, initial_peer_local_locator_port_);
+    }
 }
 
 } // namespace rtps
