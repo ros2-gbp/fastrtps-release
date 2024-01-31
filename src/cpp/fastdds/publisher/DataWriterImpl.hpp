@@ -108,7 +108,8 @@ protected:
             TypeSupport type,
             Topic* topic,
             const DataWriterQos& qos,
-            DataWriterListener* listener = nullptr);
+            DataWriterListener* listener = nullptr,
+            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
 
     DataWriterImpl(
             PublisherImpl* p,
@@ -488,6 +489,8 @@ protected:
 
     std::shared_ptr<IPayloadPool> payload_pool_;
 
+    bool is_custom_payload_pool_ = false;
+
     std::unique_ptr<LoanCollection> loans_;
 
     fastrtps::rtps::GUID_t guid_;
@@ -587,7 +590,7 @@ protected:
     static void set_qos(
             DataWriterQos& to,
             const DataWriterQos& from,
-            bool is_default);
+            bool update_immutable);
 
     /**
      * Extends the check_qos() call, including the check for

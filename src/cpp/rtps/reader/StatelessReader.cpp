@@ -278,20 +278,30 @@ bool StatelessReader::change_received(
     // TODO Revisar si no hay que incluirlo.
     if (!thereIsUpperRecordOf(change->writerGUID, change->sequenceNumber))
     {
-        // Update Ownership strength.
-        if (EXCLUSIVE_OWNERSHIP_QOS == m_att.ownershipKind)
+        bool update_notified = true;
+
+        decltype(matched_writers_)::iterator writer = matched_writers_.end();
+        if ((EXCLUSIVE_OWNERSHIP_QOS == m_att.ownershipKind) ||
+                (m_trustedWriterEntityId == change->writerGUID.entityId))
         {
-            auto writer = std::find_if(matched_writers_.begin(), matched_writers_.end(),
+            writer = std::find_if(matched_writers_.begin(), matched_writers_.end(),
                             [change](const RemoteWriterInfo_t& item)
                             {
                                 return item.guid == change->writerGUID;
                             });
+            bool is_matched = matched_writers_.end() != writer;
+            update_notified = is_matched;
+        }
+
+        // Update Ownership strength.
+        if (EXCLUSIVE_OWNERSHIP_QOS == m_att.ownershipKind)
+        {
             assert(matched_writers_.end() != writer);
             change->reader_info.writer_ownership_strength = writer->ownership_strength;
         }
         else
         {
-            change->reader_info.writer_ownership_strength = std::numeric_limits<uint32_t>::max();
+            change->reader_info.writer_ownership_strength = (std::numeric_limits<uint32_t>::max)();
         }
 
         if (mp_history->received_change(change, 0))
@@ -301,7 +311,11 @@ bool StatelessReader::change_received(
             auto seq = change->sequenceNumber;
 
             Time_t::now(change->reader_info.receptionTimestamp);
-            SequenceNumber_t previous_seq = update_last_notified(change->writerGUID, change->sequenceNumber);
+            SequenceNumber_t previous_seq{ 0, 0 };
+            if (update_notified)
+            {
+                previous_seq = update_last_notified(change->writerGUID, change->sequenceNumber);
+            }
             ++total_unread_;
 
             on_data_notify(guid, change->sourceTimestamp);
@@ -548,7 +562,7 @@ bool StatelessReader::processDataMsg(
                 EPROSIMA_LOG_WARNING(RTPS_MSG_IN, IDSTRING "Problem copying CacheChange, received data is: "
                         << change->serializedPayload.length << " bytes and max size in reader "
                         << m_guid << " is "
-                        << (fixed_payload_size_ > 0 ? fixed_payload_size_ : std::numeric_limits<uint32_t>::max()));
+                        << (fixed_payload_size_ > 0 ? fixed_payload_size_ : (std::numeric_limits<uint32_t>::max)()));
                 change_pool_->release_cache(change_to_add);
                 return false;
             }
