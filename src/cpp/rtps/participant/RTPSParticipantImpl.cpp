@@ -24,6 +24,7 @@
 #include <sstream>
 
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
 #include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
@@ -61,6 +62,8 @@
 #include <rtps/participant/RTPSParticipantImpl.h>
 #include <rtps/persistence/PersistenceService.h>
 #include <statistics/rtps/GuidUtils.hpp>
+#include <utils/SystemInfo.hpp>
+#include <utils/string_utilities.hpp>
 
 namespace eprosima {
 namespace fastrtps {
@@ -69,6 +72,35 @@ namespace rtps {
 using UDPv4TransportDescriptor = fastdds::rtps::UDPv4TransportDescriptor;
 using TCPTransportDescriptor = fastdds::rtps::TCPTransportDescriptor;
 using SharedMemTransportDescriptor = fastdds::rtps::SharedMemTransportDescriptor;
+using BuiltinTransports = fastdds::rtps::BuiltinTransports;
+
+/**
+ * Parse the environment variable specifying the transports to instantiate
+ */
+static BuiltinTransports get_builtin_transports_from_env_var()
+{
+    static constexpr const char* env_var_name = "FASTDDS_BUILTIN_TRANSPORTS";
+
+    BuiltinTransports ret_val = BuiltinTransports::DEFAULT;
+    std::string env_value;
+    if (SystemInfo::get_env(env_var_name, env_value) == ReturnCode_t::RETCODE_OK)
+    {
+        if (!get_element_enum_value(env_value.c_str(), ret_val,
+                "NONE", BuiltinTransports::NONE,
+                "DEFAULT", BuiltinTransports::DEFAULT,
+                "DEFAULTv6", BuiltinTransports::DEFAULTv6,
+                "SHM", BuiltinTransports::SHM,
+                "UDPv4", BuiltinTransports::UDPv4,
+                "UDPv6", BuiltinTransports::UDPv6,
+                "LARGE_DATA", BuiltinTransports::LARGE_DATA,
+                "LARGE_DATAv6", BuiltinTransports::LARGE_DATAv6))
+        {
+            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Wrong value '" << env_value << "' for environment variable '" <<
+                    env_var_name << "'. Leaving as DEFAULT");
+        }
+    }
+    return ret_val;
+}
 
 static EntityId_t TrustedWriter(
         const EntityId_t& reader)
@@ -150,37 +182,15 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     {
         m_persistence_guid = GUID_t(persistence_guid, c_EntityId_RTPSParticipant);
     }
-    // Builtin transports by default
-    if (PParam.useBuiltinTransports)
-    {
-        UDPv4TransportDescriptor descriptor;
-        descriptor.sendBufferSize = m_att.sendSocketBufferSize;
-        descriptor.receiveBufferSize = m_att.listenSocketBufferSize;
-        if (is_intraprocess_only())
-        {
-            // Avoid multicast leaving the host for intraprocess-only participants
-            descriptor.TTL = 0;
-        }
-        m_network_Factory.RegisterTransport(&descriptor, &m_att.properties);
 
-#ifdef SHM_TRANSPORT_BUILTIN
-        if (!is_intraprocess_only())
-        {
-            SharedMemTransportDescriptor shm_transport;
-            // We assume (Linux) UDP doubles the user socket buffer size in kernel, so
-            // the equivalent segment size in SHM would be socket buffer size x 2
-            auto segment_size_udp_equivalent =
-                    std::max(m_att.sendSocketBufferSize, m_att.listenSocketBufferSize) * 2;
-            shm_transport.segment_size(segment_size_udp_equivalent);
-            // Use same default max_message_size on both UDP and SHM
-            shm_transport.max_message_size(descriptor.max_message_size());
-            has_shm_transport_ |= m_network_Factory.RegisterTransport(&shm_transport);
-        }
-#endif // ifdef SHM_TRANSPORT_BUILTIN
+    // Setup builtin transports
+    if (m_att.useBuiltinTransports)
+    {
+        m_att.setup_transports(get_builtin_transports_from_env_var());
     }
 
     // BACKUP servers guid is its persistence one
-    if (PParam.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
+    if (m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
     {
         m_persistence_guid = m_guid;
     }
@@ -191,14 +201,14 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     guid_str_ = guid_sstr.str();
 
     // Client-server discovery protocol requires that every TCP transport has a listening port
-    switch (PParam.builtin.discovery_config.discoveryProtocol)
+    switch (m_att.builtin.discovery_config.discoveryProtocol)
     {
         case DiscoveryProtocol::BACKUP:
         case DiscoveryProtocol::CLIENT:
         case DiscoveryProtocol::SERVER:
         case DiscoveryProtocol::SUPER_CLIENT:
             // Verify if listening ports are provided
-            for (auto& transportDescriptor : PParam.userTransports)
+            for (auto& transportDescriptor : m_att.userTransports)
             {
                 TCPTransportDescriptor* pT = dynamic_cast<TCPTransportDescriptor*>(transportDescriptor.get());
                 if (pT && pT->listening_ports.empty())
@@ -213,7 +223,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     }
 
     // User defined transports
-    for (const auto& transportDescriptor : PParam.userTransports)
+    for (const auto& transportDescriptor : m_att.userTransports)
     {
         if (m_network_Factory.RegisterTransport(transportDescriptor.get(), &m_att.properties))
         {
@@ -339,7 +349,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     // Start security
     if (!m_security_manager.init(
                 security_attributes_,
-                PParam.properties))
+                m_att.properties))
     {
         // Participant will be deleted, no need to allocate buffers or create builtin endpoints
         return;
@@ -353,10 +363,10 @@ RTPSParticipantImpl::RTPSParticipantImpl(
         m_att.defaultMulticastLocatorList.clear();
     }
 
-    createReceiverResources(m_att.builtin.metatrafficMulticastLocatorList, true, false);
-    createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false);
-    createReceiverResources(m_att.defaultUnicastLocatorList, true, false);
-    createReceiverResources(m_att.defaultMulticastLocatorList, true, false);
+    createReceiverResources(m_att.builtin.metatrafficMulticastLocatorList, true, false, true);
+    createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false, true);
+    createReceiverResources(m_att.defaultUnicastLocatorList, true, false, true);
+    createReceiverResources(m_att.defaultMulticastLocatorList, true, false, true);
 
     namespace ExternalLocatorsProcessor = fastdds::rtps::ExternalLocatorsProcessor;
     ExternalLocatorsProcessor::set_listening_locators(m_att.builtin.metatraffic_external_unicast_locators,
@@ -392,12 +402,12 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     flow_controller_factory_.init(this);
 
     // Support old API
-    if (PParam.throughputController.bytesPerPeriod != UINT32_MAX && PParam.throughputController.periodMillisecs != 0)
+    if (m_att.throughputController.bytesPerPeriod != UINT32_MAX && m_att.throughputController.periodMillisecs != 0)
     {
         fastdds::rtps::FlowControllerDescriptor old_descriptor;
         old_descriptor.name = guid_str_.c_str();
-        old_descriptor.max_bytes_per_period = PParam.throughputController.bytesPerPeriod;
-        old_descriptor.period_ms = PParam.throughputController.periodMillisecs;
+        old_descriptor.max_bytes_per_period = m_att.throughputController.bytesPerPeriod;
+        old_descriptor.period_ms = m_att.throughputController.periodMillisecs;
         flow_controller_factory_.register_flow_controller(old_descriptor);
     }
 
@@ -1567,7 +1577,7 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
             }
 
             // Try creating receiver resources
-            if (createReceiverResources(attributes.unicastLocatorList, false, true))
+            if (createReceiverResources(attributes.unicastLocatorList, false, true, false))
             {
                 break;
             }
@@ -1596,8 +1606,8 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
             attributes.multicastLocatorList = m_att.defaultMulticastLocatorList;
             attributes.external_unicast_locators = m_att.default_external_unicast_locators;
         }
-        createReceiverResources(attributes.unicastLocatorList, false, true);
-        createReceiverResources(attributes.multicastLocatorList, false, true);
+        createReceiverResources(attributes.unicastLocatorList, false, true, true);
+        createReceiverResources(attributes.multicastLocatorList, false, true, true);
     }
 
     fastdds::rtps::ExternalLocatorsProcessor::set_listening_locators(attributes.external_unicast_locators,
@@ -1681,7 +1691,8 @@ void RTPSParticipantImpl::setup_external_locators(
 bool RTPSParticipantImpl::createReceiverResources(
         LocatorList_t& Locator_list,
         bool ApplyMutation,
-        bool RegisterReceiver)
+        bool RegisterReceiver,
+        bool log_when_creation_fails)
 {
     std::vector<std::shared_ptr<ReceiverResource>> newItemsBuffer;
     bool ret_val = Locator_list.empty();
@@ -1690,9 +1701,9 @@ bool RTPSParticipantImpl::createReceiverResources(
     // An auxilary buffer is needed in the ReceiverResource to to decrypt the message,
     // that imposes a limit in the received messages size even if the transport allows (uint32_t) messages size.
     uint32_t max_receiver_buffer_size =
-            is_secure() ? std::numeric_limits<uint16_t>::max() : std::numeric_limits<uint32_t>::max();
+            is_secure() ? std::numeric_limits<uint16_t>::max() : (std::numeric_limits<uint32_t>::max)();
 #else
-    uint32_t max_receiver_buffer_size = std::numeric_limits<uint32_t>::max();
+    uint32_t max_receiver_buffer_size = (std::numeric_limits<uint32_t>::max)();
 #endif // if HAVE_SECURITY
 
     for (auto it_loc = Locator_list.begin(); it_loc != Locator_list.end(); ++it_loc)
@@ -1707,6 +1718,11 @@ bool RTPSParticipantImpl::createReceiverResources(
                 applyLocatorAdaptRule(*it_loc);
                 ret = m_network_Factory.BuildReceiverResources(*it_loc, newItemsBuffer, max_receiver_buffer_size);
             }
+        }
+
+        if (!ret && log_when_creation_fails)
+        {
+            EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT, "Could not create the specified receiver resource");
         }
 
         ret_val |= !newItemsBuffer.empty();
@@ -2066,9 +2082,9 @@ uint32_t RTPSParticipantImpl::getMaxMessageSize() const
     // that imposes a limit in the received messages size even if the transport allows (uint32_t) messages size.
     // So the sender limits also its size.
     uint32_t max_receiver_buffer_size =
-            is_secure() ? std::numeric_limits<uint16_t>::max() : std::numeric_limits<uint32_t>::max();
+            is_secure() ? std::numeric_limits<uint16_t>::max() : (std::numeric_limits<uint32_t>::max)();
 #else
-    uint32_t max_receiver_buffer_size = std::numeric_limits<uint32_t>::max();
+    uint32_t max_receiver_buffer_size = (std::numeric_limits<uint32_t>::max)();
 #endif // if HAVE_SECURITY
 
     return (std::min)(
