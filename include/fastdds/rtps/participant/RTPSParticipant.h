@@ -19,6 +19,7 @@
 #ifndef _FASTDDS_RTPS_RTPSParticipant_H_
 #define _FASTDDS_RTPS_RTPSParticipant_H_
 
+#include <cstdint>
 #include <cstdlib>
 #include <memory>
 
@@ -68,6 +69,7 @@ class RTPS_DllAPI RTPSParticipant
 {
     friend class RTPSParticipantImpl;
     friend class RTPSDomain;
+    friend class RTPSDomainImpl;
 
 private:
 
@@ -254,6 +256,33 @@ public:
      */
     void enable();
 
+    /**
+     * @brief Ignore all messages coming from the RTPSParticipant
+     *
+     * @param[in] participant_guid RTPSParticipant GUID to be ignored
+     * @return True if correctly included into the ignore collection. False otherwise.
+     */
+    bool ignore_participant(
+            const GuidPrefix_t& participant_guid);
+
+    /**
+     * @brief Ignore all messages coming from the RTPSWriter
+     *
+     * @param[in] writer_guid RTPSWriter GUID to be ignored
+     * @return True if correctly included into the ignore collection. False otherwise.
+     */
+    bool ignore_writer(
+            const GUID_t& writer_guid);
+
+    /**
+     * @brief Ignore all messages coming from the RTPSReader
+     *
+     * @param[in] reader_guid RTPSReader GUID to be ignored
+     * @return True if correctly included into the ignore collection. False otherwise.
+     */
+    bool ignore_reader(
+            const GUID_t& reader_guid);
+
 #if HAVE_SECURITY
 
     /**
@@ -276,7 +305,7 @@ public:
 
 #ifdef FASTDDS_STATISTICS
 
-    /*
+    /**
      * Add a listener to receive statistics backend callbacks
      * @param listener
      * @param kind combination of fastdds::statistics::EventKind flags used as a mask. Events to notify.
@@ -286,7 +315,7 @@ public:
             std::shared_ptr<fastdds::statistics::IListener> listener,
             uint32_t kind);
 
-    /*
+    /**
      * Remove a listener from receiving statistics backend callbacks
      * @param listener
      * @param kind combination of fastdds::statistics::EventKind flags used as a mask. Events to ignore.
@@ -295,6 +324,14 @@ public:
     bool remove_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener,
             uint32_t kind);
+
+    /**
+     * @brief Set the enabled statistics writers mask
+     *
+     * @param enabled_writers The new mask to set
+     */
+    void set_enabled_statistics_writers_mask(
+            uint32_t enabled_writers);
 
 #endif // FASTDDS_STATISTICS
 

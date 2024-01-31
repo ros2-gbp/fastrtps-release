@@ -26,11 +26,8 @@
 #include <cstdlib>
 #include <list>
 #include <mutex>
+#include <set>
 #include <sys/types.h>
-
-#include <fastrtps/fastrtps_dll.h>
-#include <fastrtps/utils/Semaphore.h>
-#include <fastrtps/utils/shared_mutex.hpp>
 
 #if defined(_WIN32)
 #include <process.h>
@@ -38,29 +35,24 @@
 #include <unistd.h>
 #endif // if defined(_WIN32)
 
-#include <rtps/messages/RTPSMessageGroup_t.hpp>
-#include <rtps/messages/SendBuffersManager.hpp>
-
-#include <fastdds/rtps/common/Guid.h>
-
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-
 #include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
-
+#include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/history/IChangePool.h>
 #include <fastdds/rtps/history/IPayloadPool.h>
-
-#include <fastdds/rtps/network/NetworkFactory.h>
-#include <fastdds/rtps/network/ReceiverResource.h>
-#include <fastdds/rtps/network/SenderResource.h>
-
 #include <fastdds/rtps/messages/MessageReceiver.h>
-
 #include <fastdds/rtps/resources/ResourceEvent.h>
-#include "../flowcontrol/FlowControllerFactory.hpp"
+#include <fastdds/rtps/transport/SenderResource.h>
+#include <fastrtps/utils/Semaphore.h>
+#include <fastrtps/utils/shared_mutex.hpp>
 
+#include "../flowcontrol/FlowControllerFactory.hpp"
+#include <rtps/messages/RTPSMessageGroup_t.hpp>
+#include <rtps/messages/SendBuffersManager.hpp>
+#include <rtps/network/NetworkFactory.h>
+#include <rtps/network/ReceiverResource.h>
 #include <statistics/rtps/StatisticsBase.hpp>
 
 #if HAVE_SECURITY
@@ -320,6 +312,7 @@ public:
      */
     inline RTPSParticipantListener* getListener()
     {
+        std::lock_guard<std::recursive_mutex> _(*getParticipantMutex());
         return mp_participantListener;
     }
 
@@ -330,6 +323,7 @@ public:
     void set_listener(
             RTPSParticipantListener* listener)
     {
+        std::lock_guard<std::recursive_mutex> _(*getParticipantMutex());
         mp_participantListener = listener;
     }
 
@@ -541,7 +535,7 @@ private:
     //! BuiltinProtocols of this RTPSParticipant
     BuiltinProtocols* mp_builtinProtocols;
     //!Id counter to correctly assign the ids to writers and readers.
-    uint32_t IdCounter;
+    std::atomic<uint32_t> IdCounter;
     //! Mutex to safely access endpoints collections
     mutable shared_mutex endpoints_list_mutex;
     //!Writer List.
@@ -593,6 +587,13 @@ private:
     //! Determine if the RTPSParticipantImpl was initialized successfully.
     bool initialized_ = false;
 
+    //! Ignored entities collections
+    std::set<GuidPrefix_t> ignored_participants_;
+    std::set<GUID_t> ignored_writers_;
+    std::set<GUID_t> ignored_readers_;
+    //! Protect ignored entities collection concurrent access
+    mutable shared_mutex ignored_mtx_;
+
     RTPSParticipantImpl& operator =(
             const RTPSParticipantImpl&) = delete;
 
@@ -643,6 +644,12 @@ private:
      */
     bool createSendResources(
             Endpoint* pend);
+
+    /** Add participant's external locators to endpoint's when none available
+        @param endpoint - Pointer to the endpoint whose external locators are to be set
+     */
+    void setup_external_locators(
+            Endpoint* endpoint);
 
     /** When we want to create a new Resource but the physical channel specified by the Locator
         can not be opened, we want to mutate the Locator to open a more or less equivalent channel.
@@ -735,6 +742,11 @@ private:
      * Get default unicast locators when not provided by the user.
      */
     void get_default_unicast_locators();
+
+    bool match_local_endpoints_ = true;
+
+    bool should_match_local_endpoints(
+            const RTPSParticipantAttributes& att);
 
 public:
 
@@ -1001,10 +1013,64 @@ public:
      */
     void environment_file_has_changed();
 
+    /**
+     * @brief Query if the participant is found in the ignored collection
+     *
+     * @param[in] participant_guid Participant to be queried
+     * @return True if found in the ignored collection. False otherwise.
+     */
+    bool is_participant_ignored(
+            const GuidPrefix_t& participant_guid);
+
+    /**
+     * @brief Query if the writer is found in the ignored collection
+     *
+     * @param[in] writer_guid Writer to be queried
+     * @return True if found in the ignored collection. False otherwise.
+     */
+    bool is_writer_ignored(
+            const GUID_t& writer_guid);
+
+    /**
+     * @brief Query if the reader is found in the ignored collection
+     *
+     * @param[in] reader_guid Reader to be queried
+     * @return True if found in the ignored collection. False otherwise.
+     */
+    bool is_reader_ignored(
+            const GUID_t& reader_guid);
+
+    /**
+     * @brief Add a Participant into the corresponding ignore collection.
+     *
+     * @param[in] participant_guid Participant that is to be ignored.
+     * @return True if correctly included into the ignore collection. False otherwise.
+     */
+    bool ignore_participant(
+            const GuidPrefix_t& participant_guid);
+
+    /**
+     * @brief Add a Writer into the corresponding ignore collection.
+     *
+     * @param[in] writer_guid Writer that is to be ignored.
+     * @return True if correctly included into the ignore collection. False otherwise.
+     */
+    bool ignore_writer(
+            const GUID_t& writer_guid);
+
+    /**
+     * @brief Add a Reader into the corresponding ignore collection.
+     *
+     * @param[in] reader_guid Reader that is to be ignored.
+     * @return True if correctly included into the ignore collection. False otherwise.
+     */
+    bool ignore_reader(
+            const GUID_t& reader_guid);
+
     template <EndpointKind_t kind, octet no_key, octet with_key>
     static bool preprocess_endpoint_attributes(
             const EntityId_t& entity_id,
-            uint32_t& id_count,
+            std::atomic<uint32_t>& id_count,
             EndpointAttributes& att,
             EntityId_t& entId);
 
@@ -1052,7 +1118,20 @@ public:
     bool unregister_in_reader(
             std::shared_ptr<fastdds::statistics::IListener> listener) override;
 
+    /**
+     * @brief Set the enabled statistics writers mask
+     *
+     * @param enabled_writers The new mask to set
+     */
+    void set_enabled_statistics_writers_mask(
+            uint32_t enabled_writers) override;
+
 #endif // FASTDDS_STATISTICS
+
+    bool should_match_local_endpoints()
+    {
+        return match_local_endpoints_;
+    }
 
 };
 } // namespace rtps

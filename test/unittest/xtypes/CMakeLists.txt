@@ -44,6 +44,7 @@ set(XTYPES_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/BuiltinAnnotationsTypeObject.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/string_convert.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
@@ -60,6 +61,14 @@ set(XTYPES_TEST_SOURCE
     ${XTYPES_SOURCE}
     )
 
+if(ANDROID)
+    if (ANDROID_NATIVE_API_LEVEL LESS 24)
+        list(APPEND XTYPES_TEST_SOURCE
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
+endif()
+
 include_directories(mock/)
 
 add_executable(XTypesTests ${XTYPES_TEST_SOURCE})
@@ -72,6 +81,7 @@ target_compile_definitions(XTypesTests PRIVATE
 target_include_directories(XTypesTests PRIVATE
     ${Asio_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src/cpp
     )
 target_link_libraries(XTypesTests GTest::gtest ${MOCKS})
 if(MSVC OR MSVC_IDE)
@@ -80,3 +90,7 @@ else()
     target_link_libraries(XTypesTests ${PRIVACY} fastcdr)
 endif()
 add_gtest(XTypesTests SOURCES ${XTYPES_TEST_SOURCE})
+
+if(ANDROID)
+    set_property(TARGET XTypesTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

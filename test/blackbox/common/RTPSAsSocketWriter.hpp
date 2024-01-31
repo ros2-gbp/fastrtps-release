@@ -24,7 +24,6 @@
 #include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastrtps/rtps/writer/RTPSWriter.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
 #include <fastrtps/rtps/writer/WriterListener.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/rtps/history/WriterHistory.h>
@@ -64,8 +63,8 @@ public:
         mw << magicword << "_" << asio::ip::host_name() << "_" << GET_PID();
         magicword_ = mw.str();
 
-        // By default, memory mode is preallocated (the most restritive)
-        hattr_.memoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
+        hattr_.memoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         writer_attr_.times.heartbeatPeriod.seconds = 0;
@@ -307,13 +306,7 @@ public:
 
     bool get_disable_positive_acks()
     {
-        bool ret_val = false;
-        auto stateful_writer = dynamic_cast<eprosima::fastrtps::rtps::StatefulWriter*>(writer_);
-        if (stateful_writer)
-        {
-            ret_val = stateful_writer->get_disable_positive_acks();
-        }
-        return ret_val;
+        return writer_->get_disable_positive_acks();
     }
 
 private:

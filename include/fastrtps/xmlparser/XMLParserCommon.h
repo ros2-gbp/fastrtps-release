@@ -33,6 +33,7 @@ enum class XMLP_ret
 
 extern const char* DEFAULT_FASTRTPS_ENV_VARIABLE;
 extern const char* DEFAULT_FASTRTPS_PROFILES;
+extern const char* DEFAULT_STATISTICS_DATAWRITER_PROFILE;
 extern const char* SKIP_DEFAULT_XML_FILE;
 
 extern const char* ROOT;
@@ -100,6 +101,7 @@ extern const char* INTRAPROCESS_DELIVERY;
 extern const char* ALLOCATION;
 extern const char* PREFIX;
 extern const char* DEF_UNI_LOC_LIST;
+extern const char* DEF_EXT_UNI_LOC_LIST;
 extern const char* DEF_MULTI_LOC_LIST;
 extern const char* SEND_SOCK_BUF_SIZE;
 extern const char* LIST_SOCK_BUF_SIZE;
@@ -135,6 +137,7 @@ extern const char* MAX_PARTITIONS;
 extern const char* TOPIC;
 extern const char* QOS;
 extern const char* TIMES;
+extern const char* EXT_UNI_LOC_LIST;
 extern const char* UNI_LOC_LIST;
 extern const char* MULTI_LOC_LIST;
 extern const char* REM_LOC_LIST;
@@ -148,6 +151,7 @@ extern const char* MATCHED_SUBSCRIBERS_ALLOCATION;
 extern const char* MATCHED_PUBLISHERS_ALLOCATION;
 
 ///
+extern const char* IGN_NON_MATCHING_LOCS;
 extern const char* PROPERTIES;
 extern const char* BIN_PROPERTIES;
 extern const char* PROPERTY;
@@ -282,6 +286,7 @@ extern const char* LEASE_ANNOUNCE;
 extern const char* INITIAL_ANNOUNCEMENTS;
 extern const char* AVOID_BUILTIN_MULTICAST;
 extern const char* SIMPLE_EDP;
+extern const char* META_EXT_UNI_LOC_LIST;
 extern const char* META_UNI_LOC_LIST;
 extern const char* META_MULTI_LOC_LIST;
 extern const char* INIT_PEERS_LIST;
@@ -413,6 +418,7 @@ extern const char* TLS_DEFAULT_VERIFY_PATH;
 extern const char* TLS_VERIFY_DEPTH;
 extern const char* TLS_RSA_PRIVATE_KEY_FILE;
 extern const char* TLS_HANDSHAKE_ROLE;
+extern const char* TLS_SERVER_NAME;
 
 // TLS HandShake Role
 extern const char* TLS_HANDSHAKE_ROLE_DEFAULT;

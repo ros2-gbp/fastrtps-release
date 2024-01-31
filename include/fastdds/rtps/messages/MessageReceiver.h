@@ -159,6 +159,7 @@ private:
      * -Return an error if the message is malformed.
      * @param[in,out] msg      Pointer to the message
      * @param[in] smh          Pointer to the submessage header
+     * @param[out] WriterID    Writer EntityID (only for DATA messages)
      * @param[in] was_decoded  Whether the submessage being processed came from decoding a secured submessage
      * @return True if correct, false otherwise
      */
@@ -168,12 +169,14 @@ private:
      *
      * @param msg
      * @param smh
+     * @param writerID
      * @param was_decoded
      * @return
      */
     bool proc_Submsg_Data(
             CDRMessage_t* msg,
             SubmessageHeader_t* smh,
+            EntityId_t& writerID,
             bool was_decoded) const;
     bool proc_Submsg_DataFrag(
             CDRMessage_t* msg,

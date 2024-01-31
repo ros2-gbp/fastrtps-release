@@ -87,6 +87,8 @@ public:
 
     MOCK_METHOD0(ParticipantProxiesEnd, ResourceLimitedVector<ParticipantProxyData*>::const_iterator());
 
+    MOCK_METHOD(RTPSParticipantImpl*, getRTPSParticipant, (), (const));
+
     ProxyPool<ReaderProxyData>& get_temporary_reader_proxies_pool()
     {
         return temp_proxy_readers;
@@ -105,7 +107,6 @@ public:
     ProxyPool<ReaderProxyData> temp_proxy_readers = {{4, 1}};
     ProxyPool<WriterProxyData> temp_proxy_writers = {{4, 1}};
 };
-
 
 } //namespace rtps
 } //namespace fastrtps

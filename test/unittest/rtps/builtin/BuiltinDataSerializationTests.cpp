@@ -19,8 +19,9 @@
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
-#include <fastrtps/rtps/network/NetworkFactory.h>
+
 #include <fastdds/core/policy/ParameterSerializer.hpp>
+#include <rtps/network/NetworkFactory.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -1197,25 +1198,6 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_interoperability)
     ASSERT_EQ("200", out.content_filter().expression_parameters[3].to_string());
 }
 
-TEST(BuiltinDataSerializationTests, null_checks)
-{
-    {
-        // Test deserialization sanity checks
-        uint32_t msg_size = 100;
-        CDRMessage_t msg(msg_size);
-
-        ASSERT_FALSE(CDRMessage::addData(nullptr, (octet*) &msg, msg_size));
-        ASSERT_FALSE(CDRMessage::addData(&msg, nullptr, msg_size));
-        ASSERT_TRUE(CDRMessage::addData(&msg, nullptr, 0));
-
-        // Test deserialization sanity checks
-
-        ASSERT_FALSE(CDRMessage::readData(nullptr, (octet*) &msg, msg_size));
-        ASSERT_FALSE(CDRMessage::readData(&msg, nullptr, msg_size));
-        ASSERT_TRUE(CDRMessage::readData(&msg, nullptr, 0));
-    }
-}
-
 /*!
  * \test Test for deserialization of messages with expression parameters list
  *       with sizes of 100 or greater
@@ -1317,6 +1299,25 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_max_parameter_check)
         msg_fault.pos = 0;
         // Deserialization of messages with more than 100 parameters should fail
         ASSERT_FALSE(out.readFromCDRMessage(&msg_fault, network, true));
+    }
+}
+
+TEST(BuiltinDataSerializationTests, null_checks)
+{
+    {
+        // Test deserialization sanity checks
+        uint32_t msg_size = 100;
+        CDRMessage_t msg(msg_size);
+
+        ASSERT_FALSE(CDRMessage::addData(nullptr, (octet*) &msg, msg_size));
+        ASSERT_FALSE(CDRMessage::addData(&msg, nullptr, msg_size));
+        ASSERT_TRUE(CDRMessage::addData(&msg, nullptr, 0));
+
+        // Test deserialization sanity checks
+
+        ASSERT_FALSE(CDRMessage::readData(nullptr, (octet*) &msg, msg_size));
+        ASSERT_FALSE(CDRMessage::readData(&msg, nullptr, msg_size));
+        ASSERT_TRUE(CDRMessage::readData(&msg, nullptr, 0));
     }
 }
 

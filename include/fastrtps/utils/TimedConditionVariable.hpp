@@ -18,7 +18,7 @@
 
 #ifndef _UTILS_TIMEDCONDITIONVARIABLE_HPP_
 #define _UTILS_TIMEDCONDITIONVARIABLE_HPP_
-#include <fastrtps/fastrtps_dll.h>
+#include <fastrtps/config.h>
 
 /*
    NOTE: Windows implementation temporary disabled due to aleatory high CPU consumption when

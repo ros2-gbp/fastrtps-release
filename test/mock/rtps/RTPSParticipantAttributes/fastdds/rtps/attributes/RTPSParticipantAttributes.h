@@ -23,18 +23,17 @@
 #include <sstream>
 
 #include <fastdds/rtps/attributes/BuiltinTransports.hpp>
+#include <fastdds/rtps/attributes/ExternalLocators.hpp>
 #include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/PortParameters.h>
 #include <fastdds/rtps/common/Time_t.h>
-#include <fastdds/rtps/common/Types.h>
 #include <fastdds/rtps/flowcontrol/FlowControllerDescriptor.hpp>
 #include <fastdds/rtps/flowcontrol/ThroughputControllerDescriptor.h>
 #include <fastdds/rtps/resources/ResourceManagement.h>
 #include <fastdds/rtps/transport/TransportInterface.h>
-#include <fastrtps/fastrtps_dll.h>
 #include <fastrtps/utils/fixed_size_string.hpp>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
 
@@ -387,6 +386,9 @@ public:
     //! Metatraffic Multicast Locator List.
     LocatorList_t metatrafficMulticastLocatorList;
 
+    //! The collection of external locators to use for communication on metatraffic topics.
+    fastdds::rtps::ExternalLocators metatraffic_external_unicast_locators;
+
     //! Initial peers.
     LocatorList_t initialPeersList;
 
@@ -423,6 +425,7 @@ public:
                (typelookup_config.use_server == b.typelookup_config.use_server) &&
                (this->metatrafficUnicastLocatorList == b.metatrafficUnicastLocatorList) &&
                (this->metatrafficMulticastLocatorList == b.metatrafficMulticastLocatorList) &&
+               (this->metatraffic_external_unicast_locators == b.metatraffic_external_unicast_locators) &&
                (this->initialPeersList == b.initialPeersList) &&
                (this->readerHistoryMemoryPolicy == b.readerHistoryMemoryPolicy) &&
                (this->readerPayloadSize == b.readerPayloadSize) &&
@@ -454,6 +457,7 @@ public:
         return (this->name == b.name) &&
                (this->defaultUnicastLocatorList == b.defaultUnicastLocatorList) &&
                (this->defaultMulticastLocatorList == b.defaultMulticastLocatorList) &&
+               (this->default_external_unicast_locators == b.default_external_unicast_locators) &&
                (this->ignore_non_matching_locators == b.ignore_non_matching_locators) &&
                (this->sendSocketBufferSize == b.sendSocketBufferSize) &&
                (this->listenSocketBufferSize == b.listenSocketBufferSize) &&
@@ -466,7 +470,6 @@ public:
                (this->properties == b.properties) &&
                (this->prefix == b.prefix) &&
                (this->flow_controllers == b.flow_controllers);
-
     }
 
     /**
@@ -511,6 +514,11 @@ public:
      * case that it was defined with NO MulticastLocators. This is usually left empty.
      */
     LocatorList_t defaultMulticastLocatorList;
+
+    /**
+     * The collection of external locators to use for communication on user created topics.
+     */
+    fastdds::rtps::ExternalLocators default_external_unicast_locators;
 
     /**
      * Whether locators that don't match with the announced locators should be kept.

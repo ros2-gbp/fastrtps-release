@@ -144,6 +144,8 @@ jobs:
 
       - name: Install OpenSSL
         uses: eProsima/eprosima-CI/windows/install_openssl@v0
+        with:
+          version: '3.1.1'
 
       - name: Update OpenSSL environment variables
         run: |
@@ -390,7 +392,7 @@ jobs:
               $depends_repos_path = ".\src\fastrtps\.github\workflows\config\default_ci_${{ inputs.fastdds_branch }}.repos"
               if (!(Test-Path -Path $depends_repos_path))
               {
-                $depends_repos_path = ".\src\fastrtps\.github\workflows\config\default_ci_2.6.x.repos"
+                $depends_repos_path = ".\src\fastrtps\.github\workflows\config\default_ci_2.10.x.repos"
               }
               $meta_path = ".\src\fastrtps\.github\workflows\config\default_ci.meta"
           }

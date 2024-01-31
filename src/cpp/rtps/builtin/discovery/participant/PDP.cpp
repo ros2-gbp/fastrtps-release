@@ -59,6 +59,7 @@
 
 #include <rtps/builtin/discovery/participant/PDPEndpoints.hpp>
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
+#include <rtps/network/ExternalLocatorsProcessor.hpp>
 
 #include <mutex>
 #include <chrono>
@@ -185,7 +186,7 @@ ParticipantProxyData* PDP::add_participant_proxy_data(
         }
         else
         {
-            logWarning(RTPS_PDP, "Maximum number of participant proxies (" << max_proxies << \
+            EPROSIMA_LOG_WARNING(RTPS_PDP, "Maximum number of participant proxies (" << max_proxies << \
                     ") reached for participant " << mp_RTPSParticipant->getGuid() << std::endl);
             return nullptr;
         }
@@ -243,7 +244,7 @@ void PDP::initializeParticipantProxyData(
 
     participant_data->m_availableBuiltinEndpoints |= builtin_endpoints_->builtin_endpoints();
 
-    if (mp_RTPSParticipant->getAttributes().builtin.use_WriterLivelinessProtocol)
+    if (attributes.builtin.use_WriterLivelinessProtocol)
     {
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_WRITER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_READER;
@@ -257,13 +258,13 @@ void PDP::initializeParticipantProxyData(
 #endif // if HAVE_SECURITY
     }
 
-    if (mp_RTPSParticipant->getAttributes().builtin.typelookup_config.use_server)
+    if (attributes.builtin.typelookup_config.use_server)
     {
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REQUEST_DATA_READER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REPLY_DATA_WRITER;
     }
 
-    if (mp_RTPSParticipant->getAttributes().builtin.typelookup_config.use_client)
+    if (attributes.builtin.typelookup_config.use_client)
     {
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REQUEST_DATA_WRITER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REPLY_DATA_READER;
@@ -300,7 +301,7 @@ void PDP::initializeParticipantProxyData(
         // If it has not been set, use guid
         if (persistent == c_GuidPrefix_Unknown)
         {
-            persistent = mp_RTPSParticipant->getAttributes().prefix;
+            persistent = attributes.prefix;
         }
 
         // If persistent is set, set it into the participant proxy
@@ -332,11 +333,15 @@ void PDP::initializeParticipantProxyData(
                 participant_data->metatraffic_locators.add_multicast_locator(loc);
             }
         }
+
+        fastdds::rtps::ExternalLocatorsProcessor::add_external_locators(*participant_data,
+                attributes.builtin.metatraffic_external_unicast_locators,
+                attributes.default_external_unicast_locators);
     }
 
     participant_data->m_participantName = std::string(attributes.getName());
 
-    participant_data->m_userData = mp_RTPSParticipant->getAttributes().userData;
+    participant_data->m_userData = attributes.userData;
 
 #if HAVE_SECURITY
     if (mp_RTPSParticipant->is_secure())
@@ -367,33 +372,14 @@ void PDP::initializeParticipantProxyData(
     }
 #endif // if HAVE_SECURITY
 
-    // Set participant type property
-    std::stringstream participant_type;
-    participant_type << mp_RTPSParticipant->getAttributes().builtin.discovery_config.discoveryProtocol;
-    auto ptype = participant_type.str();
-    participant_data->m_properties.push_back(fastdds::dds::parameter_property_participant_type, ptype);
-
-    /* Add physical properties if present */
-    std::vector<std::string> physical_property_names = {
-        fastdds::dds::parameter_policy_physical_data_host,
-        fastdds::dds::parameter_policy_physical_data_user,
-        fastdds::dds::parameter_policy_physical_data_process
-    };
-    for (auto physical_property_name : physical_property_names)
-    {
-        std::string* physical_property = PropertyPolicyHelper::find_property(
-            mp_RTPSParticipant->getAttributes().properties, physical_property_name);
-        if (nullptr != physical_property)
-        {
-            participant_data->m_properties.push_back(physical_property_name, *physical_property);
-        }
-    }
+    // Set properties that will be sent to Proxy Data
+    set_external_participant_properties_(participant_data);
 }
 
 bool PDP::initPDP(
         RTPSParticipantImpl* part)
 {
-    logInfo(RTPS_PDP, "Beginning");
+    EPROSIMA_LOG_INFO(RTPS_PDP, "Beginning");
     mp_RTPSParticipant = part;
     m_discovery = mp_RTPSParticipant->getAttributes().builtin;
     initial_announcements_ = m_discovery.discovery_config.initial_announcements;
@@ -465,7 +451,7 @@ void PDP::announceParticipantState(
 {
     if (enabled_)
     {
-        // logInfo(RTPS_PDP, "Announcing RTPSParticipant State (new change: " << new_change << ")");
+        // EPROSIMA_LOG_INFO(RTPS_PDP, "Announcing RTPSParticipant State (new change: " << new_change << ")");
         CacheChange_t* change = nullptr;
 
         if (!dispose)
@@ -510,7 +496,7 @@ void PDP::announceParticipantState(
                     }
                     else
                     {
-                        logError(RTPS_PDP, "Cannot serialize ParticipantProxyData.");
+                        EPROSIMA_LOG_ERROR(RTPS_PDP, "Cannot serialize ParticipantProxyData.");
                     }
                 }
             }
@@ -555,7 +541,7 @@ void PDP::announceParticipantState(
                 }
                 else
                 {
-                    logError(RTPS_PDP, "Cannot serialize ParticipantProxyData.");
+                    EPROSIMA_LOG_ERROR(RTPS_PDP, "Cannot serialize ParticipantProxyData.");
                 }
             }
         }
@@ -584,7 +570,7 @@ void PDP::notify_and_maybe_ignore_new_participant(
 {
     should_be_ignored = false;
 
-    logInfo(RTPS_PDP_DISCOVERY, "New participant "
+    EPROSIMA_LOG_INFO(RTPS_PDP_DISCOVERY, "New participant "
             << pdata->m_guid << " at "
             << "MTTLoc: " << pdata->metatraffic_locators
             << " DefLoc:" << pdata->default_locators);
@@ -600,7 +586,13 @@ void PDP::notify_and_maybe_ignore_new_participant(
 
             listener->onParticipantDiscovery(
                 getRTPSParticipant()->getUserRTPSParticipant(),
-                std::move(info));
+                std::move(info),
+                should_be_ignored);
+        }
+
+        if (should_be_ignored)
+        {
+            getRTPSParticipant()->ignore_participant(pdata->m_guid.guidPrefix);
         }
     }
 }
@@ -678,7 +670,7 @@ bool PDP::lookupWriterProxyData(
 bool PDP::removeReaderProxyData(
         const GUID_t& reader_guid)
 {
-    logInfo(RTPS_PDP, "Removing reader proxy data " << reader_guid);
+    EPROSIMA_LOG_INFO(RTPS_PDP, "Removing reader proxy data " << reader_guid);
     std::lock_guard<std::recursive_mutex> guardPDP(*this->mp_mutex);
 
     for (ParticipantProxyData* pit : participant_proxies_)
@@ -712,10 +704,17 @@ bool PDP::removeReaderProxyData(
     return false;
 }
 
+bool PDP::removeReaderProxyData(
+        const GUID_t& /*reader_guid*/,
+        ReaderDiscoveryInfo::DISCOVERY_STATUS /*reason*/)
+{
+    return false;
+}
+
 bool PDP::removeWriterProxyData(
         const GUID_t& writer_guid)
 {
-    logInfo(RTPS_PDP, "Removing writer proxy data " << writer_guid);
+    EPROSIMA_LOG_INFO(RTPS_PDP, "Removing writer proxy data " << writer_guid);
     std::lock_guard<std::recursive_mutex> guardPDP(*this->mp_mutex);
 
     for (ParticipantProxyData* pit : participant_proxies_)
@@ -747,6 +746,13 @@ bool PDP::removeWriterProxyData(
         }
     }
 
+    return false;
+}
+
+bool PDP::removeWriterProxyData(
+        const GUID_t& /*writer_guid*/,
+        WriterDiscoveryInfo::DISCOVERY_STATUS /*reason*/)
+{
     return false;
 }
 
@@ -787,7 +793,7 @@ ReaderProxyData* PDP::addReaderProxyData(
         GUID_t& participant_guid,
         std::function<bool(ReaderProxyData*, bool, const ParticipantProxyData&)> initializer_func)
 {
-    logInfo(RTPS_PDP, "Adding reader proxy data " << reader_guid);
+    EPROSIMA_LOG_INFO(RTPS_PDP, "Adding reader proxy data " << reader_guid);
     ReaderProxyData* ret_val = nullptr;
 
     // notify statistics module
@@ -842,7 +848,7 @@ ReaderProxyData* PDP::addReaderProxyData(
                 }
                 else
                 {
-                    logWarning(RTPS_PDP, "Maximum number of reader proxies (" << max_proxies <<
+                    EPROSIMA_LOG_WARNING(RTPS_PDP, "Maximum number of reader proxies (" << max_proxies <<
                             ") reached for participant " << mp_RTPSParticipant->getGuid() << std::endl);
                     return nullptr;
                 }
@@ -883,7 +889,7 @@ WriterProxyData* PDP::addWriterProxyData(
         GUID_t& participant_guid,
         std::function<bool(WriterProxyData*, bool, const ParticipantProxyData&)> initializer_func)
 {
-    logInfo(RTPS_PDP, "Adding writer proxy data " << writer_guid);
+    EPROSIMA_LOG_INFO(RTPS_PDP, "Adding writer proxy data " << writer_guid);
     WriterProxyData* ret_val = nullptr;
 
     // notify statistics module
@@ -937,7 +943,7 @@ WriterProxyData* PDP::addWriterProxyData(
                 }
                 else
                 {
-                    logWarning(RTPS_PDP, "Maximum number of writer proxies (" << max_proxies <<
+                    EPROSIMA_LOG_WARNING(RTPS_PDP, "Maximum number of writer proxies (" << max_proxies <<
                             ") reached for participant " << mp_RTPSParticipant->getGuid() << std::endl);
                     return nullptr;
                 }
@@ -1000,7 +1006,7 @@ bool PDP::remove_remote_participant(
         return false;
     }
 
-    logInfo(RTPS_PDP, partGUID );
+    EPROSIMA_LOG_INFO(RTPS_PDP, partGUID );
     ParticipantProxyData* pdata = nullptr;
 
     //Remove it from our vector or RTPSParticipantProxies:
@@ -1083,7 +1089,9 @@ bool PDP::remove_remote_participant(
             std::lock_guard<std::mutex> lock(callback_mtx_);
             ParticipantDiscoveryInfo info(*pdata);
             info.status = reason;
-            listener->onParticipantDiscovery(mp_RTPSParticipant->getUserRTPSParticipant(), std::move(info));
+            bool should_be_ignored = false;
+            listener->onParticipantDiscovery(mp_RTPSParticipant->getUserRTPSParticipant(), std::move(
+                        info), should_be_ignored);
         }
 
         this->mp_mutex->lock();
@@ -1296,10 +1304,47 @@ void PDP::set_initial_announcement_interval()
     if ((initial_announcements_.count > 0) && (initial_announcements_.period <= c_TimeZero))
     {
         // Force a small interval (1ms) between initial announcements
-        logWarning(RTPS_PDP, "Initial announcement period is not strictly positive. Changing to 1ms.");
+        EPROSIMA_LOG_WARNING(RTPS_PDP, "Initial announcement period is not strictly positive. Changing to 1ms.");
         initial_announcements_.period = { 0, 1000000 };
     }
     set_next_announcement_interval();
+}
+
+void PDP::set_external_participant_properties_(
+        ParticipantProxyData* participant_data)
+{
+    // For each property add it if it should be sent (it is propagated)
+    for (auto const& property : mp_RTPSParticipant->getAttributes().properties.properties())
+    {
+        if (property.propagate())
+        {
+            participant_data->m_properties.push_back(property.name(), property.value());
+        }
+    }
+
+    // Set participant type property
+    // TODO: This could be done somewhere else that makes more sense.
+    std::stringstream participant_type;
+    participant_type << mp_RTPSParticipant->getAttributes().builtin.discovery_config.discoveryProtocol;
+    auto ptype = participant_type.str();
+    participant_data->m_properties.push_back(fastdds::dds::parameter_property_participant_type, ptype);
+
+    // Add physical properties if present
+    // TODO: This should be done using propagate value, however this cannot be done without breaking compatibility
+    std::vector<std::string> physical_property_names = {
+        fastdds::dds::parameter_policy_physical_data_host,
+        fastdds::dds::parameter_policy_physical_data_user,
+        fastdds::dds::parameter_policy_physical_data_process
+    };
+    for (auto physical_property_name : physical_property_names)
+    {
+        std::string* physical_property = PropertyPolicyHelper::find_property(
+            mp_RTPSParticipant->getAttributes().properties, physical_property_name);
+        if (nullptr != physical_property)
+        {
+            participant_data->m_properties.push_back(physical_property_name, *physical_property);
+        }
+    }
 }
 
 static void set_builtin_matched_allocation(
@@ -1326,6 +1371,8 @@ static void set_builtin_endpoint_locators(
         const PDP* pdp,
         const BuiltinProtocols* builtin)
 {
+    const RTPSParticipantAttributes& pattr = pdp->getRTPSParticipant()->getRTPSParticipantAttributes();
+
     auto part_data = pdp->getLocalParticipantProxyData();
     if (nullptr == part_data)
     {
@@ -1348,6 +1395,10 @@ static void set_builtin_endpoint_locators(
             endpoint.multicastLocatorList.push_back(loc);
         }
     }
+
+    // External locators are always taken from the same place
+    endpoint.external_unicast_locators = pdp->builtin_attributes().metatraffic_external_unicast_locators;
+    endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
 }
 
 ReaderAttributes PDP::create_builtin_reader_attributes() const

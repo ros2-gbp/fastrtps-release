@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <fastdds/rtps/network/NetworkFactory.h>
+#include <rtps/network/NetworkFactory.h>
 
 #include <limits>
 #include <utility>
@@ -36,8 +36,8 @@ using SendResourceList = fastdds::rtps::SendResourceList;
 
 NetworkFactory::NetworkFactory(
         const RTPSParticipantAttributes& PParam)
-    : maxMessageSizeBetweenTransports_(std::numeric_limits<uint32_t>::max())
-    , minSendBufferSize_(std::numeric_limits<uint32_t>::max())
+    : maxMessageSizeBetweenTransports_((std::numeric_limits<uint32_t>::max)())
+    , minSendBufferSize_((std::numeric_limits<uint32_t>::max)())
 {
     const std::string* enforce_metatraffic = nullptr;
     enforce_metatraffic = PropertyPolicyHelper::find_property(PParam.properties, "fastdds.shm.enforce_metatraffic");
@@ -60,7 +60,7 @@ NetworkFactory::NetworkFactory(
         }
         else
         {
-            logWarning(RTPS_NETWORK, "Unrecognized value '" << *enforce_metatraffic << "'" <<
+            EPROSIMA_LOG_WARNING(RTPS_NETWORK, "Unrecognized value '" << *enforce_metatraffic << "'" <<
                     " for 'fastdds.shm.enforce_metatraffic'. Using default value: 'none'");
         }
     }
@@ -120,7 +120,7 @@ bool NetworkFactory::RegisterTransport(
 {
     bool wasRegistered = false;
 
-    uint32_t minSendBufferSize = std::numeric_limits<uint32_t>::max();
+    uint32_t minSendBufferSize = (std::numeric_limits<uint32_t>::max)();
 
     std::unique_ptr<TransportInterface> transport(descriptor->create_transport());
 
@@ -421,7 +421,7 @@ uint16_t NetworkFactory::calculate_well_known_port(
 
     if (port > 65535)
     {
-        logError(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
+        EPROSIMA_LOG_ERROR(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
                 << "too much participants created or portBase is too high.");
         std::cout << "Calculated port number is too high. Probably the domainId is over 232, there are "
                   << "too much participants created or portBase is too high." << std::endl;

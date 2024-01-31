@@ -71,7 +71,7 @@ bool TopicPayloadPool::do_get_payload(
             // Failed to resize, but we can still keep it for later.
             free_payloads_.push_back(payload);
             lock.unlock();
-            logError(RTPS_HISTORY, "Failed to resize the payload");
+            EPROSIMA_LOG_ERROR(RTPS_HISTORY, "Failed to resize the payload");
 
             cache_change.serializedPayload.data = nullptr;
             cache_change.serializedPayload.max_size = 0;
@@ -179,7 +179,7 @@ TopicPayloadPool::PayloadNode* TopicPayloadPool::allocate(
 {
     if (all_payloads_.size() >= max_pool_size_)
     {
-        logWarning(RTPS_HISTORY, "Maximum number of allowed reserved payloads reached");
+        EPROSIMA_LOG_WARNING(RTPS_HISTORY, "Maximum number of allowed reserved payloads reached");
         return nullptr;
     }
 
@@ -198,7 +198,7 @@ TopicPayloadPool::PayloadNode* TopicPayloadPool::do_allocate(
     }
     else
     {
-        logWarning(RTPS_HISTORY, "Failure to create a new payload ");
+        EPROSIMA_LOG_WARNING(RTPS_HISTORY, "Failure to create a new payload ");
     }
 
     return payload;
@@ -212,7 +212,7 @@ void TopicPayloadPool::update_maximum_size(
     {
         if (config.maximum_size == 0)
         {
-            max_pool_size_ = std::numeric_limits<uint32_t>::max();
+            max_pool_size_ = (std::numeric_limits<uint32_t>::max)();
             ++infinite_histories_count_;
         }
         else

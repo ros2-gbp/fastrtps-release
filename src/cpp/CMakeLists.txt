@@ -75,6 +75,7 @@ set(${PROJECT_NAME}_source_files
     rtps/messages/submessages/DataMsg.hpp
     rtps/messages/submessages/GapMsg.hpp
     rtps/messages/submessages/HeartbeatMsg.hpp
+    rtps/network/ExternalLocatorsProcessor.cpp
     rtps/network/NetworkFactory.cpp
     rtps/network/ReceiverResource.cpp
     rtps/attributes/RTPSParticipantAttributes.cpp
@@ -97,6 +98,7 @@ set(${PROJECT_NAME}_source_files
     fastdds/topic/ContentFilteredTopicImpl.cpp
     fastdds/topic/Topic.cpp
     fastdds/topic/TopicImpl.cpp
+    fastdds/topic/TopicProxyFactory.cpp
     fastdds/topic/TypeSupport.cpp
     fastdds/topic/qos/TopicQos.cpp
     fastdds/publisher/qos/DataWriterQos.cpp
@@ -109,6 +111,7 @@ set(${PROJECT_NAME}_source_files
     fastdds/subscriber/Subscriber.cpp
     fastdds/subscriber/DataReader.cpp
     fastdds/subscriber/DataReaderImpl.cpp
+    fastdds/subscriber/ReadCondition.cpp
     fastdds/subscriber/history/DataReaderHistory.cpp
     fastdds/domain/DomainParticipantFactory.cpp
     fastdds/domain/DomainParticipantImpl.cpp
@@ -336,6 +339,8 @@ if(SQLITE3_SUPPORT)
         ${${PROJECT_NAME}_sqlite3_source_files}
         )
     set(HAVE_SQLITE3 1)
+    # sqlite.c requires a C compiler
+    enable_language(C)
 else()
     set(HAVE_SQLITE3 0)
 endif()
@@ -393,8 +398,8 @@ if(NOT CMAKE_ATOMIC_LIB)
 endif()
 
 try_run(SM_RUN_RESULT SM_COMPILE_RESULT
-        "${CMAKE_CURRENT_BINARY_DIR}/shmtest"
-        "${CMAKE_SOURCE_DIR}/cmake/modules/check_shared_mutex_priority.cpp"
+        "${PROJECT_BINARY_DIR}/shmtest"
+        "${PROJECT_SOURCE_DIR}/cmake/modules/check_shared_mutex_priority.cpp"
         LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_ATOMIC_LIB}
         RUN_OUTPUT_VARIABLE SM_RUN_OUTPUT)
 
@@ -517,12 +522,12 @@ if(MSVC OR MSVC_IDE)
 
         # replace the values in the manifest template
         configure_file(
-            "${CMAKE_SOURCE_DIR}/cmake/packaging/windows/fastrtps.manifest.in"
-            "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest"
+            "${PROJECT_SOURCE_DIR}/cmake/packaging/windows/fastrtps.manifest.in"
+            "${PROJECT_BINARY_DIR}/fastrtps.manifest"
             @ONLY
             )
 
-        file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/fastrtps.manifest" MANIFEST_FILE_PATH)
+        file(TO_NATIVE_PATH "${PROJECT_BINARY_DIR}/fastrtps.manifest" MANIFEST_FILE_PATH)
         target_link_options(${PROJECT_NAME} PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${MANIFEST_FILE_PATH}")
 
         unset(WINDOWS_SOURCE_DIR)
@@ -617,10 +622,10 @@ endif()
 
 install(TARGETS ${PROJECT_NAME} eProsima_atomic
     EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
-    RUNTIME DESTINATION ${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-    LIBRARY DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
-    ARCHIVE DESTINATION ${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}
     COMPONENT libraries
+    RUNTIME DESTINATION "${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
+    LIBRARY DESTINATION "${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
+    ARCHIVE DESTINATION "${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
     )
 
 export(TARGETS ${PROJECT_NAME} eProsima_atomic FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-${FASTDDS_LINKING}-targets.cmake)

@@ -148,7 +148,7 @@ void PDPSimple::initializeParticipantProxyData(
     else if (!getRTPSParticipant()->getAttributes().builtin.discovery_config.
                     use_STATIC_EndpointDiscoveryProtocol)
     {
-        logError(RTPS_PDP, "Neither EDP simple nor EDP static enabled. Endpoints will not be discovered.");
+        EPROSIMA_LOG_ERROR(RTPS_PDP, "Neither EDP simple nor EDP static enabled. Endpoints will not be discovered.");
     }
 }
 
@@ -167,7 +167,7 @@ bool PDPSimple::init(
         mp_EDP = new EDPStatic(this, mp_RTPSParticipant);
         if (!mp_EDP->initEDP(m_discovery))
         {
-            logError(RTPS_PDP, "Endpoint discovery configuration failed");
+            EPROSIMA_LOG_ERROR(RTPS_PDP, "Endpoint discovery configuration failed");
             delete mp_EDP;
             mp_EDP = nullptr;
             return false;
@@ -178,7 +178,7 @@ bool PDPSimple::init(
         mp_EDP = new EDPSimple(this, mp_RTPSParticipant);
         if (!mp_EDP->initEDP(m_discovery))
         {
-            logError(RTPS_PDP, "Endpoint discovery configuration failed");
+            EPROSIMA_LOG_ERROR(RTPS_PDP, "Endpoint discovery configuration failed");
             delete mp_EDP;
             mp_EDP = nullptr;
             return false;
@@ -186,7 +186,7 @@ bool PDPSimple::init(
     }
     else
     {
-        logWarning(RTPS_PDP, "No EndpointDiscoveryProtocol defined");
+        EPROSIMA_LOG_WARNING(RTPS_PDP, "No EndpointDiscoveryProtocol defined");
         return false;
     }
 
@@ -291,7 +291,7 @@ void PDPSimple::announceParticipantState(
 
 bool PDPSimple::createPDPEndpoints()
 {
-    logInfo(RTPS_PDP, "Beginning");
+    EPROSIMA_LOG_INFO(RTPS_PDP, "Beginning");
 
     fastdds::rtps::SimplePDPEndpoints* endpoints = nullptr;
 #if HAVE_SECURITY
@@ -320,7 +320,7 @@ bool PDPSimple::createPDPEndpoints()
         create_dcps_participant_secure_endpoints();
     }
 #endif  // HAVE_SECURITY
-    logInfo(RTPS_PDP, "SPDP Endpoints creation finished");
+    EPROSIMA_LOG_INFO(RTPS_PDP, "SPDP Endpoints creation finished");
     return ret_val;
 }
 
@@ -362,7 +362,7 @@ bool PDPSimple::create_dcps_participant_endpoints()
     }
     else
     {
-        logError(RTPS_PDP, "'" << topic_name << "' builtin reader creation failed");
+        EPROSIMA_LOG_ERROR(RTPS_PDP, "'" << topic_name << "' builtin reader creation failed");
         reader.release();
         return false;
     }
@@ -380,8 +380,7 @@ bool PDPSimple::create_dcps_participant_endpoints()
     watt.endpoint.reliabilityKind = BEST_EFFORT;
     watt.endpoint.remoteLocatorList = m_discovery.initialPeersList;
 
-    if (mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
+    if (pattr.throughputController.bytesPerPeriod != UINT32_MAX && pattr.throughputController.periodMillisecs != 0)
     {
         watt.mode = ASYNCHRONOUS_WRITER;
     }
@@ -411,7 +410,7 @@ bool PDPSimple::create_dcps_participant_endpoints()
     }
     else
     {
-        logError(RTPS_PDP, "'" << topic_name << "' builtin writer creation failed");
+        EPROSIMA_LOG_ERROR(RTPS_PDP, "'" << topic_name << "' builtin writer creation failed");
         writer.release();
         return false;
     }
@@ -454,7 +453,7 @@ bool PDPSimple::create_dcps_participant_secure_endpoints()
     }
     else
     {
-        logError(RTPS_PDP, "'" << topic_name << "' builtin reader creation failed");
+        EPROSIMA_LOG_ERROR(RTPS_PDP, "'" << topic_name << "' builtin reader creation failed");
         reader.release();
         return false;
     }
@@ -477,7 +476,7 @@ bool PDPSimple::create_dcps_participant_secure_endpoints()
     }
     else
     {
-        logError(RTPS_PDP, "'" << topic_name << "' builtin writer creation failed");
+        EPROSIMA_LOG_ERROR(RTPS_PDP, "'" << topic_name << "' builtin writer creation failed");
         writer.release();
         return false;
     }
@@ -519,7 +518,7 @@ void PDPSimple::assignRemoteEndpoints(
 void PDPSimple::removeRemoteEndpoints(
         ParticipantProxyData* pdata)
 {
-    logInfo(RTPS_PDP, "For RTPSParticipant: " << pdata->m_guid);
+    EPROSIMA_LOG_INFO(RTPS_PDP, "For RTPSParticipant: " << pdata->m_guid);
 
     GUID_t guid = pdata->m_guid;
 
@@ -632,7 +631,7 @@ void PDPSimple::match_pdp_remote_endpoints(
                         reader->getGuid(), pdata.m_guid, *temp_writer_data,
                         reader->getAttributes().security_attributes()))
             {
-                logError(RTPS_EDP, "Security manager returns an error for writer " <<
+                EPROSIMA_LOG_ERROR(RTPS_EDP, "Security manager returns an error for writer " <<
                         temp_writer_data->guid());
             }
         }
@@ -661,7 +660,7 @@ void PDPSimple::match_pdp_remote_endpoints(
                         writer->getGuid(), pdata.m_guid, *temp_reader_data,
                         writer->getAttributes().security_attributes()))
             {
-                logError(RTPS_EDP, "Security manager returns an error for reader " <<
+                EPROSIMA_LOG_ERROR(RTPS_EDP, "Security manager returns an error for reader " <<
                         temp_reader_data->guid());
             }
         }

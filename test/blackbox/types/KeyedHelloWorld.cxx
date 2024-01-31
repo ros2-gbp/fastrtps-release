@@ -34,13 +34,16 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
+#define KeyedHelloWorld_max_cdr_typesize 137ULL;
+#define KeyedHelloWorld_max_key_cdr_typesize 2ULL;
+
 KeyedHelloWorld::KeyedHelloWorld()
 {
-    // m_key com.eprosima.idl.parser.typecode.PrimitiveTypeCode@8e0379d
+    // unsigned short m_key
     m_key = 0;
-    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@341b80b2
+    // unsigned short m_index
     m_index = 0;
-    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@55a1c291
+    // string m_message
     m_message ="";
 
 }
@@ -61,7 +64,7 @@ KeyedHelloWorld::KeyedHelloWorld(
 }
 
 KeyedHelloWorld::KeyedHelloWorld(
-        KeyedHelloWorld&& x)
+        KeyedHelloWorld&& x) noexcept 
 {
     m_key = x.m_key;
     m_index = x.m_index;
@@ -80,7 +83,7 @@ KeyedHelloWorld& KeyedHelloWorld::operator =(
 }
 
 KeyedHelloWorld& KeyedHelloWorld::operator =(
-        KeyedHelloWorld&& x)
+        KeyedHelloWorld&& x) noexcept
 {
 
     m_key = x.m_key;
@@ -106,19 +109,8 @@ bool KeyedHelloWorld::operator !=(
 size_t KeyedHelloWorld::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    size_t initial_alignment = current_alignment;
-
-
-    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
-
-
-    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
-
-
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 128 + 1;
-
-
-    return current_alignment - initial_alignment;
+    static_cast<void>(current_alignment);
+    return KeyedHelloWorld_max_cdr_typesize;
 }
 
 size_t KeyedHelloWorld::getCdrSerializedSize(
@@ -147,7 +139,7 @@ void KeyedHelloWorld::serialize(
 
     scdr << m_key;
     scdr << m_index;
-    scdr << m_message;
+    scdr << m_message.c_str();
 
 }
 
@@ -157,7 +149,11 @@ void KeyedHelloWorld::deserialize(
 
     dcdr >> m_key;
     dcdr >> m_index;
-    dcdr >> m_message;
+    {
+        std::string aux;
+        dcdr >> aux;
+        m_message = aux.c_str();
+    }
 }
 
 /*!
@@ -221,7 +217,7 @@ uint16_t& KeyedHelloWorld::index()
  * @param _message New value to be copied in member message
  */
 void KeyedHelloWorld::message(
-        const std::string& _message)
+        const eprosima::fastrtps::fixed_string<128>& _message)
 {
     m_message = _message;
 }
@@ -231,7 +227,7 @@ void KeyedHelloWorld::message(
  * @param _message New value to be moved in member message
  */
 void KeyedHelloWorld::message(
-        std::string&& _message)
+        eprosima::fastrtps::fixed_string<128>&& _message)
 {
     m_message = std::move(_message);
 }
@@ -240,7 +236,7 @@ void KeyedHelloWorld::message(
  * @brief This function returns a constant reference to member message
  * @return Constant reference to member message
  */
-const std::string& KeyedHelloWorld::message() const
+const eprosima::fastrtps::fixed_string<128>& KeyedHelloWorld::message() const
 {
     return m_message;
 }
@@ -249,24 +245,17 @@ const std::string& KeyedHelloWorld::message() const
  * @brief This function returns a reference to member message
  * @return Reference to member message
  */
-std::string& KeyedHelloWorld::message()
+eprosima::fastrtps::fixed_string<128>& KeyedHelloWorld::message()
 {
     return m_message;
 }
 
+
 size_t KeyedHelloWorld::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    size_t current_align = current_alignment;
-
-
-     current_align += 2 + eprosima::fastcdr::Cdr::alignment(current_align, 2);
-
-     
-
-
-
-    return current_align;
+    static_cast<void>(current_alignment);
+    return KeyedHelloWorld_max_key_cdr_typesize;
 }
 
 bool KeyedHelloWorld::isKeyDefined()
@@ -278,6 +267,8 @@ void KeyedHelloWorld::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-     scdr << m_key;
-        
+   scdr << m_key;
+   
+ 
+  
 }

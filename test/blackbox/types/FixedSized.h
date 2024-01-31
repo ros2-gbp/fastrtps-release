@@ -23,6 +23,8 @@
 #define _FAST_DDS_GENERATED_FIXEDSIZED_H_
 
 
+#include <fastrtps/utils/fixed_size_string.hpp>
+
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -91,7 +93,7 @@ public:
      * @param x Reference to the object FixedSized that will be copied.
      */
     eProsima_user_DllExport FixedSized(
-            FixedSized&& x);
+            FixedSized&& x) noexcept;
 
     /*!
      * @brief Copy assignment.
@@ -105,7 +107,7 @@ public:
      * @param x Reference to the object FixedSized that will be copied.
      */
     eProsima_user_DllExport FixedSized& operator =(
-            FixedSized&& x);
+            FixedSized&& x) noexcept;
 
     /*!
      * @brief Comparison operator.
@@ -142,11 +144,11 @@ public:
 
 
     /*!
-     * @brief This function returns the maximum serialized size of an object
-     * depending on the buffer alignment.
-     * @param current_alignment Buffer alignment.
-     * @return Maximum serialized size.
-     */
+    * @brief This function returns the maximum serialized size of an object
+    * depending on the buffer alignment.
+    * @param current_alignment Buffer alignment.
+    * @return Maximum serialized size.
+    */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -201,6 +203,7 @@ public:
 private:
 
     uint16_t m_index;
+
 };
 
 #endif // _FAST_DDS_GENERATED_FIXEDSIZED_H_

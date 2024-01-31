@@ -32,7 +32,7 @@
 #include <gtest/gtest.h>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastrtps/types/TypesBase.h>
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <utils/SystemInfo.hpp>
 
 #define SIZE 512
@@ -240,7 +240,7 @@ TEST_F(SystemInfoTests, FileWatchTest)
                         cv_.notify_all();
                     });
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(_1s);
 
     // Read contents
     {

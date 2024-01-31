@@ -49,6 +49,7 @@ set(EDPTESTS_SOURCE EdpTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/BuiltinAnnotationsTypeObject.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
 
 if(WIN32)
@@ -64,6 +65,7 @@ target_compile_definitions(EdpTests PRIVATE
     )
 target_include_directories(EdpTests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/PDP
+    ${PROJECT_SOURCE_DIR}/test/mock/rtps/ExternalLocatorsProcessor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantImpl
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/Endpoint
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReaderProxyData
@@ -84,6 +86,9 @@ target_include_directories(EdpTests PRIVATE
 target_link_libraries(EdpTests foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
+if(QNX)
+    target_link_libraries(EdpTests socket)
+endif()
 if(MSVC OR MSVC_IDE)
     target_link_libraries(EdpTests ${PRIVACY} fastcdr iphlpapi Shlwapi ws2_32)
 else()
@@ -91,3 +96,7 @@ else()
 endif()
 
 add_gtest(EdpTests SOURCES ${EDPTESTS_SOURCE})
+
+if(ANDROID)
+    set_property(TARGET EdpTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

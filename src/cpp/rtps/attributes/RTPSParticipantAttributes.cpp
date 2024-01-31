@@ -160,7 +160,7 @@ static void setup_transports_shm(
         RTPSParticipantAttributes& att)
 {
 #ifdef FASTDDS_SHM_TRANSPORT_DISABLED
-    logError(RTPS_PARTICIPANT, "Trying to configure SHM transport only, " <<
+    EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Trying to configure SHM transport only, " <<
             "but Fast DDS was built without SHM transport support.");
 #else
     auto descriptor = create_shm_transport(att);
@@ -294,7 +294,7 @@ void RTPSParticipantAttributes::setup_transports(
             break;
 
         default:
-            logError(RTPS_PARTICIPANT,
+            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
                     "Setup for '" << transports << "' transport configuration not yet supported.");
             return;
     }

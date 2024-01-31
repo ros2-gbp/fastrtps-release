@@ -6,11 +6,11 @@ on:
         description: 'Documentation branch name'
         required: true
         type: string
-        default: '2.6.x'
+        default: '2.10.x'
 
   push:
     branches:
-      - '2.6.x'
+      - '2.10.x'
     paths-ignore:
       - '**.md'
       - '**.txt'
@@ -18,7 +18,7 @@ on:
 
   pull_request:
     branches:
-      - '2.6.x'
+      - '2.10.x'
     paths-ignore:
       - '**.md'
       - '**.txt'
@@ -94,7 +94,7 @@ jobs:
 
                 # Attempt to use version's branch, which will most likely be the base anyways.
                 # This is just in case the PR was to an intermediate branch
-                TEMP_BRANCH=2.6.x
+                TEMP_BRANCH=2.10.x
                 RESPONSE_CODE=$(git ls-remote --heads $DOCS_REPO $TEMP_BRANCH | wc -l)
 
                 if [[ ${RESPONSE_CODE} == "0" ]]

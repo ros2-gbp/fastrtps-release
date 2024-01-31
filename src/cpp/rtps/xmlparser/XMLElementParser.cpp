@@ -14,12 +14,17 @@
 //
 #include <cstring>
 #include <regex>
+#include <string>
+#include <unordered_map>
+
 #include <tinyxml2.h>
+
 #include <fastrtps/xmlparser/XMLParserCommon.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastdds/dds/log/Log.hpp>
+
 #include <utils/string_utilities.hpp>
 
 using namespace eprosima::fastrtps;
@@ -121,7 +126,8 @@ XMLP_ret XMLParser::getXMLParticipantAllocationAttributes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'rtpsParticipantAllocationAttributesType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER,
+                    "Invalid element found into 'rtpsParticipantAllocationAttributesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -169,7 +175,8 @@ XMLP_ret XMLParser::getXMLRemoteLocatorsAllocationAttributes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'remoteLocatorsAllocationConfigType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER,
+                    "Invalid element found into 'remoteLocatorsAllocationConfigType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -218,7 +225,8 @@ XMLP_ret XMLParser::getXMLSendBuffersAllocationAttributes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'sendBuffersAllocationConfigType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER,
+                    "Invalid element found into 'sendBuffersAllocationConfigType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -282,7 +290,7 @@ XMLP_ret XMLParser::getXMLDiscoverySettings(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << _EDP << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << _EDP << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             else if (strcmp(text, SIMPLE) == 0)
@@ -297,7 +305,7 @@ XMLP_ret XMLParser::getXMLDiscoverySettings(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << _EDP << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << _EDP << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -354,7 +362,7 @@ XMLP_ret XMLParser::getXMLDiscoverySettings(
                 }
                 else
                 {
-                    logError(XMLPARSER, "Invalid element found into 'simpleEDP'. Name: " << name);
+                    EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'simpleEDP'. Name: " << name);
                     return XMLP_ret::XML_ERROR;
                 }
             }
@@ -398,7 +406,7 @@ XMLP_ret XMLParser::getXMLDiscoverySettings(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'discoverySettingsType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'discoverySettingsType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -417,6 +425,7 @@ XMLP_ret XMLParser::getXMLBuiltinAttributes(
         <xs:all minOccurs="0">
             <xs:element name="discovery_config" type="discoverySettingsType" minOccurs="0"/>
             <xs:element name="use_WriterLivelinessProtocol" type="boolType" minOccurs="0"/>
+            <xs:element name="metatraffic_external_unicast_locators" type="externalLocatorListType" minOccurs="0"/>
             <xs:element name="metatrafficUnicastLocatorList" type="locatorListType" minOccurs="0"/>
             <xs:element name="metatrafficMulticastLocatorList" type="locatorListType" minOccurs="0"/>
             <xs:element name="initialPeersList" type="locatorListType" minOccurs="0"/>
@@ -427,11 +436,21 @@ XMLP_ret XMLParser::getXMLBuiltinAttributes(
        </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+
+        if (tags_present[name])
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'builtinAttributesType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, DISCOVERY_SETTINGS) == 0)
         {
             // discovery_config - DiscoverySettings
@@ -444,6 +463,15 @@ XMLP_ret XMLParser::getXMLBuiltinAttributes(
         {
             // use_WriterLivelinessProtocol - boolType
             if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &builtin.use_WriterLivelinessProtocol, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, META_EXT_UNI_LOC_LIST) == 0)
+        {
+            // metatraffic_external_unicast_locators - externalLocatorListType
+            if (XMLP_ret::XML_OK !=
+                    getXMLExternalLocatorList(p_aux0, builtin.metatraffic_external_unicast_locators, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -522,7 +550,7 @@ XMLP_ret XMLParser::getXMLBuiltinAttributes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'builtinAttributesType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'builtinAttributesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -566,7 +594,7 @@ XMLP_ret XMLParser::getXMLInitialAnnouncementsConfig(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'portType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'portType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -655,7 +683,7 @@ XMLP_ret XMLParser::getXMLPortParameters(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'portType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'portType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -679,7 +707,7 @@ XMLP_ret XMLParser::getXMLTransports(
     p_aux0 = elem->FirstChildElement(TRANSPORT_ID);
     if (nullptr == p_aux0)
     {
-        logError(XMLPARSER, "Node '" << elem->Value() << "' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << elem->Value() << "' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -688,7 +716,7 @@ XMLP_ret XMLParser::getXMLTransports(
         const char* text = p_aux0->GetText();
         if (nullptr == text)
         {
-            logError(XMLPARSER, "Node '" << TRANSPORT_ID << "' without content");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << TRANSPORT_ID << "' without content");
             return XMLP_ret::XML_ERROR;
         }
         else
@@ -700,7 +728,7 @@ XMLP_ret XMLParser::getXMLTransports(
             }
             else
             {
-                logError(XMLPARSER, "Transport Node not found. Given ID: " << text);
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Transport Node not found. Given ID: " << text);
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -747,7 +775,7 @@ XMLP_ret XMLParser::getXMLThroughputController(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'portType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'portType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -789,7 +817,7 @@ XMLP_ret XMLParser::getXMLTopicAttributes(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, _NO_KEY) == 0)
@@ -802,7 +830,7 @@ XMLP_ret XMLParser::getXMLTopicAttributes(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -812,7 +840,7 @@ XMLP_ret XMLParser::getXMLTopicAttributes(
             const char* text;
             if (nullptr == (text = p_aux0->GetText()))
             {
-                logError(XMLPARSER, "<" << p_aux0->Value() << "> getXMLString XML_ERROR!");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "<" << p_aux0->Value() << "> getXMLString XML_ERROR!");
                 return XMLP_ret::XML_ERROR;
             }
             topic.topicName = text;
@@ -823,7 +851,7 @@ XMLP_ret XMLParser::getXMLTopicAttributes(
             const char* text;
             if (nullptr == (text = p_aux0->GetText()))
             {
-                logError(XMLPARSER, "<" << p_aux0->Value() << "> getXMLString XML_ERROR!");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "<" << p_aux0->Value() << "> getXMLString XML_ERROR!");
                 return XMLP_ret::XML_ERROR;
             }
             topic.topicDataType = text;
@@ -846,7 +874,7 @@ XMLP_ret XMLParser::getXMLTopicAttributes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'topicAttributesType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'topicAttributesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -917,7 +945,7 @@ XMLP_ret XMLParser::getXMLResourceLimitsQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'resourceLimitsQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'resourceLimitsQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -980,7 +1008,7 @@ XMLP_ret XMLParser::getXMLContainerAllocationConfig(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'containerAllocationConfigType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'containerAllocationConfigType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -988,13 +1016,13 @@ XMLP_ret XMLParser::getXMLContainerAllocationConfig(
     // Check results
     if (allocation_config.initial > allocation_config.maximum)
     {
-        logError(XMLPARSER,
+        EPROSIMA_LOG_ERROR(XMLPARSER,
                 "Parsing 'containerAllocationConfigType': Field 'initial' cannot be greater than 'maximum'.");
         return XMLP_ret::XML_ERROR;
     }
     else if ((allocation_config.increment == 0) && (allocation_config.initial != allocation_config.maximum))
     {
-        logError(XMLPARSER, "Parsing 'containerAllocationConfigType': Field 'increment' cannot be zero.");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Parsing 'containerAllocationConfigType': Field 'increment' cannot be zero.");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -1034,7 +1062,7 @@ XMLP_ret XMLParser::getXMLHistoryQosPolicy(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, KEEP_LAST) == 0)
@@ -1047,7 +1075,7 @@ XMLP_ret XMLParser::getXMLHistoryQosPolicy(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -1061,7 +1089,7 @@ XMLP_ret XMLParser::getXMLHistoryQosPolicy(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'historyQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'historyQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -1179,23 +1207,36 @@ XMLP_ret XMLParser::getXMLWriterQosPolicies(
             }
         }
         else if (strcmp(name, DURABILITY_SRV) == 0 ||
-                strcmp(name, TIME_FILTER) == 0 || strcmp(name, OWNERSHIP) == 0 ||
-                strcmp(name, OWNERSHIP_STRENGTH) == 0 || strcmp(name, DEST_ORDER) == 0 ||
+                strcmp(name, TIME_FILTER) == 0 || strcmp(name, DEST_ORDER) == 0 ||
                 strcmp(name, PRESENTATION) == 0)
         {
             // TODO: Do not supported for now
             //if (nullptr != (p_aux = elem->FirstChildElement(    DURABILITY_SRV))) getXMLDurabilityServiceQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(       TIME_FILTER))) getXMLTimeBasedFilterQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(         OWNERSHIP))) getXMLOwnershipQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(OWNERSHIP_STRENGTH))) getXMLOwnershipStrengthQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(        DEST_ORDER))) getXMLDestinationOrderQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(      PRESENTATION))) getXMLPresentationQos(p_aux, ident);
-            logError(XMLPARSER, "Quality of Service '" << p_aux0->Value() << "' do not supported for now");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Quality of Service '" << p_aux0->Value() << "' do not supported for now");
         }
         else if (strcmp(name, DATA_SHARING) == 0)
         {
             //data sharing
             if (XMLP_ret::XML_OK != getXMLDataSharingQos(p_aux0, qos.data_sharing, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, OWNERSHIP) == 0)
+        {
+            //ownership
+            if (XMLP_ret::XML_OK != getXMLOwnershipQos(p_aux0, qos.m_ownership, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, OWNERSHIP_STRENGTH) == 0)
+        {
+            //ownership
+            if (XMLP_ret::XML_OK != getXMLOwnershipStrengthQos(p_aux0, qos.m_ownershipStrength, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -1234,7 +1275,7 @@ XMLP_ret XMLParser::getXMLWriterQosPolicies(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'writerQosPoliciesType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'writerQosPoliciesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -1339,22 +1380,28 @@ XMLP_ret XMLParser::getXMLReaderQosPolicies(
             }
         }
         else if (strcmp(name, DURABILITY_SRV) == 0 ||
-                strcmp(name, TIME_FILTER) == 0 || strcmp(name, OWNERSHIP) == 0 ||
-                strcmp(name, OWNERSHIP_STRENGTH) == 0 || strcmp(name, DEST_ORDER) == 0 ||
+                strcmp(name, TIME_FILTER) == 0 || strcmp(name, DEST_ORDER) == 0 ||
                 strcmp(name, PRESENTATION) == 0)
         {
             // TODO: Do not supported for now
             //if (nullptr != (p_aux = elem->FirstChildElement(    DURABILITY_SRV))) getXMLDurabilityServiceQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(       TIME_FILTER))) getXMLTimeBasedFilterQos(p_aux, ident);
-            //if (nullptr != (p_aux = elem->FirstChildElement(         OWNERSHIP))) getXMLOwnershipQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(        DEST_ORDER))) getXMLDestinationOrderQos(p_aux, ident);
             //if (nullptr != (p_aux = elem->FirstChildElement(      PRESENTATION))) getXMLPresentationQos(p_aux, ident);
-            logError(XMLPARSER, "Quality of Service '" << p_aux0->Value() << "' do not supported for now");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Quality of Service '" << p_aux0->Value() << "' do not supported for now");
         }
         else if (strcmp(name, DATA_SHARING) == 0)
         {
             //data sharing
             if (XMLP_ret::XML_OK != getXMLDataSharingQos(p_aux0, qos.data_sharing, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, OWNERSHIP) == 0)
+        {
+            //ownership
+            if (XMLP_ret::XML_OK != getXMLOwnershipQos(p_aux0, qos.m_ownership, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -1385,7 +1432,7 @@ XMLP_ret XMLParser::getXMLReaderQosPolicies(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'readerQosPoliciesType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'readerQosPoliciesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -1427,7 +1474,7 @@ XMLP_ret XMLParser::getXMLDurabilityQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             bKindDefined = true;
@@ -1449,19 +1496,19 @@ XMLP_ret XMLParser::getXMLDurabilityQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'durabilityQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'durabilityQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
     if (!bKindDefined)
     {
-        logError(XMLPARSER, "Node 'durabilityQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'durabilityQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -1515,7 +1562,7 @@ XMLP_ret XMLParser::getXMLDurabilityQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << HISTORY_KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << HISTORY_KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, KEEP_LAST) == 0)
@@ -1528,7 +1575,7 @@ XMLP_ret XMLParser::getXMLDurabilityQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << HISTORY_KIND << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << HISTORY_KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -1566,7 +1613,7 @@ XMLP_ret XMLParser::getXMLDurabilityQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'durabilityServiceQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'durabilityServiceQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -1602,14 +1649,14 @@ XMLP_ret XMLParser::getXMLDeadlineQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'deadlineQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'deadlineQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bPeriodDefined)
     {
-        logError(XMLPARSER, "Node 'deadlineQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'deadlineQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -1645,14 +1692,14 @@ XMLP_ret XMLParser::getXMLLatencyBudgetQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'latencyBudgetQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'latencyBudgetQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bDurationDefined)
     {
-        logError(XMLPARSER, "Node 'latencyBudgetQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'latencyBudgetQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
     return XMLP_ret::XML_OK;
@@ -1693,7 +1740,7 @@ XMLP_ret XMLParser::getXMLLivelinessQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, AUTOMATIC) == 0)
@@ -1710,7 +1757,7 @@ XMLP_ret XMLParser::getXMLLivelinessQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -1732,7 +1779,7 @@ XMLP_ret XMLParser::getXMLLivelinessQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'livelinessQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'livelinessQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -1773,7 +1820,7 @@ XMLP_ret XMLParser::getXMLReliabilityQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, _BEST_EFFORT) == 0)
@@ -1786,7 +1833,7 @@ XMLP_ret XMLParser::getXMLReliabilityQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -1800,7 +1847,7 @@ XMLP_ret XMLParser::getXMLReliabilityQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'reliabilityQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'reliabilityQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -1836,14 +1883,14 @@ XMLP_ret XMLParser::getXMLLifespanQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'lifespanQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'lifespanQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bDurationDefined)
     {
-        logError(XMLPARSER, "Node 'lifespanQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'lifespanQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -1885,7 +1932,7 @@ XMLP_ret XMLParser::getXMLDisablePositiveAcksQos(
         }
         else
         {
-            logError(XMLPARSER, "Node 'disablePositiveAcksQosPolicyType' with unknown content");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'disablePositiveAcksQosPolicyType' with unknown content");
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -1933,7 +1980,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, ON) == 0)
@@ -1950,7 +1997,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
             kind_found = true;
@@ -1970,7 +2017,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             }
             if (max_domains < 0)
             {
-                logError(XMLPARSER, "max domains cannot be negative");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "max domains cannot be negative");
                 return XMLP_ret::XML_ERROR;
             }
 
@@ -2003,7 +2050,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
                 }
                 else
                 {
-                    logError(XMLPARSER, "Invalid element found in 'domain_ids'. Name: " << name1);
+                    EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found in 'domain_ids'. Name: " << name1);
                     return XMLP_ret::XML_ERROR;
                 }
             }
@@ -2011,27 +2058,27 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             if (!domain_id_found)
             {
                 // Not even one
-                logError(XMLPARSER, "Node '" << DOMAIN_IDS << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << DOMAIN_IDS << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found in 'data_sharing'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found in 'data_sharing'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!kind_found)
     {
-        logError(XMLPARSER, "Node 'data_sharing' without kind");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'data_sharing' without kind");
         return XMLP_ret::XML_ERROR;
     }
 
     if (max_domains != 0 && domain_ids.size() > static_cast<uint32_t>(max_domains))
     {
-        logError(XMLPARSER, "Node 'data_sharing' defines a maximum of " << max_domains
-                                                                        << " domain IDs but also define " << domain_ids.size() <<
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'data_sharing' defines a maximum of " << max_domains
+                                                                                  << " domain IDs but also define " << domain_ids.size() <<
                 " domain IDs");
         return XMLP_ret::XML_ERROR;
     }
@@ -2090,27 +2137,26 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'timeBasedFilterQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'timeBasedFilterQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bSeparationDefined)
     {
-        logError(XMLPARSER, "Node 'timeBasedFilterQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'timeBasedFilterQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
     return XMLP_ret::XML_OK;
    }
  */
 
-// TODO Implement OwnershipQos
-/*
-   XMLP_ret XMLParser::getXMLOwnershipQos(
+XMLP_ret XMLParser::getXMLOwnershipQos(
         tinyxml2::XMLElement* elem,
         OwnershipQosPolicy& ownership,
         uint8_t ident)
-   {
+{
+    (void)ident;
 
     //    <xs:complexType name="ownershipQosPolicyType">
     //        <xs:all>
@@ -2138,7 +2184,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, SHARED) == 0)
@@ -2151,35 +2197,32 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' with bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'ownershipQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'ownershipQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bKindDefined)
     {
-        logError(XMLPARSER, "Node 'ownershipQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'ownershipQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
 
     return XMLP_ret::
-    XML_OK;
-   }
- */
+                   XML_OK;
+}
 
-// TODO Implement OwnershipStrengthQos
-/*
-   XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
+XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
         tinyxml2::XMLElement* elem,
         OwnershipStrengthQosPolicy& ownershipStrength,
         uint8_t ident)
-   {
+{
 
     //    <xs:complexType name="ownershipStrengthQosPolicyType">
     //        <xs:all>
@@ -2203,21 +2246,20 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'ownershipStrengthQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER,
+                    "Invalid element found into 'ownershipStrengthQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bValueDefined)
     {
-        logError(XMLPARSER, "Node 'ownershipStrengthQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'ownershipStrengthQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
 
     return XMLP_ret::XML_OK;
-   }
- */
-
+}
 
 // TODO Implement DestinationOrderQos
 /*
@@ -2254,7 +2296,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, BY_RECEPTION_TIMESTAMP) == 0)
@@ -2267,20 +2309,20 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'destinationOrderQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'destinationOrderQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bKindDefined)
     {
-        logError(XMLPARSER, "Node 'destinationOrderQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'destinationOrderQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2325,7 +2367,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << ACCESS_SCOPE << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << ACCESS_SCOPE << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, INSTANCE) == 0)
@@ -2342,7 +2384,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << ACCESS_SCOPE << "' bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << ACCESS_SCOPE << "' bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -2364,7 +2406,7 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'presentationQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'presentationQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -2398,7 +2440,7 @@ XMLP_ret XMLParser::getXMLPartitionQos(
             if (nullptr == p_aux1)
             {
                 // Not even one
-                logError(XMLPARSER, "Node '" << NAMES << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << NAMES << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
 
@@ -2417,14 +2459,14 @@ XMLP_ret XMLParser::getXMLPartitionQos(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'partitionQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'partitionQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bNamesDefined)
     {
-        logError(XMLPARSER, "Node 'partitionQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'partitionQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2463,7 +2505,7 @@ XMLP_ret XMLParser::getXMLPublishModeQos(
             const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node '" << KIND << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             if (strcmp(text, SYNCHRONOUS) == 0)
@@ -2476,20 +2518,20 @@ XMLP_ret XMLParser::getXMLPublishModeQos(
             }
             else
             {
-                logError(XMLPARSER, "Node '" << KIND << "' bad content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' bad content");
                 return XMLP_ret::XML_ERROR;
             }
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'publishModeQosPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'publishModeQosPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (!bKindDefined)
     {
-        logError(XMLPARSER, "Node 'publishModeQosPolicyType' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'publishModeQosPolicyType' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -2538,7 +2580,7 @@ XMLP_ret XMLParser::getXMLDuration(
 
         if (elem->FirstChildElement() != nullptr)
         {
-            logError(XMLPARSER, "If a Duration_t type element is defined as DURATION_INFINITY it cannot have <sec> or"
+            EPROSIMA_LOG_ERROR(XMLPARSER, "If a Duration_t type element is defined as DURATION_INFINITY it cannot have <sec> or"
                     " <nanosec> subelements.");
             return XMLP_ret::XML_ERROR;
         }
@@ -2571,7 +2613,7 @@ XMLP_ret XMLParser::getXMLDuration(
             text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node 'SECONDS' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'SECONDS' without content");
                 return XMLP_ret::XML_ERROR;
             }
             else if (std::regex_match(text, infinite_sec))
@@ -2582,7 +2624,7 @@ XMLP_ret XMLParser::getXMLDuration(
             }
             else if (XMLP_ret::XML_OK != getXMLInt(p_aux0, &duration.seconds, ident))
             {
-                logError(XMLPARSER, "<" << elem->Value() << "> getXMLInt XML_ERROR!");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLInt XML_ERROR!");
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -2605,7 +2647,7 @@ XMLP_ret XMLParser::getXMLDuration(
             text = p_aux0->GetText();
             if (nullptr == text)
             {
-                logError(XMLPARSER, "Node 'NANOSECONDS' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'NANOSECONDS' without content");
                 return XMLP_ret::XML_ERROR;
             }
             else if (std::regex_match(text, infinite_nsec))
@@ -2616,13 +2658,13 @@ XMLP_ret XMLParser::getXMLDuration(
             }
             else if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &duration.nanosec, ident))
             {
-                logError(XMLPARSER, "<" << elem->Value() << "> getXMLInt XML_ERROR!");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLInt XML_ERROR!");
                 return XMLP_ret::XML_ERROR;
             }
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'durationType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'durationType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -2630,7 +2672,7 @@ XMLP_ret XMLParser::getXMLDuration(
     // An empty Duration_t xml is forbidden
     if (empty)
     {
-        logError(XMLPARSER, "'durationType' elements cannot be empty."
+        EPROSIMA_LOG_ERROR(XMLPARSER, "'durationType' elements cannot be empty."
                 "At least second or nanoseconds should be provided");
         return XMLP_ret::XML_ERROR;
     }
@@ -2692,7 +2734,7 @@ XMLP_ret XMLParser::getXMLWriterTimes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'writerTimesType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'writerTimesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -2737,7 +2779,7 @@ XMLP_ret XMLParser::getXMLReaderTimes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'readerTimesType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'readerTimesType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -2759,12 +2801,21 @@ XMLP_ret XMLParser::getXMLLocatorUDPv4(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     locator.kind = LOCATOR_KIND_UDPv4;
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'udpv4LocatorType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, PORT) == 0)
         {
             // port - uint32Type
@@ -2793,7 +2844,7 @@ XMLP_ret XMLParser::getXMLLocatorUDPv4(
                 }
                 else
                 {
-                    logError(XMLPARSER,
+                    EPROSIMA_LOG_ERROR(XMLPARSER,
                             "DNS server did not return any IPv4 address for: '" << s << "'. Name: " << name);
                     return XMLP_ret::XML_ERROR;
                 }
@@ -2802,7 +2853,7 @@ XMLP_ret XMLParser::getXMLLocatorUDPv4(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'udpv4LocatorType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'udpv4LocatorType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -2823,12 +2874,21 @@ XMLP_ret XMLParser::getXMLLocatorUDPv6(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     locator.kind = LOCATOR_KIND_UDPv6;
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'udpv6LocatorType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, PORT) == 0)
         {
             // port - uint32Type
@@ -2857,7 +2917,7 @@ XMLP_ret XMLParser::getXMLLocatorUDPv6(
                 }
                 else
                 {
-                    logError(XMLPARSER,
+                    EPROSIMA_LOG_ERROR(XMLPARSER,
                             "DNS server did not return any IPv6 address for: '" << s << "'. Name: " << name);
                     return XMLP_ret::XML_ERROR;
                 }
@@ -2866,7 +2926,7 @@ XMLP_ret XMLParser::getXMLLocatorUDPv6(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'udpv6LocatorType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'udpv6LocatorType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -2890,12 +2950,21 @@ XMLP_ret XMLParser::getXMLLocatorTCPv4(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     locator.kind = LOCATOR_KIND_TCPv4;
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'tcpv4LocatorType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, PORT) == 0)
         {
             // port - uint16Type
@@ -2948,7 +3017,7 @@ XMLP_ret XMLParser::getXMLLocatorTCPv4(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'tcpv4LocatorType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'tcpv4LocatorType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -2970,12 +3039,21 @@ XMLP_ret XMLParser::getXMLLocatorTCPv6(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     locator.kind = LOCATOR_KIND_TCPv6;
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'tcpv6LocatorType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, PORT) == 0)
         {
             // port - uint16Type
@@ -3008,10 +3086,137 @@ XMLP_ret XMLParser::getXMLLocatorTCPv6(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'tcpv6LocatorType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'tcpv6LocatorType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
+    return XMLP_ret::XML_OK;
+}
+
+template<typename T>
+static XMLP_ret process_unsigned_attribute(
+        const tinyxml2::XMLElement* elem,
+        const char* name,
+        T& value,
+        const unsigned int min_value,
+        const unsigned int max_value)
+{
+    auto attribute = elem->FindAttribute(name);
+    if (nullptr != attribute)
+    {
+        unsigned int v = 0;
+        if (tinyxml2::XMLError::XML_SUCCESS == attribute->QueryUnsignedValue(&v))
+        {
+            if (min_value <= v && v <= max_value)
+            {
+                value = static_cast<T>(v);
+                return XMLP_ret::XML_OK;
+            }
+        }
+
+        EPROSIMA_LOG_ERROR(XMLPARSER,
+                "Wrong value '" << attribute->Value() << "' for attribute '" << name << "' on '" <<
+                elem->Name() << "'");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    return XMLP_ret::XML_OK;
+}
+
+static XMLP_ret process_external_locator_attributes(
+        const tinyxml2::XMLElement* elem,
+        eprosima::fastdds::rtps::LocatorWithMask& locator,
+        eprosima::fastdds::rtps::ExternalLocators& external_locators)
+{
+    static const char* EXTERNALITY_ATTR_NAME = "externality";
+    static const char* COST_ATTR_NAME = "cost";
+    static const char* MASK_ATTR_NAME = "mask";
+
+    // Attributes initialized with default value
+    uint8_t externality = 1;
+    uint8_t cost = 0;
+    uint8_t mask = 24;
+
+    if (XMLP_ret::XML_OK != process_unsigned_attribute(elem, EXTERNALITY_ATTR_NAME, externality, 1, 255) ||
+            XMLP_ret::XML_OK != process_unsigned_attribute(elem, COST_ATTR_NAME, cost, 0, 255) ||
+            XMLP_ret::XML_OK != process_unsigned_attribute(elem, MASK_ATTR_NAME, mask, 1, 127))
+    {
+        return XMLP_ret::XML_ERROR;
+    }
+
+    locator.mask(mask);
+    external_locators[externality][cost].push_back(locator);
+
+    return XMLP_ret::XML_OK;
+}
+
+XMLP_ret XMLParser::getXMLExternalLocatorList(
+        tinyxml2::XMLElement* elem,
+        eprosima::fastdds::rtps::ExternalLocators& external_locators,
+        uint8_t ident)
+{
+    /*
+        <xs:complexType name="externalLocatorListType">
+            <xs:sequence>
+              <xs:choice>
+                <xs:element name="udpv4" type="udpExternalLocatorType"/>
+                <xs:element name="udpv6" type="udpExternalLocatorType"/>
+              </xs:choice>
+            </xs:sequence>
+        </xs:complexType>
+     */
+
+    external_locators.clear();
+
+    tinyxml2::XMLElement* child = nullptr;
+    for (child = elem->FirstChildElement(); nullptr != child; child = child->NextSiblingElement())
+    {
+        fastdds::rtps::LocatorWithMask locator;
+        const char* name = child->Name();
+        if (strcmp(name, UDPv4_LOCATOR) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLLocatorUDPv4(child, locator, ident + 1))
+            {
+                external_locators.clear();
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, UDPv6_LOCATOR) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLLocatorUDPv6(child, locator, ident + 1))
+            {
+                external_locators.clear();
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found inside 'externalLocatorListType'. Name: " << name);
+            external_locators.clear();
+            return XMLP_ret::XML_ERROR;
+        }
+
+        if (IPLocator::isAny(locator) || 0 == locator.port)
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Address and port are mandatory for 'udpExternalLocatorType'.");
+            external_locators.clear();
+            return XMLP_ret::XML_ERROR;
+        }
+
+        if (IPLocator::isMulticast(locator))
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Address should be unicast for 'udpExternalLocatorType'.");
+            external_locators.clear();
+            return XMLP_ret::XML_ERROR;
+        }
+
+        if (XMLP_ret::XML_OK != process_external_locator_attributes(child, locator, external_locators))
+        {
+            external_locators.clear();
+            return XMLP_ret::XML_ERROR;
+        }
+    }
+
     return XMLP_ret::XML_OK;
 }
 
@@ -3031,7 +3236,7 @@ XMLP_ret XMLParser::getXMLLocatorList(
     p_aux0 = elem->FirstChildElement(LOCATOR);
     if (nullptr == p_aux0)
     {
-        logError(XMLPARSER, "Node '" << elem->Value() << "' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << elem->Value() << "' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3078,7 +3283,7 @@ XMLP_ret XMLParser::getXMLLocatorList(
         }
         else if (nullptr != (p_aux1 = p_aux0->FirstChildElement()))
         {
-            logError(XMLPARSER, "Invalid element found into 'locatorType'. Name: " << p_aux1->Name());
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'locatorType'. Name: " << p_aux1->Name());
             return XMLP_ret::XML_ERROR;
         }
 
@@ -3107,7 +3312,7 @@ XMLP_ret XMLParser::getXMLHistoryMemoryPolicy(
     const char* text = elem->GetText();
     if (nullptr == text)
     {
-        logError(XMLPARSER, "Node '" << KIND << "' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
         return XMLP_ret::XML_ERROR;
     }
     if (strcmp(text, PREALLOCATED) == 0)
@@ -3128,7 +3333,7 @@ XMLP_ret XMLParser::getXMLHistoryMemoryPolicy(
     }
     else
     {
-        logError(XMLPARSER, "Node '" << KIND << "' bad content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' bad content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3159,7 +3364,7 @@ XMLP_ret XMLParser::getXMLPropertiesPolicy(
             p_aux1 = p_aux0->FirstChildElement(PROPERTY);
             if (nullptr == p_aux1)
             {
-                logError(XMLPARSER, "Node '" << PROPERTIES << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << PROPERTIES << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
 
@@ -3221,7 +3426,7 @@ XMLP_ret XMLParser::getXMLPropertiesPolicy(
             p_aux1 = p_aux0->FirstChildElement(PROPERTY);
             if (nullptr == p_aux1)
             {
-                logError(XMLPARSER, "Node '" << BIN_PROPERTIES << "' without content");
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << BIN_PROPERTIES << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
 
@@ -3255,7 +3460,7 @@ XMLP_ret XMLParser::getXMLPropertiesPolicy(
                     {
                         // TODO:
                         // value - stringType
-                        logError(XMLPARSER, "Tag '" << p_aux2->Value() << "' do not supported for now");
+                        EPROSIMA_LOG_ERROR(XMLPARSER, "Tag '" << p_aux2->Value() << "' do not supported for now");
                         /*std::string s = "";
                            if (XMLP_ret::XML_OK != getXMLString(p_aux2, &s, ident + 2)) return XMLP_ret::XML_ERROR;
                            bin_prop.value(s);*/
@@ -3277,7 +3482,7 @@ XMLP_ret XMLParser::getXMLPropertiesPolicy(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'propertyPolicyType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'propertyPolicyType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -3291,7 +3496,7 @@ XMLP_ret XMLParser::getXMLOctetVector(
 {
     if (nullptr == elem)
     {
-        logError(XMLPARSER, "preconditions error");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "preconditions error");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3303,7 +3508,7 @@ XMLP_ret XMLParser::getXMLOctetVector(
     {
         if (1 < ++num_elems)
         {
-            logError(XMLPARSER, "More than one tag on " << p_aux0->GetLineNum());
+            EPROSIMA_LOG_ERROR(XMLPARSER, "More than one tag on " << p_aux0->GetLineNum());
             ret_value = XMLP_ret::XML_ERROR;
         }
         if (0 == strcmp(p_aux0->Name(), VALUE))
@@ -3320,7 +3525,7 @@ XMLP_ret XMLParser::getXMLOctetVector(
 
                 if (!ss || std::numeric_limits<octet>::max() < o)
                 {
-                    logError(XMLPARSER, "Expected an octet value on line " << p_aux0->GetLineNum());
+                    EPROSIMA_LOG_ERROR(XMLPARSER, "Expected an octet value on line " << p_aux0->GetLineNum());
                     ret_value = XMLP_ret::XML_ERROR;
                     break;
                 }
@@ -3335,7 +3540,7 @@ XMLP_ret XMLParser::getXMLOctetVector(
 
                     if (!ss || '.' != c)
                     {
-                        logError(XMLPARSER, "Expected a '.' separator on line " << p_aux0->GetLineNum());
+                        EPROSIMA_LOG_ERROR(XMLPARSER, "Expected a '.' separator on line " << p_aux0->GetLineNum());
                         ret_value = XMLP_ret::XML_ERROR;
                         break;
                     }
@@ -3344,7 +3549,8 @@ XMLP_ret XMLParser::getXMLOctetVector(
         }
         else
         {
-            logError(XMLPARSER, "Invalid tag with name of " << p_aux0->Name() << " on line " << p_aux0->GetLineNum());
+            EPROSIMA_LOG_ERROR(XMLPARSER,
+                    "Invalid tag with name of " << p_aux0->Name() << " on line " << p_aux0->GetLineNum());
             ret_value = XMLP_ret::XML_ERROR;
         }
     }
@@ -3359,12 +3565,12 @@ XMLP_ret XMLParser::getXMLInt(
 {
     if (nullptr == elem || nullptr == in)
     {
-        logError(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (tinyxml2::XMLError::XML_SUCCESS != elem->QueryIntText(in))
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLInt XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLInt XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     return XMLP_ret::XML_OK;
@@ -3377,12 +3583,12 @@ XMLP_ret XMLParser::getXMLUint(
 {
     if (nullptr == elem || nullptr == ui)
     {
-        logError(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (tinyxml2::XMLError::XML_SUCCESS != elem->QueryUnsignedText(ui))
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLUint XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     return XMLP_ret::XML_OK;
@@ -3396,13 +3602,13 @@ XMLP_ret XMLParser::getXMLUint(
     unsigned int ui = 0u;
     if (nullptr == elem || nullptr == ui16)
     {
-        logError(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (tinyxml2::XMLError::XML_SUCCESS != elem->QueryUnsignedText(&ui) ||
             ui >= 65536)
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLUint XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     *ui16 = static_cast<uint16_t>(ui);
@@ -3416,12 +3622,12 @@ XMLP_ret XMLParser::getXMLBool(
 {
     if (nullptr == elem || nullptr == b)
     {
-        logError(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (tinyxml2::XMLError::XML_SUCCESS != elem->QueryBoolText(b))
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLBool XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLBool XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     return XMLP_ret::XML_OK;
@@ -3444,12 +3650,12 @@ XMLP_ret XMLParser::getXMLEnum(
 
     if (nullptr == elem || nullptr == e)
     {
-        logError(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (nullptr == (text = elem->GetText()))
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (strcmp(text, OFF) == 0)
@@ -3466,7 +3672,7 @@ XMLP_ret XMLParser::getXMLEnum(
     }
     else
     {
-        logError(XMLPARSER, "Node '" << INTRAPROCESS_DELIVERY << "' with bad content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << INTRAPROCESS_DELIVERY << "' with bad content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3495,12 +3701,12 @@ XMLP_ret XMLParser::getXMLEnum(
 
     if (nullptr == elem || nullptr == e)
     {
-        logError(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (nullptr == (text = elem->GetText()))
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (strcmp(text, NONE) == 0)
@@ -3529,7 +3735,7 @@ XMLP_ret XMLParser::getXMLEnum(
     }
     else
     {
-        logError(XMLPARSER, "Node '" << RTPS_PDP_TYPE << "' with bad content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << RTPS_PDP_TYPE << "' with bad content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3553,12 +3759,12 @@ XMLP_ret XMLParser::getXMLEnum(
 
     if (nullptr == elem || nullptr == e)
     {
-        logError(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (nullptr == (text = elem->GetText()))
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3567,7 +3773,7 @@ XMLP_ret XMLParser::getXMLEnum(
 
     if (!std::regex_match(text, schema))
     {
-        logError(XMLPARSER, "provided flags doesn't match expected ParticipantFilteringFlags!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "provided flags doesn't match expected ParticipantFilteringFlags!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3619,17 +3825,17 @@ XMLP_ret XMLParser::getXMLRemoteServer(
 
     if (nullptr == elem )
     {
-        logError(XMLPARSER, "nullptr when getXMLRemoteServer XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLRemoteServer XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (nullptr == (Prefix = elem->Attribute(PREFIX)))
     {
-        logError(XMLPARSER, "nullptr when getXMLRemoteServer try to recover server's guidPrefix XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLRemoteServer try to recover server's guidPrefix XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (!server.ReadguidPrefix(Prefix))
     {
-        logError(XMLPARSER, "getXMLRemoteServer found an invalid server's guidPrefix XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "getXMLRemoteServer found an invalid server's guidPrefix XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3638,20 +3844,20 @@ XMLP_ret XMLParser::getXMLRemoteServer(
 
     if ( pLU == nullptr && pLM == nullptr )
     {
-        logError(XMLPARSER, "getXMLRemoteServer couldn't find any server's locator XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "getXMLRemoteServer couldn't find any server's locator XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
 
     if (pLU && XMLP_ret::XML_OK != getXMLLocatorList(pLU, server.metatrafficUnicastLocatorList, ident))
     {
-        logError(XMLPARSER,
+        EPROSIMA_LOG_ERROR(XMLPARSER,
                 "getXMLRemoteServer was given a misformatted server's " << META_UNI_LOC_LIST << " XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
 
     if (pLM && XMLP_ret::XML_OK != getXMLLocatorList(pLM, server.metatrafficMulticastLocatorList, ident))
     {
-        logError(XMLPARSER,
+        EPROSIMA_LOG_ERROR(XMLPARSER,
                 "getXMLRemoteServer was given a misformatted server's " << META_MULTI_LOC_LIST << " XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
@@ -3676,12 +3882,12 @@ XMLP_ret XMLParser::getXMLList(
 
     if (nullptr == elem)
     {
-        logError(XMLPARSER, "nullptr when getXMLList XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLList XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (nullptr == (pS = elem->FirstChildElement(RSERVER)))
     {
-        logError(XMLPARSER, "getXMLList couldn't find any RemoteServer XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "getXMLList couldn't find any RemoteServer XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3690,7 +3896,7 @@ XMLP_ret XMLParser::getXMLList(
         eprosima::fastdds::rtps::RemoteServerAttributes server;
         if (XMLP_ret::XML_OK != getXMLRemoteServer(pS, server, ident))
         {
-            logError(XMLPARSER, "getXMLList was given a misformatted RemoteServer XML_ERROR!");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "getXMLList was given a misformatted RemoteServer XML_ERROR!");
             return XMLP_ret::XML_ERROR;
         }
         list.push_back(std::move(server));
@@ -3711,12 +3917,12 @@ XMLP_ret XMLParser::getXMLString(
 
     if (nullptr == elem || nullptr == s)
     {
-        logError(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (nullptr == (text = elem->GetText()))
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLString XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLString XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     *s = text;
@@ -3732,12 +3938,12 @@ XMLP_ret XMLParser::getXMLguidPrefix(
 
     if (nullptr == elem )
     {
-        logError(XMLPARSER, "nullptr when getXMLguidPrefix XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLguidPrefix XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     else if (nullptr == (text = elem->GetText()))
     {
-        logError(XMLPARSER, "<" << elem->Value() << "> getXMLguidPrefix XML_ERROR!");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLguidPrefix XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -3757,6 +3963,8 @@ XMLP_ret XMLParser::getXMLPublisherAttributes(
                 <xs:element name="topic" type="topicAttributesType" minOccurs="0"/>
                 <xs:element name="qos" type="writerQosPoliciesType" minOccurs="0"/>
                 <xs:element name="times" type="writerTimesType" minOccurs="0"/>
+                <xs:element name="external_unicast_locators" type="externalLocatorListType" minOccurs="0"/>
+                <xs:element name="ignore_non_matching_locators" type="boolType" minOccurs="0"/>
                 <xs:element name="unicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="multicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="throughputController" type="throughputControllerType" minOccurs="0"/>
@@ -3770,11 +3978,20 @@ XMLP_ret XMLParser::getXMLPublisherAttributes(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'publisherProfileType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, TOPIC) == 0)
         {
             // topic
@@ -3795,6 +4012,22 @@ XMLP_ret XMLParser::getXMLPublisherAttributes(
         {
             // times
             if (XMLP_ret::XML_OK != getXMLWriterTimes(p_aux0, publisher.times, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, IGN_NON_MATCHING_LOCS) == 0)
+        {
+            // ignore_non_matching_locators - boolType
+            if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &publisher.ignore_non_matching_locators, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, EXT_UNI_LOC_LIST) == 0)
+        {
+            // external_unicast_locators - externalLocatorListType
+            if (XMLP_ret::XML_OK != getXMLExternalLocatorList(p_aux0, publisher.external_unicast_locators, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -3879,7 +4112,7 @@ XMLP_ret XMLParser::getXMLPublisherAttributes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'publisherProfileType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'publisherProfileType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -3897,6 +4130,8 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
                 <xs:element name="topic" type="topicAttributesType" minOccurs="0"/>
                 <xs:element name="qos" type="readerQosPoliciesType" minOccurs="0"/>
                 <xs:element name="times" type="readerTimesType" minOccurs="0"/>
+                <xs:element name="external_unicast_locators" type="externalLocatorListType" minOccurs="0"/>
+                <xs:element name="ignore_non_matching_locators" type="boolType" minOccurs="0"/>
                 <xs:element name="unicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="multicastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="expectsInlineQos" type="boolType" minOccurs="0"/>
@@ -3910,11 +4145,20 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
         </xs:complexType>
      */
 
+    std::unordered_map<std::string, bool> tags_present;
+
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = elem->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
     {
         name = p_aux0->Name();
+        if (tags_present[name])
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'subscriberProfileType'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present[name] = true;
+
         if (strcmp(name, TOPIC) == 0)
         {
             // topic
@@ -3935,6 +4179,22 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
         {
             // times
             if (XMLP_ret::XML_OK != getXMLReaderTimes(p_aux0, subscriber.times, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, IGN_NON_MATCHING_LOCS) == 0)
+        {
+            // ignore_non_matching_locators - boolType
+            if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &subscriber.ignore_non_matching_locators, ident))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, EXT_UNI_LOC_LIST) == 0)
+        {
+            // external_unicast_locators - externalLocatorListType
+            if (XMLP_ret::XML_OK != getXMLExternalLocatorList(p_aux0, subscriber.external_unicast_locators, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -4023,7 +4283,7 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
         }
         else
         {
-            logError(XMLPARSER, "Invalid element found into 'subscriberProfileType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'subscriberProfileType'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -4050,10 +4310,11 @@ XMLP_ret XMLParser::getXMLBuiltinTransports(
             </xs:restriction>
         </xs:simpleType>
      */
+
     const char* text = elem->GetText();
     if (nullptr == text)
     {
-        logError(XMLPARSER, "Node '" << KIND << "' without content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -4067,7 +4328,7 @@ XMLP_ret XMLParser::getXMLBuiltinTransports(
             LARGE_DATA, eprosima::fastdds::rtps::BuiltinTransports::LARGE_DATA,
             LARGE_DATAv6, eprosima::fastdds::rtps::BuiltinTransports::LARGE_DATAv6))
     {
-        logError(XMLPARSER, "Node '" << KIND << "' bad content");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' bad content");
         return XMLP_ret::XML_ERROR;
     }
 

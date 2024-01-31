@@ -178,6 +178,24 @@ void RTPSParticipant::enable()
     mp_impl->enable();
 }
 
+bool RTPSParticipant::ignore_participant(
+        const GuidPrefix_t& participant_guid)
+{
+    return mp_impl->ignore_participant(participant_guid);
+}
+
+bool RTPSParticipant::ignore_writer(
+        const GUID_t& /*writer_guid*/)
+{
+    return false;
+}
+
+bool RTPSParticipant::ignore_reader(
+        const GUID_t& /*reader_guid*/)
+{
+    return false;
+}
+
 #if HAVE_SECURITY
 
 bool RTPSParticipant::is_security_enabled_for_writer(
@@ -208,6 +226,12 @@ bool RTPSParticipant::remove_statistics_listener(
         uint32_t kind)
 {
     return mp_impl->remove_statistics_listener(listener, kind);
+}
+
+void RTPSParticipant::set_enabled_statistics_writers_mask(
+        uint32_t enabled_writers)
+{
+    mp_impl->set_enabled_statistics_writers_mask(enabled_writers);
 }
 
 #endif // FASTDDS_STATISTICS
