@@ -52,7 +52,7 @@ static void set_builtin_reader_history_attributes(
         const ResourceLimitedContainerConfig& allocation,
         bool is_secure)
 {
-    constexpr uint32_t c_upper_limit = std::numeric_limits<uint32_t>::max() / 2u;
+    constexpr uint32_t c_upper_limit = (std::numeric_limits<uint32_t>::max)() / 2u;
 
     hatt.payloadMaxSize = is_secure ? 128 : 28;
 
@@ -1089,6 +1089,8 @@ void WLP::update_liveliness_changed_status(
         int32_t alive_change,
         int32_t not_alive_change)
 {
+    std::lock_guard<RecursiveTimedMutex> lock(reader->getMutex());
+
     reader->liveliness_changed_status_.alive_count += alive_change;
     reader->liveliness_changed_status_.alive_count_change += alive_change;
     reader->liveliness_changed_status_.not_alive_count += not_alive_change;

@@ -34,7 +34,7 @@ endif()
 
 
 add_executable(ParticipantTests ${PARTICIPANTTESTS_SOURCE})
-target_compile_definitions(ParticipantTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(ParticipantTests PRIVATE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
@@ -47,7 +47,7 @@ target_link_libraries(ParticipantTests fastrtps fastcdr foonathan_memory
     ${CMAKE_DL_LIBS})
 
 if(EPROSIMA_TEST_DNS_NOT_SET_UP)
-    set(dns_filter "ParticipantTests.SimpleParticipantRemoteServerListConfigurationDNS")
+    set(dns_filter "-ParticipantTests.SimpleParticipantRemoteServerListConfigurationDNS")
 endif()
 
 add_gtest(ParticipantTests SOURCES ${PARTICIPANTTESTS_SOURCE} IGNORE ${dns_filter})
