@@ -13,16 +13,17 @@
 // limitations under the License.
 
 #include <atomic>
+#include <thread>
 #include <tuple>
 
-#include "BlackboxTests.hpp"
-
-#include "PubSubReader.hpp"
-#include "PubSubWriter.hpp"
+#include <gtest/gtest.h>
 
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include "BlackboxTests.hpp"
+#include "PubSubReader.hpp"
+#include "PubSubWriter.hpp"
 #include <rtps/transport/test_UDPv4Transport.h>
-#include <gtest/gtest.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastdds::rtps;
@@ -991,6 +992,11 @@ TEST_P(PubSubHistory, PubSubAsReliableKeepLastWithKeyUnorderedReception)
     // Send data
     writer.send(data);
     ASSERT_TRUE(data.empty());
+
+    reader.block_for_at_least(static_cast<size_t>(keys * depth * 0.1));
+
+    //! Avoid dropping deterministically the same re-sent samples
+    testTransport->dropDataMessagesPercentage.store(10);
 
     reader.block_for_all();
     reader.stopReception();
