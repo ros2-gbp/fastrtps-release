@@ -616,11 +616,16 @@ XMLP_ret XMLParser::parseXMLBitmaskDynamicType(
     const char* anno_bit_bound = p_root->Attribute(BIT_BOUND);
     if (anno_bit_bound != nullptr)
     {
-        bit_bound = static_cast<uint16_t>(std::atoi(anno_bit_bound));
+        auto input_bit_bound = std::atoi(anno_bit_bound);
+        if (input_bit_bound < 1 || input_bit_bound > 64)
+        {
+            return XMLP_ret::XML_ERROR;
+        }
+        bit_bound = static_cast<uint16_t>(input_bit_bound);
     }
 
     const char* name = p_root->Attribute(NAME);
-    if (nullptr == name)
+    if (nullptr == name || name[0] == '\0')
     {
         return XMLP_ret::XML_ERROR;
     }
@@ -719,6 +724,12 @@ XMLP_ret XMLParser::parseXMLStructDynamicType(
      */
     XMLP_ret ret = XMLP_ret::XML_OK;
     const char* name = p_root->Attribute(NAME);
+    if (nullptr == name || name[0] == '\0')
+    {
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Missing required attribute 'name' in 'structDcl'.");
+        return XMLP_ret::XML_ERROR;
+    }
+
     p_dynamictypebuilder_t typeBuilder; // = types::DynamicTypeBuilderFactory::get_instance()->create_struct_builder();
     //typeBuilder->set_name(name);
     uint32_t mId = 0;

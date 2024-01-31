@@ -134,7 +134,7 @@ if(TINYXML2_INCLUDE_DIR)
 endif(TINYXML2_INCLUDE_DIR)
 
 add_executable(XMLProfileParserTests ${XMLPROFILEPARSER_SOURCE})
-target_compile_definitions(XMLProfileParserTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(XMLProfileParserTests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
@@ -149,7 +149,9 @@ target_include_directories(XMLProfileParserTests PRIVATE
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPTransportDescriptor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPv4TransportDescriptor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPv6TransportDescriptor
+    ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantAttributes
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src/cpp
     ${Asio_INCLUDE_DIR}
     $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
@@ -233,20 +235,21 @@ if(ANDROID)
 endif()
 
 add_executable(XMLParserTests ${XMLPARSER_SOURCE})
-target_compile_definitions(XMLParserTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(XMLParserTests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(XMLParserTests PRIVATE
+    ${PROJECT_SOURCE_DIR}/test/mock/rtps/SharedMemTransportDescriptor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/TCPTransportDescriptor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/TCPv4TransportDescriptor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/TCPv6TransportDescriptor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPTransportDescriptor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPv4TransportDescriptor
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/UDPv6TransportDescriptor
-    ${PROJECT_SOURCE_DIR}/test/mock/rtps/SharedMemTransportDescriptor
+    ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSParticipantAttributes
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
@@ -281,7 +284,7 @@ if(ANDROID)
 endif()
 
 add_executable(XMLTreeTests ${XMLTREE_SOURCE})
-target_compile_definitions(XMLTreeTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(XMLTreeTests PRIVATE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
@@ -366,7 +369,7 @@ if(ANDROID)
 endif()
 
 add_executable(XMLEndpointParserTests ${XMLENDPOINTPARSERTESTS_SOURCE})
-target_compile_definitions(XMLEndpointParserTests PRIVATE FASTRTPS_NO_LIB
+target_compile_definitions(XMLEndpointParserTests PRIVATE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
     )
