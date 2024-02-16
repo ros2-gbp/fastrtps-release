@@ -410,6 +410,9 @@ protected:
     //! DataWriterListener
     DataWriterListener* listener_ = nullptr;
 
+    //! Mutex to protect listener_
+    std::mutex listener_mutex_;
+
     //!History
     DataWriterHistory history_;
 
@@ -449,6 +452,11 @@ protected:
                 fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERY_STATUS reason,
                 const fastrtps::rtps::GUID_t& reader_guid,
                 const fastrtps::rtps::ReaderProxyData* reader_info) override;
+
+#ifdef FASTDDS_STATISTICS
+        void notify_status_observer(
+                const uint32_t& status_id);
+#endif //FASTDDS_STATISTICS
 
         DataWriterImpl* data_writer_;
     }
@@ -496,6 +504,8 @@ protected:
     fastrtps::rtps::GUID_t guid_;
 
     std::unique_ptr<ReaderFilterCollection> reader_filters_;
+
+    DataRepresentationId_t data_representation_ {DEFAULT_DATA_REPRESENTATION};
 
     ReturnCode_t check_write_preconditions(
             void* data,

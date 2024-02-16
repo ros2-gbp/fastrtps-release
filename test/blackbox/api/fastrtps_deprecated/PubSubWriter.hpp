@@ -42,6 +42,8 @@
 #include <fastrtps/transport/UDPTransportDescriptor.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
 #include <fastrtps/transport/UDPv6TransportDescriptor.h>
+#include <fastrtps/transport/TCPv4TransportDescriptor.h>
+#include <fastdds/rtps/transport/TCPv6TransportDescriptor.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
@@ -289,15 +291,32 @@ public:
     void init()
     {
         //Create participant
-        participant_attr_.domainId = (uint32_t)GET_PID() % 230;
-
         // Use local copies of attributes to catch #6507 issues with valgrind
         eprosima::fastrtps::ParticipantAttributes participant_attr;
         eprosima::fastrtps::PublisherAttributes publisher_attr;
-        participant_attr = participant_attr_;
-        publisher_attr = publisher_attr_;
 
-        participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
+        if (!xml_file_.empty())
+        {
+            eprosima::fastrtps::Domain::loadXMLProfilesFile(xml_file_);
+            if (!participant_profile_.empty())
+            {
+                // Need to specify ID in XML
+                participant_ = eprosima::fastrtps::Domain::createParticipant(participant_profile_,
+                                &participant_listener_);
+                ASSERT_NE(participant_, nullptr);
+                participant_attr = participant_->getAttributes();
+                publisher_attr = publisher_attr_;
+            }
+        }
+        if (participant_ == nullptr)
+        {
+            participant_attr_.domainId = (uint32_t)GET_PID() % 230;
+
+            participant_attr = participant_attr_;
+            publisher_attr = publisher_attr_;
+
+            participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr, &participant_listener_);
+        }
 
         if (participant_ != nullptr)
         {
@@ -723,6 +742,76 @@ public:
             const int32_t depth)
     {
         publisher_attr_.topic.historyQos.depth = depth;
+        return *this;
+    }
+
+    PubSubWriter& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports)
+    {
+        participant_attr_.rtps.setup_transports(transports);
+        return *this;
+    }
+
+    PubSubWriter& setup_large_data_tcp(
+            bool v6 = false,
+            const uint16_t& port = 0)
+    {
+        participant_attr_.rtps.useBuiltinTransports = false;
+
+        /* Transports configuration */
+        // UDP transport for PDP over multicast
+        // TCP transport for EDP and application data (The listening port must to be unique for
+        // each participant in the same host)
+        uint16_t tcp_listening_port = port;
+        if (v6)
+        {
+            auto pdp_transport = std::make_shared<eprosima::fastdds::rtps::UDPv6TransportDescriptor>();
+            participant_attr_.rtps.userTransports.push_back(pdp_transport);
+
+            auto data_transport = std::make_shared<eprosima::fastdds::rtps::TCPv6TransportDescriptor>();
+            data_transport->add_listener_port(tcp_listening_port);
+            participant_attr_.rtps.userTransports.push_back(data_transport);
+        }
+        else
+        {
+            auto pdp_transport = std::make_shared<eprosima::fastdds::rtps::UDPv4TransportDescriptor>();
+            participant_attr_.rtps.userTransports.push_back(pdp_transport);
+
+            auto data_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+            data_transport->add_listener_port(tcp_listening_port);
+            participant_attr_.rtps.userTransports.push_back(data_transport);
+        }
+
+        /* Locators */
+        eprosima::fastrtps::rtps::Locator_t pdp_locator;
+        eprosima::fastrtps::rtps::Locator_t tcp_locator;
+        if (v6)
+        {
+            // Define locator for PDP over multicast
+            pdp_locator.kind = LOCATOR_KIND_UDPv6;
+            eprosima::fastrtps::rtps::IPLocator::setIPv6(pdp_locator, "ff1e::ffff:efff:1");
+            // Define locator for EDP and user data
+            tcp_locator.kind = LOCATOR_KIND_TCPv6;
+            eprosima::fastrtps::rtps::IPLocator::setIPv6(tcp_locator, "::");
+            eprosima::fastrtps::rtps::IPLocator::setPhysicalPort(tcp_locator, tcp_listening_port);
+            eprosima::fastrtps::rtps::IPLocator::setLogicalPort(tcp_locator, 0);
+        }
+        else
+        {
+            // Define locator for PDP over multicast
+            pdp_locator.kind = LOCATOR_KIND_UDPv4;
+            eprosima::fastrtps::rtps::IPLocator::setIPv4(pdp_locator, "239.255.0.1");
+            // Define locator for EDP and user data
+            tcp_locator.kind = LOCATOR_KIND_TCPv4;
+            eprosima::fastrtps::rtps::IPLocator::setIPv4(tcp_locator, "0.0.0.0");
+            eprosima::fastrtps::rtps::IPLocator::setPhysicalPort(tcp_locator, tcp_listening_port);
+            eprosima::fastrtps::rtps::IPLocator::setLogicalPort(tcp_locator, 0);
+        }
+
+        participant_attr_.rtps.builtin.metatrafficMulticastLocatorList.push_back(pdp_locator);
+        participant_attr_.rtps.builtin.metatrafficUnicastLocatorList.push_back(tcp_locator);
+        participant_attr_.rtps.defaultUnicastLocatorList.push_back(tcp_locator);
+
         return *this;
     }
 
@@ -1208,6 +1297,18 @@ public:
         return matched_;
     }
 
+    void set_xml_filename(
+            const std::string& name)
+    {
+        xml_file_ = name;
+    }
+
+    void set_participant_profile(
+            const std::string& profile)
+    {
+        participant_profile_ = profile;
+    }
+
     unsigned int missed_deadlines() const
     {
         return listener_.missed_deadlines();
@@ -1487,6 +1588,9 @@ private:
     std::map<std::string,  int> mapTopicCountList_;
     std::map<std::string,  int> mapPartitionCountList_;
     bool discovery_result_;
+
+    std::string xml_file_ = "";
+    std::string participant_profile_ = "";
 
     std::function<bool(const eprosima::fastrtps::rtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
 

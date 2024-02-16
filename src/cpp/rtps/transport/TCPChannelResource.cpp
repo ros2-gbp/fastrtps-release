@@ -84,7 +84,7 @@ ResponseCode TCPChannelResource::process_bind_request(
     if (connection_status_.compare_exchange_strong(expected, eConnectionStatus::eEstablished))
     {
         locator_ = IPLocator::toPhysicalLocator(locator);
-        EPROSIMA_LOG_INFO(RTCP_MSG, "Connection Stablished");
+        EPROSIMA_LOG_INFO(RTCP_MSG, "Connection Established");
         return RETCODE_OK;
     }
     else if (expected == eConnectionStatus::eEstablished)
@@ -139,9 +139,7 @@ void TCPChannelResource::add_logical_port(
             pending_logical_output_ports_.emplace_back(port);
             if (connection_established())
             {
-                scopedLock.unlock();
                 TCPTransactionId id = rtcp_manager->sendOpenLogicalPortRequest(this, port);
-                scopedLock.lock();
                 negotiating_logical_ports_[id] = port;
             }
         }
@@ -292,6 +290,30 @@ bool TCPChannelResource::remove_logical_port(
     logical_output_ports_.erase(it, logical_output_ports_.end());
     it = std::remove(pending_logical_output_ports_.begin(), pending_logical_output_ports_.end(), port);
     pending_logical_output_ports_.erase(it, pending_logical_output_ports_.end());
+    return true;
+}
+
+bool TCPChannelResource::check_socket_send_buffer(
+        const size_t& msg_size,
+        const asio::ip::tcp::socket::native_handle_type& socket_native_handle)
+{
+    int bytesInSendQueue = 0;
+
+#ifndef _WIN32
+    if (ioctl(socket_native_handle, TIOCOUTQ, &bytesInSendQueue) == -1)
+    {
+        bytesInSendQueue = 0;
+    }
+#else // ifdef _WIN32
+    static_cast<void>(socket_native_handle);
+#endif // ifndef _WIN32
+
+
+    size_t future_queue_size = size_t(bytesInSendQueue) + msg_size;
+    if (future_queue_size > size_t(parent_->configuration()->sendBufferSize))
+    {
+        return false;
+    }
     return true;
 }
 

@@ -29,6 +29,7 @@ const char* LIBRARY_SETTINGS = "library_settings";
 const char* TRANSPORT_DESCRIPTORS = "transport_descriptors";
 const char* PROFILE_NAME = "profile_name";
 const char* DEFAULT_PROF = "is_default_profile";
+const char* DOMAINPARTICIPANT_FACTORY = "domainparticipant_factory";
 const char* PARTICIPANT = "participant";
 const char* PUBLISHER = "publisher";
 const char* SUBSCRIBER = "subscriber";
@@ -47,6 +48,7 @@ const char* SEND_BUFFER_SIZE = "sendBufferSize";
 const char* TTL = "TTL";
 const char* NON_BLOCKING_SEND = "non_blocking_send";
 const char* WHITE_LIST = "interfaceWhiteList";
+const char* INTERFACE = "interface";
 const char* MAX_MESSAGE_SIZE = "maxMessageSize";
 const char* MAX_INITIAL_PEERS_RANGE = "maxInitialPeersRange";
 const char* KEEP_ALIVE_FREQUENCY = "keep_alive_frequency_ms";
@@ -59,6 +61,8 @@ const char* METADATA_LOGICAL_PORT = "metadata_logical_port";
 const char* LISTENING_PORTS = "listening_ports";
 const char* CALCULATE_CRC = "calculate_crc";
 const char* CHECK_CRC = "check_crc";
+const char* KEEP_ALIVE_THREAD = "keep_alive_thread";
+const char* ACCEPT_THREAD = "accept_thread";
 const char* SEGMENT_SIZE = "segment_size";
 const char* PORT_QUEUE_CAPACITY = "port_queue_capacity";
 const char* PORT_OVERFLOW_POLICY = "port_overflow_policy";
@@ -67,8 +71,17 @@ const char* HEALTHY_CHECK_TIMEOUT_MS = "healthy_check_timeout_ms";
 const char* DISCARD = "DISCARD";
 const char* FAIL = "FAIL";
 const char* RTPS_DUMP_FILE = "rtps_dump_file";
+const char* DEFAULT_RECEPTION_THREADS = "default_reception_threads";
+const char* RECEPTION_THREADS = "reception_threads";
+const char* RECEPTION_THREAD = "reception_thread";
+const char* DUMP_THREAD = "dump_thread";
 const char* ON = "ON";
 const char* AUTO = "AUTO";
+const char* THREAD_SETTINGS = "thread_settings";
+const char* SCHEDULING_POLICY = "scheduling_policy";
+const char* PRIORITY = "priority";
+const char* AFFINITY = "affinity";
+const char* STACK_SIZE = "stack_size";
 
 const char* OFF = "OFF";
 const char* USER_DATA_ONLY = "USER_DATA_ONLY";
@@ -80,6 +93,12 @@ const char* TYPE = "type";
 // const char* TOPIC = "topic";
 const char* DATA_WRITER = "data_writer";
 const char* DATA_READER = "data_reader";
+
+/// DomainParticipantFactory Qos
+const char* ENTITY_FACTORY = "entity_factory";
+const char* AUTOENABLE_CREATED_ENTITIES = "autoenable_created_entities";
+const char* SHM_WATCHDOG_THREAD = "shm_watchdog_thread";
+const char* FILE_WATCH_THREADS = "file_watch_threads";
 
 /// RTPS Domain attributes
 const char* INTRAPROCESS_DELIVERY = "intraprocess_delivery";
@@ -102,6 +121,7 @@ const char* PART_ID = "participantID";
 const char* THROUGHPUT_CONT = "throughputController";
 const char* USER_TRANS = "userTransports";
 const char* USE_BUILTIN_TRANS = "useBuiltinTransports";
+const char* BUILTIN_TRANS = "builtinTransports";
 const char* PROPERTIES_POLICY = "propertiesPolicy";
 const char* NAME = "name";
 const char* REMOTE_LOCATORS = "remote_locators";
@@ -116,6 +136,11 @@ const char* DYNAMIC_LC = "dynamic";
 const char* MAX_PROPERTIES = "max_properties";
 const char* MAX_USER_DATA = "max_user_data";
 const char* MAX_PARTITIONS = "max_partitions";
+const char* TIMED_EVENTS_THREAD = "timed_events_thread";
+const char* DISCOVERY_SERVER_THREAD = "discovery_server_thread";
+const char* SECURITY_LOG_THREAD = "security_log_thread";
+const char* BUILTIN_TRANSPORTS_RECEPTION_THREADS = "builtin_transports_reception_threads";
+const char* BUILTIN_CONTROLLERS_SENDER_THREAD = "builtin_controllers_sender_thread";
 
 /// Publisher-subscriber attributes
 const char* TOPIC = "topic";
@@ -133,6 +158,7 @@ const char* USER_DEF_ID = "userDefinedID";
 const char* ENTITY_ID = "entityID";
 const char* MATCHED_SUBSCRIBERS_ALLOCATION = "matchedSubscribersAllocation";
 const char* MATCHED_PUBLISHERS_ALLOCATION = "matchedPublishersAllocation";
+const char* DATA_SHARING_LISTENER_THREAD = "data_sharing_listener_thread";
 
 ///
 const char* IGN_NON_MATCHING_LOCS = "ignore_non_matching_locators";
@@ -160,6 +186,10 @@ const char* UDPv6 = "UDPv6";
 const char* TCPv4 = "TCPv4";
 const char* TCPv6 = "TCPv6";
 const char* SHM = "SHM";
+const char* DEFAULT_C = "DEFAULT";
+const char* DEFAULTv6 = "DEFAULTv6";
+const char* LARGE_DATA = "LARGE_DATA";
+const char* LARGE_DATAv6 = "LARGE_DATAv6";
 const char* INIT_ACKNACK_DELAY = "initialAcknackDelay";
 const char* HEARTB_RESP_DELAY = "heartbeatResponseDelay";
 const char* INIT_HEARTB_DELAY = "initialHeartbeatDelay";
@@ -172,6 +202,7 @@ const char* SECONDS = "sec";
 const char* NANOSECONDS = "nanosec";
 const char* SHARED = "SHARED";
 const char* EXCLUSIVE = "EXCLUSIVE";
+
 // For backward compatibility we allow any DURATION_XXX in duration_t element and any subelement
 // const char* DURATION_INFINITY = R"xsd(\s*DURATION_INFINITY\s*)xsd";
 // const char* DURATION_INFINITE_SEC = R"xsd(\s*(DURATION_INFINITY|DURATION_INFINITE_SEC)\s*)xsd";

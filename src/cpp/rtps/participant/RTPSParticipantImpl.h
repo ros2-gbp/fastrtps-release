@@ -45,6 +45,7 @@
 #include <fastdds/rtps/messages/MessageReceiver.h>
 #include <fastdds/rtps/resources/ResourceEvent.h>
 #include <fastdds/rtps/transport/SenderResource.h>
+#include <fastdds/statistics/rtps/monitor_service/interfaces/IConnectionsQueryable.hpp>
 #include <fastrtps/utils/Semaphore.h>
 #include <fastrtps/utils/shared_mutex.hpp>
 
@@ -54,16 +55,35 @@
 #include <rtps/network/NetworkFactory.h>
 #include <rtps/network/ReceiverResource.h>
 #include <statistics/rtps/StatisticsBase.hpp>
+#include <statistics/types/monitorservice_types.h>
 
 #if HAVE_SECURITY
 #include <fastdds/rtps/Endpoint.h>
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <rtps/security/SecurityManager.h>
+#include <rtps/security/SecurityPluginFactory.h>
 #endif // if HAVE_SECURITY
 
 namespace eprosima {
 
 namespace fastdds {
+
+#ifdef FASTDDS_STATISTICS
+
+namespace statistics {
+namespace rtps {
+
+struct IStatusQueryable;
+struct IStatusObserver;
+struct IConnectionsObserver;
+class SimpleQueryable;
+class MonitorService;
+
+} // namespace rtps
+} // namespace statistics
+
+#endif //FASTDDS_STATISTICS
+
 namespace dds {
 namespace builtin {
 
@@ -105,7 +125,11 @@ class WLP;
  * @ingroup RTPS_MODULE
  */
 class RTPSParticipantImpl
-    : public fastdds::statistics::StatisticsParticipantImpl
+    : public fastdds::statistics::StatisticsParticipantImpl,
+    public fastdds::statistics::rtps::IConnectionsQueryable
+#if HAVE_SECURITY
+    , private security::SecurityPluginFactory
+#endif // if HAVE_SECURITY
 {
     /*
        Receiver Control block is a struct we use to encapsulate the resources that take part in message reception.
@@ -356,6 +380,17 @@ public:
             uint32_t length);
 
 #if HAVE_SECURITY
+    uint32_t calculate_extra_size_for_rtps_message()
+    {
+        uint32_t ret_val = 0u;
+        if (security_attributes_.is_rtps_protected)
+        {
+            ret_val = m_security_manager.calculate_extra_size_for_rtps_message();
+        }
+
+        return ret_val;
+    }
+
     security::SecurityManager& security_manager()
     {
         return m_security_manager;
@@ -397,6 +432,8 @@ public:
      */
     bool is_security_enabled_for_reader(
             const ReaderAttributes& reader_attributes);
+
+    security::Logging* create_builtin_logging_plugin() override;
 
 #endif // if HAVE_SECURITY
 
@@ -662,6 +699,12 @@ private:
 
     //!Will this participant use intraprocess only?
     bool is_intraprocess_only_;
+
+#ifdef FASTDDS_STATISTICS
+    std::unique_ptr<fastdds::statistics::rtps::MonitorService> monitor_server_;
+    std::unique_ptr<fastdds::statistics::rtps::SimpleQueryable> simple_queryable_;
+    std::atomic<const fastdds::statistics::rtps::IConnectionsObserver*> conns_observer_;
+#endif // ifdef FASTDDS_STATISTICS
 
     /*
      * Flow controller factory.
@@ -1115,6 +1158,106 @@ public:
      */
     void set_enabled_statistics_writers_mask(
             uint32_t enabled_writers) override;
+
+    /**
+     * Creates the monitor service in this RTPSParticipant with the provided interfaces.
+     *
+     * @param sq reference to the object implementing the StatusQueryable interface.
+     * It will usually be the DDS DomainParticipant
+     *
+     * @return A const pointer to the listener (implemented within the RTPSParticipant)
+     *
+     */
+    const fastdds::statistics::rtps::IStatusObserver* create_monitor_service(
+            fastdds::statistics::rtps::IStatusQueryable& status_queryable);
+
+    /**
+     * Creates the monitor service in this RTPSParticipant with a simple default
+     * implementation of the IStatusQueryable.
+     *
+     * @return true if the monitor service could be correctly created.
+     *
+     */
+    bool create_monitor_service();
+
+    /**
+     * Returns whether the monitor service in created in this RTPSParticipant.
+     *
+     * @return true if the monitor service is created.
+     * @return false otherwise.
+     *
+     */
+    bool is_monitor_service_created() const;
+
+    /**
+     * Enables the monitor service in this RTPSParticipant.
+     *
+     * @return true if the monitor service could be correctly enabled.
+     *
+     */
+    bool enable_monitor_service() const;
+
+    /**
+     * Disables the monitor service in this RTPSParticipant. Does nothing if the service was not enabled before.
+     *
+     * @return true if the monitor service could be correctly disabled.
+     * @return false if the service could not be properly disabled or if the monitor service was not previously enabled.
+     *
+     */
+    bool disable_monitor_service() const;
+
+    /**
+     * fills in the ParticipantProxyData from a MonitorService Message
+     *
+     * @param [out] data Proxy to fill
+     * @param [in] msg MonitorService Message to get the proxy information from.
+     *
+     * @return true if the operation succeeds.
+     */
+    bool fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::ParticipantProxyData& data,
+            fastdds::statistics::MonitorServiceStatusData& msg);
+
+    /**
+     * fills in the WriterProxyData from a MonitorService Message
+     *
+     * @param [out] data Proxy to fill.
+     * @param [in] msg MonitorService Message to get the proxy information from.
+     *
+     * @return true if the operation succeeds.
+     */
+    bool fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::WriterProxyData& data,
+            fastdds::statistics::MonitorServiceStatusData& msg);
+
+    /**
+     * fills in the ReaderProxyData from a MonitorService Message
+     *
+     * @param [out] data Proxy to fill.
+     * @param [in] msg MonitorService Message to get the proxy information from.
+     *
+     * @return true if the operation succeeds.
+     */
+    bool fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::ReaderProxyData& data,
+            fastdds::statistics::MonitorServiceStatusData& msg);
+
+    bool get_entity_connections(
+            const GUID_t&,
+            fastdds::statistics::rtps::ConnectionList& conn_list) override;
+
+    const fastdds::statistics::rtps::IConnectionsObserver* get_connections_observer()
+    {
+        return conns_observer_.load();
+    }
+
+#else
+    bool get_entity_connections(
+            const GUID_t&,
+            fastdds::statistics::rtps::ConnectionList&) override
+    {
+        return false;
+    }
 
 #endif // FASTDDS_STATISTICS
 

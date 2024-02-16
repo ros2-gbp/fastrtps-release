@@ -33,9 +33,11 @@
 #include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
 #include <fastdds/rtps/reader/ReaderDiscoveryInfo.h>
 #include <fastdds/rtps/writer/WriterDiscoveryInfo.h>
+#include <fastdds/statistics/rtps/monitor_service/interfaces/IProxyObserver.hpp>
+#include <fastdds/statistics/rtps/monitor_service/interfaces/IProxyQueryable.hpp>
 #include <fastrtps/qos/QosPolicies.h>
-#include <fastrtps/utils/ProxyPool.hpp>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
+#include <fastrtps/utils/ProxyPool.hpp>
 
 namespace eprosima {
 
@@ -79,7 +81,7 @@ class ITopicPayloadPool;
  * It also keeps the Participant Discovery Data and provides interfaces to access it
  *@ingroup DISCOVERY_MODULE
  */
-class PDP
+class PDP : public fastdds::statistics::rtps::IProxyQueryable
 {
     friend class PDPListener;
     friend class PDPServerListener;
@@ -328,9 +330,9 @@ public:
      * Get a pointer to the local RTPSParticipant ParticipantProxyData object.
      * @return Pointer to the local RTPSParticipant ParticipantProxyData object.
      */
-    ParticipantProxyData* getLocalParticipantProxyData()
+    ParticipantProxyData* getLocalParticipantProxyData() const
     {
-        return participant_proxies_.front();
+        return participant_proxies_.empty() ? nullptr : participant_proxies_.front();
     }
 
     /**
@@ -358,6 +360,15 @@ public:
     ResourceLimitedVector<ParticipantProxyData*>::const_iterator ParticipantProxiesEnd()
     {
         return participant_proxies_.end();
+    }
+
+    /**
+     * Get the number of participant proxies.
+     * @return size_t.
+     */
+    size_t participant_proxies_number()
+    {
+        return participant_proxies_number_;
     }
 
     /**
@@ -420,7 +431,15 @@ public:
         return temp_writer_proxies_;
     }
 
+    ReaderAttributes create_builtin_reader_attributes() const;
+
+    WriterAttributes create_builtin_writer_attributes() const;
+
 #if HAVE_SECURITY
+    void add_builtin_security_attributes(
+            ReaderAttributes& ratt,
+            WriterAttributes& watt) const;
+
     virtual bool pairing_remote_writer_with_local_reader_after_security(
             const GUID_t& local_reader,
             const WriterProxyData& remote_writer_data);
@@ -429,6 +448,38 @@ public:
             const GUID_t& local_writer,
             const ReaderProxyData& remote_reader_data);
 #endif // HAVE_SECURITY
+
+#ifdef FASTDDS_STATISTICS
+    bool get_all_local_proxies(
+            std::vector<GUID_t>& guids) override;
+
+    bool get_serialized_proxy(
+            const GUID_t& guid,
+            CDRMessage_t* msg) override;
+
+    void set_proxy_observer(
+            const fastdds::statistics::rtps::IProxyObserver* proxy_observer);
+
+    const fastdds::statistics::rtps::IProxyObserver* get_proxy_observer()
+    {
+        return proxy_observer_.load();
+    }
+
+#else
+    bool get_all_local_proxies(
+            std::vector<GUID_t>&) override
+    {
+        return false;
+    }
+
+    bool get_serialized_proxy(
+            const GUID_t&,
+            CDRMessage_t*) override
+    {
+        return false;
+    }
+
+#endif // FASTDDS_STATISTICS
 
 protected:
 
@@ -458,8 +509,6 @@ protected:
     ResourceLimitedVector<WriterProxyData*> writer_proxies_pool_;
     //!Variable to indicate if any parameter has changed.
     std::atomic_bool m_hasChangedLocalPDP;
-    //!Listener for the SPDP messages.
-    ReaderListener* mp_listener;
     //! ProxyPool for temporary reader proxies
     ProxyPool<ReaderProxyData> temp_reader_proxies_;
     //! ProxyPool for temporary writer proxies
@@ -530,6 +579,16 @@ protected:
      * Called after creating the builtin endpoints to update the metatraffic unicast locators of BuiltinProtocols
      */
     virtual void update_builtin_locators() = 0;
+
+    void notify_and_maybe_ignore_new_participant(
+            ParticipantProxyData* pdata,
+            bool& should_be_ignored);
+
+#ifdef FASTDDS_STATISTICS
+
+    std::atomic<const fastdds::statistics::rtps::IProxyObserver*> proxy_observer_;
+
+#endif // FASTDDS_STATISTICS
 
 private:
 
