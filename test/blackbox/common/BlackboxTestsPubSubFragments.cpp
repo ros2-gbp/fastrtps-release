@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "BlackboxTests.hpp"
-
-#include "PubSubReader.hpp"
-#include "PubSubWriter.hpp"
+#include <thread>
 
 #include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include "BlackboxTests.hpp"
+#include "PubSubReader.hpp"
+#include "PubSubWriter.hpp"
 #include <rtps/transport/test_UDPv4Transport.h>
 
 using namespace eprosima::fastrtps;
@@ -619,6 +620,66 @@ TEST_P(PubSubFragmentsLimited, AsyncPubSubAsReliableKeyedData300kbKeepLast1InLos
     uint32_t bytesPerPeriod = 153601;
     uint32_t periodInMs = 100;
     writer.add_throughput_controller_descriptor_to_pparams(scheduler_policy_, bytesPerPeriod, periodInMs)
+            .heartbeat_period_seconds(0)
+            .heartbeat_period_nanosec(1000000)
+            .history_depth(1)
+            .asynchronously(eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    // Because its volatile the durability
+    // Wait for discovery.
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    auto data = default_keyeddata300kb_data_generator(5);
+
+    reader.startReception(data);
+
+    // Send data
+    writer.send(data, 100);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block reader until reception finished or timeout.
+    reader.block_for_seq({ 0, 5 });
+
+    // Sanity check. Make sure we have dropped a few packets
+    ASSERT_EQ(
+        test_UDPv4Transport::test_UDPv4Transport_DropLog.size(),
+        testTransport->dropLogLength);
+}
+
+// Regression test for 20257
+// When a non existing change is removed, the change is also removed from the data instance changes sequence
+TEST(PubSubFragmentsLimited,
+        AsyncPubSubAsReliableKeyedData300kbKeepLast1LoosyConditionsSmallFragmentsCorrectlyBehavesWhenInlineQoSAreForced)
+{
+    PubSubReader<KeyedData1mbPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<KeyedData1mbPubSubType> writer(TEST_TOPIC_NAME);
+
+    reader.history_depth(2)
+            .expect_inline_qos(true)
+            .reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
+            .init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    // To simulate lossy conditions, we are going to remove the default
+    // builtin transport, and instead use a lossy shim layer variant.
+    auto testTransport = std::make_shared<test_UDPv4TransportDescriptor>();
+    testTransport->maxMessageSize = 1024;
+    // We drop 20% of all data frags
+    testTransport->dropDataFragMessagesPercentage = 20;
+    testTransport->dropLogLength = 1;
+    writer.disable_builtin_transport();
+    writer.add_user_transport_to_pparams(testTransport);
+
+    // When doing fragmentation, it is necessary to have some degree of
+    // flow control not to overrun the receive buffer.
+    uint32_t bytesPerPeriod = 153601;
+    uint32_t periodInMs = 100;
+    writer.add_throughput_controller_descriptor_to_pparams(
+        eprosima::fastdds::rtps::FlowControllerSchedulerPolicy::HIGH_PRIORITY, bytesPerPeriod, periodInMs)
             .heartbeat_period_seconds(0)
             .heartbeat_period_nanosec(1000000)
             .history_depth(1)

@@ -17,6 +17,10 @@
  *
  */
 
+#include <cassert>
+#include <mutex>
+#include <thread>
+
 #include <fastdds/rtps/reader/StatelessReader.h>
 #include <fastdds/rtps/history/ReaderHistory.h>
 #include <fastdds/rtps/reader/ReaderListener.h>
@@ -30,11 +34,6 @@
 #include <rtps/DataSharing/ReaderPool.hpp>
 
 #include "rtps/RTPSDomainImpl.hpp"
-
-#include <mutex>
-#include <thread>
-
-#include <cassert>
 
 #define IDSTRING "(ID:" << std::this_thread::get_id() << ") " <<
 
@@ -118,6 +117,16 @@ bool StatelessReader::matched_writer_add(
                     listener->on_writer_discovery(this, WriterDiscoveryInfo::CHANGED_QOS_WRITER, wdata.guid(),
                             &wdata);
                 }
+
+#ifdef FASTDDS_STATISTICS
+                // notify monitor service so that the connectionlist for this entity
+                // could be updated
+                if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+                {
+                    mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+                }
+#endif //FASTDDS_STATISTICS
+
                 return false;
             }
         }
@@ -196,6 +205,15 @@ bool StatelessReader::matched_writer_add(
         listener->on_writer_discovery(this, WriterDiscoveryInfo::DISCOVERED_WRITER, wdata.guid(), &wdata);
     }
 
+#ifdef FASTDDS_STATISTICS
+    // notify monitor service so that the connectionlist for this entity
+    // could be updated
+    if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+    {
+        mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+    }
+#endif //FASTDDS_STATISTICS
+
     return true;
 }
 
@@ -248,6 +266,16 @@ bool StatelessReader::matched_writer_remove(
                     guard.unlock();
                     listener->on_writer_discovery(this, WriterDiscoveryInfo::REMOVED_WRITER, writer_guid, nullptr);
                 }
+
+#ifdef FASTDDS_STATISTICS
+                // notify monitor service so that the connectionlist for this entity
+                // could be updated
+                if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+                {
+                    mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+                }
+#endif //FASTDDS_STATISTICS
+
                 return true;
             }
         }
@@ -278,20 +306,30 @@ bool StatelessReader::change_received(
     // TODO Revisar si no hay que incluirlo.
     if (!thereIsUpperRecordOf(change->writerGUID, change->sequenceNumber))
     {
-        // Update Ownership strength.
-        if (EXCLUSIVE_OWNERSHIP_QOS == m_att.ownershipKind)
+        bool update_notified = true;
+
+        decltype(matched_writers_)::iterator writer = matched_writers_.end();
+        if ((EXCLUSIVE_OWNERSHIP_QOS == m_att.ownershipKind) ||
+                (m_trustedWriterEntityId == change->writerGUID.entityId))
         {
-            auto writer = std::find_if(matched_writers_.begin(), matched_writers_.end(),
+            writer = std::find_if(matched_writers_.begin(), matched_writers_.end(),
                             [change](const RemoteWriterInfo_t& item)
                             {
                                 return item.guid == change->writerGUID;
                             });
+            bool is_matched = matched_writers_.end() != writer;
+            update_notified = is_matched;
+        }
+
+        // Update Ownership strength.
+        if (EXCLUSIVE_OWNERSHIP_QOS == m_att.ownershipKind)
+        {
             assert(matched_writers_.end() != writer);
             change->reader_info.writer_ownership_strength = writer->ownership_strength;
         }
         else
         {
-            change->reader_info.writer_ownership_strength = std::numeric_limits<uint32_t>::max();
+            change->reader_info.writer_ownership_strength = (std::numeric_limits<uint32_t>::max)();
         }
 
         if (mp_history->received_change(change, 0))
@@ -301,7 +339,11 @@ bool StatelessReader::change_received(
             auto seq = change->sequenceNumber;
 
             Time_t::now(change->reader_info.receptionTimestamp);
-            SequenceNumber_t previous_seq = update_last_notified(change->writerGUID, change->sequenceNumber);
+            SequenceNumber_t previous_seq{ 0, 0 };
+            if (update_notified)
+            {
+                previous_seq = update_last_notified(change->writerGUID, change->sequenceNumber);
+            }
             ++total_unread_;
 
             on_data_notify(guid, change->sourceTimestamp);
@@ -459,6 +501,47 @@ void StatelessReader::change_read_by_user(
 
 }
 
+#ifdef FASTDDS_STATISTICS
+
+bool StatelessReader::get_connections(
+        eprosima::fastdds::statistics::rtps::ConnectionList& connection_list)
+{
+    connection_list.reserve(matched_writers_.size());
+
+    std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
+    for (RemoteWriterInfo_t& writer : matched_writers_)
+    {
+        fastdds::statistics::Connection connection;
+        fastdds::statistics::ConnectionMode mode;
+
+        connection.guid(fastdds::statistics::to_statistics_type(writer.guid));
+
+        if (writer.is_datasharing)
+        {
+            mode = fastdds::statistics::DATA_SHARING;
+        }
+        else if (RTPSDomainImpl::should_intraprocess_between(m_guid, writer.guid))
+        {
+            mode = fastdds::statistics::INTRAPROCESS;
+        }
+        else
+        {
+            mode = fastdds::statistics::TRANSPORT;
+
+            //! In the case of a stateless reader
+            //! there is no need to communicate with the writer
+            //! so there are no posible locators.
+        }
+
+        connection.mode(mode);
+        connection_list.push_back(connection);
+    }
+
+    return true;
+}
+
+#endif // ifdef FASTDDS_STATISTICS
+
 bool StatelessReader::processDataMsg(
         CacheChange_t* change)
 {
@@ -548,7 +631,7 @@ bool StatelessReader::processDataMsg(
                 EPROSIMA_LOG_WARNING(RTPS_MSG_IN, IDSTRING "Problem copying CacheChange, received data is: "
                         << change->serializedPayload.length << " bytes and max size in reader "
                         << m_guid << " is "
-                        << (fixed_payload_size_ > 0 ? fixed_payload_size_ : std::numeric_limits<uint32_t>::max()));
+                        << (fixed_payload_size_ > 0 ? fixed_payload_size_ : (std::numeric_limits<uint32_t>::max)()));
                 change_pool_->release_cache(change_to_add);
                 return false;
             }
@@ -631,6 +714,7 @@ bool StatelessReader::processDataFragMsg(
                             // Sample fits inside pending change. Reuse it.
                             work_change->copy_not_memcpy(change_to_add);
                             work_change->serializedPayload.length = sampleSize;
+                            work_change->instanceHandle.clear();
                             work_change->setFragmentSize(change_to_add->getFragmentSize(), true);
                         }
                         else
@@ -656,6 +740,7 @@ bool StatelessReader::processDataFragMsg(
                         {
                             work_change->copy_not_memcpy(change_to_add);
                             work_change->serializedPayload.length = sampleSize;
+                            work_change->instanceHandle.clear();
                             work_change->setFragmentSize(change_to_add->getFragmentSize(), true);
                         }
                     }
@@ -665,6 +750,12 @@ bool StatelessReader::processDataFragMsg(
                 CacheChange_t* change_completed = nullptr;
                 if (work_change != nullptr)
                 {
+                    // Set the instanceHandle only when fragment number 1 is received
+                    if (!work_change->instanceHandle.isDefined() && fragmentStartingNum == 1)
+                    {
+                        work_change->instanceHandle = change_to_add->instanceHandle;
+                    }
+
                     if (work_change->add_fragments(change_to_add->serializedPayload, fragmentStartingNum,
                             fragmentsInSubmessage))
                     {

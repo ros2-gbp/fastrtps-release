@@ -41,7 +41,7 @@ endif(WIN32)
 ###############################################################################
 if(EPROSIMA_BUILD_TESTS)
     find_package(GTest CONFIG REQUIRED)
-    include(${PROJECT_SOURCE_DIR}/cmake/common/gtest.cmake)
+    include(${PROJECT_SOURCE_DIR}/cmake/testing/GoogleTest.cmake)
 
     add_subdirectory(blackbox)
     add_subdirectory(communication)
@@ -59,10 +59,10 @@ endif()
 # Profiling tests using valgrind
 ###############################################################################
 if(NOT ((MSVC OR MSVC_IDE)) AND PROFILING_TESTS)
-   find_program(CTEST_MEMORYCHECK_COMMAND NAMES valgrind)
-   if(CTEST_MEMORYCHECK_COMMAND)
-      add_subdirectory(profiling)
-   endif()
+    find_program(CTEST_MEMORYCHECK_COMMAND NAMES valgrind)
+    if(CTEST_MEMORYCHECK_COMMAND)
+        add_subdirectory(profiling)
+    endif()
 endif()
 
 ###############################################################################

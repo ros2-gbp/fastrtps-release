@@ -24,6 +24,7 @@
 #include <sstream>
 
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
 #include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
@@ -61,6 +62,17 @@
 #include <rtps/participant/RTPSParticipantImpl.h>
 #include <rtps/persistence/PersistenceService.h>
 #include <statistics/rtps/GuidUtils.hpp>
+#include <utils/SystemInfo.hpp>
+#include <utils/string_utilities.hpp>
+
+#ifdef FASTDDS_STATISTICS
+#include <statistics/types/monitorservice_types.h>
+#include <statistics/rtps/monitor-service/MonitorService.hpp>
+#endif // ifdef FASTDDS_STATISTICS
+
+#if HAVE_SECURITY
+#include <security/logging/LogTopic.h>
+#endif  // HAVE_SECURITY
 
 namespace eprosima {
 namespace fastrtps {
@@ -69,6 +81,35 @@ namespace rtps {
 using UDPv4TransportDescriptor = fastdds::rtps::UDPv4TransportDescriptor;
 using TCPTransportDescriptor = fastdds::rtps::TCPTransportDescriptor;
 using SharedMemTransportDescriptor = fastdds::rtps::SharedMemTransportDescriptor;
+using BuiltinTransports = fastdds::rtps::BuiltinTransports;
+
+/**
+ * Parse the environment variable specifying the transports to instantiate
+ */
+static BuiltinTransports get_builtin_transports_from_env_var()
+{
+    static constexpr const char* env_var_name = "FASTDDS_BUILTIN_TRANSPORTS";
+
+    BuiltinTransports ret_val = BuiltinTransports::DEFAULT;
+    std::string env_value;
+    if (SystemInfo::get_env(env_var_name, env_value) == ReturnCode_t::RETCODE_OK)
+    {
+        if (!get_element_enum_value(env_value.c_str(), ret_val,
+                "NONE", BuiltinTransports::NONE,
+                "DEFAULT", BuiltinTransports::DEFAULT,
+                "DEFAULTv6", BuiltinTransports::DEFAULTv6,
+                "SHM", BuiltinTransports::SHM,
+                "UDPv4", BuiltinTransports::UDPv4,
+                "UDPv6", BuiltinTransports::UDPv6,
+                "LARGE_DATA", BuiltinTransports::LARGE_DATA,
+                "LARGE_DATAv6", BuiltinTransports::LARGE_DATAv6))
+        {
+            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Wrong value '" << env_value << "' for environment variable '" <<
+                    env_var_name << "'. Leaving as DEFAULT");
+        }
+    }
+    return ret_val;
+}
 
 static EntityId_t TrustedWriter(
         const EntityId_t& reader)
@@ -137,12 +178,16 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     , internal_metatraffic_locators_(false)
     , internal_default_locators_(false)
 #if HAVE_SECURITY
-    , m_security_manager(this)
+    , m_security_manager(this, *this)
 #endif // if HAVE_SECURITY
     , mp_participantListener(plisten)
     , mp_userParticipant(par)
     , mp_mutex(new std::recursive_mutex())
     , is_intraprocess_only_(should_be_intraprocess_only(PParam))
+#ifdef FASTDDS_STATISTICS
+    , monitor_server_(nullptr)
+    , conns_observer_(nullptr)
+#endif // if FASTDDS_STATISTICS
     , has_shm_transport_(false)
     , match_local_endpoints_(should_match_local_endpoints(PParam))
 {
@@ -150,37 +195,15 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     {
         m_persistence_guid = GUID_t(persistence_guid, c_EntityId_RTPSParticipant);
     }
-    // Builtin transports by default
-    if (PParam.useBuiltinTransports)
-    {
-        UDPv4TransportDescriptor descriptor;
-        descriptor.sendBufferSize = m_att.sendSocketBufferSize;
-        descriptor.receiveBufferSize = m_att.listenSocketBufferSize;
-        if (is_intraprocess_only())
-        {
-            // Avoid multicast leaving the host for intraprocess-only participants
-            descriptor.TTL = 0;
-        }
-        m_network_Factory.RegisterTransport(&descriptor, &m_att.properties);
 
-#ifdef SHM_TRANSPORT_BUILTIN
-        if (!is_intraprocess_only())
-        {
-            SharedMemTransportDescriptor shm_transport;
-            // We assume (Linux) UDP doubles the user socket buffer size in kernel, so
-            // the equivalent segment size in SHM would be socket buffer size x 2
-            auto segment_size_udp_equivalent =
-                    std::max(m_att.sendSocketBufferSize, m_att.listenSocketBufferSize) * 2;
-            shm_transport.segment_size(segment_size_udp_equivalent);
-            // Use same default max_message_size on both UDP and SHM
-            shm_transport.max_message_size(descriptor.max_message_size());
-            has_shm_transport_ |= m_network_Factory.RegisterTransport(&shm_transport);
-        }
-#endif // ifdef SHM_TRANSPORT_BUILTIN
+    // Setup builtin transports
+    if (m_att.useBuiltinTransports)
+    {
+        m_att.setup_transports(get_builtin_transports_from_env_var());
     }
 
     // BACKUP servers guid is its persistence one
-    if (PParam.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
+    if (m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
     {
         m_persistence_guid = m_guid;
     }
@@ -191,14 +214,14 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     guid_str_ = guid_sstr.str();
 
     // Client-server discovery protocol requires that every TCP transport has a listening port
-    switch (PParam.builtin.discovery_config.discoveryProtocol)
+    switch (m_att.builtin.discovery_config.discoveryProtocol)
     {
         case DiscoveryProtocol::BACKUP:
         case DiscoveryProtocol::CLIENT:
         case DiscoveryProtocol::SERVER:
         case DiscoveryProtocol::SUPER_CLIENT:
             // Verify if listening ports are provided
-            for (auto& transportDescriptor : PParam.userTransports)
+            for (auto& transportDescriptor : m_att.userTransports)
             {
                 TCPTransportDescriptor* pT = dynamic_cast<TCPTransportDescriptor*>(transportDescriptor.get());
                 if (pT && pT->listening_ports.empty())
@@ -213,7 +236,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     }
 
     // User defined transports
-    for (const auto& transportDescriptor : PParam.userTransports)
+    for (const auto& transportDescriptor : m_att.userTransports)
     {
         if (m_network_Factory.RegisterTransport(transportDescriptor.get(), &m_att.properties))
         {
@@ -239,7 +262,9 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     }
 
     mp_userParticipant->mp_impl = this;
-    mp_event_thr.init_thread();
+    uint32_t id_for_thread = static_cast<uint32_t>(m_att.participantID);
+    const fastdds::rtps::ThreadSettings& thr_config = m_att.timed_events_thread;
+    mp_event_thr.init_thread(thr_config, "dds.ev.%u", id_for_thread);
 
     if (!networkFactoryHasRegisteredTransports())
     {
@@ -339,7 +364,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     // Start security
     if (!m_security_manager.init(
                 security_attributes_,
-                PParam.properties))
+                m_att.properties))
     {
         // Participant will be deleted, no need to allocate buffers or create builtin endpoints
         return;
@@ -392,12 +417,12 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     flow_controller_factory_.init(this);
 
     // Support old API
-    if (PParam.throughputController.bytesPerPeriod != UINT32_MAX && PParam.throughputController.periodMillisecs != 0)
+    if (m_att.throughputController.bytesPerPeriod != UINT32_MAX && m_att.throughputController.periodMillisecs != 0)
     {
         fastdds::rtps::FlowControllerDescriptor old_descriptor;
         old_descriptor.name = guid_str_.c_str();
-        old_descriptor.max_bytes_per_period = PParam.throughputController.bytesPerPeriod;
-        old_descriptor.period_ms = PParam.throughputController.periodMillisecs;
+        old_descriptor.max_bytes_per_period = m_att.throughputController.bytesPerPeriod;
+        old_descriptor.period_ms = m_att.throughputController.periodMillisecs;
         flow_controller_factory_.register_flow_controller(old_descriptor);
     }
 
@@ -1695,9 +1720,9 @@ bool RTPSParticipantImpl::createReceiverResources(
     // An auxilary buffer is needed in the ReceiverResource to to decrypt the message,
     // that imposes a limit in the received messages size even if the transport allows (uint32_t) messages size.
     uint32_t max_receiver_buffer_size =
-            is_secure() ? std::numeric_limits<uint16_t>::max() : std::numeric_limits<uint32_t>::max();
+            is_secure() ? std::numeric_limits<uint16_t>::max() : (std::numeric_limits<uint32_t>::max)();
 #else
-    uint32_t max_receiver_buffer_size = std::numeric_limits<uint32_t>::max();
+    uint32_t max_receiver_buffer_size = (std::numeric_limits<uint32_t>::max)();
 #endif // if HAVE_SECURITY
 
     for (auto it_loc = Locator_list.begin(); it_loc != Locator_list.end(); ++it_loc)
@@ -2076,9 +2101,9 @@ uint32_t RTPSParticipantImpl::getMaxMessageSize() const
     // that imposes a limit in the received messages size even if the transport allows (uint32_t) messages size.
     // So the sender limits also its size.
     uint32_t max_receiver_buffer_size =
-            is_secure() ? std::numeric_limits<uint16_t>::max() : std::numeric_limits<uint32_t>::max();
+            is_secure() ? std::numeric_limits<uint16_t>::max() : (std::numeric_limits<uint32_t>::max)();
 #else
-    uint32_t max_receiver_buffer_size = std::numeric_limits<uint32_t>::max();
+    uint32_t max_receiver_buffer_size = (std::numeric_limits<uint32_t>::max)();
 #endif // if HAVE_SECURITY
 
     return (std::min)(
@@ -2194,6 +2219,12 @@ bool RTPSParticipantImpl::is_security_enabled_for_reader(
     }
 
     return false;
+}
+
+security::Logging* RTPSParticipantImpl::create_builtin_logging_plugin()
+{
+    uint32_t participant_id = static_cast<uint32_t>(m_att.participantID);
+    return new security::LogTopic(participant_id, m_att.security_log_thread);
 }
 
 #endif // if HAVE_SECURITY
@@ -2694,6 +2725,231 @@ void RTPSParticipantImpl::set_enabled_statistics_writers_mask(
     {
         writer->set_enabled_statistics_writers_mask(enabled_writers);
     }
+}
+
+const fastdds::statistics::rtps::IStatusObserver* RTPSParticipantImpl::create_monitor_service(
+        fastdds::statistics::rtps::IStatusQueryable& status_queryable)
+{
+    monitor_server_.reset(new fastdds::statistics::rtps::MonitorService(
+                m_guid,
+                pdp(),
+                this,
+                status_queryable,
+                [&](RTPSWriter** WriterOut,
+                WriterAttributes& param,
+                const std::shared_ptr<IPayloadPool>& payload_pool,
+                WriterHistory* hist,
+                WriterListener* listen,
+                const EntityId_t& entityId,
+                bool isBuiltin)-> bool
+                {
+                    return this->createWriter(WriterOut, param, payload_pool, hist, listen, entityId, isBuiltin);
+                },
+                [&](RTPSWriter* w,
+                const fastrtps::TopicAttributes& topicAtt,
+                const fastrtps::WriterQos& wqos) -> bool
+                {
+                    return this->registerWriter(w, topicAtt, wqos);
+                },
+                getEventResource()
+                ));
+
+    if (nullptr != monitor_server_)
+    {
+        auto monitor_listener = monitor_server_->get_listener();
+        conns_observer_.store(monitor_listener);
+        pdp()->set_proxy_observer(monitor_listener);
+
+        return monitor_listener;
+    }
+    else
+    {
+        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Could not create monitor service");
+        return nullptr;
+    }
+}
+
+bool RTPSParticipantImpl::create_monitor_service()
+{
+    bool ret = false;
+
+    simple_queryable_.reset(new fastdds::statistics::rtps::SimpleQueryable);
+    create_monitor_service(*simple_queryable_);
+
+    if (nullptr != monitor_server_)
+    {
+        ret = true;
+    }
+
+    return ret;
+}
+
+bool RTPSParticipantImpl::is_monitor_service_created() const
+{
+    return (nullptr != monitor_server_);
+}
+
+bool RTPSParticipantImpl::enable_monitor_service() const
+{
+    bool ret = false;
+    if (nullptr != monitor_server_)
+    {
+        ret = monitor_server_->enable_monitor_service();
+    }
+    return ret;
+}
+
+bool RTPSParticipantImpl::disable_monitor_service() const
+{
+    bool ret = false;
+    if (nullptr != monitor_server_ && monitor_server_->is_enabled())
+    {
+        ret = monitor_server_->disable_monitor_service();
+    }
+    return ret;
+}
+
+bool RTPSParticipantImpl::fill_discovery_data_from_cdr_message(
+        fastrtps::rtps::ParticipantProxyData& data,
+        fastdds::statistics::MonitorServiceStatusData& msg)
+{
+    bool ret = true;
+    CDRMessage_t serialized_msg{0};
+    serialized_msg.wraps = true;
+
+    serialized_msg.buffer = msg.value().entity_proxy().data();
+    serialized_msg.length = static_cast<uint32_t>(msg.value().entity_proxy().size());
+
+    ret = data.readFromCDRMessage(
+        &serialized_msg,
+        true,
+        network_factory(),
+        has_shm_transport(),
+        false);
+
+    return ret && (data.m_guid.entityId == c_EntityId_RTPSParticipant);
+}
+
+bool RTPSParticipantImpl::fill_discovery_data_from_cdr_message(
+        fastrtps::rtps::WriterProxyData& data,
+        fastdds::statistics::MonitorServiceStatusData& msg)
+{
+    bool ret = true;
+    CDRMessage_t serialized_msg{0};
+    serialized_msg.wraps = true;
+
+    serialized_msg.buffer = msg.value().entity_proxy().data();
+    serialized_msg.length = static_cast<uint32_t>(msg.value().entity_proxy().size());
+
+    ret = data.readFromCDRMessage(
+        &serialized_msg,
+        network_factory(),
+        has_shm_transport(),
+        false);
+
+    return ret && (data.guid().entityId.is_writer());
+}
+
+bool RTPSParticipantImpl::fill_discovery_data_from_cdr_message(
+        fastrtps::rtps::ReaderProxyData& data,
+        fastdds::statistics::MonitorServiceStatusData& msg)
+{
+    bool ret = true;
+    CDRMessage_t serialized_msg{0};
+    serialized_msg.wraps = true;
+
+    serialized_msg.buffer = msg.value().entity_proxy().data();
+    serialized_msg.length = static_cast<uint32_t>(msg.value().entity_proxy().size());
+
+    ret = data.readFromCDRMessage(
+        &serialized_msg,
+        network_factory(),
+        has_shm_transport(),
+        false);
+
+    return ret && (data.guid().entityId.is_reader());
+}
+
+bool
+RTPSParticipantImpl::get_entity_connections(
+        const GUID_t& guid,
+        fastdds::statistics::rtps::ConnectionList& conn_list)
+{
+    bool ret = true;
+    if (guid.entityId == c_EntityId_RTPSParticipant)
+    {
+
+        //! Avoid getting the local participant
+        conn_list.reserve(pdp()->participant_proxies_number());
+        std::lock_guard<std::recursive_mutex> lock(*pdp()->getMutex());
+
+        auto pit = pdp()->ParticipantProxiesBegin();
+        ++pit;
+        for (; pit != pdp()->ParticipantProxiesEnd(); ++pit)
+        {
+            fastdds::statistics::Connection connection;
+            connection.guid(fastdds::statistics::to_statistics_type((*pit)->m_guid));
+            connection.mode(fastdds::statistics::TRANSPORT);
+
+            std::vector<fastdds::statistics::detail::Locator_s> statistic_locators;
+            statistic_locators.reserve((*pit)->metatraffic_locators.multicast.size() +
+                    (*pit)->metatraffic_locators.unicast.size());
+
+            std::for_each((*pit)->metatraffic_locators.multicast.begin(), (*pit)->metatraffic_locators.multicast.end(),
+                    [&statistic_locators](const Locator_t& locator)
+                    {
+                        statistic_locators.push_back(fastdds::statistics::to_statistics_type(locator));
+                    });
+
+            std::for_each((*pit)->metatraffic_locators.unicast.begin(), (*pit)->metatraffic_locators.unicast.end(),
+                    [&statistic_locators](const Locator_t& locator)
+                    {
+                        statistic_locators.push_back(fastdds::statistics::to_statistics_type(locator));
+                    });
+
+            std::for_each((*pit)->default_locators.multicast.begin(), (*pit)->default_locators.multicast.end(),
+                    [&statistic_locators](const Locator_t& locator)
+                    {
+                        statistic_locators.push_back(fastdds::statistics::to_statistics_type(locator));
+                    });
+
+            std::for_each((*pit)->default_locators.unicast.begin(), (*pit)->default_locators.unicast.end(),
+                    [&statistic_locators](const Locator_t& locator)
+                    {
+                        statistic_locators.push_back(fastdds::statistics::to_statistics_type(locator));
+                    });
+
+            connection.announced_locators(statistic_locators);
+            connection.used_locators(statistic_locators);
+            conn_list.push_back(connection);
+        }
+    }
+    else if (guid.entityId.is_reader())
+    {
+        for (auto& reader : m_userReaderList)
+        {
+            if (reader->m_guid == guid)
+            {
+                reader->get_connections(conn_list);
+            }
+        }
+    }
+    else if (guid.entityId.is_writer())
+    {
+        for (auto& writer : m_userWriterList)
+        {
+            if (writer->m_guid == guid)
+            {
+                writer->get_connections(conn_list);
+            }
+        }
+    }
+    else
+    {
+        ret = false;
+        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Unknown entitiy kind to get connections: " << guid);
+    }
+    return ret;
 }
 
 #endif // FASTDDS_STATISTICS

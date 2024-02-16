@@ -1,6 +1,21 @@
 Forthcoming
 -----------
 
+* Added `non_blocking_send` to TCP Transport.
+
+Version 2.13.0
+--------------
+
+* Added monitor service feature.
+* Enable configuration of thread setting for all threads.
+* Added the possibility to define a listening port equal to 0 in TCP Transport
+* Added support for TCP to Fast DDS CLI and environment variable
+* Enable Discovery Server example through TCP.
+* Define a discovery server' super client by environment variable.
+* Added the possibility to define interfaces in the whitelist by interface name.
+* Added configuration of builtin transports through DomainParticipantQos, environment variable and XML.
+* Enable support for DataRepresentationQos to select the CDR encoding.
+
 Version 2.12.0
 --------------
 

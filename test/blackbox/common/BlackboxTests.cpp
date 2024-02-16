@@ -30,6 +30,7 @@ using namespace eprosima::fastrtps::rtps;
 
 //#define cout "Use Log instead!"
 
+const char* certs_path = nullptr;
 uint16_t global_port = 0;
 bool enable_datasharing;
 bool use_pull_mode;
@@ -91,12 +92,15 @@ int main(
     testing::InitGoogleTest(&argc, argv);
     testing::AddGlobalTestEnvironment(new BlackboxEnvironment);
 
+    if (!::testing::GTEST_FLAG(list_tests))
+    {
 #if HAVE_SECURITY
-    blackbox_security_init();
+        blackbox_security_init();
 #endif // if HAVE_SECURITY
 #if TLS_FOUND
-    tls_init();
+        tls_init();
 #endif // if TLS_FOUND
+    }
 
     return RUN_ALL_TESTS();
 }

@@ -78,6 +78,7 @@ set(${PROJECT_NAME}_source_files
     rtps/network/ExternalLocatorsProcessor.cpp
     rtps/network/NetworkFactory.cpp
     rtps/network/ReceiverResource.cpp
+    rtps/attributes/RTPSParticipantAttributes.cpp
     rtps/participant/RTPSParticipant.cpp
     rtps/participant/RTPSParticipantImpl.cpp
     rtps/RTPSDomain.cpp
@@ -99,6 +100,7 @@ set(${PROJECT_NAME}_source_files
     fastdds/topic/TopicImpl.cpp
     fastdds/topic/TopicProxyFactory.cpp
     fastdds/topic/TypeSupport.cpp
+    fastdds/topic/TopicDataType.cpp
     fastdds/topic/qos/TopicQos.cpp
     fastdds/publisher/qos/DataWriterQos.cpp
     fastdds/subscriber/qos/DataReaderQos.cpp
@@ -122,23 +124,24 @@ set(${PROJECT_NAME}_source_files
     fastdds/builtin/typelookup/TypeLookupManager.cpp
     fastdds/builtin/typelookup/TypeLookupRequestListener.cpp
     fastdds/builtin/typelookup/TypeLookupReplyListener.cpp
+    rtps/transport/ChainingTransport.cpp
     rtps/transport/ChannelResource.cpp
-    rtps/transport/UDPChannelResource.cpp
-    rtps/transport/TCPChannelResource.cpp
-    rtps/transport/TCPChannelResourceBasic.cpp
+    rtps/transport/PortBasedTransportDescriptor.cpp
+    rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
+    rtps/transport/tcp/RTCPMessageManager.cpp
+    rtps/transport/tcp/TCPControlMessage.cpp
     rtps/transport/TCPAcceptor.cpp
     rtps/transport/TCPAcceptorBasic.cpp
-    rtps/transport/UDPv4Transport.cpp
+    rtps/transport/TCPChannelResource.cpp
+    rtps/transport/TCPChannelResourceBasic.cpp
     rtps/transport/TCPTransportInterface.cpp
-    rtps/transport/UDPTransportInterface.cpp
-    rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
     rtps/transport/TCPv4Transport.cpp
-    rtps/transport/UDPv6Transport.cpp
     rtps/transport/TCPv6Transport.cpp
     rtps/transport/test_UDPv4Transport.cpp
-    rtps/transport/tcp/TCPControlMessage.cpp
-    rtps/transport/tcp/RTCPMessageManager.cpp
-    rtps/transport/ChainingTransport.cpp
+    rtps/transport/UDPChannelResource.cpp
+    rtps/transport/UDPTransportInterface.cpp
+    rtps/transport/UDPv4Transport.cpp
+    rtps/transport/UDPv6Transport.cpp
 
     dynamic-types/AnnotationDescriptor.cpp
     dynamic-types/AnnotationParameterValue.cpp
@@ -198,6 +201,7 @@ set(${PROJECT_NAME}_source_files
     rtps/flowcontrol/FlowControllerFactory.cpp
     rtps/exceptions/Exception.cpp
     rtps/attributes/PropertyPolicy.cpp
+    rtps/attributes/ThreadSettings.cpp
     rtps/common/Token.cpp
     rtps/xmlparser/XMLParserCommon.cpp
     rtps/xmlparser/XMLElementParser.cpp
@@ -256,12 +260,17 @@ if (FASTDDS_STATISTICS)
     set(statistics_sources
         statistics/fastdds/domain/DomainParticipantImpl.cpp
         statistics/fastdds/domain/DomainParticipantStatisticsListener.cpp
-        statistics/rtps/StatisticsBase.cpp
+        statistics/rtps/monitor-service/MonitorService.cpp
+        statistics/rtps/monitor-service/MonitorServiceListener.cpp
         statistics/rtps/reader/StatisticsReaderImpl.cpp
+        statistics/rtps/StatisticsBase.cpp
         statistics/rtps/writer/StatisticsWriterImpl.cpp
         statistics/types/typesPubSubTypes.cxx
         statistics/types/types.cxx
         statistics/types/typesv1.cxx
+        statistics/types/monitorservice_types.cxx
+        statistics/types/monitorservice_typesv1.cxx
+        statistics/types/monitorservice_typesPubSubTypes.cxx
         )
 
     list(APPEND ${PROJECT_NAME}_source_files

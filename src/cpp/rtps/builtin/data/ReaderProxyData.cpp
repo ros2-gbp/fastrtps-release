@@ -594,12 +594,14 @@ bool ReaderProxyData::writeToCDRMessage(
     }
 #endif // if HAVE_SECURITY
 
-    /* TODO - Enable when implement XCDR, XCDR2 and/or XML
-       if (m_qos.representation.send_always() || m_qos.representation.hasChanged)
-       {
-        if (!m_qos.representation.addToCDRMessage(msg)) return false;
-       }
-     */
+    if (m_qos.representation.send_always() || m_qos.representation.hasChanged)
+    {
+        if (!fastdds::dds::QosPoliciesSerializer<DataRepresentationQosPolicy>::add_to_cdr_message(m_qos.representation,
+                msg))
+        {
+            return false;
+        }
+    }
 
     if (m_qos.type_consistency.send_always() || m_qos.type_consistency.hasChanged)
     {
@@ -633,9 +635,10 @@ bool ReaderProxyData::writeToCDRMessage(
 bool ReaderProxyData::readFromCDRMessage(
         CDRMessage_t* msg,
         const NetworkFactory& network,
-        bool is_shm_transport_available)
+        bool is_shm_transport_available,
+        bool should_filter_locators)
 {
-    auto param_process = [this, &network, &is_shm_transport_available](
+    auto param_process = [this, &network, &is_shm_transport_available, &should_filter_locators](
         CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
                 switch (pid)
@@ -857,14 +860,21 @@ bool ReaderProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration))
+                        if (!should_filter_locators)
                         {
-                            ProxyDataFilters::filter_locators(
-                                is_shm_transport_available,
-                                remote_locators_,
-                                temp_locator,
-                                true);
+                            remote_locators_.add_unicast_locator(p.locator);
+                        }
+                        else
+                        {
+                            Locator_t temp_locator;
+                            if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration))
+                            {
+                                ProxyDataFilters::filter_locators(
+                                    is_shm_transport_available,
+                                    remote_locators_,
+                                    temp_locator,
+                                    true);
+                            }
                         }
                         break;
                     }
@@ -877,14 +887,21 @@ bool ReaderProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration))
+                        if (!should_filter_locators)
                         {
-                            ProxyDataFilters::filter_locators(
-                                is_shm_transport_available,
-                                remote_locators_,
-                                temp_locator,
-                                false);
+                            remote_locators_.add_multicast_locator(p.locator);
+                        }
+                        else
+                        {
+                            Locator_t temp_locator;
+                            if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration))
+                            {
+                                ProxyDataFilters::filter_locators(
+                                    is_shm_transport_available,
+                                    remote_locators_,
+                                    temp_locator,
+                                    false);
+                            }
                         }
                         break;
                     }
