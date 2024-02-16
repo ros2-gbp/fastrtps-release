@@ -15,12 +15,22 @@
 #ifndef _FASTDDS_TCP_TRANSPORT_INTERFACE_H_
 #define _FASTDDS_TCP_TRANSPORT_INTERFACE_H_
 
-#include <fastdds/rtps/transport/TransportInterface.h>
+#include <vector>
+#include <map>
+#include <memory>
+#include <mutex>
+
+#include <asio.hpp>
+#include <asio/steady_timer.hpp>
+
 #include <fastdds/rtps/transport/TCPTransportDescriptor.h>
+#include <fastdds/rtps/transport/TransportInterface.h>
 #include <fastrtps/utils/IPFinder.h>
+
 #include <rtps/transport/tcp/RTCPHeader.h>
-#include <rtps/transport/TCPChannelResourceBasic.h>
 #include <rtps/transport/TCPAcceptorBasic.h>
+#include <rtps/transport/TCPChannelResourceBasic.h>
+
 #if TLS_FOUND
 #define OPENSSL_API_COMPAT 10101
 #include <rtps/transport/TCPAcceptorSecure.h>
@@ -28,14 +38,7 @@
 #endif // if TLS_FOUND
 
 #include <statistics/rtps/messages/OutputTrafficManager.hpp>
-
-#include <asio.hpp>
-#include <asio/steady_timer.hpp>
-#include <thread>
-#include <vector>
-#include <map>
-#include <memory>
-#include <mutex>
+#include <utils/thread.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -64,7 +67,7 @@ class TCPTransportInterface : public TransportInterface
     {
     public:
 
-        bool in_use = false;
+        uint16_t in_use = 0;
 
         std::condition_variable cv;
     };
@@ -76,15 +79,33 @@ protected:
     std::vector<fastrtps::rtps::IPFinder::info_IP> current_interfaces_;
     asio::io_service io_service_;
     asio::io_service io_service_timers_;
+    std::unique_ptr<asio::ip::tcp::socket> initial_peer_local_locator_socket_;
+    uint16_t initial_peer_local_locator_port_;
+    /**
+     * Whether to use non-blocking calls to send().
+     *
+     * When set to true, calls to send() will return immediately if the send buffer is full.
+     * This may happen when receive buffer on reader's side is full. No error will be returned
+     * to the upper layer. This means that the application will behave
+     * as if the datagram is sent but lost (i.e. throughput may be reduced). This value is
+     * specially useful on high-frequency writers.
+     *
+     * When set to false, calls to send() will block until the send buffer has space for the
+     * datagram. This may cause application lock.
+     */
+    bool non_blocking_send_;
+
 #if TLS_FOUND
     asio::ssl::context ssl_context_;
 #endif // if TLS_FOUND
-    std::shared_ptr<std::thread> io_service_thread_;
-    std::shared_ptr<std::thread> io_service_timers_thread_;
+    eprosima::thread io_service_thread_;
+    eprosima::thread io_service_timers_thread_;
     std::shared_ptr<RTCPMessageManager> rtcp_message_manager_;
     std::mutex rtcp_message_manager_mutex_;
     std::condition_variable rtcp_message_manager_cv_;
+    // Mutex to control access to channel_resources_
     mutable std::mutex sockets_map_mutex_;
+    // Mutex to control access to unbound_channel_resources_
     mutable std::mutex unbound_map_mutex_;
 
     std::map<Locator, std::shared_ptr<TCPChannelResource>> channel_resources_; // The key is the "Physical locator"
@@ -136,7 +157,7 @@ protected:
             std::shared_ptr<TCPChannelResource>& channel);
 
     //! Creates a TCP acceptor to wait for incoming connections by the given locator.
-    bool create_acceptor_socket(
+    uint16_t create_acceptor_socket(
             const Locator& locator);
 
     virtual void get_ips(
@@ -170,6 +191,12 @@ protected:
             Locator& locator) const = 0;
 
     /**
+     * Converts a remote endpoint to a locator if possible. Otherwise, it sets an invalid locator.
+     */
+    Locator remote_endpoint_to_locator(
+            const std::shared_ptr<TCPChannelResource>& channel) const;
+
+    /**
      * Shutdown method to close the connections of the transports.
      */
     void shutdown() override;
@@ -187,13 +214,17 @@ protected:
     std::string get_password() const;
 
     /**
-     * Send a buffer to a destination
+     * Send a buffer to a destination indicated by the locator.
+     * There must exist a channel bound to the locator, otherwise the send will be skipped.
      */
     bool send(
             const fastrtps::rtps::octet* send_buffer,
             uint32_t send_buffer_size,
-            std::shared_ptr<TCPChannelResource>& channel,
+            const eprosima::fastrtps::rtps::Locator_t& locator,
             const Locator& remote_locator);
+
+    void create_listening_thread(
+            const std::shared_ptr<TCPChannelResource>& channel);
 
 public:
 
@@ -209,9 +240,9 @@ public:
     bool CloseInputChannel(
             const Locator&) override;
 
-    //! Removes all outbound sockets on the given port.
+    //! Resets the locator bound to the sender resource.
     void CloseOutputChannel(
-            std::shared_ptr<TCPChannelResource>& channel);
+            fastrtps::rtps::Locator_t& locator);
 
     //! Reports whether Locators correspond to the same port.
     bool DoInputLocatorsMatch(
@@ -328,11 +359,11 @@ public:
             Locator& remote_locator);
 
     /**
-     * Blocking Send through the specified channel.
+     * Blocking Send through the channel inside channel_resources_ matching the locator provided.
      * @param send_buffer Slice into the raw data to send.
      * @param send_buffer_size Size of the raw data. It will be used as a bounds check for the previous argument.
      * It must not exceed the send_buffer_size fed to this class during construction.
-     * @param channel channel we're sending from.
+     * @param locator Physical locator we're sending to.
      * @param destination_locators_begin pointer to destination locators iterator begin, the iterator can be advanced inside this fuction
      * so should not be reuse.
      * @param destination_locators_end pointer to destination locators iterator end, the iterator can be advanced inside this fuction
@@ -341,7 +372,7 @@ public:
     bool send(
             const fastrtps::rtps::octet* send_buffer,
             uint32_t send_buffer_size,
-            std::shared_ptr<TCPChannelResource>& channel,
+            const fastrtps::rtps::Locator_t& locator,
             fastrtps::rtps::LocatorsIterator* destination_locators_begin,
             fastrtps::rtps::LocatorsIterator* destination_locators_end);
 
@@ -434,6 +465,19 @@ public:
     void update_network_interfaces() override;
 
     bool is_localhost_allowed() const override;
+
+    /**
+     * Method to fill local locator physical port.
+     * @param locator locator to be filled.
+     */
+    void fill_local_physical_port(
+            Locator& locator) const;
+
+    bool get_non_blocking_send() const
+    {
+        return non_blocking_send_;
+    }
+
 };
 
 } // namespace rtps

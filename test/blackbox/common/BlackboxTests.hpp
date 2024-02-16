@@ -52,6 +52,7 @@ extern void blackbox_security_init();
 extern void tls_init();
 #endif // if TLS_FOUND
 
+extern const char* certs_path;
 extern uint16_t global_port;
 extern bool enable_datasharing;
 extern bool use_pull_mode;
@@ -143,6 +144,10 @@ std::list<FixedSized> default_fixed_sized_data_generator(
 std::list<KeyedHelloWorld> default_keyedhelloworld_data_generator(
         size_t max = 0,
         bool unique_key = false);
+
+std::list<KeyedHelloWorld> default_keyedhelloworld_per_participant_data_generator(
+        size_t participants,
+        size_t max = 0);
 
 std::list<StringTest> default_large_string_data_generator(
         size_t max = 0);

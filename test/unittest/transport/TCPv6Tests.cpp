@@ -25,6 +25,7 @@
 #include <fastrtps/utils/Semaphore.h>
 
 #include <MockReceiverResource.h>
+#include "mock/MockTCPv6Transport.h"
 #include <rtps/network/NetworkFactory.h>
 #include <rtps/transport/TCPv6Transport.h>
 
@@ -175,6 +176,166 @@ TEST_F(TCPv6Tests, opening_and_closing_input_channel)
     ASSERT_FALSE (transportUnderTest.IsInputChannelOpen(multicastFilterLocator));
     ASSERT_FALSE (transportUnderTest.CloseInputChannel(multicastFilterLocator));
 }
+
+// This test verifies that the autofill port feature correctly sets an automatic port when
+// the descriptors's port is set to 0.
+TEST_F(TCPv6Tests, autofill_port)
+{
+    // Check normal port assignation
+    TCPv6TransportDescriptor test_descriptor;
+    test_descriptor.add_listener_port(g_default_port);
+    TCPv6Transport transportUnderTest(test_descriptor);
+    transportUnderTest.init();
+
+    EXPECT_TRUE(transportUnderTest.configuration()->listening_ports[0] == g_default_port);
+
+    // Check default port assignation
+    TCPv6TransportDescriptor test_descriptor_autofill;
+    test_descriptor_autofill.add_listener_port(0);
+    TCPv6Transport transportUnderTest_autofill(test_descriptor_autofill);
+    transportUnderTest_autofill.init();
+
+    EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports[0] != 0);
+    EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports.size() == 1);
+
+    uint16_t port = 12345;
+    TCPv6TransportDescriptor test_descriptor_multiple_autofill;
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    test_descriptor_multiple_autofill.add_listener_port(port);
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    TCPv6Transport transportUnderTest_multiple_autofill(test_descriptor_multiple_autofill);
+    transportUnderTest_multiple_autofill.init();
+
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[0] != 0);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[1] == port);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[2] != 0);
+    EXPECT_TRUE(
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[0] !=
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[2]);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports.size() == 3);
+}
+
+// This test verifies server's channel resources mapping keys uniqueness, where keys are clients locators.
+// Clients typically communicated its PID as its locator port. When having several clients in the same
+// process this lead to overwriting server's channel resources map elements.
+TEST_F(TCPv6Tests, client_announced_local_port_uniqueness)
+{
+    TCPv6TransportDescriptor recvDescriptor;
+    recvDescriptor.add_listener_port(g_default_port);
+    MockTCPv6Transport receiveTransportUnderTest(recvDescriptor);
+    receiveTransportUnderTest.init();
+
+    TCPv6TransportDescriptor sendDescriptor_1;
+    TCPv6Transport sendTransportUnderTest_1(sendDescriptor_1);
+    sendTransportUnderTest_1.init();
+
+    TCPv6TransportDescriptor sendDescriptor_2;
+    TCPv6Transport sendTransportUnderTest_2(sendDescriptor_2);
+    sendTransportUnderTest_2.init();
+
+    Locator_t outputLocator;
+    outputLocator.kind = LOCATOR_KIND_TCPv6;
+    IPLocator::setIPv6(outputLocator, "::1");
+    outputLocator.port = g_default_port;
+    IPLocator::setLogicalPort(outputLocator, 7610);
+
+    SendResourceList send_resource_list_1;
+    ASSERT_TRUE(sendTransportUnderTest_1.OpenOutputChannel(send_resource_list_1, outputLocator));
+    ASSERT_FALSE(send_resource_list_1.empty());
+
+    SendResourceList send_resource_list_2;
+    ASSERT_TRUE(sendTransportUnderTest_2.OpenOutputChannel(send_resource_list_2, outputLocator));
+    ASSERT_FALSE(send_resource_list_2.empty());
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    ASSERT_EQ(receiveTransportUnderTest.get_channel_resources().size(), 2);
+}
+
+#ifndef _WIN32
+// The primary purpose of this test is to check the non-blocking behavior of a secure socket sending data to a
+// destination that does not read or does it so slowly.
+TEST_F(TCPv6Tests, non_blocking_send)
+{
+    uint16_t port = g_default_port;
+    uint32_t msg_size = eprosima::fastdds::rtps::s_minimumSocketBuffer;
+    // Create a TCP Server transport
+    TCPv6TransportDescriptor senderDescriptor;
+    senderDescriptor.add_listener_port(port);
+    senderDescriptor.sendBufferSize = msg_size;
+    MockTCPv6Transport senderTransportUnderTest(senderDescriptor);
+    eprosima::fastrtps::rtps::RTPSParticipantAttributes att;
+    att.properties.properties().emplace_back("fastdds.tcp_transport.non_blocking_send", "true");
+    senderTransportUnderTest.init(&att.properties);
+
+    // Create a TCP Client socket.
+    // The creation of a reception transport for testing this functionality is not
+    // feasible. For the saturation of the sending socket, it's necessary first to
+    // saturate the reception socket of the datareader. This saturation requires
+    // preventing the datareader from reading from the socket, what inevitably
+    // happens continuously if instantiating and connecting the receiver transport.
+    // Hence, a raw socket is opened and connected to the server. There won't be read
+    // calls on that socket.
+    Locator_t serverLoc;
+    serverLoc.kind = LOCATOR_KIND_TCPv6;
+    IPLocator::setIPv6(serverLoc, "::1");
+    serverLoc.port = g_default_port;
+    IPLocator::setLogicalPort(serverLoc, 7610);
+
+    // TCPChannelResourceBasic::connect() like connection
+    asio::io_service io_service;
+    asio::ip::tcp::resolver resolver(io_service);
+    auto endpoints = resolver.resolve(
+        IPLocator::ip_to_string(serverLoc),
+        std::to_string(IPLocator::getPhysicalPort(serverLoc)));
+
+    asio::ip::tcp::socket socket = asio::ip::tcp::socket (io_service);
+    asio::async_connect(
+        socket,
+        endpoints,
+        [](std::error_code ec
+#if ASIO_VERSION >= 101200
+        , asio::ip::tcp::endpoint
+#else
+        , asio::ip::tcp::resolver::iterator
+#endif // if ASIO_VERSION >= 101200
+        )
+        {
+            ASSERT_TRUE(!ec);
+        }
+        );
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    /*
+       Get server's accepted channel. This is retrieved from the unbound_channel_resources_,
+       which is a vector where client channels are pushed immediately after the server accepts
+       a connection. This channel will not be present in the server's channel_resources_ map
+       as communication lacks most of the discovery messages using a raw socket as participant.
+     */
+    auto sender_unbound_channel_resources = senderTransportUnderTest.get_unbound_channel_resources();
+    ASSERT_TRUE(sender_unbound_channel_resources.size() == 1);
+    auto sender_channel_resource =
+            std::static_pointer_cast<TCPChannelResourceBasic>(sender_unbound_channel_resources[0]);
+
+    // Prepare the message
+    asio::error_code ec;
+    std::vector<octet> message(msg_size, 0);
+    const octet* data = message.data();
+    size_t size = message.size();
+
+    // Send the message with no header
+    for (int i = 0; i < 5; i++)
+    {
+        sender_channel_resource->send(nullptr, 0, data, size, ec);
+    }
+
+    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+    socket.cancel();
+    socket.close();
+}
+#endif // ifndef _WIN32
+
 /*
    TEST_F(TCPv6Tests, send_and_receive_between_both_secure_ports)
    {

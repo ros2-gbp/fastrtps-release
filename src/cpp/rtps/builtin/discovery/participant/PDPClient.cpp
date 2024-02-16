@@ -278,26 +278,20 @@ bool PDPClient::create_ds_pdp_best_effort_reader(
     ratt.endpoint.durabilityKind = VOLATILE;
     ratt.endpoint.reliabilityKind = BEST_EFFORT;
 
-    endpoints.stateless_listener.reset(new PDPSecurityInitiatorListener(this));
+    endpoints.stateless_reader.listener_.reset(new PDPSecurityInitiatorListener(this));
 
     // Create PDP Reader
     RTPSReader* reader = nullptr;
     if (mp_RTPSParticipant->createReader(&reader, ratt, endpoints.stateless_reader.history_.get(),
-            endpoints.stateless_listener.get(), c_EntityId_SPDPReader, true, false))
+            endpoints.stateless_reader.listener_.get(), c_EntityId_SPDPReader, true, false))
     {
         endpoints.stateless_reader.reader_ = dynamic_cast<fastrtps::rtps::StatelessReader*>(reader);
-
-        // Enable unknown clients to reach this reader
-        reader->enableMessagesFromUnkownWriters(true);
-
         mp_RTPSParticipant->set_endpoint_rtps_protection_supports(reader, false);
     }
     // Could not create PDP Reader, so return false
     else
     {
         EPROSIMA_LOG_ERROR(RTPS_PDP_SERVER, "PDPServer security initiation Reader creation failed");
-
-        endpoints.stateless_listener.reset();
         endpoints.stateless_reader.release();
         return false;
     }
@@ -360,7 +354,7 @@ bool PDPClient::create_ds_pdp_reliable_endpoints(
     }
 #endif // HAVE_SECURITY
 
-    mp_listener = new PDPListener(this);
+    endpoints.reader.listener_.reset(new PDPListener(this));
 
     RTPSReader* reader = nullptr;
 #if HAVE_SECURITY
@@ -369,7 +363,8 @@ bool PDPClient::create_ds_pdp_reliable_endpoints(
 #else
     EntityId_t reader_entity = c_EntityId_SPDPReader;
 #endif // if HAVE_SECURITY
-    if (mp_RTPSParticipant->createReader(&reader, ratt, endpoints.reader.history_.get(), mp_listener,
+    if (mp_RTPSParticipant->createReader(&reader, ratt, endpoints.reader.history_.get(),
+            endpoints.reader.listener_.get(),
             reader_entity, true, false))
     {
         endpoints.reader.reader_ = dynamic_cast<fastrtps::rtps::StatefulReader*>(reader);
@@ -381,8 +376,6 @@ bool PDPClient::create_ds_pdp_reliable_endpoints(
     else
     {
         EPROSIMA_LOG_ERROR(RTPS_PDP, "PDPClient Reader creation failed");
-        delete mp_listener;
-        mp_listener = nullptr;
         endpoints.reader.release();
         return false;
     }
@@ -483,25 +476,30 @@ bool PDPClient::create_ds_pdp_reliable_endpoints(
 void PDPClient::assignRemoteEndpoints(
         ParticipantProxyData* pdata)
 {
+    bool ignored = false;
+    notify_and_maybe_ignore_new_participant(pdata, ignored);
+    if (!ignored)
     {
-        eprosima::shared_lock<eprosima::shared_mutex> disc_lock(mp_builtin->getDiscoveryMutex());
-
-        // Verify if this participant is a server
-        for (auto& svr : mp_builtin->m_DiscoveryServers)
         {
-            if (data_matches_with_prefix(svr.guidPrefix, *pdata))
+            eprosima::shared_lock<eprosima::shared_mutex> disc_lock(mp_builtin->getDiscoveryMutex());
+
+            // Verify if this participant is a server
+            for (auto& svr : mp_builtin->m_DiscoveryServers)
             {
-                std::unique_lock<std::recursive_mutex> lock(*getMutex());
-                svr.proxy = pdata;
+                if (data_matches_with_prefix(svr.guidPrefix, *pdata))
+                {
+                    std::unique_lock<std::recursive_mutex> lock(*getMutex());
+                    svr.proxy = pdata;
+                }
             }
         }
-    }
 
 #if HAVE_SECURITY
-    if (mp_RTPSParticipant->security_manager().discovered_participant(*pdata))
+        if (mp_RTPSParticipant->security_manager().discovered_participant(*pdata))
 #endif // HAVE_SECURITY
-    {
-        perform_builtin_endpoints_matching(*pdata);
+        {
+            perform_builtin_endpoints_matching(*pdata);
+        }
     }
 }
 
@@ -929,6 +927,33 @@ void PDPClient::match_pdp_reader_nts_(
     }
 }
 
+bool ros_super_client_env()
+{
+    std::string super_client_str;
+    bool super_client = false;
+    std::vector<std::string> true_vec = {"TRUE", "true", "True", "1"};
+    std::vector<std::string> false_vec = {"FALSE", "false", "False", "0"};
+
+    SystemInfo::get_env(ROS_SUPER_CLIENT, super_client_str);
+    if (super_client_str != "")
+    {
+        if (find(true_vec.begin(), true_vec.end(), super_client_str) != true_vec.end())
+        {
+            super_client = true;
+        }
+        else if (find(false_vec.begin(), false_vec.end(), super_client_str) != false_vec.end())
+        {
+            super_client = false;
+        }
+        else
+        {
+            EPROSIMA_LOG_ERROR(RTPS_PDP,
+                    "Invalid value for ROS_SUPER_CLIENT environment variable : " << super_client_str);
+        }
+    }
+    return super_client;
+}
+
 const std::string& ros_discovery_server_env()
 {
     static std::string servers;
@@ -960,7 +985,11 @@ bool load_environment_server_info(
     const static std::regex ROS2_IPV4_ADDRESSPORT_PATTERN(R"(^((?:[0-9]{1,3}\.){3}[0-9]{1,3})?:?(?:(\d+))?$)");
     const static std::regex ROS2_IPV6_ADDRESSPORT_PATTERN(
         R"(^\[?((?:[0-9a-fA-F]{0,4}\:){0,7}[0-9a-fA-F]{0,4})?(?:\])?:?(?:(\d+))?$)");
-    const static std::regex ROS2_DNS_DOMAINPORT_PATTERN(R"(^(UDPv[46]?:\[[\w\.-]{0,63}\]|[\w\.-]{0,63}):?(?:(\d+))?$)");
+    // Regex to handle DNS and UDPv4/6 expressions
+    const static std::regex ROS2_DNS_DOMAINPORT_PATTERN(R"(^(UDPv[46]?:\[[\w\.:-]{0,63}\]|[\w\.-]{0,63}):?(?:(\d+))?$)");
+    // Regex to handle TCPv4/6 expressions
+    const static std::regex ROS2_DNS_DOMAINPORT_PATTERN_TCP(
+        R"(^(TCPv[46]?:\[[\w\.:-]{0,63}\]):?(?:(\d+))?$)");
 
     // Filling port info
     auto process_port = [](int port, Locator_t& server)
@@ -1189,6 +1218,100 @@ bool load_environment_server_info(
                                     }
 
                                     process_port( port, server_locator);
+                                    flist.push_front(server_locator);
+                                }
+                            }
+                        }
+                    }
+
+                    if (flist.empty())
+                    {
+                        std::stringstream ss;
+                        ss << "Wrong domain name passed into the server's list " << locator;
+                        throw std::invalid_argument(ss.str());
+                    }
+
+                    // add server to the list
+                    add_server2qos(server_id, std::move(flist), attributes);
+                }
+                // try resolve TCP DNS
+                else if (std::regex_match(locator, mr, ROS2_DNS_DOMAINPORT_PATTERN_TCP,
+                        std::regex_constants::match_not_null))
+                {
+                    std::forward_list<Locator> flist;
+
+                    {
+                        std::stringstream new_locator(locator,
+                                std::ios_base::in |
+                                std::ios_base::out |
+                                std::ios_base::ate);
+
+                        // first try the formal notation, add default port if necessary
+                        if (!mr[2].matched)
+                        {
+                            new_locator << ":" << DEFAULT_TCP_SERVER_PORT;
+                        }
+
+                        new_locator >> server_locator;
+                    }
+
+                    // Otherwise add all resolved locators
+                    switch ( server_locator.kind )
+                    {
+                        case LOCATOR_KIND_TCPv4:
+                        case LOCATOR_KIND_TCPv6:
+                            IPLocator::setLogicalPort(server_locator, static_cast<uint16_t>(server_locator.port));
+                            flist.push_front(server_locator);
+                            break;
+                        case LOCATOR_KIND_INVALID:
+                        {
+                            std::smatch::iterator it = mr.cbegin();
+
+                            // traverse submatches
+                            if (++it != mr.cend())
+                            {
+                                std::string domain_name = it->str();
+                                std::set<std::string> ipv4, ipv6;
+                                std::tie(ipv4, ipv6) = IPLocator::resolveNameDNS(domain_name);
+
+                                // get port if any
+                                int port = DEFAULT_TCP_SERVER_PORT;
+                                if (++it != mr.cend() && it->matched)
+                                {
+                                    port = stoi(it->str());
+                                }
+
+                                for ( const std::string& loc : ipv4 )
+                                {
+                                    server_locator.kind = LOCATOR_KIND_TCPv4;
+                                    server_locator.set_Invalid_Address();
+                                    IPLocator::setIPv4(server_locator, loc);
+
+                                    if (IPLocator::isAny(server_locator))
+                                    {
+                                        // A server cannot be reach in all interfaces, it's clearly a localhost call
+                                        IPLocator::setIPv4(server_locator, "127.0.0.1");
+                                    }
+
+                                    process_port( port, server_locator);
+                                    IPLocator::setLogicalPort(server_locator, static_cast<uint16_t>(port));
+                                    flist.push_front(server_locator);
+                                }
+
+                                for ( const std::string& loc : ipv6 )
+                                {
+                                    server_locator.kind = LOCATOR_KIND_TCPv6;
+                                    server_locator.set_Invalid_Address();
+                                    IPLocator::setIPv6(server_locator, loc);
+
+                                    if (IPLocator::isAny(server_locator))
+                                    {
+                                        // A server cannot be reach in all interfaces, it's clearly a localhost call
+                                        IPLocator::setIPv6(server_locator, "::1");
+                                    }
+
+                                    process_port( port, server_locator);
+                                    IPLocator::setLogicalPort(server_locator, static_cast<uint16_t>(port));
                                     flist.push_front(server_locator);
                                 }
                             }

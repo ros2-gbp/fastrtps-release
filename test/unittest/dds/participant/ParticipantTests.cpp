@@ -49,7 +49,11 @@
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
+#include <fastdds/rtps/transport/TCPv4TransportDescriptor.h>
+#include <fastdds/rtps/transport/TCPv6TransportDescriptor.h>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/types/DynamicDataFactory.h>
@@ -76,6 +80,7 @@
 #define GET_PID getpid
 #endif // if defined(_WIN32)
 
+
 namespace eprosima {
 namespace fastdds {
 namespace dds {
@@ -92,7 +97,6 @@ using fastrtps::types::TypeDescriptor;
 using fastrtps::xmlparser::XMLP_ret;
 using fastrtps::xmlparser::XMLProfileManager;
 
-
 // Mocked TopicDataType for Topic creation tests
 class TopicDataTypeMock : public TopicDataType
 {
@@ -106,8 +110,16 @@ public:
     }
 
     bool serialize(
+            void* data,
+            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override
+    {
+        return serialize(data, payload, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
+    }
+
+    bool serialize(
             void* /*data*/,
-            fastrtps::rtps::SerializedPayload_t* /*payload*/) override
+            fastrtps::rtps::SerializedPayload_t* /*payload*/,
+            DataRepresentationId_t /*data_representation*/) override
     {
         return true;
     }
@@ -120,7 +132,14 @@ public:
     }
 
     std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/) override
+            void* data) override
+    {
+        return getSerializedSizeProvider(data, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
+    }
+
+    std::function<uint32_t()> getSerializedSizeProvider(
+            void* /*data*/,
+            DataRepresentationId_t /*data_representation*/) override
     {
         return []()->uint32_t
                {
@@ -165,8 +184,16 @@ public:
     }
 
     bool serialize(
+            void* data,
+            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override
+    {
+        return serialize(data, payload, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
+    }
+
+    bool serialize(
             void* /*data*/,
-            fastrtps::rtps::SerializedPayload_t* /*payload*/) override
+            fastrtps::rtps::SerializedPayload_t* /*payload*/,
+            DataRepresentationId_t /*data_representation*/) override
     {
         return true;
     }
@@ -179,7 +206,14 @@ public:
     }
 
     std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/) override
+            void* data) override
+    {
+        return getSerializedSizeProvider(data, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
+    }
+
+    std::function<uint32_t()> getSerializedSizeProvider(
+            void* /*data*/,
+            DataRepresentationId_t /*data_representation*/) override
     {
         return []()->uint32_t
                {
@@ -874,6 +908,95 @@ TEST(ParticipantTests, SimpleParticipantRemoteServerListConfiguration)
 
     EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant));
 }
+
+
+/**
+ * Test that a SIMPLE participant is transformed into a CLIENT if the variable ROS_SUPER_CLIENT is false and into a SUPERCLIENT if it's true.
+ * It also checks that the environment variable has priority over the coded QoS settings.
+ */
+TEST(ParticipantTests, TransformSimpleParticipantToSuperclientByEnvVariable)
+{
+    set_environment_variable();
+
+#ifdef _WIN32
+    ASSERT_EQ(0, _putenv_s(rtps::ROS_SUPER_CLIENT, "false"));
+#else
+    ASSERT_EQ(0, setenv(rtps::ROS_SUPER_CLIENT, "false", 1));
+#endif // _WIN32
+
+    rtps::RemoteServerList_t output;
+    rtps::RemoteServerList_t qos_output;
+    expected_remote_server_list_output(output);
+
+    DomainParticipantQos qos;
+    set_participant_qos(qos, qos_output);
+
+    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(
+        (uint32_t)GET_PID() % 230, qos);
+    ASSERT_NE(nullptr, participant);
+
+    fastrtps::rtps::RTPSParticipantAttributes attributes;
+    get_rtps_attributes(participant, attributes);
+    EXPECT_EQ(attributes.builtin.discovery_config.discoveryProtocol, fastrtps::rtps::DiscoveryProtocol::CLIENT);
+    EXPECT_EQ(attributes.builtin.discovery_config.m_DiscoveryServers, output);
+
+#ifdef _WIN32
+    ASSERT_EQ(0, _putenv_s(rtps::ROS_SUPER_CLIENT, "true"));
+#else
+    ASSERT_EQ(0, setenv(rtps::ROS_SUPER_CLIENT, "true", 1));
+#endif // _WIN32
+
+    DomainParticipant* participant_2 = DomainParticipantFactory::get_instance()->create_participant(
+        (uint32_t)GET_PID() % 230, qos);
+    ASSERT_NE(nullptr, participant_2);
+
+    fastrtps::rtps::RTPSParticipantAttributes attributes_2;
+    get_rtps_attributes(participant_2, attributes_2);
+    EXPECT_EQ(attributes_2.builtin.discovery_config.discoveryProtocol, fastrtps::rtps::DiscoveryProtocol::SUPER_CLIENT);
+    EXPECT_EQ(attributes_2.builtin.discovery_config.m_DiscoveryServers, output);
+
+    // check UDPv6 transport is there
+    auto udpv6_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes) -> bool
+            {
+                for (auto& transportDescriptor : attributes.userTransports)
+                {
+                    if ( nullptr != dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            };
+    EXPECT_TRUE(udpv6_check(attributes));
+
+    DomainParticipantQos result_qos = participant->get_qos();
+    EXPECT_EQ(result_qos.wire_protocol().builtin.discovery_config.m_DiscoveryServers, qos_output);
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, participant->set_qos(result_qos));
+
+    // check UDPv6 transport is there
+    auto udpv6_check_2 = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_2) -> bool
+            {
+                for (auto& transportDescriptor : attributes_2.userTransports)
+                {
+                    if ( nullptr != dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            };
+    EXPECT_TRUE(udpv6_check_2(attributes_2));
+
+    result_qos = participant_2->get_qos();
+    EXPECT_EQ(result_qos.wire_protocol().builtin.discovery_config.m_DiscoveryServers, qos_output);
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, participant_2->set_qos(result_qos));
+
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant));
+    EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_2));
+}
+
 
 
 /**
@@ -2979,12 +3102,11 @@ TEST(ParticipantTests, SetDomainParticipantQos)
 }
 
 /*
- * This test checks that the PropertyPolicyQos and TransportConfigQos are immutable policy qos, i.e. these can not be
+ * This test checks that the inmutable policy qos can not be
  * changed in an enabled participant
  */
 TEST(ParticipantTests, UpdatableDomainParticipantQos)
 {
-
     DomainParticipant* participant =
             DomainParticipantFactory::get_instance()->create_participant(
         (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
@@ -3001,7 +3123,30 @@ TEST(ParticipantTests, UpdatableDomainParticipantQos)
     pqos.transport().listen_socket_buffer_size = 262144;
     ASSERT_EQ(participant->set_qos(pqos), ReturnCode_t::RETCODE_IMMUTABLE_POLICY);
 
+    // Check that the builtin_controllers_sender_thread can not be changed in an enabled participant
+    participant->get_qos(pqos);
+    pqos.builtin_controllers_sender_thread().affinity = 1;
+    ASSERT_EQ(participant->set_qos(pqos), ReturnCode_t::RETCODE_IMMUTABLE_POLICY);
+
+    // Check that the timed_events_thread can not be changed in an enabled participant
+    participant->get_qos(pqos);
+    pqos.timed_events_thread().affinity = 1;
+    ASSERT_EQ(participant->set_qos(pqos), ReturnCode_t::RETCODE_IMMUTABLE_POLICY);
+
+    // Check that the discovery_server_thread can not be changed in an enabled participant
+    participant->get_qos(pqos);
+    pqos.discovery_server_thread().affinity = 1;
+    ASSERT_EQ(participant->set_qos(pqos), ReturnCode_t::RETCODE_IMMUTABLE_POLICY);
+
+#if HAVE_SECURITY
+    // Check that the security_log_thread can not be changed in an enabled participant
+    participant->get_qos(pqos);
+    pqos.security_log_thread().affinity = 1;
+    ASSERT_EQ(participant->set_qos(pqos), ReturnCode_t::RETCODE_IMMUTABLE_POLICY);
+
     ASSERT_EQ(DomainParticipantFactory::get_instance()->delete_participant(participant), ReturnCode_t::RETCODE_OK);
+#endif // if HAVE_SECURITY
+
 }
 
 /*
@@ -3927,6 +4072,236 @@ TEST(ParticipantTests, TwoParticipantWithSameFixedId)
         ASSERT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->set_qos(factory_qos));
     }
 }
+
+
+TEST(ParticipantTests, ParticipantCreationWithBuiltinTransport)
+{
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::DEFAULT);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv4TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+        EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_));
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::DEFAULTv6);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+        EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_));
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::SHM);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::SharedMemTransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+        EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_));
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::UDPv4);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv4TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+        EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_));
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::UDPv6);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+        EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_));
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::LARGE_DATA);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    bool hasSHM = false;
+                    bool hasUDP = false;
+                    bool hasTCP = false;
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::SharedMemTransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasSHM = true;
+                        }
+                        else if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv4TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasUDP = true;
+                        }
+                        else if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::TCPv4TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasTCP = true;
+                        }
+                    }
+
+                    return (hasSHM && hasUDP && hasTCP);
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+        EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_));
+    }
+
+    {
+        DomainParticipantQos qos;
+        fastrtps::rtps::RTPSParticipantAttributes attributes_;
+        qos.setup_transports(rtps::BuiltinTransports::LARGE_DATAv6);
+
+        DomainParticipant* participant_ = DomainParticipantFactory::get_instance()->create_participant(
+            (uint32_t)GET_PID() % 230, qos);
+        ASSERT_NE(nullptr, participant_);
+
+        get_rtps_attributes(participant_, attributes_);
+
+        auto transport_check = [](fastrtps::rtps::RTPSParticipantAttributes& attributes_) -> bool
+                {
+                    bool hasSHM = false;
+                    bool hasUDP = false;
+                    bool hasTCP = false;
+                    for (auto& transportDescriptor : attributes_.userTransports)
+                    {
+                        if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::SharedMemTransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasSHM = true;
+                        }
+                        else if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::UDPv6TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasUDP = true;
+                        }
+                        else if ( nullptr !=
+                                dynamic_cast<fastdds::rtps::TCPv6TransportDescriptor*>(transportDescriptor.get()))
+                        {
+                            hasTCP = true;
+                        }
+                    }
+
+                    return (hasSHM && hasUDP && hasTCP);
+                };
+        EXPECT_TRUE(transport_check(attributes_));
+        EXPECT_FALSE(attributes_.useBuiltinTransports);
+        EXPECT_EQ(ReturnCode_t::RETCODE_OK, DomainParticipantFactory::get_instance()->delete_participant(participant_));
+    }
+}
+
+
 
 } // namespace dds
 } // namespace fastdds

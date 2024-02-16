@@ -107,7 +107,7 @@ TEST(BuiltinDataSerializationTests, ok_with_defaults)
 
         // Perform deserialization
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
         // EXPECT_EQ(in, out);
     }
 
@@ -126,7 +126,7 @@ TEST(BuiltinDataSerializationTests, ok_with_defaults)
 
         // Perform deserialization
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
     }
 }
 
@@ -179,7 +179,7 @@ TEST(BuiltinDataSerializationTests, ignore_unsupported_type_info)
         msg.length = msg.max_size;
 
         WriterProxyData out(max_unicast_locators, max_multicast_locators);
-        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false)));
+        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, true)));
     }
 
     // DATA(r)
@@ -231,7 +231,7 @@ TEST(BuiltinDataSerializationTests, ignore_unsupported_type_info)
         msg.length = msg.max_size;
 
         ReaderProxyData out(max_unicast_locators, max_multicast_locators);
-        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false)));
+        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, true)));
     }
 }
 
@@ -346,7 +346,7 @@ TEST(BuiltinDataSerializationTests, ignore_unsupported_type_object)
         msg.length = msg.max_size;
 
         WriterProxyData out(max_unicast_locators, max_multicast_locators);
-        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false)));
+        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, true)));
     }
 }
 
@@ -424,7 +424,45 @@ TEST(BuiltinDataSerializationTests, property_list_with_binary_properties)
     msg.length = msg.max_size;
 
     ParticipantProxyData out(RTPSParticipantAllocationAttributes{});
-    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, true, network, false)));
+    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, true, network, false, true)));
+}
+
+// Regression test for redmine ticket 20306
+TEST(BuiltinDataSerializationTests, other_vendor_parameter_list_with_custom_pids)
+{
+    octet data_p_buffer[] =
+    {
+        // Encapsulation
+        0x00, 0x03, 0x00, 0x00,
+
+        // PID_PROTOCOL_VERSION
+        0x15, 0, 4, 0,
+        2, 1, 0, 0,
+
+        // PID_VENDORID
+        0x16, 0, 4, 0,
+        2, 0, 0, 0,
+
+        // PID_PARTICIPANT_GUID
+        0x50, 0, 16, 0,
+        2, 0, 54, 83, 136, 247, 149, 252, 47, 105, 174, 141, 0, 0, 1, 193,
+
+        // PID_NETWORK_CONFIGURATION_SET
+        0x07, 0x80, 8, 0,
+        1, 2, 3, 4, 5, 6, 7, 8,
+
+        // PID_SENTINEL
+        0x01, 0, 0, 0
+    };
+
+    CDRMessage_t msg(0);
+    msg.init(data_p_buffer, static_cast<uint32_t>(sizeof(data_p_buffer)));
+    msg.length = msg.max_size;
+
+    ParticipantProxyData out(RTPSParticipantAllocationAttributes{});
+    out.m_networkConfiguration = 0;
+    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, true, network, false, true)));
+    ASSERT_EQ(out.m_networkConfiguration, 0u);
 }
 
 /*!
@@ -455,7 +493,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_without_parameters)
 
     // Perform deserialization
     msg.pos = 0;
-    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
     ASSERT_EQ(in.content_filter().content_filtered_topic_name, out.content_filter().content_filtered_topic_name);
     ASSERT_EQ(in.content_filter().related_topic_name, out.content_filter().related_topic_name);
@@ -496,7 +534,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_with_parameters)
 
     // Perform deserialization
     msg.pos = 0;
-    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
     ASSERT_EQ(in.content_filter().content_filtered_topic_name, out.content_filter().content_filtered_topic_name);
     ASSERT_EQ(in.content_filter().related_topic_name, out.content_filter().related_topic_name);
@@ -588,7 +626,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_topic_name_deser
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -637,7 +675,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_topic_name_deser
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -722,7 +760,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_related_topic_na
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -771,7 +809,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_related_topic_na
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -805,7 +843,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_empty_filter_class)
 
     // Perform deserialization
     msg.pos = 0;
-    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
     assert_is_empty_content_filter(out.content_filter());
 }
@@ -860,7 +898,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_filter_class_des
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -909,7 +947,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_filter_class_des
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -943,7 +981,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_empty_filter_expressio
 
     // Perform deserialization
     msg.pos = 0;
-    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
     assert_is_empty_content_filter(out.content_filter());
 }
@@ -998,7 +1036,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_filter_expressio
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -1185,7 +1223,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_interoperability)
     msg.length = msg.max_size;
 
     ReaderProxyData out(max_unicast_locators, max_multicast_locators);
-    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false)));
+    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, true)));
 
     ASSERT_EQ("ContentFilter_0", out.content_filter().content_filtered_topic_name.to_string());
     ASSERT_EQ("Square", out.content_filter().related_topic_name.to_string());
@@ -1254,7 +1292,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_max_parameter_check)
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
 
         ASSERT_EQ(100, out.content_filter().expression_parameters.size());
 
@@ -1298,7 +1336,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_max_parameter_check)
 
         msg_fault.pos = 0;
         // Deserialization of messages with more than 100 parameters should fail
-        ASSERT_FALSE(out.readFromCDRMessage(&msg_fault, network, true));
+        ASSERT_FALSE(out.readFromCDRMessage(&msg_fault, network, true, true));
     }
 }
 

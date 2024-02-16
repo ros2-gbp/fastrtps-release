@@ -68,9 +68,7 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-
 // Default configuration values for PDP reliable entities.
-
 const Duration_t pdp_heartbeat_period{ 0, 350 * 1000000  }; // 350 milliseconds
 const Duration_t pdp_nack_response_delay{ 0, 100 * 1000000  }; // 100 milliseconds
 const Duration_t pdp_nack_supression_duration{ 0, 11 * 1000000 }; // 11 milliseconds
@@ -93,7 +91,6 @@ PDP::PDP (
     , writer_proxies_number_(allocation.total_writers().initial)
     , writer_proxies_pool_(allocation.total_writers())
     , m_hasChangedLocalPDP(true)
-    , mp_listener(nullptr)
     , temp_reader_proxies_({
                 allocation.locators.max_unicast_locators,
                 allocation.locators.max_multicast_locators,
@@ -104,6 +101,9 @@ PDP::PDP (
                 allocation.locators.max_multicast_locators,
                 allocation.data_limits})
     , mp_mutex(new std::recursive_mutex())
+#ifdef FASTDDS_STATISTICS
+    , proxy_observer_(nullptr)
+#endif // ifdef FASTDDS_STATISTICS
     , resend_participant_info_event_(nullptr)
 {
     size_t max_unicast_locators = allocation.locators.max_unicast_locators;
@@ -137,9 +137,6 @@ PDP::~PDP()
 
     builtin_endpoints_->delete_pdp_endpoints(mp_RTPSParticipant);
     builtin_endpoints_.reset();
-
-    delete mp_listener;
-    mp_listener = nullptr;
 
     for (ParticipantProxyData* it : participant_proxies_)
     {
@@ -521,7 +518,9 @@ void PDP::announceParticipantState(
         else
         {
             this->mp_mutex->lock();
-            ParticipantProxyData proxy_data_copy(*getLocalParticipantProxyData());
+            ParticipantProxyData* local_participant_data = getLocalParticipantProxyData();
+            InstanceHandle_t key = local_participant_data->m_key;
+            ParticipantProxyData proxy_data_copy(*local_participant_data);
             this->mp_mutex->unlock();
 
             if (history.getHistorySize() > 0)
@@ -533,7 +532,7 @@ void PDP::announceParticipantState(
                             {
                                 return cdr_size;
                             },
-                            NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key);
+                            NOT_ALIVE_DISPOSED_UNREGISTERED, key);
 
             if (change != nullptr)
             {
@@ -575,6 +574,39 @@ void PDP::resetParticipantAnnouncement()
     if (resend_participant_info_event_)
     {
         resend_participant_info_event_->restart_timer();
+    }
+}
+
+void PDP::notify_and_maybe_ignore_new_participant(
+        ParticipantProxyData* pdata,
+        bool& should_be_ignored)
+{
+    should_be_ignored = false;
+
+    EPROSIMA_LOG_INFO(RTPS_PDP_DISCOVERY, "New participant "
+            << pdata->m_guid << " at "
+            << "MTTLoc: " << pdata->metatraffic_locators
+            << " DefLoc:" << pdata->default_locators);
+
+    RTPSParticipantListener* listener = getRTPSParticipant()->getListener();
+    if (listener != nullptr)
+    {
+        {
+            std::lock_guard<std::mutex> cb_lock(callback_mtx_);
+            ParticipantDiscoveryInfo info(*pdata);
+            info.status = ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT;
+
+
+            listener->onParticipantDiscovery(
+                getRTPSParticipant()->getUserRTPSParticipant(),
+                std::move(info),
+                should_be_ignored);
+        }
+
+        if (should_be_ignored)
+        {
+            getRTPSParticipant()->ignore_participant(pdata->m_guid.guidPrefix);
+        }
     }
 }
 
@@ -983,6 +1015,130 @@ bool PDP::pairing_remote_reader_with_local_writer_after_security(
 
 #endif // HAVE_SECURITY
 
+#ifdef FASTDDS_STATISTICS
+bool PDP::get_all_local_proxies(
+        std::vector<GUID_t>& guids)
+{
+    std::lock_guard<std::recursive_mutex> guardPDP(*this->mp_mutex);
+    ParticipantProxyData* local_participant = getLocalParticipantProxyData();
+    guids.reserve(local_participant->m_writers->size() +
+            local_participant->m_readers->size() +
+            1);
+
+    //! Add the Participant entity to the local entities
+    guids.push_back(local_participant->m_guid);
+
+    // Add all the writers and readers belonging to the participant
+    for (auto& writer : *(local_participant->m_writers))
+    {
+        guids.push_back(writer.second->guid());
+    }
+
+    for (auto& reader : *(local_participant->m_readers))
+    {
+        guids.push_back(reader.second->guid());
+    }
+
+    return true;
+}
+
+bool PDP::get_serialized_proxy(
+        const GUID_t& guid,
+        CDRMessage_t* msg)
+{
+    bool ret = false;
+    bool found = false;
+
+    std::lock_guard<std::recursive_mutex> guardPDP(*this->mp_mutex);
+
+    if (guid.entityId == c_EntityId_RTPSParticipant)
+    {
+        for (auto part_proxy = participant_proxies_.begin();
+                part_proxy != participant_proxies_.end(); ++part_proxy)
+        {
+            if ((*part_proxy)->m_guid == guid)
+            {
+                msg->msg_endian = LITTLEEND;
+                msg->max_size = msg->reserved_size = (*part_proxy)->get_serialized_size(true);
+                ret = (*part_proxy)->writeToCDRMessage(msg, true);
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            EPROSIMA_LOG_ERROR(PDP, "Unknown participant proxy requested to serialize: " << guid);
+        }
+    }
+    else if (guid.entityId.is_reader())
+    {
+        for (auto part_proxy = participant_proxies_.begin();
+                part_proxy != participant_proxies_.end(); ++part_proxy)
+        {
+            if ((*part_proxy)->m_guid.guidPrefix == guid.guidPrefix)
+            {
+                for (auto& reader : *((*part_proxy)->m_readers))
+                {
+                    if (reader.second->guid() == guid)
+                    {
+                        msg->max_size = msg->reserved_size = reader.second->get_serialized_size(true);
+                        ret = reader.second->writeToCDRMessage(msg, true);
+                        found = true;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            EPROSIMA_LOG_ERROR(PDP, "Unknown reader proxy requested to serialize: " << guid);
+        }
+    }
+    else if (guid.entityId.is_writer())
+    {
+        for (auto part_proxy = participant_proxies_.begin();
+                part_proxy != participant_proxies_.end(); ++part_proxy)
+        {
+            if ((*part_proxy)->m_guid.guidPrefix == guid.guidPrefix)
+            {
+                for (auto& writer : *((*part_proxy)->m_writers))
+                {
+                    if (writer.second->guid() == guid)
+                    {
+                        msg->max_size = msg->reserved_size = writer.second->get_serialized_size(true);
+                        ret = writer.second->writeToCDRMessage(msg, true);
+                        found = true;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            EPROSIMA_LOG_ERROR(PDP, "Unknown writer proxy requested to serialize: " << guid);
+        }
+    }
+    else
+    {
+        EPROSIMA_LOG_ERROR(PDP, "Unknown entitiy kind requested to serialize: " << guid);
+    }
+
+    return ret;
+}
+
+void PDP::set_proxy_observer(
+        const fastdds::statistics::rtps::IProxyObserver* proxy_observer)
+{
+    proxy_observer_.store(proxy_observer);
+}
+
+#endif // FASTDDS_STATISTICS
+
 bool PDP::remove_remote_participant(
         const GUID_t& partGUID,
         ParticipantDiscoveryInfo::DISCOVERY_STATUS reason)
@@ -1333,6 +1489,131 @@ void PDP::set_external_participant_properties_(
         }
     }
 }
+
+static void set_builtin_matched_allocation(
+        ResourceLimitedContainerConfig& allocation,
+        const RTPSParticipantAttributes& pattr)
+{
+    // Matched endpoints will depend on total number of participants
+    allocation = pattr.allocation.participants;
+
+    // As participants allocation policy includes the local participant, one has to be substracted
+    if (allocation.initial > 1)
+    {
+        allocation.initial--;
+    }
+    if ((allocation.maximum > 1) &&
+            (allocation.maximum < std::numeric_limits<size_t>::max()))
+    {
+        allocation.maximum--;
+    }
+}
+
+static void set_builtin_endpoint_locators(
+        EndpointAttributes& endpoint,
+        const PDP* pdp,
+        const BuiltinProtocols* builtin)
+{
+    const RTPSParticipantAttributes& pattr = pdp->getRTPSParticipant()->getRTPSParticipantAttributes();
+
+    auto part_data = pdp->getLocalParticipantProxyData();
+    if (nullptr == part_data)
+    {
+        // Local participant data has not yet been created.
+        // This means we are creating the PDP endpoints, so we copy the locators from mp_builtin
+        endpoint.multicastLocatorList = builtin->m_metatrafficMulticastLocatorList;
+        endpoint.unicastLocatorList = builtin->m_metatrafficUnicastLocatorList;
+    }
+    else
+    {
+        // Locators are copied from the local participant metatraffic locators
+        endpoint.unicastLocatorList.clear();
+        for (const Locator_t& loc : part_data->metatraffic_locators.unicast)
+        {
+            endpoint.unicastLocatorList.push_back(loc);
+        }
+        endpoint.multicastLocatorList.clear();
+        for (const Locator_t& loc : part_data->metatraffic_locators.multicast)
+        {
+            endpoint.multicastLocatorList.push_back(loc);
+        }
+    }
+
+    // External locators are always taken from the same place
+    endpoint.external_unicast_locators = pdp->builtin_attributes().metatraffic_external_unicast_locators;
+    endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
+}
+
+ReaderAttributes PDP::create_builtin_reader_attributes() const
+{
+    ReaderAttributes attributes;
+
+    const RTPSParticipantAttributes& pattr = getRTPSParticipant()->getRTPSParticipantAttributes();
+    set_builtin_matched_allocation(attributes.matched_writers_allocation, pattr);
+    set_builtin_endpoint_locators(attributes.endpoint, this, mp_builtin);
+
+    // Builtin endpoints are always reliable, transient local, keyed topics
+    attributes.endpoint.reliabilityKind = RELIABLE;
+    attributes.endpoint.durabilityKind = TRANSIENT_LOCAL;
+    attributes.endpoint.topicKind = WITH_KEY;
+
+    // Built-in readers never expect inline qos
+    attributes.expectsInlineQos = false;
+
+    return attributes;
+}
+
+WriterAttributes PDP::create_builtin_writer_attributes() const
+{
+    WriterAttributes attributes;
+
+    const RTPSParticipantAttributes& pattr = getRTPSParticipant()->getRTPSParticipantAttributes();
+    set_builtin_matched_allocation(attributes.matched_readers_allocation, pattr);
+    set_builtin_endpoint_locators(attributes.endpoint, this, mp_builtin);
+
+    // Builtin endpoints are always reliable, transient local, keyed topics
+    attributes.endpoint.reliabilityKind = RELIABLE;
+    attributes.endpoint.durabilityKind = TRANSIENT_LOCAL;
+    attributes.endpoint.topicKind = WITH_KEY;
+
+    return attributes;
+}
+
+#if HAVE_SECURITY
+void PDP::add_builtin_security_attributes(
+        ReaderAttributes& ratt,
+        WriterAttributes& watt) const
+{
+    const security::ParticipantSecurityAttributes& part_attr = mp_RTPSParticipant->security_attributes();
+
+    ratt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
+    ratt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
+
+    watt.endpoint.security_attributes().is_submessage_protected = part_attr.is_discovery_protected;
+    watt.endpoint.security_attributes().plugin_endpoint_attributes = PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID;
+
+    if (part_attr.is_discovery_protected)
+    {
+        security::PluginParticipantSecurityAttributes plugin_part_attr(part_attr.plugin_participant_attributes);
+
+        if (plugin_part_attr.is_discovery_encrypted)
+        {
+            ratt.endpoint.security_attributes().plugin_endpoint_attributes |=
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
+            watt.endpoint.security_attributes().plugin_endpoint_attributes |=
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
+        }
+        if (plugin_part_attr.is_discovery_origin_authenticated)
+        {
+            ratt.endpoint.security_attributes().plugin_endpoint_attributes |=
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
+            watt.endpoint.security_attributes().plugin_endpoint_attributes |=
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ORIGIN_AUTHENTICATED;
+        }
+    }
+}
+
+#endif // HAVE_SECURITY
 
 } /* namespace rtps */
 } /* namespace fastrtps */

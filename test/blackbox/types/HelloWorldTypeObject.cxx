@@ -229,6 +229,14 @@ const TypeObject* GetCompleteHelloWorldObject()
     // Header
     type_object->complete().struct_type().header().detail().type_name("HelloWorld");
     // TODO inheritance
+    {
+        AppliedAnnotation ann;
+        //ann.annotation_typeid(GetfinalIdentifier(true));
+        ann.annotation_typeid(*TypeObjectFactory::get_instance()->get_type_identifier_trying_complete("final"));
+        type_object->complete().struct_type().header().detail().ann_custom().push_back(ann);
+    }
+
+
     TypeIdentifier identifier;
     identifier._d(EK_COMPLETE);
 

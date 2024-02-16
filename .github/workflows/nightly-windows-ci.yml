@@ -1,4 +1,4 @@
-name: Fast-DDS Windows CI
+name: Fast-DDS Windows CI (nightly)
 
 on:
   workflow_dispatch:
@@ -21,3 +21,11 @@ jobs:
       cmake-args: "-DSECURITY=OFF"
       ctest-args: "-LE xfail"
       fastdds_branch: 'master'
+
+  nightly-3_0_x-windows-ci:
+    uses: ./.github/workflows/reusable-windows-ci.yml
+    with:
+      label: 'nightly-3.0.x-windows-ci'
+      cmake-args: "-DSECURITY=ON"
+      ctest-args: "-LE xfail"
+      fastdds_branch: '3.0.x-devel'
