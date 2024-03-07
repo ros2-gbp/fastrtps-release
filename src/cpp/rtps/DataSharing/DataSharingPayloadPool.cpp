@@ -42,10 +42,7 @@ void DataSharingPayloadPool::advance(
         uint64_t& index) const
 {
     // lower part is the index, upper part is the loop counter
-    if (static_cast<uint32_t>(index) + 1 <= descriptor_->history_size)
-    {
-        ++index;
-    }
+    ++index;
     if (static_cast<uint32_t>(index) % descriptor_->history_size == 0)
     {
         index = ((index >> 32) + 1) << 32;

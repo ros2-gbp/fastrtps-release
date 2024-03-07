@@ -80,8 +80,7 @@ public:
 
     void run(
             uint32_t samples,
-            uint32_t loops = 0,
-            uint32_t interval = 250);
+            uint32_t loops = 0);
 
 private:
 

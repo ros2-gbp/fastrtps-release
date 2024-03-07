@@ -54,6 +54,7 @@ public:
         return guidPrefix == r.guidPrefix
                && metatrafficUnicastLocatorList == r.metatrafficUnicastLocatorList
                && metatrafficMulticastLocatorList == r.metatrafficMulticastLocatorList;
+        //     && proxy == r.proxy;
     }
 
     RTPS_DllAPI void clear()
@@ -61,7 +62,7 @@ public:
         guidPrefix = fastrtps::rtps::GuidPrefix_t::unknown();
         metatrafficUnicastLocatorList.clear();
         metatrafficMulticastLocatorList.clear();
-        is_connected = false;
+        proxy = nullptr;
     }
 
     RTPS_DllAPI fastrtps::rtps::GUID_t GetParticipant() const;
@@ -99,8 +100,8 @@ public:
     //!Guid prefix
     fastrtps::rtps::GuidPrefix_t guidPrefix;
 
-    // Whether connection has been established
-    bool is_connected = false;
+    // Live participant proxy reference
+    const fastrtps::rtps::ParticipantProxyData* proxy{};
 
     // Check if there are specific transport locators associated
     // the template parameter is the locator kind (e.g. LOCATOR_KIND_UDPv4)
