@@ -472,6 +472,7 @@ bool PDPClient::create_ds_pdp_reliable_endpoints(
     return true;
 }
 
+// the ParticipantProxyData* pdata must be the one kept in PDP database
 void PDPClient::assignRemoteEndpoints(
         ParticipantProxyData* pdata)
 {
@@ -487,7 +488,8 @@ void PDPClient::assignRemoteEndpoints(
             {
                 if (data_matches_with_prefix(svr.guidPrefix, *pdata))
                 {
-                    svr.is_connected = true;
+                    std::unique_lock<std::recursive_mutex> lock(*getMutex());
+                    svr.proxy = pdata;
                 }
             }
         }
@@ -515,11 +517,11 @@ void PDPClient::notifyAboveRemoteEndpoints(
         {
             if (data_matches_with_prefix(svr.guidPrefix, pdata))
             {
-                if (!svr.is_connected && nullptr != get_participant_proxy_data(svr.guidPrefix))
+                if (nullptr == svr.proxy)
                 {
-                    //! mark proxy as connected from an unmangled prefix in case
-                    //! it could not be done in assignRemoteEndpoints()
-                    svr.is_connected = true;
+                    //! try to retrieve the participant proxy data from an unmangled prefix in case
+                    //! we could not fill svr.proxy in assignRemoteEndpoints()
+                    svr.proxy = get_participant_proxy_data(svr.guidPrefix);
                 }
 
                 match_pdp_reader_nts_(svr, pdata.m_guid.guidPrefix);
@@ -594,7 +596,7 @@ void PDPClient::removeRemoteEndpoints(
             if (svr.guidPrefix == pdata->m_guid.guidPrefix)
             {
                 std::unique_lock<std::recursive_mutex> lock(*getMutex());
-                svr.is_connected = false;
+                svr.proxy = nullptr; // reasign when we receive again server DATA(p)
                 is_server = true;
                 mp_sync->restart_timer(); // enable announcement and sync mechanism till this server reappears
             }
@@ -766,11 +768,11 @@ void PDPClient::announceParticipantState(
                     for (auto& svr : mp_builtin->m_DiscoveryServers)
                     {
                         // if we are matched to a server report demise
-                        if (svr.is_connected)
+                        if (svr.proxy != nullptr)
                         {
                             //locators.push_back(svr.metatrafficMulticastLocatorList);
                             locators.push_back(svr.metatrafficUnicastLocatorList);
-                            remote_readers.emplace_back(svr.guidPrefix,
+                            remote_readers.emplace_back(svr.proxy->m_guid.guidPrefix,
                                     endpoints->reader.reader_->getGuid().entityId);
                         }
                     }
@@ -803,7 +805,7 @@ void PDPClient::announceParticipantState(
                     {
                         // non-pinging announcements like lease duration ones must be
                         // broadcast to all servers
-                        if (!svr.is_connected || !_serverPing)
+                        if (svr.proxy == nullptr || !_serverPing)
                         {
                             locators.push_back(svr.metatrafficMulticastLocatorList);
                             locators.push_back(svr.metatrafficUnicastLocatorList);

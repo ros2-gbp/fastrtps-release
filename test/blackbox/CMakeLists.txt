@@ -51,7 +51,7 @@ if(NOT LibP11_FOUND)
 endif() # LibP11_FOUND
 
 if(EPROSIMA_TEST_DNS_NOT_SET_UP)
-    set(dns_filter "-*ServerClientEnvironmentSetUpDNS*")
+    set(dns_filter "-Discovery.ServerClientEnvironmentSetUpDNS")
 endif()
 
 file(GLOB RTPS_BLACKBOXTESTS_TEST_SOURCE "common/RTPSBlackboxTests*.cpp")
@@ -96,7 +96,6 @@ target_include_directories(BlackboxTests_RTPS PRIVATE
     ${Asio_INCLUDE_DIR})
 target_link_libraries(BlackboxTests_RTPS fastrtps fastcdr foonathan_memory GTest::gtest)
 gtest_discover_tests(BlackboxTests_RTPS
-    TEST_PREFIX "BlackboxTests_RTPS."
     TEST_FILTER ${pkcs_filter}
     NO_PRETTY_VALUES
     )
@@ -217,7 +216,6 @@ if(FASTRTPS_API_TESTS)
             ENVIRONMENT "R_UNICAST_PORT_RANDOM_NUMBER=${R_UNICAST_PORT_RANDOM_NUMBER}"
             ENVIRONMENT "MULTICAST_PORT_RANDOM_NUMBER=${MULTICAST_PORT_RANDOM_NUMBER}"
             ENVIRONMENT $<IF:$<BOOL:${OPENSSL_CONF}>,OPENSSL_CONF=${OPENSSL_CONF},>
-        TEST_PREFIX "BlackboxTests_FastRTPS."
         TEST_FILTER ${pkcs_filter} ${dns_filter}
         NO_PRETTY_VALUES
         )
@@ -272,7 +270,6 @@ if(FASTDDS_PIM_API_TESTS)
             ENVIRONMENT "R_UNICAST_PORT_RANDOM_NUMBER=${R_UNICAST_PORT_RANDOM_NUMBER}"
             ENVIRONMENT "MULTICAST_PORT_RANDOM_NUMBER=${MULTICAST_PORT_RANDOM_NUMBER}"
             ENVIRONMENT $<IF:$<BOOL:${OPENSSL_CONF}>,OPENSSL_CONF=${OPENSSL_CONF},>
-        TEST_PREFIX "BlackboxTests_DDS_PIM."
         TEST_FILTER ${pkcs_filter} ${dns_filter}
         NO_PRETTY_VALUES
         )
