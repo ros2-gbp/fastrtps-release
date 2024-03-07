@@ -567,10 +567,48 @@ TEST_F(TCPv4Tests, send_and_receive_between_allowed_interfaces_ports_by_name)
         senderThread->join();
         ASSERT_TRUE(bOk);
     }
-
-
 }
 
+TEST_F(TCPv4Tests, check_TCPv4_interface_whitelist_initialization)
+{
+    std::vector<IPFinder::info_IP> interfaces;
+
+    GetIP4s(interfaces);
+
+    std::vector<std::string> mock_interfaces;
+    for (auto& ip : interfaces)
+    {
+        mock_interfaces.push_back(ip.name);
+    }
+    // Add manually localhost to test adding multiple interfaces
+    mock_interfaces.push_back("127.0.0.1");
+
+    for (auto& ip : mock_interfaces)
+    {
+        descriptor.interfaceWhiteList.emplace_back(ip);
+    }
+    MockTCPv4Transport transportUnderTest(descriptor);
+    transportUnderTest.init();
+
+    // Check that the transport whitelist and the acceptors map is the same size as the mock_interfaces
+    ASSERT_EQ(transportUnderTest.get_interface_whitelist().size(), descriptor.interfaceWhiteList.size());
+    ASSERT_EQ(transportUnderTest.get_acceptors_map().size(), descriptor.interfaceWhiteList.size());
+
+    // Check that every interface is in the whitelist
+    auto check_whitelist = transportUnderTest.get_interface_whitelist();
+    for (auto& ip : mock_interfaces)
+    {
+        ASSERT_NE(std::find(check_whitelist.begin(), check_whitelist.end(), asio::ip::address_v4::from_string(
+                    ip)), check_whitelist.end());
+    }
+
+    // Check that every interface is in the acceptors map
+    for (const auto& test : transportUnderTest.get_acceptors_map())
+    {
+        ASSERT_NE(std::find(mock_interfaces.begin(), mock_interfaces.end(), IPLocator::toIPv4string(
+                    test.first)), mock_interfaces.end());
+    }
+}
 
 #if TLS_FOUND
 TEST_F(TCPv4Tests, send_and_receive_between_secure_ports_client_verifies)
@@ -2011,6 +2049,120 @@ TEST_F(TCPv4Tests, non_blocking_send)
     socket.close();
 }
 #endif // ifndef _WIN32
+
+// This test verifies that a server can reconnect to a client after the client has once failed in a
+// openLogicalPort request
+TEST_F(TCPv4Tests, reconnect_after_open_port_failure)
+{
+    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Warning);
+    uint16_t port = g_default_port;
+    // Create a TCP Server transport
+    TCPv4TransportDescriptor serverDescriptor;
+    serverDescriptor.add_listener_port(port);
+    std::unique_ptr<TCPv4Transport> serverTransportUnderTest(new TCPv4Transport(serverDescriptor));
+    serverTransportUnderTest->init();
+
+    // Create a TCP Client transport
+    TCPv4TransportDescriptor clientDescriptor;
+    std::unique_ptr<MockTCPv4Transport> clientTransportUnderTest(new MockTCPv4Transport(clientDescriptor));
+    clientTransportUnderTest->init();
+
+    // Add initial peer to the client
+    Locator_t initialPeerLocator;
+    IPLocator::createLocator(LOCATOR_KIND_TCPv4, "127.0.0.1", port, initialPeerLocator);
+    IPLocator::setLogicalPort(initialPeerLocator, 7410);
+
+    // Connect client to server
+    EXPECT_TRUE(serverTransportUnderTest->OpenInputChannel(initialPeerLocator, nullptr, 0x00FF));
+    SendResourceList client_resource_list;
+    ASSERT_TRUE(clientTransportUnderTest->OpenOutputChannel(client_resource_list, initialPeerLocator));
+    ASSERT_FALSE(client_resource_list.empty());
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    auto channel = clientTransportUnderTest->get_channel_resources().begin()->second;
+
+    // Logical port is opened
+    ASSERT_TRUE(channel->is_logical_port_opened(7410));
+
+    // Disconnect server
+    EXPECT_TRUE(serverTransportUnderTest->CloseInputChannel(initialPeerLocator));
+    serverTransportUnderTest.reset();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    // Client should have passed logical port to pending list
+    ASSERT_FALSE(channel->is_logical_port_opened(7410));
+    ASSERT_TRUE(channel->is_logical_port_added(7410));
+
+    // Now try normal reconnection
+    serverTransportUnderTest.reset(new TCPv4Transport(serverDescriptor));
+    serverTransportUnderTest->init();
+    ASSERT_TRUE(serverTransportUnderTest->OpenInputChannel(initialPeerLocator, nullptr, 0x00FF));
+    clientTransportUnderTest->send(nullptr, 0, channel->locator(), initialPeerLocator); // connect()
+
+    // Logical port is opened (moved from pending list)
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    ASSERT_TRUE(channel->is_logical_port_opened(7410));
+
+    // Disconnect server
+    EXPECT_TRUE(serverTransportUnderTest->CloseInputChannel(initialPeerLocator));
+    serverTransportUnderTest.reset();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    // Client should have passed logical port to pending list
+    ASSERT_FALSE(channel->is_logical_port_opened(7410));
+    ASSERT_TRUE(channel->is_logical_port_added(7410));
+
+    // Now try reconnect the server and close server's input channel before client's open logical
+    // port request, and then delete server and reconnect
+    serverTransportUnderTest.reset(new TCPv4Transport(serverDescriptor));
+    serverTransportUnderTest->init();
+    ASSERT_TRUE(serverTransportUnderTest->OpenInputChannel(initialPeerLocator, nullptr, 0x00FF));
+    EXPECT_TRUE(serverTransportUnderTest->CloseInputChannel(initialPeerLocator));
+    clientTransportUnderTest->send(nullptr, 0, channel->locator(), initialPeerLocator); // connect()
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    serverTransportUnderTest.reset();
+    ASSERT_FALSE(channel->is_logical_port_opened(7410));
+    ASSERT_TRUE(channel->is_logical_port_added(7410));
+
+    // Now try normal reconnection
+    serverTransportUnderTest.reset(new TCPv4Transport(serverDescriptor));
+    serverTransportUnderTest->init();
+    ASSERT_TRUE(serverTransportUnderTest->OpenInputChannel(initialPeerLocator, nullptr, 0x00FF));
+    clientTransportUnderTest->send(nullptr, 0, channel->locator(), initialPeerLocator); // connect()
+
+    // Logical port is opened (moved from pending list)
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    ASSERT_TRUE(channel->is_logical_port_opened(7410));
+
+    // Clear test
+    EXPECT_TRUE(serverTransportUnderTest->CloseInputChannel(initialPeerLocator));
+    client_resource_list.clear();
+}
+
+// This test verifies that OpenOutputChannel correctly handles a remote locator with
+// same physical port as the local listening port.
+TEST_F(TCPv4Tests, opening_output_channel_with_same_locator_as_local_listening_port)
+{
+    TCPv4Transport transportUnderTest(descriptor);
+    transportUnderTest.init();
+
+    // Two locators with the same port as the local listening port, but different addresses
+    Locator_t lowerOutputChannelLocator;
+    lowerOutputChannelLocator.kind = LOCATOR_KIND_TCPv4;
+    lowerOutputChannelLocator.port = g_default_port;
+    IPLocator::setLogicalPort(lowerOutputChannelLocator, g_default_port);
+    Locator_t higherOutputChannelLocator = lowerOutputChannelLocator;
+    IPLocator::setIPv4(lowerOutputChannelLocator, 1, 1, 1, 1);
+    IPLocator::setIPv4(higherOutputChannelLocator, 255, 255, 255, 255);
+
+    SendResourceList send_resource_list;
+
+    // If the remote address is lower than the local one, no channel must be created but it must be added to the send_resource_list
+    ASSERT_TRUE(transportUnderTest.OpenOutputChannel(send_resource_list, lowerOutputChannelLocator));
+    ASSERT_FALSE(transportUnderTest.is_output_channel_open_for(lowerOutputChannelLocator));
+    ASSERT_EQ(send_resource_list.size(), 1);
+    // If the remote address is higher than the local one, a CONNECT channel must be created and added to the send_resource_list
+    ASSERT_TRUE(transportUnderTest.OpenOutputChannel(send_resource_list, higherOutputChannelLocator));
+    ASSERT_TRUE(transportUnderTest.is_output_channel_open_for(higherOutputChannelLocator));
+    ASSERT_EQ(send_resource_list.size(), 2);
+}
 
 void TCPv4Tests::HELPER_SetDescriptorDefaults()
 {
