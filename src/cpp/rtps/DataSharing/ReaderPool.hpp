@@ -132,15 +132,13 @@ public:
         {
             CacheChange_t ch;
             SequenceNumber_t last_sequence = c_SequenceNumber_Unknown;
-            uint64_t current_end = end();
-            get_next_unread_payload(ch, last_sequence, current_end);
-            while (ch.sequenceNumber != SequenceNumber_t::unknown() || next_payload_ != current_end)
+            get_next_unread_payload(ch, last_sequence);
+            while (ch.sequenceNumber != SequenceNumber_t::unknown())
             {
-                current_end = end();
                 advance(next_payload_);
-                get_next_unread_payload(ch, last_sequence, current_end);
+                get_next_unread_payload(ch, last_sequence);
             }
-            assert(next_payload_ == current_end);
+            assert(next_payload_ == end());
         }
 
         return true;
