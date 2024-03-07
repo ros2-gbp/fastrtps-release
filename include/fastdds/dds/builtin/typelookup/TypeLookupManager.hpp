@@ -286,12 +286,6 @@ private:
         bool create_secure_endpoints();
      #endif
      */
-
-    void request_cache_change_acked(
-            fastrtps::rtps::CacheChange_t* change);
-
-    void reply_cache_change_acked(
-            fastrtps::rtps::CacheChange_t* change);
 };
 
 } /* namespace builtin */

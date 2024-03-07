@@ -150,13 +150,6 @@ void TypeLookupRequestListener::onNewCacheChangeAdded(
     reader->getHistory()->remove_change(change);
 }
 
-void TypeLookupRequestListener::onWriterChangeReceivedByAll(
-        fastrtps::rtps::RTPSWriter*,
-        fastrtps::rtps::CacheChange_t* change)
-{
-    tlm_->request_cache_change_acked(change);
-}
-
 } // namespace builtin
 } // namespace dds
 } // namespace fastdds
