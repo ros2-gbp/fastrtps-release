@@ -75,7 +75,7 @@ public:
 
 /**
  * Class XMLEndpointParser used to parse the XML file that contains information about remote endpoints.
- * @ingroup DISCOVERY_MODULE
+ * @ingroup DISCVOERYMODULE
  */
 class XMLEndpointParser : XMLParser
 {
