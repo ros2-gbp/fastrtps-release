@@ -48,7 +48,7 @@ def define_args(tests_definition):
 
         if 'kind' not in test.keys():
             print('ARGUMENT ERROR : '
-                  'Test definition requires <kind> field for each participant')
+                  'Test definition requites <kind> field for each participant')
             continue
 
         # All processes has seed argument
@@ -58,9 +58,7 @@ def define_args(tests_definition):
                               'wait',
                               'magic',
                               'publishers',
-                              'sleep_before_exec',
-                              'interval',
-                              'timeout']
+                              'sleep_before_exec']
 
         for argument in possible_arguments:
             if argument in test.keys():
@@ -71,8 +69,7 @@ def define_args(tests_definition):
         possible_flags = ['exit_on_lost_liveliness',
                           'zero_copy',
                           'fixed_type',
-                          'notexit',
-                          'succeed_on_timeout']
+                          'notexit']
 
         for flag in possible_flags:
             if flag in test.keys():
