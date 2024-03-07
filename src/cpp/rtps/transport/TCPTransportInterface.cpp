@@ -348,20 +348,11 @@ uint16_t TCPTransportInterface::create_acceptor_socket(
             std::vector<std::string> vInterfaces = get_binding_interfaces_list();
             for (std::string& sInterface : vInterfaces)
             {
-                Locator loc = locator;
-                if (loc.kind == LOCATOR_KIND_TCPv4)
-                {
-                    IPLocator::setIPv4(loc, sInterface);
-                }
-                else if (loc.kind == LOCATOR_KIND_TCPv6)
-                {
-                    IPLocator::setIPv6(loc, sInterface);
-                }
 #if TLS_FOUND
                 if (configuration()->apply_security)
                 {
                     std::shared_ptr<TCPAcceptorSecure> acceptor =
-                            std::make_shared<TCPAcceptorSecure>(io_service_, sInterface, loc);
+                            std::make_shared<TCPAcceptorSecure>(io_service_, sInterface, locator);
                     acceptors_[acceptor->locator()] = acceptor;
                     acceptor->accept(this, ssl_context_);
                     final_port = static_cast<uint16_t>(acceptor->locator().port);
@@ -370,7 +361,7 @@ uint16_t TCPTransportInterface::create_acceptor_socket(
 #endif // if TLS_FOUND
                 {
                     std::shared_ptr<TCPAcceptorBasic> acceptor =
-                            std::make_shared<TCPAcceptorBasic>(io_service_, sInterface, loc);
+                            std::make_shared<TCPAcceptorBasic>(io_service_, sInterface, locator);
                     acceptors_[acceptor->locator()] = acceptor;
                     acceptor->accept(this);
                     final_port = static_cast<uint16_t>(acceptor->locator().port);
@@ -766,31 +757,10 @@ bool TCPTransportInterface::OpenOutputChannel(
             listening_port = config->listening_ports.front();
         }
 
-        bool local_lower_interface = false;
-        if (IPLocator::getPhysicalPort(physical_locator) == listening_port)
-        {
-            std::vector<Locator> list;
-            std::vector<fastrtps::rtps::IPFinder::info_IP> local_interfaces;
-            get_ips(local_interfaces);
-            for (const auto& interface_it : local_interfaces)
-            {
-                Locator interface_loc(interface_it.locator);
-                interface_loc.port = physical_locator.port;
-                if (is_interface_allowed(interface_loc))
-                {
-                    list.push_back(interface_loc);
-                }
-            }
-            if (!list.empty() && (list.front() < physical_locator))
-            {
-                local_lower_interface = true;
-            }
-        }
-
         // If the remote physical port is higher than our listening port, a new CONNECT channel needs to be created and connected
         // and the locator added to the send_resource_list.
         // If the remote physical port is lower than our listening port, only the locator needs to be added to the send_resource_list.
-        if (IPLocator::getPhysicalPort(physical_locator) > listening_port || local_lower_interface)
+        if (IPLocator::getPhysicalPort(physical_locator) > listening_port)
         {
             // Client side (either Server-Client or LARGE_DATA)
             EPROSIMA_LOG_INFO(OpenOutputChannel, "OpenOutputChannel: [CONNECT] (physical: "

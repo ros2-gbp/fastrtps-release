@@ -194,14 +194,11 @@ void PDPListener::process_alive_data(
         // Create a new one when not found
         old_data = parent_pdp_->createParticipantProxyData(new_data, writer_guid);
 
+        reader->getMutex().unlock();
+        lock.unlock();
+
         if (old_data != nullptr)
         {
-            // Copy proxy to be passed forward before releasing PDP mutex
-            ParticipantProxyData old_data_copy(*old_data);
-
-            reader->getMutex().unlock();
-            lock.unlock();
-
             // Assigning remote endpoints implies sending a DATA(p) to all matched and fixed readers, since
             // StatelessWriter::matched_reader_add marks the entire history as unsent if the added reader's
             // durability is bigger or equal to TRANSIENT_LOCAL_DURABILITY_QOS (TRANSIENT_LOCAL or TRANSIENT),
@@ -212,19 +209,13 @@ void PDPListener::process_alive_data(
             // participant is discovered in the middle of BuiltinProtocols::initBuiltinProtocols, which will
             // create the first DATA(p) upon finishing, thus triggering the sent to all fixed and matched
             // readers anyways.
-            parent_pdp_->assignRemoteEndpoints(&old_data_copy);
-        }
-        else
-        {
-            reader->getMutex().unlock();
-            lock.unlock();
+            parent_pdp_->assignRemoteEndpoints(old_data);
         }
     }
     else
     {
         old_data->updateData(new_data);
         old_data->isAlive = true;
-
         reader->getMutex().unlock();
 
         EPROSIMA_LOG_INFO(RTPS_PDP_DISCOVERY, "Update participant "
@@ -237,9 +228,6 @@ void PDPListener::process_alive_data(
             parent_pdp_->mp_EDP->assignRemoteEndpoints(*old_data, true);
         }
 
-        // Copy proxy to be passed forward before releasing PDP mutex
-        ParticipantProxyData old_data_copy(*old_data);
-
         lock.unlock();
 
         RTPSParticipantListener* listener = parent_pdp_->getRTPSParticipant()->getListener();
@@ -249,7 +237,7 @@ void PDPListener::process_alive_data(
 
             {
                 std::lock_guard<std::mutex> cb_lock(parent_pdp_->callback_mtx_);
-                ParticipantDiscoveryInfo info(old_data_copy);
+                ParticipantDiscoveryInfo info(*old_data);
                 info.status = ParticipantDiscoveryInfo::CHANGED_QOS_PARTICIPANT;
 
                 listener->onParticipantDiscovery(

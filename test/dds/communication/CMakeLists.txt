@@ -115,7 +115,6 @@ list(APPEND TEST_DEFINITIONS
     zero_copy_sub_communication
     mix_zero_copy_communication
     close_TCP_client
-    simple_data_sharing_stress
     )
 
 
