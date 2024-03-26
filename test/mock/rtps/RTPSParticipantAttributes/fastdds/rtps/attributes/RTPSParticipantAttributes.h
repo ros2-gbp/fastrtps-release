@@ -35,10 +35,11 @@
 #include <fastdds/rtps/flowcontrol/FlowControllerDescriptor.hpp>
 #include <fastdds/rtps/flowcontrol/ThroughputControllerDescriptor.h>
 #include <fastdds/rtps/resources/ResourceManagement.h>
+#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
 #include <fastdds/rtps/transport/TransportInterface.h>
 #include <fastrtps/fastrtps_dll.h>
-#include <fastrtps/utils/fixed_size_string.hpp>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
+#include <fastrtps/utils/fixed_size_string.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -468,6 +469,7 @@ public:
                (this->ignore_non_matching_locators == b.ignore_non_matching_locators) &&
                (this->sendSocketBufferSize == b.sendSocketBufferSize) &&
                (this->listenSocketBufferSize == b.listenSocketBufferSize) &&
+               (this->netmaskFilter == b.netmaskFilter) &&
                (this->builtin == b.builtin) &&
                (this->port == b.port) &&
                (this->userData == b.userData) &&
@@ -496,6 +498,22 @@ public:
             fastdds::rtps::BuiltinTransports /*transports*/)
     {
         // Only include UDPv4 behavior for mock tests
+        setup_transports_default(*this);
+        useBuiltinTransports = false;
+    }
+
+    /**
+     * Provides a way of easily configuring transport related configuration on certain pre-defined scenarios with
+     * certain options. Options only take effect if the selected builtin transport is LARGE_DATA.
+     *
+     * @param transports Defines the transport configuration scenario to setup.
+     * @param options Defines the options to be used in the transport configuration.
+     */
+    void setup_transports(
+            fastdds::rtps::BuiltinTransports /*transports*/,
+            const fastdds::rtps::BuiltinTransportsOptions& /*options*/)
+    {
+        // Only include UDPv4 behavior for mock tests, ignore options
         setup_transports_default(*this);
         useBuiltinTransports = false;
     }
@@ -551,6 +569,9 @@ public:
      * Default value: 0.
      */
     uint32_t listenSocketBufferSize = 0;
+
+    //! Netmask filter configuration
+    fastdds::rtps::NetmaskFilterKind netmaskFilter = fastdds::rtps::NetmaskFilterKind::AUTO;
 
     //! Optionally allows user to define the GuidPrefix_t
     GuidPrefix_t prefix;
@@ -625,10 +646,17 @@ public:
     fastdds::rtps::ThreadSettings security_log_thread;
 #endif // if HAVE_SECURITY
 
+    /*! Maximum message size used to avoid fragmentation, setted ONLY in LARGE_DATA. If this value is
+     * not zero, the network factory will allow the initialization of UDP transports with maxMessageSize
+     * higher than 65500 KB (s_maximumMessageSize).
+     */
+    uint32_t max_msg_size_no_frag = 0;
+
 private:
 
     //! Name of the participant.
     string_255 name{"RTPSParticipant"};
+
 };
 
 }  // namespace rtps

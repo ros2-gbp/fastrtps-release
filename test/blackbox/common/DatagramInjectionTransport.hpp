@@ -12,11 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <fstream>
 #include <mutex>
 #include <set>
 
 #include <fastdds/rtps/transport/ChainingTransport.h>
 #include <fastdds/rtps/transport/ChainingTransportDescriptor.h>
+#include <fastdds/rtps/transport/SenderResource.h>
+#include <fastdds/rtps/transport/TransportReceiverInterface.h>
+
+using SenderResource = eprosima::fastrtps::rtps::SenderResource;
 
 namespace eprosima {
 namespace fastdds {
@@ -37,10 +42,16 @@ public:
 
     std::set<TransportReceiverInterface*> get_receivers();
 
+    void update_send_resource_list(
+            const SendResourceList& send_resource_list);
+
+    std::set<SenderResource*> get_send_resource_list();
+
 private:
 
     std::mutex mtx_;
     std::set<TransportReceiverInterface*> receivers_;
+    std::set<SenderResource*> send_resource_list_;
 };
 
 class DatagramInjectionTransport : public ChainingTransport
@@ -60,23 +71,25 @@ public:
     }
 
     bool send(
-            eprosima::fastrtps::rtps::SenderResource* /*low_sender_resource*/,
-            const eprosima::fastrtps::rtps::octet* /*send_buffer*/,
-            uint32_t /*send_buffer_size*/,
-            eprosima::fastrtps::rtps::LocatorsIterator* /*destination_locators_begin*/,
-            eprosima::fastrtps::rtps::LocatorsIterator* /*destination_locators_end*/,
-            const std::chrono::steady_clock::time_point& /*timeout*/) override
+            eprosima::fastrtps::rtps::SenderResource* low_sender_resource,
+            const eprosima::fastrtps::rtps::octet* send_buffer,
+            uint32_t send_buffer_size,
+            eprosima::fastrtps::rtps::LocatorsIterator* destination_locators_begin,
+            eprosima::fastrtps::rtps::LocatorsIterator* destination_locators_end,
+            const std::chrono::steady_clock::time_point& timeout) override
     {
-        return true;
+        return low_sender_resource->send(send_buffer, send_buffer_size, destination_locators_begin,
+                       destination_locators_end, timeout);
     }
 
     void receive(
-            TransportReceiverInterface* /*next_receiver*/,
-            const eprosima::fastrtps::rtps::octet* /*receive_buffer*/,
-            uint32_t /*receive_buffer_size*/,
-            const eprosima::fastrtps::rtps::Locator_t& /*local_locator*/,
-            const eprosima::fastrtps::rtps::Locator_t& /*remote_locator*/) override
+            TransportReceiverInterface* next_receiver,
+            const eprosima::fastrtps::rtps::octet* receive_buffer,
+            uint32_t receive_buffer_size,
+            const eprosima::fastrtps::rtps::Locator_t& local_locator,
+            const eprosima::fastrtps::rtps::Locator_t& remote_locator) override
     {
+        next_receiver->OnDataReceived(receive_buffer, receive_buffer_size, local_locator, remote_locator);
     }
 
     bool OpenInputChannel(
@@ -90,6 +103,35 @@ public:
             parent_->add_receiver(receiver_interface);
         }
         return ret_val;
+    }
+
+    bool OpenOutputChannel(
+            SendResourceList& send_resource_list,
+            const Locator& loc) override
+    {
+        bool ret_val = ChainingTransport::OpenOutputChannel(send_resource_list, loc);
+        parent_->update_send_resource_list(send_resource_list);
+        return ret_val;
+    }
+
+    static void deliver_datagram_from_file(
+            const std::set<eprosima::fastdds::rtps::TransportReceiverInterface*>& receivers,
+            const char* filename)
+    {
+        std::basic_ifstream<char> file(filename, std::ios::binary | std::ios::in);
+
+        file.seekg(0, file.end);
+        size_t file_size = static_cast<size_t>(file.tellg());
+        file.seekg(0, file.beg);
+
+        std::vector<uint8_t> buf(file_size);
+        file.read(reinterpret_cast<char*>(buf.data()), file_size);
+
+        eprosima::fastdds::rtps::Locator loc;
+        for (const auto& rec : receivers)
+        {
+            rec->OnDataReceived(buf.data(), static_cast<uint32_t>(file_size), loc, loc);
+        }
     }
 
 private:

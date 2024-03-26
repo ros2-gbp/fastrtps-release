@@ -27,6 +27,7 @@
 #include "PubSubWriter.hpp"
 #include "PubSubWriterReader.hpp"
 #include "PubSubParticipant.hpp"
+#include "UDPMessageSender.hpp"
 
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/common/EntityId_t.hpp>
@@ -85,32 +86,6 @@ public:
             default:
                 break;
         }
-    }
-
-};
-
-struct UDPMessageSender
-{
-    asio::io_service service;
-    asio::ip::udp::socket socket;
-
-    UDPMessageSender()
-        : service()
-        , socket(service)
-    {
-        socket.open(asio::ip::udp::v4());
-    }
-
-    void send(
-            const CDRMessage_t& msg,
-            const Locator_t& destination)
-    {
-        std::string addr = IPLocator::toIPv4string(destination);
-        unsigned short port = static_cast<unsigned short>(destination.port);
-        auto remote = asio::ip::udp::endpoint(asio::ip::address::from_string(addr), port);
-        asio::error_code ec;
-
-        socket.send_to(asio::buffer(msg.buffer, msg.length), remote, 0, ec);
     }
 
 };
@@ -4815,6 +4790,117 @@ TEST_P(Security, MaliciousParticipantRemovalIgnore)
     writer.send(data);
     ASSERT_TRUE(data.empty());
     reader.block_for_all();
+}
+
+TEST(Security, ValidateAuthenticationHandshakePropertiesParsing)
+{
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+
+    PropertyPolicy property_policy;
+
+    property_policy.properties().emplace_back(Property("dds.sec.auth.plugin",
+            "builtin.PKI-DH"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_ca",
+            "file://" + std::string(certs_path) + "/maincacert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.identity_certificate",
+            "file://" + std::string(certs_path) + "/mainsubcert.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.private_key",
+            "file://" + std::string(certs_path) + "/mainsubkey.pem"));
+    property_policy.properties().emplace_back(Property("dds.sec.crypto.plugin",
+            "builtin.AES-GCM-GMAC"));
+
+    // max_handshake_requests out of bounds
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.max_handshake_requests",
+            "0"));
+
+    writer.property_policy(property_policy).init();
+
+    // Writer creation should fail
+    ASSERT_FALSE(writer.isInitialized());
+
+    writer.destroy();
+
+    property_policy.properties().pop_back();
+
+    // initial_handshake_resend_period out of bounds
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.initial_handshake_resend_period",
+            "-200"));
+
+    writer.property_policy(property_policy).init();
+
+    // Writer creation should fail
+    ASSERT_FALSE(writer.isInitialized());
+
+    writer.destroy();
+
+    property_policy.properties().pop_back();
+
+    // handshake_resend_period_gain out of bounds
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.handshake_resend_period_gain",
+            "0.5"));
+
+    writer.property_policy(property_policy).init();
+
+    // Writer creation should fail
+    ASSERT_FALSE(writer.isInitialized());
+
+    writer.destroy();
+
+    property_policy.properties().pop_back();
+
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.max_handshake_requests",
+            "5"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.initial_handshake_resend_period",
+            "200"));
+    property_policy.properties().emplace_back(Property("dds.sec.auth.builtin.PKI-DH.handshake_resend_period_gain",
+            "1.75"));
+
+    writer.property_policy(property_policy).init();
+
+    // Writer should correctly initialize
+    ASSERT_TRUE(writer.isInitialized());
+}
+
+TEST(Security, ValidateAuthenticationHandshakeProperties)
+{
+    // Create
+    PubSubReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
+
+    PropertyPolicy property_policy;
+    std::string xml_file = "auth_handshake_props_profile.xml";
+    std::string profile_name = "auth_handshake_props";
+
+    // Set a configuration that makes participant authentication
+    // to be performed quickly so that we receive handshake
+    // in 0.15 secs approx
+    writer.set_xml_filename(xml_file);
+    writer.set_participant_profile(profile_name);
+
+    reader.set_xml_filename(xml_file);
+    reader.set_participant_profile(profile_name);
+
+    reader.init();
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.init();
+    ASSERT_TRUE(writer.isInitialized());
+
+    // If the settings were correctly applied
+    // we expect to be authorized in less than 0.5 seconds
+    // In reality, this time could be 0.2 perfectly,
+    // but some padding is left because of the ci
+    // or slower platforms
+    std::chrono::duration<double, std::milli> max_time(500);
+    auto t0 = std::chrono::steady_clock::now();
+    reader.waitAuthorized();
+    auto auth_elapsed_time = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - t0);
+
+    // Both should be authorized
+    writer.waitAuthorized();
+
+    ASSERT_TRUE(auth_elapsed_time < max_time);
 }
 
 

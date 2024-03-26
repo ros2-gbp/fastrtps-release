@@ -44,6 +44,8 @@
 #include <fastrtps/types/TypeObjectFactory.h>
 #include <fastrtps/types/DynamicPubSubType.h>
 
+#include <fastdds/rtps/common/LocatorList.hpp>
+
 #include <fastrtps/utils/TimeConversion.h>
 #include <fastrtps/utils/IPLocator.h>
 #include "fastrtps/utils/shared_mutex.hpp"
@@ -59,7 +61,7 @@
 
 #include <rtps/builtin/discovery/participant/PDPEndpoints.hpp>
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
+#include <rtps/network/utils/external_locators.hpp>
 
 #include <mutex>
 #include <chrono>
@@ -339,7 +341,7 @@ void PDP::initializeParticipantProxyData(
             }
         }
 
-        fastdds::rtps::ExternalLocatorsProcessor::add_external_locators(*participant_data,
+        fastdds::rtps::network::external_locators::add_external_locators(*participant_data,
                 attributes.builtin.metatraffic_external_unicast_locators,
                 attributes.default_external_unicast_locators);
     }
@@ -1239,6 +1241,21 @@ bool PDP::remove_remote_participant(
 
         this->mp_mutex->lock();
 
+        // Delete from sender resource list (TCP only)
+        LocatorList_t remote_participant_locators;
+        for (auto& remote_participant_default_locator : pdata->default_locators.unicast)
+        {
+            remote_participant_locators.push_back(remote_participant_default_locator);
+        }
+        for (auto& remote_participant_metatraffic_locator : pdata->metatraffic_locators.unicast)
+        {
+            remote_participant_locators.push_back(remote_participant_metatraffic_locator);
+        }
+        if (!remote_participant_locators.empty())
+        {
+            mp_RTPSParticipant->update_removed_participant(remote_participant_locators);
+        }
+
         // Return reader proxy objects to pool
         for (auto pit : *pdata->m_readers)
         {
@@ -1266,6 +1283,7 @@ bool PDP::remove_remote_participant(
         participant_proxies_pool_.push_back(pdata);
 
         this->mp_mutex->unlock();
+
         return true;
     }
 

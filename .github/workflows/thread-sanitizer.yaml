@@ -15,14 +15,6 @@ on:
         required: false
         type: string
 
-  push:
-    branches:
-      - 'master'
-    paths-ignore:
-      - '**.md'
-      - '**.txt'
-      - '!**/CMakeLists.txt'
-
   pull_request:
     branches:
       - 'master'
@@ -30,6 +22,9 @@ on:
       - '**.md'
       - '**.txt'
       - '!**/CMakeLists.txt'
+
+  schedule:
+    - cron: '0 1 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -41,7 +36,8 @@ jobs:
     name: Sanitizer Evaluation
 
     if: ${{ !(contains(github.event.pull_request.labels.*.name, 'no-test') ||
-              contains(github.event.pull_request.labels.*.name, 'skip-ci')) }}
+              contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+              contains(github.event.pull_request.labels.*.name, 'conflicts')) }}
 
     runs-on: ubuntu-22.04
 
@@ -54,10 +50,19 @@ jobs:
         CXX: g++-12
 
     steps:
-      - name: Install wget
+      # https://github.com/actions/runner-images/issues/9491
+      - name: Fix kernel mmap rnd bits
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
         with:
-          packages: wget
+          packages: curl grep libasio-dev libtinyxml2-dev python3 python3-pip software-properties-common wget
+
+      - name: Get minimum supported version of CMake
+        uses: eProsima/eProsima-CI/external/get-cmake@v0
+        with:
+          cmakeVersion: '3.22.6'
 
       - name: Setup CCache
         uses: eProsima/eProsima-CI/external/setup-ccache-action@v0
@@ -89,13 +94,12 @@ jobs:
           cd ./src/fastrtps
           git checkout ${{ env.FASTDDS_BRANCH }}
 
-      - name: Install apt packages
-        uses: ./src/fastrtps/.github/actions/install-apt-packages
-
-      - name: Install GTest
-        uses: eProsima/eProsima-CI/ubuntu/install_gtest@v0
+      - name: Fetch Fast DDS CI dependencies
+        uses: eProsima/eProsima-CI/multiplatform/vcs_import@v0
         with:
-          version: release-1.11.0
+          vcs_repos_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/ci.repos
+          destination_workspace: src
+          skip_existing: 'true'
 
       - name: Build workspace
         run: |
