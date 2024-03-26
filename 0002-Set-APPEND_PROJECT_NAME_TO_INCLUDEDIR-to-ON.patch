@@ -1,4 +1,4 @@
-From cfdd8124b70c54bcea4323e7c64948ea1b63a350 Mon Sep 17 00:00:00 2001
+From 7771c7e652d750a2a689ffaf1284d666b0554d2d Mon Sep 17 00:00:00 2001
 From: Shane Loretz <shane.loretz@gmail.com>
 Date: Mon, 21 Mar 2022 14:16:17 -0700
 Subject: [PATCH 2/2] Set APPEND_PROJECT_NAME_TO_INCLUDEDIR to ON
@@ -8,7 +8,7 @@ Subject: [PATCH 2/2] Set APPEND_PROJECT_NAME_TO_INCLUDEDIR to ON
  1 file changed, 1 insertion(+)
 
 diff --git a/debian/rules.em b/debian/rules.em
-index 8ab6ca9ad1ac..a96478593ffc 100755
+index 8ab6ca9a..a9647859 100755
 --- a/debian/rules.em
 +++ b/debian/rules.em
 @@ -39,6 +39,7 @@ override_dh_auto_configure:
@@ -20,5 +20,5 @@ index 8ab6ca9ad1ac..a96478593ffc 100755
  
  override_dh_auto_build:
 -- 
-2.44.0
+2.34.1
 

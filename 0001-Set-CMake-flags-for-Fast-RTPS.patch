@@ -1,4 +1,4 @@
-From 9f55cf6e52f7511f6c71cf3718241b7954f6faf4 Mon Sep 17 00:00:00 2001
+From c0af3bcb489404aa4a93f94ea9606aacf63d1d56 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?=
  <nuclearsandwich@users.noreply.github.com>
 Date: Sat, 12 Feb 2022 10:38:44 -0500
@@ -9,7 +9,7 @@ Subject: [PATCH 1/2] Set CMake flags for Fast-RTPS
  1 file changed, 2 insertions(+)
 
 diff --git a/debian/rules.em b/debian/rules.em
-index 284a07142d7a..8ab6ca9ad1ac 100755
+index 284a0714..8ab6ca9a 100755
 --- a/debian/rules.em
 +++ b/debian/rules.em
 @@ -37,6 +37,8 @@ override_dh_auto_configure:
@@ -22,5 +22,5 @@ index 284a07142d7a..8ab6ca9ad1ac 100755
  
  override_dh_auto_build:
 -- 
-2.44.0
+2.34.1
 
