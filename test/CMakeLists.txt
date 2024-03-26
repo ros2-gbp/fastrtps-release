@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Require C++ 14 for testing as both GTest v1.14.0 and ROS 2 Jazzy require it anyways
+set(FORCE_CXX "14")
+check_stdcxx(${FORCE_CXX})
+
 option(PERFORMANCE_TESTS "Activate the building and execution of performance tests" OFF)
 option(SYSTEM_TESTS "Activate the building and execution of system tests" OFF)
 option(PROFILING_TESTS "Activate the building and execution of profiling tests" OFF)
 option(EPROSIMA_BUILD_TESTS "Activate the building and execution unit tests and integral tests" OFF)
+option(FASTDDS_EXAMPLE_TESTS "Activate the building and execution of Fast DDS examples tests" OFF)
 
 if(EPROSIMA_BUILD)
     set(EPROSIMA_BUILD_TESTS ON)
@@ -44,15 +49,22 @@ if(EPROSIMA_BUILD_TESTS)
     include(${PROJECT_SOURCE_DIR}/cmake/testing/GoogleTest.cmake)
 
     add_subdirectory(blackbox)
-    add_subdirectory(communication)
     add_subdirectory(unittest)
     add_subdirectory(xtypes)
     add_subdirectory(dds/communication)
+    add_subdirectory(dds/communication/security)
     add_subdirectory(dds/discovery)
 
     if(UNIX AND NOT APPLE AND STRICT_REALTIME)
         add_subdirectory(realtime)
     endif()
+endif()
+
+###############################################################################
+# Example tests
+###############################################################################
+if (COMPILE_EXAMPLES AND FASTDDS_EXAMPLE_TESTS)
+    add_subdirectory(examples)
 endif()
 
 ###############################################################################
