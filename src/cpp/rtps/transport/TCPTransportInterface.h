@@ -23,6 +23,9 @@
 #include <asio.hpp>
 #include <asio/steady_timer.hpp>
 
+#include <fastdds/rtps/common/LocatorWithMask.hpp>
+#include <fastdds/rtps/transport/network/AllowedNetworkInterface.hpp>
+#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
 #include <fastdds/rtps/transport/TCPTransportDescriptor.h>
 #include <fastdds/rtps/transport/TransportInterface.h>
 #include <fastrtps/utils/IPFinder.h>
@@ -76,24 +79,10 @@ class TCPTransportInterface : public TransportInterface
 
 protected:
 
-    std::vector<fastrtps::rtps::IPFinder::info_IP> current_interfaces_;
     asio::io_service io_service_;
     asio::io_service io_service_timers_;
     std::unique_ptr<asio::ip::tcp::socket> initial_peer_local_locator_socket_;
     uint16_t initial_peer_local_locator_port_;
-    /**
-     * Whether to use non-blocking calls to send().
-     *
-     * When set to true, calls to send() will return immediately if the send buffer is full.
-     * This may happen when receive buffer on reader's side is full. No error will be returned
-     * to the upper layer. This means that the application will behave
-     * as if the datagram is sent but lost (i.e. throughput may be reduced). This value is
-     * specially useful on high-frequency writers.
-     *
-     * When set to false, calls to send() will block until the send buffer has space for the
-     * datagram. This may cause application lock.
-     */
-    bool non_blocking_send_;
 
 #if TLS_FOUND
     asio::ssl::context ssl_context_;
@@ -120,6 +109,15 @@ protected:
     std::map<Locator, std::shared_ptr<TCPAcceptor>> acceptors_;
 
     eprosima::fastdds::statistics::rtps::OutputTrafficManager statistics_info_;
+
+    // Map containging the logical ports that must be added to a channel that has not been created yet. This could happen
+    // with acceptor channels that are created after their output channel has been opened (LARGE_DATA case).
+    // The key is the physical locator associated with the sender resource, and later to the channel.
+    std::map<Locator, std::set<uint16_t>> channel_pending_logical_ports_;
+    std::mutex channel_pending_logical_ports_mutex_;
+
+    NetmaskFilterKind netmask_filter_;
+    std::vector<AllowedNetworkInterface> allowed_interfaces_;
 
     TCPTransportInterface(
             int32_t transport_kind);
@@ -160,9 +158,10 @@ protected:
     uint16_t create_acceptor_socket(
             const Locator& locator);
 
-    virtual void get_ips(
+    virtual bool get_ips(
             std::vector<fastrtps::rtps::IPFinder::info_IP>& loc_names,
-            bool return_loopback = false) const = 0;
+            bool return_loopback,
+            bool force_lookup) const = 0;
 
     bool is_input_port_open(
             uint16_t port) const;
@@ -194,6 +193,12 @@ protected:
      * Converts a remote endpoint to a locator if possible. Otherwise, it sets an invalid locator.
      */
     Locator remote_endpoint_to_locator(
+            const std::shared_ptr<TCPChannelResource>& channel) const;
+
+    /**
+     * Converts a local endpoint to a locator if possible. Otherwise, it sets an invalid locator.
+     */
+    Locator local_endpoint_to_locator(
             const std::shared_ptr<TCPChannelResource>& channel) const;
 
     /**
@@ -241,7 +246,7 @@ public:
             const Locator&) override;
 
     //! Resets the locator bound to the sender resource.
-    void CloseOutputChannel(
+    void SenderResourceHasBeenClosed(
             fastrtps::rtps::Locator_t& locator);
 
     //! Reports whether Locators correspond to the same port.
@@ -271,7 +276,8 @@ public:
     virtual uint16_t GetMaxLogicalPort() const = 0;
 
     bool init(
-            const fastrtps::rtps::PropertyPolicy* properties = nullptr) override;
+            const fastrtps::rtps::PropertyPolicy* properties = nullptr,
+            const uint32_t& max_msg_size_no_frag = 0) override;
 
     //! Checks whether there are open and bound sockets for the given port.
     bool IsInputChannelOpen(
@@ -289,7 +295,7 @@ public:
             const Locator& loc) const = 0;
 
     virtual bool is_interface_allowed(
-            const std::string& interface) const = 0;
+            const std::string& iface) const = 0;
 
     //! Checks for TCP kinds.
     bool IsLocatorSupported(
@@ -466,6 +472,8 @@ public:
 
     bool is_localhost_allowed() const override;
 
+    NetmaskFilterInfo netmask_filter_info() const override;
+
     /**
      * Method to fill local locator physical port.
      * @param locator locator to be filled.
@@ -473,11 +481,26 @@ public:
     void fill_local_physical_port(
             Locator& locator) const;
 
-    bool get_non_blocking_send() const
-    {
-        return non_blocking_send_;
-    }
+    /**
+     * Close the output channel associated to the given remote participant but if its locators belong to the
+     * given list of initial peers.
+     *
+     * @param send_resource_list List of send resources associated to the local participant.
+     * @param remote_participant_locators Set of locators associated to the remote participant.
+     * @param participant_initial_peers List of locators associated to the initial peers of the local participant.
+     */
+    void cleanup_sender_resources(
+            SendResourceList& send_resource_list,
+            const LocatorList& remote_participant_locators,
+            const LocatorList& participant_initial_peers) const;
 
+    /**
+     * Method to add the logical ports associated to a channel that was not available
+     * when the logical ports were obtained.
+     * @param channel Channel that might add the logical ports if available.
+     */
+    void send_channel_pending_logical_ports(
+            std::shared_ptr<TCPChannelResource>& channel);
 };
 
 } // namespace rtps

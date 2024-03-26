@@ -21,7 +21,11 @@
 #include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/LocatorSelector.hpp>
+#include <fastdds/rtps/common/LocatorSelectorEntry.hpp>
+#include <fastdds/rtps/common/LocatorWithMask.hpp>
 #include <fastdds/rtps/common/PortParameters.h>
+#include <fastdds/rtps/transport/network/AllowedNetworkInterface.hpp>
+#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
 #include <fastdds/rtps/transport/SenderResource.h>
 #include <fastdds/rtps/transport/TransportDescriptorInterface.h>
 #include <fastdds/rtps/transport/TransportReceiverInterface.h>
@@ -42,6 +46,8 @@ static const std::string s_IPv4AddressAny = "0.0.0.0";
 static const std::string s_IPv6AddressAny = "::";
 
 using SendResourceList = std::vector<std::unique_ptr<fastrtps::rtps::SenderResource>>;
+using NetmaskFilterInfo = std::pair<NetmaskFilterKind, std::vector<AllowedNetworkInterface>>;
+using TransportNetmaskFilterInfo = std::pair<int32_t, NetmaskFilterInfo>;
 
 /**
  * Interface against which to implement a transport layer, decoupled from FastRTPS internals.
@@ -85,10 +91,12 @@ public:
     /**
      * Initialize this transport. This method will prepare all the internals of the transport.
      * @param properties Optional policy to specify additional parameters of the created transport.
+     * @param max_msg_size_no_frag Optional maximum message size to avoid 65500 KB fragmentation limit.
      * @return True when the transport was correctly initialized.
      */
     virtual bool init(
-            const fastrtps::rtps::PropertyPolicy* properties = nullptr) = 0;
+            const fastrtps::rtps::PropertyPolicy* properties = nullptr,
+            const uint32_t& max_msg_size_no_frag = 0) = 0;
 
     /**
      * Must report whether the input channel associated to this locator is open. Channels must either be
@@ -134,6 +142,29 @@ public:
     virtual bool OpenOutputChannel(
             SendResourceList& sender_resource_list,
             const Locator&) = 0;
+
+    /**
+     * Must open the channel that maps to/from the given locator selector entry. This method must allocate,
+     * reserve and mark any resources that are needed for said channel.
+     *
+     * @param sender_resource_list Participant's send resource list.
+     * @param locator_selector_entry Locator selector entry with the remote entity locators.
+     *
+     * @return true if the channel was correctly opened or if finding an already opened one.
+     */
+    virtual bool OpenOutputChannels(
+            SendResourceList& sender_resource_list,
+            const fastrtps::rtps::LocatorSelectorEntry& locator_selector_entry);
+
+    /**
+     * Close the channel that maps to/from the given locator selector entry.
+     *
+     * @param sender_resource_list Participant's send resource list.
+     * @param locator_selector_entry Locator selector entry with the remote entity locators.
+     */
+    virtual void CloseOutputChannels(
+            SendResourceList& sender_resource_list,
+            const fastrtps::rtps::LocatorSelectorEntry& locator_selector_entry);
 
     /** Opens an input channel to receive incoming connections.
      *   If there is an existing channel it registers the receiver interface.
@@ -274,6 +305,12 @@ public:
     virtual bool is_localhost_allowed() const
     {
         return true;
+    }
+
+    //! Returns netmask filter information (transport's netmask filter kind and allowlist)
+    virtual NetmaskFilterInfo netmask_filter_info() const
+    {
+        return {NetmaskFilterKind::AUTO, {}};
     }
 
 protected:

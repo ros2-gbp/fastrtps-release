@@ -33,7 +33,7 @@
 
 #include <fastdds/core/policy/ParameterList.hpp>
 #include <rtps/builtin/discovery/participant/PDPEndpoints.hpp>
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
+#include <rtps/network/utils/external_locators.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <mutex>
@@ -107,7 +107,7 @@ void PDPListener::onNewCacheChangeAdded(
         CDRMessage_t msg(change->serializedPayload);
         temp_participant_data_.clear();
         if (temp_participant_data_.readFromCDRMessage(&msg, true, parent_pdp_->getRTPSParticipant()->network_factory(),
-                parent_pdp_->getRTPSParticipant()->has_shm_transport(), true))
+                parent_pdp_->getRTPSParticipant()->has_shm_transport(), true, change_in->vendor_id))
         {
             // After correctly reading it
             change->instanceHandle = temp_participant_data_.m_key;
@@ -120,7 +120,7 @@ void PDPListener::onNewCacheChangeAdded(
 
             // Filter locators
             const auto& pattr = parent_pdp_->getRTPSParticipant()->getAttributes();
-            fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators(temp_participant_data_,
+            fastdds::rtps::network::external_locators::filter_remote_locators(temp_participant_data_,
                     pattr.builtin.metatraffic_external_unicast_locators, pattr.default_external_unicast_locators,
                     pattr.ignore_non_matching_locators);
 
@@ -194,11 +194,14 @@ void PDPListener::process_alive_data(
         // Create a new one when not found
         old_data = parent_pdp_->createParticipantProxyData(new_data, writer_guid);
 
-        reader->getMutex().unlock();
-        lock.unlock();
-
         if (old_data != nullptr)
         {
+            // Copy proxy to be passed forward before releasing PDP mutex
+            ParticipantProxyData old_data_copy(*old_data);
+
+            reader->getMutex().unlock();
+            lock.unlock();
+
             // Assigning remote endpoints implies sending a DATA(p) to all matched and fixed readers, since
             // StatelessWriter::matched_reader_add marks the entire history as unsent if the added reader's
             // durability is bigger or equal to TRANSIENT_LOCAL_DURABILITY_QOS (TRANSIENT_LOCAL or TRANSIENT),
@@ -209,13 +212,19 @@ void PDPListener::process_alive_data(
             // participant is discovered in the middle of BuiltinProtocols::initBuiltinProtocols, which will
             // create the first DATA(p) upon finishing, thus triggering the sent to all fixed and matched
             // readers anyways.
-            parent_pdp_->assignRemoteEndpoints(old_data);
+            parent_pdp_->assignRemoteEndpoints(&old_data_copy);
+        }
+        else
+        {
+            reader->getMutex().unlock();
+            lock.unlock();
         }
     }
     else
     {
         old_data->updateData(new_data);
         old_data->isAlive = true;
+
         reader->getMutex().unlock();
 
         EPROSIMA_LOG_INFO(RTPS_PDP_DISCOVERY, "Update participant "
@@ -228,6 +237,9 @@ void PDPListener::process_alive_data(
             parent_pdp_->mp_EDP->assignRemoteEndpoints(*old_data, true);
         }
 
+        // Copy proxy to be passed forward before releasing PDP mutex
+        ParticipantProxyData old_data_copy(*old_data);
+
         lock.unlock();
 
         RTPSParticipantListener* listener = parent_pdp_->getRTPSParticipant()->getListener();
@@ -237,7 +249,7 @@ void PDPListener::process_alive_data(
 
             {
                 std::lock_guard<std::mutex> cb_lock(parent_pdp_->callback_mtx_);
-                ParticipantDiscoveryInfo info(*old_data);
+                ParticipantDiscoveryInfo info(old_data_copy);
                 info.status = ParticipantDiscoveryInfo::CHANGED_QOS_PARTICIPANT;
 
                 listener->onParticipantDiscovery(
