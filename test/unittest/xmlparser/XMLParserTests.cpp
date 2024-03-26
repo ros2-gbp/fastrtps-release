@@ -23,6 +23,9 @@
 #include <fastdds/dds/log/StdoutConsumer.hpp>
 #include <fastdds/dds/log/StdoutErrConsumer.hpp>
 #include <fastdds/rtps/attributes/ThreadSettings.hpp>
+#include <fastdds/rtps/transport/network/AllowedNetworkInterface.hpp>
+#include <fastdds/rtps/transport/network/BlockedNetworkInterface.hpp>
+#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
 #include <fastdds/rtps/transport/PortBasedTransportDescriptor.hpp>
 #include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
@@ -71,6 +74,7 @@ TEST_F(XMLParserTests, regressions)
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/simple_participant_profiles_nok.xml", root));
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParser::loadXML("regressions/simple_participant_profiles_ok.xml", root));
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/20186_profile_bin.xml", root));
+    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/20187_profile_bin.xml", root));
 }
 
 TEST_F(XMLParserTests, NoFile)
@@ -866,7 +870,9 @@ TEST_F(XMLParserTests, loadXMLProfiles)
  */
 TEST_F(XMLParserTests, parseXMLTransportData)
 {
-    eprosima::fastdds::rtps::ThreadSettings modified_thread_settings;
+    using namespace eprosima::fastdds::rtps;
+
+    ThreadSettings modified_thread_settings;
     modified_thread_settings.scheduling_policy = 12;
     modified_thread_settings.priority = 12;
     modified_thread_settings.affinity = 12;
@@ -891,9 +897,19 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     <interfaceWhiteList>\
                         <address>192.168.1.41</address>\
                         <address>127.0.0.1</address>\
-                        <address>wlp0s20f3</address>\
-                        <address>lo</address>\
+                        <interface>wlp0s20f3</interface>\
+                        <interface>lo</interface>\
                     </interfaceWhiteList>\
+                    <netmask_filter>ON</netmask_filter>\
+                    <interfaces>\
+                        <allowlist>\
+                            <interface name=\"wlp59s0\" netmask_filter=\"ON\"/>\
+                            <interface name=\"127.0.0.1\" netmask_filter=\"AUTO\"/>\
+                        </allowlist>\
+                        <blocklist>\
+                            <interface name=\"docker0\"/>\
+                        </blocklist>\
+                    </interfaces>\
                     <wan_addr>80.80.55.44</wan_addr>\
                     <output_port>5101</output_port>\
                     <keep_alive_frequency_ms>5000</keep_alive_frequency_ms>\
@@ -935,7 +951,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     </reception_threads>\
                 </transport_descriptor>\
                 ";
-        constexpr size_t xml_len {3000};
+        constexpr size_t xml_len {3500};
         char xml[xml_len];
 
         // UDPv4
@@ -956,6 +972,10 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[1], "127.0.0.1");
         EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[2], "wlp0s20f3");
         EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[3], "lo");
+        EXPECT_EQ(pUDPv4Desc->netmask_filter, NetmaskFilterKind::ON);
+        EXPECT_EQ(pUDPv4Desc->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
+        EXPECT_EQ(pUDPv4Desc->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
+        EXPECT_EQ(pUDPv4Desc->interface_blocklist[0], BlockedNetworkInterface("docker0"));
         EXPECT_EQ(pUDPv4Desc->m_output_udp_socket, 5101u);
         EXPECT_EQ(pUDPv4Desc->default_reception_threads(), modified_thread_settings);
         EXPECT_EQ(pUDPv4Desc->get_thread_config_for_port(12345), modified_thread_settings);
@@ -979,8 +999,12 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pUDPv6Desc->max_initial_peers_range(), 100u);
         EXPECT_EQ(pUDPv6Desc->interfaceWhiteList[0], "192.168.1.41");
         EXPECT_EQ(pUDPv6Desc->interfaceWhiteList[1], "127.0.0.1");
-        EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[2], "wlp0s20f3");
-        EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[3], "lo");
+        EXPECT_EQ(pUDPv6Desc->interfaceWhiteList[2], "wlp0s20f3");
+        EXPECT_EQ(pUDPv6Desc->interfaceWhiteList[3], "lo");
+        EXPECT_EQ(pUDPv6Desc->netmask_filter, NetmaskFilterKind::ON);
+        EXPECT_EQ(pUDPv6Desc->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
+        EXPECT_EQ(pUDPv6Desc->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
+        EXPECT_EQ(pUDPv6Desc->interface_blocklist[0], BlockedNetworkInterface("docker0"));
         EXPECT_EQ(pUDPv6Desc->m_output_udp_socket, 5101u);
         EXPECT_EQ(pUDPv6Desc->default_reception_threads(), modified_thread_settings);
         EXPECT_EQ(pUDPv6Desc->get_thread_config_for_port(12345), modified_thread_settings);
@@ -1005,8 +1029,18 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     <maxInitialPeersRange>100</maxInitialPeersRange>\
                     <interfaceWhiteList>\
                         <address>192.168.1.41</address>\
-                        <address>127.0.0.1</address>\
+                        <interface>lo</interface>\
                     </interfaceWhiteList>\
+                    <netmask_filter>ON</netmask_filter>\
+                    <interfaces>\
+                        <allowlist>\
+                            <interface name=\"wlp59s0\" netmask_filter=\"ON\"/>\
+                            <interface name=\"127.0.0.1\" netmask_filter=\"AUTO\"/>\
+                        </allowlist>\
+                        <blocklist>\
+                            <interface name=\"docker0\"/>\
+                        </blocklist>\
+                    </interfaces>\
                     <wan_addr>80.80.55.44</wan_addr>\
                     <keep_alive_frequency_ms>5000</keep_alive_frequency_ms>\
                     <keep_alive_timeout_ms>25000</keep_alive_timeout_ms>\
@@ -1020,6 +1054,8 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     <calculate_crc>false</calculate_crc>\
                     <check_crc>false</check_crc>\
                     <enable_tcp_nodelay>false</enable_tcp_nodelay>\
+                    <non_blocking_send>true</non_blocking_send>\
+                    <tcp_negotiation_timeout>100</tcp_negotiation_timeout>\
                     <tls><!-- TLS Section --></tls>\
                     <keep_alive_thread>\
                         <scheduling_policy>12</scheduling_policy>\
@@ -1055,7 +1091,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     </reception_threads>\
                 </transport_descriptor>\
                 ";
-        constexpr size_t xml_len {3500};
+        constexpr size_t xml_len {4000};
         char xml[xml_len];
 
         // TCPv4
@@ -1072,7 +1108,11 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pTCPv4Desc->max_message_size(), 16384u);
         EXPECT_EQ(pTCPv4Desc->max_initial_peers_range(), 100u);
         EXPECT_EQ(pTCPv4Desc->interfaceWhiteList[0], "192.168.1.41");
-        EXPECT_EQ(pTCPv4Desc->interfaceWhiteList[1], "127.0.0.1");
+        EXPECT_EQ(pTCPv4Desc->interfaceWhiteList[1], "lo");
+        EXPECT_EQ(pTCPv4Desc->netmask_filter, NetmaskFilterKind::ON);
+        EXPECT_EQ(pTCPv4Desc->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
+        EXPECT_EQ(pTCPv4Desc->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
+        EXPECT_EQ(pTCPv4Desc->interface_blocklist[0], BlockedNetworkInterface("docker0"));
         EXPECT_EQ(pTCPv4Desc->wan_addr[0], (octet)80);
         EXPECT_EQ(pTCPv4Desc->wan_addr[1], (octet)80);
         EXPECT_EQ(pTCPv4Desc->wan_addr[2], (octet)55);
@@ -1086,7 +1126,9 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pTCPv4Desc->listening_ports[0], 5100u);
         EXPECT_EQ(pTCPv4Desc->listening_ports[1], 5200u);
         EXPECT_EQ(pTCPv4Desc->keep_alive_thread, modified_thread_settings);
+        EXPECT_EQ(pTCPv4Desc->non_blocking_send, true);
         EXPECT_EQ(pTCPv4Desc->accept_thread, modified_thread_settings);
+        EXPECT_EQ(pTCPv4Desc->tcp_negotiation_timeout, 100u);
         EXPECT_EQ(pTCPv4Desc->default_reception_threads(), modified_thread_settings);
         EXPECT_EQ(pTCPv4Desc->get_thread_config_for_port(12345), modified_thread_settings);
         EXPECT_EQ(pTCPv4Desc->get_thread_config_for_port(12346), modified_thread_settings);
@@ -1106,7 +1148,11 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pTCPv6Desc->max_message_size(), 16384u);
         EXPECT_EQ(pTCPv6Desc->max_initial_peers_range(), 100u);
         EXPECT_EQ(pTCPv6Desc->interfaceWhiteList[0], "192.168.1.41");
-        EXPECT_EQ(pTCPv6Desc->interfaceWhiteList[1], "127.0.0.1");
+        EXPECT_EQ(pTCPv6Desc->interfaceWhiteList[1], "lo");
+        EXPECT_EQ(pTCPv6Desc->netmask_filter, NetmaskFilterKind::ON);
+        EXPECT_EQ(pTCPv6Desc->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
+        EXPECT_EQ(pTCPv6Desc->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
+        EXPECT_EQ(pTCPv6Desc->interface_blocklist[0], BlockedNetworkInterface("docker0"));
         EXPECT_EQ(pTCPv6Desc->keep_alive_frequency_ms, 5000u);
         EXPECT_EQ(pTCPv6Desc->keep_alive_timeout_ms, 25000u);
         EXPECT_EQ(pTCPv6Desc->max_logical_port, 9000u);
@@ -1115,8 +1161,10 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pTCPv6Desc->logical_port_increment, 2u);
         EXPECT_EQ(pTCPv6Desc->listening_ports[0], 5100u);
         EXPECT_EQ(pTCPv6Desc->listening_ports[1], 5200u);
-        EXPECT_EQ(pTCPv4Desc->keep_alive_thread, modified_thread_settings);
-        EXPECT_EQ(pTCPv4Desc->accept_thread, modified_thread_settings);
+        EXPECT_EQ(pTCPv6Desc->keep_alive_thread, modified_thread_settings);
+        EXPECT_EQ(pTCPv6Desc->non_blocking_send, true);
+        EXPECT_EQ(pTCPv6Desc->accept_thread, modified_thread_settings);
+        EXPECT_EQ(pTCPv6Desc->tcp_negotiation_timeout, 100u);
         EXPECT_EQ(pTCPv6Desc->default_reception_threads(), modified_thread_settings);
         EXPECT_EQ(pTCPv6Desc->get_thread_config_for_port(12345), modified_thread_settings);
         EXPECT_EQ(pTCPv6Desc->get_thread_config_for_port(12346), modified_thread_settings);
@@ -1171,8 +1219,8 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
         titleElement = xml_doc.RootElement();
         EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::parseXMLTransportData_wrapper(titleElement));
-        std::shared_ptr<eprosima::fastdds::rtps::SharedMemTransportDescriptor> pSHMDesc =
-                std::dynamic_pointer_cast<eprosima::fastdds::rtps::SharedMemTransportDescriptor>(
+        std::shared_ptr<SharedMemTransportDescriptor> pSHMDesc =
+                std::dynamic_pointer_cast<SharedMemTransportDescriptor>(
             xmlparser::XMLProfileManager::getTransportById("TransportId1"));
         EXPECT_EQ(pSHMDesc->segment_size(), 262144u);
         EXPECT_EQ(pSHMDesc->port_queue_capacity(), 512u);
@@ -1214,6 +1262,8 @@ TEST_F(XMLParserTests, parseXMLTransportData_NegativeClauses)
         "TTL",
         "non_blocking_send",
         "interfaceWhiteList",
+        "netmask_filter",
+        "interfaces",
         "output_port",
         "default_reception_threads",
         "reception_threads",
@@ -1228,6 +1278,8 @@ TEST_F(XMLParserTests, parseXMLTransportData_NegativeClauses)
         "receiveBufferSize",
         "TTL",
         "interfaceWhiteList",
+        "netmask_filter",
+        "interfaces",
         "keep_alive_frequency_ms",
         "keep_alive_timeout_ms",
         "max_logical_port",
@@ -1236,9 +1288,11 @@ TEST_F(XMLParserTests, parseXMLTransportData_NegativeClauses)
         "calculate_crc",
         "check_crc",
         "enable_tcp_nodelay",
+        "non_blocking_send",
         "tls",
         "keep_alive_thread",
         "accept_thread",
+        "tcp_negotiation_timeout",
         "default_reception_threads",
         "reception_threads",
         "bad_element"
