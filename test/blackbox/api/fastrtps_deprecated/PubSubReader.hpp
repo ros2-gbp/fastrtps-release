@@ -333,7 +333,8 @@ public:
 
             if (subscriber_ != nullptr)
             {
-                std::cout << "Created subscriber " << subscriber_->getGuid() << " for topic " <<
+                subscriber_guid_ = subscriber_->getGuid();
+                std::cout << "Created subscriber " << subscriber_guid_ << " for topic " <<
                     subscriber_attr_.topic.topicName << std::endl;
 
                 initialized_ = true;
@@ -353,6 +354,8 @@ public:
             eprosima::fastrtps::Domain::removeParticipant(participant_);
             participant_ = nullptr;
         }
+
+        initialized_ = false;
     }
 
     std::list<type> data_not_received()
@@ -740,9 +743,18 @@ public:
         return *this;
     }
 
+    PubSubReader& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports,
+            const eprosima::fastdds::rtps::BuiltinTransportsOptions& options)
+    {
+        participant_attr_.rtps.setup_transports(transports, options);
+        return *this;
+    }
+
     PubSubReader& setup_large_data_tcp(
             bool v6 = false,
-            const uint16_t& port = 0)
+            const uint16_t& port = 0,
+            const uint32_t& tcp_negotiation_timeout = 0)
     {
         participant_attr_.rtps.useBuiltinTransports = false;
 
@@ -758,6 +770,11 @@ public:
 
             auto data_transport = std::make_shared<eprosima::fastdds::rtps::TCPv6TransportDescriptor>();
             data_transport->add_listener_port(tcp_listening_port);
+            data_transport->calculate_crc = false;
+            data_transport->check_crc = false;
+            data_transport->apply_security = false;
+            data_transport->enable_tcp_nodelay = true;
+            data_transport->tcp_negotiation_timeout = tcp_negotiation_timeout;
             participant_attr_.rtps.userTransports.push_back(data_transport);
         }
         else
@@ -767,6 +784,11 @@ public:
 
             auto data_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
             data_transport->add_listener_port(tcp_listening_port);
+            data_transport->calculate_crc = false;
+            data_transport->check_crc = false;
+            data_transport->apply_security = false;
+            data_transport->enable_tcp_nodelay = true;
+            data_transport->tcp_negotiation_timeout = tcp_negotiation_timeout;
             participant_attr_.rtps.userTransports.push_back(data_transport);
         }
 
@@ -1412,6 +1434,11 @@ public:
         return participant_guid_;
     }
 
+    const eprosima::fastrtps::rtps::GUID_t& datareader_guid() const
+    {
+        return subscriber_guid_;
+    }
+
 private:
 
     void receive_one(
@@ -1503,6 +1530,7 @@ private:
     eprosima::fastrtps::SubscriberAttributes subscriber_attr_;
     std::string topic_name_;
     eprosima::fastrtps::rtps::GUID_t participant_guid_;
+    eprosima::fastrtps::rtps::GUID_t subscriber_guid_;
     bool initialized_;
     std::list<type> total_msgs_;
     std::mutex mutex_;

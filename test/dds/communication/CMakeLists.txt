@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-find_package(PythonInterp 3)
+find_package(Python3 COMPONENTS Interpreter)
 
 add_definitions(
     -DBOOST_ASIO_STANDALONE
@@ -46,7 +46,7 @@ target_compile_definitions(DDSSimpleCommunicationDynamicSubscriber PRIVATE
     )
 target_link_libraries(DDSSimpleCommunicationDynamicSubscriber fastrtps fastcdr foonathan_memory ${CMAKE_DL_LIBS})
 
-# Standar tests
+# Standard tests
 set(COMMON_SOURCE
     ${PROJECT_SOURCE_DIR}/test/blackbox/types/HelloWorld.cxx
     ${PROJECT_SOURCE_DIR}/test/blackbox/types/HelloWorldv1.cxx
@@ -115,6 +115,7 @@ list(APPEND TEST_DEFINITIONS
     zero_copy_sub_communication
     mix_zero_copy_communication
     close_TCP_client
+    simple_data_sharing_stress
     )
 
 
@@ -125,10 +126,24 @@ list(APPEND XML_CONFIGURATION_FILES
     simple_besteffort_zerocopy_profile.xml
     TCP_server_profile.xml
     TCP_client_profile.xml
+    liveliness_assertion_profile.xml
+    liveliness_assertion.360_profile.xml
+    shm_communication_subscriber_dies_while_processing_message_profile.xml
     )
-# Python file
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_build.py
-    ${CMAKE_CURRENT_BINARY_DIR}/test_build.py COPYONLY)
+
+list(APPEND PYTHON_FILES
+    test_build.py
+    liveliness_assertion.py
+    automatic_liveliness_assertion.py
+    shm_communication_subscriber_dies_while_processing_message.py
+    two_publishers_communication.py
+    )
+
+# Python files
+foreach(PY_FILE IN LISTS PYTHON_FILES)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${PY_FILE}
+        ${CMAKE_CURRENT_BINARY_DIR}/${PY_FILE} COPYONLY)
+endforeach()
 
 # XML files
 foreach(XML_FILE IN LISTS XML_CONFIGURATION_FILES)
@@ -142,6 +157,9 @@ foreach(TEST_FILE IN LISTS TEST_DEFINITIONS)
         ${CMAKE_CURRENT_BINARY_DIR}/${TEST_FILE}.json COPYONLY)
 endforeach()
 
+# Cmake file
+configure_file(${PROJECT_SOURCE_DIR}/cmake/common/test_wrapper.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/test_wrapper.cmake @ONLY)
 
 if(SECURITY)
     configure_file(${PROJECT_SOURCE_DIR}/test/certs/maincacert.pem
@@ -164,10 +182,10 @@ endif()
 ###############################################################################
 # Tests specification
 ###############################################################################
-if(PYTHONINTERP_FOUND)
+if(Python3_Interpreter_FOUND)
     # Dynamic types test
     add_test(NAME DDSSimpleCommunicationTypeDiscovery
-        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/simple_communication_dynamic.py)
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/simple_communication_dynamic.py)
 
     # Set test with label NoMemoryCheck
     set_property(TEST DDSSimpleCommunicationTypeDiscovery PROPERTY LABELS "NoMemoryCheck")
@@ -189,7 +207,7 @@ if(PYTHONINTERP_FOUND)
         set(TEST_NAME DDSCommunication_${TEST_DEFINITION})
         add_test(
             NAME ${TEST_NAME}
-            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/${TEST_BUILDER}
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/${TEST_BUILDER}
             ${TEST_DEFINITION}.json
             )
 
@@ -208,4 +226,91 @@ if(PYTHONINTERP_FOUND)
                 "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
         endif()
     endforeach()
+
+    # Liveliness tests
+    add_test(NAME LivelinessAssertion
+        COMMAND ${CMAKE_COMMAND} -DACTUAL_TEST=${PYTHON_EXECUTABLE} -DACTUAL_ARGS=${CMAKE_CURRENT_BINARY_DIR}/liveliness_assertion.py -P ${CMAKE_CURRENT_BINARY_DIR}/test_wrapper.cmake)
+    # Set test with label NoMemoryCheck
+    set_property(TEST LivelinessAssertion PROPERTY LABELS "NoMemoryCheck")
+
+    set_property(TEST LivelinessAssertion PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:DDSCommunicationPublisher>")
+    set_property(TEST LivelinessAssertion APPEND PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:DDSCommunicationSubscriber>")
+    if(WIN32)
+        string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+        set_property(TEST LivelinessAssertion APPEND PROPERTY ENVIRONMENT
+            "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+    endif()
+
+    add_test(NAME AutomaticLivelinessAssertion
+        COMMAND ${CMAKE_COMMAND} -DACTUAL_TEST=${PYTHON_EXECUTABLE} -DACTUAL_ARGS=${CMAKE_CURRENT_BINARY_DIR}/automatic_liveliness_assertion.py -P ${CMAKE_CURRENT_BINARY_DIR}/test_wrapper.cmake)
+    # Set test with label NoMemoryCheck
+    set_property(TEST AutomaticLivelinessAssertion PROPERTY LABELS "NoMemoryCheck")
+
+    set_property(TEST AutomaticLivelinessAssertion PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:DDSCommunicationPublisher>")
+    set_property(TEST AutomaticLivelinessAssertion APPEND PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:DDSCommunicationSubscriber>")
+    if(WIN32)
+        string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+        set_property(TEST AutomaticLivelinessAssertion APPEND PROPERTY ENVIRONMENT
+            "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+    endif()
+
+    # Shm test
+    add_test(NAME SHMCommunicationSubscriberDiesWhileProcessingMessage
+    COMMAND ${CMAKE_COMMAND} -DACTUAL_TEST=${PYTHON_EXECUTABLE} -DACTUAL_ARGS=${CMAKE_CURRENT_BINARY_DIR}/shm_communication_subscriber_dies_while_processing_message.py -P ${CMAKE_CURRENT_BINARY_DIR}/test_wrapper.cmake)
+
+    # Set test with label NoMemoryCheck
+    set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage PROPERTY LABELS "NoMemoryCheck")
+
+    set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:DDSCommunicationPublisher>")
+    set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage APPEND PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:DDSCommunicationSubscriber>")
+    set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage APPEND PROPERTY ENVIRONMENT
+        "XML_FILE=shm_communication_subscriber_dies_while_processing_message_profile.xml")
+    if(WIN32)
+        string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+        set_property(TEST SHMCommunicationSubscriberDiesWhileProcessingMessage APPEND PROPERTY ENVIRONMENT
+            "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+    endif()
+
+    add_test(NAME TwoPublishersCommunicationBestEffort
+    COMMAND ${CMAKE_COMMAND} -DACTUAL_TEST=${PYTHON_EXECUTABLE} -DACTUAL_ARGS=${CMAKE_CURRENT_BINARY_DIR}/two_publishers_communication.py -P ${CMAKE_CURRENT_BINARY_DIR}/test_wrapper.cmake)
+
+    # Set test with label NoMemoryCheck
+    set_property(TEST TwoPublishersCommunicationBestEffort PROPERTY LABELS "NoMemoryCheck")
+
+    set_property(TEST TwoPublishersCommunicationBestEffort PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:DDSCommunicationPublisher>")
+    set_property(TEST TwoPublishersCommunicationBestEffort APPEND PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:DDSCommunicationSubscriber>")
+    set_property(TEST TwoPublishersCommunicationBestEffort APPEND PROPERTY ENVIRONMENT
+        "XML_FILE=simple_besteffort_profile.xml")
+    if(WIN32)
+        string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+        set_property(TEST TwoPublishersCommunicationBestEffort APPEND PROPERTY ENVIRONMENT
+            "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+    endif()
+
+    add_test(NAME TwoPublishersCommunicationReliable
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/two_publishers_communication.py)
+
+    # Set test with label NoMemoryCheck
+    set_property(TEST TwoPublishersCommunicationReliable PROPERTY LABELS "NoMemoryCheck")
+
+    set_property(TEST TwoPublishersCommunicationReliable PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_PUBLISHER_BIN=$<TARGET_FILE:DDSCommunicationPublisher>")
+    set_property(TEST TwoPublishersCommunicationReliable APPEND PROPERTY ENVIRONMENT
+        "DDS_SIMPLE_COMMUNICATION_SUBSCRIBER_BIN=$<TARGET_FILE:DDSCommunicationSubscriber>")
+    set_property(TEST TwoPublishersCommunicationReliable APPEND PROPERTY ENVIRONMENT
+        "XML_FILE=simple_reliable_profile.xml")
+    if(WIN32)
+        string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")
+        set_property(TEST TwoPublishersCommunicationReliable APPEND PROPERTY ENVIRONMENT
+            "PATH=$<TARGET_FILE_DIR:${PROJECT_NAME}>\\;$<TARGET_FILE_DIR:fastcdr>\\;${WIN_PATH}")
+    endif()
+
 endif()
