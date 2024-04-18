@@ -259,7 +259,8 @@ tracks:
     ros_distro: jazzy
     vcs_type: git
     vcs_uri: https://github.com/eProsima/Fast-DDS.git
-    version: :{auto}
+    version: 2.14.0
+    version_saved: :{auto}
   r2b2:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
