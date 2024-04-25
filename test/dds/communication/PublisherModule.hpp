@@ -80,9 +80,12 @@ public:
 
     void run(
             uint32_t samples,
-            uint32_t loops = 0);
+            uint32_t loops = 0,
+            uint32_t interval = 250);
 
 private:
+
+    using DomainParticipantListener::on_participant_discovery;
 
     std::mutex mutex_;
     std::condition_variable cv_;

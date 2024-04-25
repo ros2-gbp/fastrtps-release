@@ -525,7 +525,7 @@ bool StatelessReader::processDataMsg(
                 logWarning(RTPS_MSG_IN, IDSTRING "Problem copying CacheChange, received data is: "
                         << change->serializedPayload.length << " bytes and max size in reader "
                         << m_guid << " is "
-                        << (fixed_payload_size_ > 0 ? fixed_payload_size_ : std::numeric_limits<uint32_t>::max()));
+                        << (fixed_payload_size_ > 0 ? fixed_payload_size_ : (std::numeric_limits<uint32_t>::max)()));
                 change_pool_->release_cache(change_to_add);
                 return false;
             }
@@ -606,6 +606,7 @@ bool StatelessReader::processDataFragMsg(
                             // Sample fits inside pending change. Reuse it.
                             work_change->copy_not_memcpy(change_to_add);
                             work_change->serializedPayload.length = sampleSize;
+                            work_change->instanceHandle.clear();
                             work_change->setFragmentSize(change_to_add->getFragmentSize(), true);
                         }
                         else
@@ -631,6 +632,7 @@ bool StatelessReader::processDataFragMsg(
                         {
                             work_change->copy_not_memcpy(change_to_add);
                             work_change->serializedPayload.length = sampleSize;
+                            work_change->instanceHandle.clear();
                             work_change->setFragmentSize(change_to_add->getFragmentSize(), true);
                         }
                     }
@@ -640,6 +642,12 @@ bool StatelessReader::processDataFragMsg(
                 CacheChange_t* change_completed = nullptr;
                 if (work_change != nullptr)
                 {
+                    // Set the instanceHandle only when fragment number 1 is received
+                    if (!work_change->instanceHandle.isDefined() && fragmentStartingNum == 1)
+                    {
+                        work_change->instanceHandle = change_to_add->instanceHandle;
+                    }
+
                     if (work_change->add_fragments(change_to_add->serializedPayload, fragmentStartingNum,
                             fragmentsInSubmessage))
                     {
