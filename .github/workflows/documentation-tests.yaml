@@ -2,23 +2,18 @@ name: Documentation build and test
 on:
   workflow_dispatch:
     inputs:
-      documentation_branch:
-        description: 'Documentation branch name'
+      fastdds_docs_branch:
+        description: 'Fast DDS Docs branch'
         required: true
         type: string
-        default: '2.6.x'
-
-  push:
-    branches:
-      - '2.6.x'
-    paths-ignore:
-      - '**.md'
-      - '**.txt'
-      - '!**/CMakeLists.txt'
+      fastdds_python_branch:
+        description: 'Fast DDS Python branch'
+        required: true
+        type: string
 
   pull_request:
-    branches:
-      - '2.6.x'
+    types:
+      - review_requested
     paths-ignore:
       - '**.md'
       - '**.txt'
@@ -28,108 +23,135 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  ACTION_BRANCH_NAME: ${{ github.ref }}
-
 jobs:
   ubuntu-build-and-test-documentation:
     name: Documentation build and test
-
-    if: ${{ !(contains(github.event.pull_request.labels.*.name, 'no-test') ||
-              contains(github.event.pull_request.labels.*.name, 'skip-ci')) }}
+    if: ${{ (
+              !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
+              !contains(github.event.pull_request.labels.*.name, 'conflicts')
+            ) }}
 
     runs-on: ubuntu-22.04
     steps:
+      - name: Add ci-pending label if PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: eProsima/eProsima-CI/external/add_labels@v0
+        with:
+          labels: ci-pending
+          number: ${{ github.event.number }}
+          repo: eProsima/Fast-DDS
+
       - name: Sync eProsima/Fast-DDS repository
-        uses: actions/checkout@v3
+        uses: eProsima/eProsima-CI/external/checkout@v0
         with:
           path: src/fastrtps
           submodules: true
 
-      - name: Install Fast DDS packages
-        uses: ./src/fastrtps/.github/actions/install-apt-packages
-
-      - name: Install documentation packages
-        uses: ./src/fastrtps/.github/actions/install-apt-packages-documentation
+      - name: Get minimum supported version of CMake
+        uses: eProsima/eProsima-CI/external/get-cmake@v0
+        with:
+          cmakeVersion: '3.22.6'
 
       - name: Setup CCache
         uses: eProsima/eProsima-CI/external/setup-ccache-action@v0
 
-      - name: Download FastDDS dependencies
-        run: |
-          pip3 install vcstool
-          vcs import --skip-existing src < ./src/fastrtps/fastrtps.repos
-
-      - name: Determine the Fast DDS Documentation branch to be used
-        run: |
-          if [[ ${{ github.event_name }} == "push" ]]
-          then
-            echo "ACTION_BRANCH_NAME=${{ github.ref }}" >> $GITHUB_ENV
-            echo "Push event: using pushed branch '${{ github.ref }}' for docs repository"
-
-          elif [[ ${{ github.event_name }} == "workflow_dispatch" ]]
-          then
-            echo "ACTION_BRANCH_NAME=${{ inputs.documentation_branch }}" >> $GITHUB_ENV
-            echo "Workflow dispatch event: using input branch '${{ inputs.documentation_branch }}' for docs repository"
-
-          elif [[ ${{ github.event_name }} == "pull_request" ]]
-          then
-            DOCS_REPO=https://github.com/eProsima/fast-dds-docs.git
-
-            # Attempt to use PR's source branch
-            TEMP_BRANCH=${{ github.head_ref }}
-            RESPONSE_CODE=$(git ls-remote --heads $DOCS_REPO $TEMP_BRANCH | wc -l)
-
-            if [[ ${RESPONSE_CODE} == "0" ]]
-            then
-              echo "PR source branch '$TEMP_BRANCH' branch DOES NOT exist in $DOCS_REPO"
-
-              # Attempt to use PR's base branch
-              TEMP_BRANCH=${{ github.base_ref }}
-              RESPONSE_CODE=$(git ls-remote --heads $DOCS_REPO $TEMP_BRANCH | wc -l)
-
-              if [[ ${RESPONSE_CODE} == "0" ]]
-              then
-                echo "PR base branch '$TEMP_BRANCH' branch DOES NOT exist in $DOCS_REPO"
-
-                # Attempt to use version's branch, which will most likely be the base anyways.
-                # This is just in case the PR was to an intermediate branch
-                TEMP_BRANCH=2.6.x
-                RESPONSE_CODE=$(git ls-remote --heads $DOCS_REPO $TEMP_BRANCH | wc -l)
-
-                if [[ ${RESPONSE_CODE} == "0" ]]
-                then
-                  # There are no more fallbacks, so we need to fail here
-                  echo "Version branch '$TEMP_BRANCH' branch DOES NOT exist in $DOCS_REPO"
-                  exit 1
-                fi
-              fi
-            fi
-
-            echo "ACTION_BRANCH_NAME=$TEMP_BRANCH" >> $GITHUB_ENV
-            echo "PR event: using deduced branch '$TEMP_BRANCH' for docs repository"
-          fi
-
-      - name: Download FastDDS documentation repo
-        uses: actions/checkout@v4
+      - name: Install apt dependencies
+        uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
         with:
-          repository: eProsima/Fast-DDS-docs
-          path: src/fastdds-docs
-          ref: ${{ env.ACTION_BRANCH_NAME }}
+          packages: curl grep wget libssl-dev doxygen imagemagick plantuml
+          update: false
+          upgrade: false
+
+      - name: Install Python dependencies
+        uses: eProsima/eProsima-CI/multiplatform/install_python_packages@v0
+        with:
+          packages: vcstool
+          upgrade: false
 
       - name: Install colcon
         uses: eProsima/eProsima-CI/ubuntu/install_colcon@v0
 
-      - name: Install required python packages
+      - name: Download Fast DDS .repos
+        uses: eProsima/eProsima-CI/ubuntu/vcs_import@v0
+        with:
+          vcs_repos_file: ./src/fastrtps/fastrtps.repos
+          destination_workspace: src
+          skip_existing: 'true'
+
+      - name: Fetch Fast DDS CI dependencies
+        uses: eProsima/eProsima-CI/multiplatform/vcs_import@v0
+        with:
+          vcs_repos_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/ci.repos
+          destination_workspace: src
+          skip_existing: 'true'
+
+      - name: Get Fast DDS Python branch
+        id: get_fastdds_python_branch
+        uses: eProsima/eProsima-CI/ubuntu/get_related_branch_from_repo@v0
+        with:
+          remote_repository: eProsima/Fast-DDS-python
+          fallback_branch: ${{ inputs.fastdds_python_branch || '1.0.x' }}
+
+      - name: Download Fast DDS Python repo
+        uses: eProsima/eProsima-CI/external/checkout@v0
+        with:
+          repository: eProsima/Fast-DDS-python
+          path: src/fastdds-python
+          ref: ${{ steps.get_fastdds_python_branch.outputs.deduced_branch }}
+
+      - name: Get Fast DDS Docs branch
+        id: get_fastdds_docs_branch
+        uses: eProsima/eProsima-CI/ubuntu/get_related_branch_from_repo@v0
+        with:
+          remote_repository: eProsima/Fast-DDS-docs
+          fallback_branch: ${{ inputs.fastdds_docs_branch || '2.6.x' }}
+
+      - name: Download Fast DDS documentation repo
+        uses: eProsima/eProsima-CI/external/checkout@v0
+        with:
+          repository: eProsima/Fast-DDS-docs
+          path: src/fastdds-docs
+          ref: ${{ steps.get_fastdds_docs_branch.outputs.deduced_branch }}
+
+      - name: Install Fast DDS Docs required python packages
         uses: eProsima/eProsima-CI/ubuntu/install_python_packages@v0
         with:
           upgrade: false
           requirements_file_name: src/fastdds-docs/docs/requirements.txt
 
-      - name: Build documentation
-        run: |
-          colcon build --event-handlers=console_direct+ --metas
+      - name: Colcon build
+        continue-on-error: false
+        uses: eProsima/eProsima-CI/multiplatform/colcon_build@v0
+        with:
+          colcon_meta_file: './src/fastrtps/.github/workflows/config/documentation.meta'
+          colcon_build_args: ''
+          colcon_build_args_default: ''
+          cmake_args: ''
+          cmake_args_default: ''
+          cmake_build_type: Release
+          workspace: ${{ github.workspace }}
+          workspace_dependencies: ''
 
-      - name: Run documentation tests
-        run: |
-          colcon test --event-handlers=console_direct+ --packages-select fastdds-docs --return-code-on-test-failure
+      - name: Colcon test
+        id: test
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
+        uses: eProsima/eProsima-CI/multiplatform/colcon_test@v0
+        with:
+          colcon_test_args: ''
+          colcon_test_args_default: --event-handlers=console_direct+
+          ctest_args: ''
+          ctest_args_default: ''
+          packages_names: fastdds-docs
+          workspace: ${{ github.workspace }}
+          workspace_dependencies: ''
+          test_report_artifact: ${{ format('test_report_{0}', github.job, join(matrix.*, '_')) }}
+
+      - name: Test summary
+        uses: eProsima/eProsima-CI/multiplatform/junit_summary@v0
+        if: ${{ !cancelled() && !contains(github.event.pull_request.labels.*.name, 'no-test') }}
+        with:
+          junit_reports_dir: "${{ steps.test.outputs.ctest_results_path }}"
+          print_summary: 'True'
+          show_failed: 'True'
+          show_disabled: 'False'
+          show_skipped: 'False'
