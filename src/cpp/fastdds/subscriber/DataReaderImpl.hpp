@@ -188,7 +188,8 @@ public:
             SampleInfoSeq& sample_infos);
 
     /**
-     * @brief Returns information about the first untaken sample.
+     * @brief Returns information about the first untaken sample. This method is meant to be called prior to
+     * a read() or take() operation as it does not modify the status condition of the entity.
      * @param [out] info Pointer to a SampleInfo structure to store first untaken sample information.
      * @return true if sample info was returned. false if there is no sample to take.
      */
@@ -389,6 +390,10 @@ protected:
                 int32_t sample_lost_since_last_update) override;
 
         DataReaderImpl* data_reader_;
+
+    private:
+
+        using fastrtps::rtps::ReaderListener::onReaderMatched;
     }
     reader_listener_;
 
