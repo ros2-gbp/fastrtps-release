@@ -139,14 +139,14 @@ DataReaderHistory::DataReaderHistory(
         compute_key_for_change_fn_ =
                 [this](CacheChange_t* a_change)
                 {
-                    if (a_change->instanceHandle.isDefined())
-                    {
-                        return true;
-                    }
-
                     if (!a_change->is_fully_assembled())
                     {
                         return false;
+                    }
+
+                    if (a_change->instanceHandle.isDefined())
+                    {
+                        return true;
                     }
 
                     if (type_ != nullptr)
@@ -331,9 +331,21 @@ bool DataReaderHistory::get_first_untaken_info(
     for (auto& it : data_available_instances_)
     {
         auto& instance_changes = it.second->cache_changes;
-        if (!instance_changes.empty())
+        for (auto& instance_change : instance_changes)
         {
-            ReadTakeCommand::generate_info(info, *(it.second), instance_changes.front());
+            WriterProxy* wp = nullptr;
+            bool is_future_change = false;
+
+            if (mp_reader->begin_sample_access_nts(instance_change, wp, is_future_change))
+            {
+                mp_reader->end_sample_access_nts(instance_change, wp, false);
+                if (is_future_change)
+                {
+                    continue;
+                }
+            }
+
+            ReadTakeCommand::generate_info(info, *(it.second), instance_change);
             return true;
         }
     }
@@ -635,15 +647,16 @@ ReaderHistory::iterator DataReaderHistory::remove_change_nts(
 bool DataReaderHistory::completed_change(
         CacheChange_t* change)
 {
-    bool ret_value = true;
+    bool ret_value = false;
 
-    if (!change->instanceHandle.isDefined())
+    if (compute_key_for_change_fn_(change))
     {
         InstanceCollection::iterator vit;
-        ret_value = compute_key_for_change_fn_(change) && find_key(change->instanceHandle, vit);
-        if (ret_value)
+
+        if (find_key(change->instanceHandle, vit))
         {
-            ret_value = !change->instanceHandle.isDefined() || complete_fn_(change, *vit->second);
+            ret_value = !change->instanceHandle.isDefined() ||
+                    complete_fn_(change, *vit->second);
         }
 
         if (!ret_value)
@@ -659,6 +672,10 @@ bool DataReaderHistory::completed_change(
                 logError(SUBSCRIBER, "Change should exist but didn't find it");
             }
         }
+    }
+    else
+    {
+        logError(SUBSCRIBER, "Could not compute key from change");
     }
 
     return ret_value;

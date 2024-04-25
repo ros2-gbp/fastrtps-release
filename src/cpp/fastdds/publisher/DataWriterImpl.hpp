@@ -340,6 +340,9 @@ protected:
     //! DataWriterListener
     DataWriterListener* listener_ = nullptr;
 
+    //! Mutex to protect listener_
+    std::mutex listener_mutex_;
+
     //!Listener to capture the events of the Writer
     class InnerDataWriterListener : public fastrtps::rtps::WriterListener
     {
@@ -378,6 +381,10 @@ protected:
                 const fastrtps::rtps::ReaderProxyData* reader_info) override;
 
         DataWriterImpl* data_writer_;
+
+    private:
+
+        using fastrtps::rtps::WriterListener::onWriterMatched;
     }
     writer_listener_;
 

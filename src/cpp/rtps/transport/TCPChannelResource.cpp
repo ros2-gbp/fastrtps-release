@@ -84,7 +84,7 @@ ResponseCode TCPChannelResource::process_bind_request(
     if (connection_status_.compare_exchange_strong(expected, eConnectionStatus::eEstablished))
     {
         locator_ = IPLocator::toPhysicalLocator(locator);
-        logInfo(RTCP_MSG, "Connection Stablished");
+        logInfo(RTCP_MSG, "Connection Established");
         return RETCODE_OK;
     }
     else if (expected == eConnectionStatus::eEstablished)
@@ -97,7 +97,7 @@ ResponseCode TCPChannelResource::process_bind_request(
 
 void TCPChannelResource::set_all_ports_pending()
 {
-    std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+    std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
     pending_logical_output_ports_.insert(pending_logical_output_ports_.end(),
             logical_output_ports_.begin(),
             logical_output_ports_.end());
@@ -107,24 +107,75 @@ void TCPChannelResource::set_all_ports_pending()
 bool TCPChannelResource::is_logical_port_opened(
         uint16_t port)
 {
-    std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+    std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+    return is_logical_port_opened_nts(port);
+}
+
+bool TCPChannelResource::is_logical_port_opened_nts(
+        uint16_t port)
+{
     return std::find(logical_output_ports_.begin(), logical_output_ports_.end(), port) != logical_output_ports_.end();
 }
 
 bool TCPChannelResource::is_logical_port_added(
         uint16_t port)
 {
-    std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+    std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
     return std::find(logical_output_ports_.begin(), logical_output_ports_.end(), port) != logical_output_ports_.end()
            || std::find(pending_logical_output_ports_.begin(), pending_logical_output_ports_.end(), port)
            != pending_logical_output_ports_.end();
+}
+
+bool TCPChannelResource::wait_logical_port_under_negotiation(
+        uint16_t port,
+        const std::chrono::milliseconds& timeout)
+{
+    std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+
+    // Early return if the port is already opened.
+    if (is_logical_port_opened_nts(port))
+    {
+        return true;
+    }
+
+    // Early return if the timeout is 0.
+    if (timeout == std::chrono::milliseconds(0))
+    {
+        return false;
+    }
+
+    // The port is under negotiation if it's in the pending list and in the negotiation list.
+    bool found_in_negotiating_list = negotiating_logical_ports_.end() != std::find_if(
+        negotiating_logical_ports_.begin(),
+        negotiating_logical_ports_.end(),
+        [port](const decltype(negotiating_logical_ports_)::value_type& item)
+        {
+            return item.second == port;
+        });
+
+    if (found_in_negotiating_list &&
+            pending_logical_output_ports_.end() != std::find(
+                pending_logical_output_ports_.begin(),
+                pending_logical_output_ports_.end(),
+                port))
+    {
+        // Wait for the negotiation to finish. The condition variable might get notified if other logical port is opened. In such case,
+        // it should wait again with the respective remaining time.
+        auto wait_predicate = [this, port]() -> bool
+                {
+                    return is_logical_port_opened_nts(port);
+                };
+        logical_output_ports_updated_cv.wait_for(scopedLock, timeout, wait_predicate);
+    }
+
+    return is_logical_port_opened_nts(port);
 }
 
 void TCPChannelResource::add_logical_port(
         uint16_t port,
         RTCPMessageManager* rtcp_manager)
 {
-    std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+    std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
     // Already opened?
     if (std::find(logical_output_ports_.begin(), logical_output_ports_.end(), port) == logical_output_ports_.end())
     {
@@ -139,9 +190,7 @@ void TCPChannelResource::add_logical_port(
             pending_logical_output_ports_.emplace_back(port);
             if (connection_established())
             {
-                scopedLock.unlock();
                 TCPTransactionId id = rtcp_manager->sendOpenLogicalPortRequest(this, port);
-                scopedLock.lock();
                 negotiating_logical_ports_[id] = port;
             }
         }
@@ -152,7 +201,7 @@ void TCPChannelResource::add_logical_port(
 void TCPChannelResource::send_pending_open_logical_ports(
         RTCPMessageManager* rtcp_manager)
 {
-    std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+    std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
     if (!pending_logical_output_ports_.empty())
     {
         for (uint16_t port : pending_logical_output_ports_)
@@ -178,11 +227,12 @@ void TCPChannelResource::add_logical_port_response(
         negotiating_logical_ports_.erase(it);
         if (portIt != pending_logical_output_ports_.end())
         {
-            pending_logical_output_ports_.erase(portIt);
             if (success)
             {
+                pending_logical_output_ports_.erase(portIt);
                 logical_output_ports_.push_back(port);
                 logInfo(RTCP, "OpenedLogicalPort: " << port);
+                logical_output_ports_updated_cv.notify_all();
             }
             else
             {
@@ -219,7 +269,7 @@ void TCPChannelResource::prepare_send_check_logical_ports_req(
         // Don't add ports just tested and already pendings
         if (p <= max_port && p != closedPort)
         {
-            std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+            std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
             auto pendingIt = std::find(pending_logical_output_ports_.begin(), pending_logical_output_ports_.end(), p);
             if (pendingIt == pending_logical_output_ports_.end())
             {
@@ -235,7 +285,7 @@ void TCPChannelResource::prepare_send_check_logical_ports_req(
     else
     {
         TCPTransactionId id = rtcp_manager->sendCheckLogicalPortsRequest(this, candidatePorts);
-        std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+        std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
         last_checked_logical_port_[id] = candidatePorts.back();
     }
 }
@@ -270,7 +320,7 @@ void TCPChannelResource::process_check_logical_ports_response(
 void TCPChannelResource::set_logical_port_pending(
         uint16_t port)
 {
-    std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+    std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
     auto it = std::find(logical_output_ports_.begin(), logical_output_ports_.end(), port);
     if (it != logical_output_ports_.end())
     {
@@ -282,7 +332,7 @@ void TCPChannelResource::set_logical_port_pending(
 bool TCPChannelResource::remove_logical_port(
         uint16_t port)
 {
-    std::unique_lock<std::recursive_mutex> scopedLock(pending_logical_mutex_);
+    std::lock_guard<std::recursive_mutex> scopedLock(pending_logical_mutex_);
     if (!is_logical_port_added(port))
     {
         return false;
@@ -292,6 +342,31 @@ bool TCPChannelResource::remove_logical_port(
     logical_output_ports_.erase(it, logical_output_ports_.end());
     it = std::remove(pending_logical_output_ports_.begin(), pending_logical_output_ports_.end(), port);
     pending_logical_output_ports_.erase(it, pending_logical_output_ports_.end());
+    return true;
+}
+
+bool TCPChannelResource::check_socket_send_buffer(
+        const size_t& msg_size,
+        const asio::ip::tcp::socket::native_handle_type& socket_native_handle)
+{
+    int bytesInSendQueue = 0;
+
+#ifndef _WIN32
+    if (ioctl(socket_native_handle, TIOCOUTQ, &bytesInSendQueue) == -1)
+    {
+        bytesInSendQueue = 0;
+    }
+#else // ifdef _WIN32
+    static_cast<void>(socket_native_handle);
+#endif // ifndef _WIN32
+
+
+    size_t future_queue_size = size_t(bytesInSendQueue) + msg_size;
+    // TCP actually allocates twice the size of the buffer requested.
+    if (future_queue_size > size_t(2 * parent_->configuration()->sendBufferSize))
+    {
+        return false;
+    }
     return true;
 }
 

@@ -298,18 +298,11 @@ TCPTransactionId RTCPMessageManager::sendConnectionRequest(
     Locator locator;
     mTransport->endpoint_to_locator(channel->local_endpoint(), locator);
 
-    auto config = mTransport->configuration();
-    if (!config->listening_ports.empty())
-    {
-        IPLocator::setPhysicalPort(locator, *(config->listening_ports.begin()));
-    }
-    else
-    {
-        IPLocator::setPhysicalPort(locator, static_cast<uint16_t>(SystemInfo::instance().process_id()));
-    }
+    mTransport->fill_local_physical_port(locator);
 
     if (locator.kind == LOCATOR_KIND_TCPv4)
     {
+        auto config = mTransport->configuration();
         const TCPv4TransportDescriptor* pTCPv4Desc = static_cast<TCPv4TransportDescriptor*>(config);
         IPLocator::setWan(locator, pTCPv4Desc->wan_addr[0], pTCPv4Desc->wan_addr[1], pTCPv4Desc->wan_addr[2],
                 pTCPv4Desc->wan_addr[3]);
@@ -469,11 +462,13 @@ ResponseCode RTCPMessageManager::processBindConnectionRequest(
 
     if (RETCODE_OK == code)
     {
-        // In server side, at this moment, the channel has to be included in the map.
         mTransport->bind_socket(channel);
     }
 
     sendData(channel, BIND_CONNECTION_RESPONSE, transaction_id, &payload, code);
+
+    // Add pending logical ports to the channel
+    mTransport->send_channel_pending_logical_ports(channel);
 
     return RETCODE_OK;
 }
@@ -483,8 +478,11 @@ ResponseCode RTCPMessageManager::processOpenLogicalPortRequest(
         const OpenLogicalPortRequest_t& request,
         const TCPTransactionId& transaction_id)
 {
-    if (!channel->connection_established())
+    // A server can send an OpenLogicalPortRequest to a client before the BindConnectionResponse is processed.
+    if (!channel->connection_established() &&
+            channel->connection_status_ != TCPChannelResource::eConnectionStatus::eWaitingForBindResponse)
     {
+        logError(RTCP, "Trying to send [OPEN_LOGICAL_PORT_RESPONSE] without connection established.");
         sendData(channel, CHECK_LOGICAL_PORT_RESPONSE, transaction_id, nullptr, RETCODE_SERVER_ERROR);
     }
     else if (request.logicalPort() == 0 || !mTransport->is_input_port_open(request.logicalPort()))

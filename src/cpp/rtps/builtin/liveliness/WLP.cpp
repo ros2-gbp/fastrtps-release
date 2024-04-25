@@ -52,7 +52,7 @@ static void set_builtin_reader_history_attributes(
         const ResourceLimitedContainerConfig& allocation,
         bool is_secure)
 {
-    constexpr uint32_t c_upper_limit = std::numeric_limits<uint32_t>::max() / 2u;
+    constexpr uint32_t c_upper_limit = (std::numeric_limits<uint32_t>::max)() / 2u;
 
     hatt.payloadMaxSize = is_secure ? 128 : 28;
 
@@ -964,7 +964,9 @@ bool WLP::assert_liveliness_manual_by_participant()
 {
     if (manual_by_participant_writers_.size() > 0)
     {
-        return pub_liveliness_manager_->assert_liveliness(MANUAL_BY_PARTICIPANT_LIVELINESS_QOS);
+        return pub_liveliness_manager_->assert_liveliness(
+            MANUAL_BY_PARTICIPANT_LIVELINESS_QOS,
+            mp_participant->getGuid().guidPrefix);
     }
     return false;
 }

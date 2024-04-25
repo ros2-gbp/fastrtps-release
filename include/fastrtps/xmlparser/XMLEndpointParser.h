@@ -26,8 +26,6 @@
 #include <string>
 #include <vector>
 
-#include <tinyxml2.h>
-
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/xmlparser/XMLParserCommon.h>
@@ -75,7 +73,7 @@ public:
 
 /**
  * Class XMLEndpointParser used to parse the XML file that contains information about remote endpoints.
- * @ingroup DISCVOERYMODULE
+ * @ingroup DISCOVERY_MODULE
  */
 class XMLEndpointParser : XMLParser
 {
