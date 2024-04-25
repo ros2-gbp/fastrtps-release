@@ -14,7 +14,7 @@
 
 #include <rtps/transport/ChannelResource.h>
 
-#include <utils/thread.hpp>
+#include <asio.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -26,7 +26,7 @@ ChannelResource::ChannelResource()
     : message_buffer_(RTPSMESSAGE_DEFAULT_SIZE)
     , alive_(true)
 {
-    EPROSIMA_LOG_INFO(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
+    logInfo(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
 }
 
 ChannelResource::ChannelResource(
@@ -36,7 +36,7 @@ ChannelResource::ChannelResource(
 {
     bool b = channelResource.alive_;
     alive_.store(b);
-    //EPROSIMA_LOG_INFO(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
+    //logInfo(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
     //message_buffer_ = std::move(channelResource.message_buffer_);
 }
 
@@ -46,7 +46,7 @@ ChannelResource::ChannelResource(
     , alive_(true)
 {
     memset(message_buffer_.buffer, 0, rec_buffer_size);
-    EPROSIMA_LOG_INFO(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
+    logInfo(RTPS_MSG_IN, "Created with CDRMessage of size: " << message_buffer_.max_size);
 }
 
 ChannelResource::~ChannelResource()
@@ -59,7 +59,7 @@ void ChannelResource::clear()
     alive_.store(false);
     if (thread_.joinable())
     {
-        if (!thread_.is_calling_thread())
+        if (thread_.get_id() != std::this_thread::get_id())
         {
             // wait for it to finish
             thread_.join();

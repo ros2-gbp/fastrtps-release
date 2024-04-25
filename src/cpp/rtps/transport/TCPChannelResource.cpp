@@ -84,7 +84,7 @@ ResponseCode TCPChannelResource::process_bind_request(
     if (connection_status_.compare_exchange_strong(expected, eConnectionStatus::eEstablished))
     {
         locator_ = IPLocator::toPhysicalLocator(locator);
-        EPROSIMA_LOG_INFO(RTCP_MSG, "Connection Established");
+        logInfo(RTCP_MSG, "Connection Established");
         return RETCODE_OK;
     }
     else if (expected == eConnectionStatus::eEstablished)
@@ -181,7 +181,7 @@ void TCPChannelResource::add_logical_port(
     {
         if (port == 0)
         {
-            EPROSIMA_LOG_ERROR(RTPS, "Trying to open logical port 0.");
+            logError(RTPS, "Trying to open logical port 0.");
         } // But let's continue...
 
         if (std::find(pending_logical_output_ports_.begin(), pending_logical_output_ports_.end(), port)
@@ -231,8 +231,8 @@ void TCPChannelResource::add_logical_port_response(
             {
                 pending_logical_output_ports_.erase(portIt);
                 logical_output_ports_.push_back(port);
+                logInfo(RTCP, "OpenedLogicalPort: " << port);
                 logical_output_ports_updated_cv.notify_all();
-                EPROSIMA_LOG_INFO(RTCP, "OpenedLogicalPort: " << port);
             }
             else
             {
@@ -242,13 +242,13 @@ void TCPChannelResource::add_logical_port_response(
         }
         else
         {
-            EPROSIMA_LOG_WARNING(RTCP, "Received add_logical_port_response for port "
+            logWarning(RTCP, "Received add_logical_port_response for port "
                     << port << ", but it wasn't found in pending list.");
         }
     }
     else
     {
-        EPROSIMA_LOG_WARNING(RTCP, "Received add_logical_port_response, but the transaction id wasn't registered " <<
+        logWarning(RTCP, "Received add_logical_port_response, but the transaction id wasn't registered " <<
                 "(maybe removed" << " while negotiating?).");
     }
 }
@@ -280,7 +280,7 @@ void TCPChannelResource::prepare_send_check_logical_ports_req(
 
     if (candidatePorts.empty()) // No more available ports!
     {
-        EPROSIMA_LOG_ERROR(RTCP, "Cannot find an available logical port.");
+        logError(RTCP, "Cannot find an available logical port.");
     }
     else
     {
@@ -313,7 +313,7 @@ void TCPChannelResource::process_check_logical_ports_response(
     }
     else
     {
-        EPROSIMA_LOG_WARNING(RTCP, "Received process_check_logical_ports_response without sending a Request.");
+        logWarning(RTCP, "Received process_check_logical_ports_response without sending a Request.");
     }
 }
 
@@ -362,7 +362,8 @@ bool TCPChannelResource::check_socket_send_buffer(
 
 
     size_t future_queue_size = size_t(bytesInSendQueue) + msg_size;
-    if (future_queue_size > size_t(parent_->configuration()->sendBufferSize))
+    // TCP actually allocates twice the size of the buffer requested.
+    if (future_queue_size > size_t(2 * parent_->configuration()->sendBufferSize))
     {
         return false;
     }

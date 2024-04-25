@@ -16,7 +16,6 @@
 #define _FASTDDS_RTPS_TRANSPORT_CHAININGTRANSPORT_H_
 
 #include <map>
-#include <memory>
 
 #include "TransportInterface.h"
 #include "ChainingTransportDescriptor.h"
@@ -26,22 +25,6 @@ namespace fastdds {
 namespace rtps {
 
 class ChainingReceiverResource;
-
-/**
- * @brief Deleter for a ChainingReceiverResource
- *
- * @note this is required to create a \c unique_ptr of a \c ChainingReceiverResource as it is
- * an incomplete class for this header.
- */
-struct ChainingReceiverResourceDeleter
-{
-    void operator ()(
-            ChainingReceiverResource* p);
-};
-
-//! Type of the \c unique_ptr of a \c ChainingReceiverResource .
-using ChainingReceiverResourceReferenceType =
-        std::unique_ptr<ChainingReceiverResource, ChainingReceiverResourceDeleter>;
 
 /**
  * This is the base class for chaining adapter transports.
@@ -70,14 +53,12 @@ public:
     /*!
      * Initialize the low-level transport. This method will prepare all the internals of the transport.
      * @param properties Optional policy to specify additional parameters of the created transport.
-     * @param max_msg_size_no_frag Optional maximum message size to avoid 65500 KB fragmentation limit.
      * @return True when the transport was correctly initialized.
      */
     RTPS_DllAPI bool init(
-            const fastrtps::rtps::PropertyPolicy* properties = nullptr,
-            const uint32_t& max_msg_size_no_frag = 0) override
+            const fastrtps::rtps::PropertyPolicy* properties = nullptr) override
     {
-        return low_level_transport_->init(properties, max_msg_size_no_frag);
+        return low_level_transport_->init(properties);
     }
 
     /*!
@@ -163,21 +144,13 @@ public:
     }
 
     /*!
-     * Call the low-level transport `is_localhost_allowed()`.
-     * Must report whether localhost locator is allowed
+     * Call the low-level transport `is_locator_allowed()`.
+     * Must report whether the given locator is allowed by this transport.
      */
-    RTPS_DllAPI bool is_localhost_allowed() const override
+    RTPS_DllAPI bool is_locator_allowed(
+            const fastrtps::rtps::Locator_t& locator) const override
     {
-        return low_level_transport_->is_localhost_allowed();
-    }
-
-    /*!
-     * Call the low-level transport `netmask_filter_info()`.
-     * Returns netmask filter information (transport's netmask filter kind and allowlist)
-     */
-    RTPS_DllAPI NetmaskFilterInfo netmask_filter_info() const override
-    {
-        return low_level_transport_->netmask_filter_info();
+        return low_level_transport_->is_locator_allowed(locator);
     }
 
     /*!
@@ -361,36 +334,13 @@ public:
         low_level_transport_->update_network_interfaces();
     }
 
-    //! Call the low-level transport `transform_remote_locator()`.
-    //! Transforms a remote locator into a locator optimized for local communications,
-    //! if allowed by both local and remote transports.
-    RTPS_DllAPI bool transform_remote_locator(
-            const fastrtps::rtps::Locator_t& remote_locator,
-            fastrtps::rtps::Locator_t& result_locator,
-            bool allowed_remote_localhost,
-            bool allowed_local_localhost) const override
-    {
-        return low_level_transport_->transform_remote_locator(remote_locator, result_locator, allowed_remote_localhost,
-                       allowed_local_localhost);
-    }
-
-    /*!
-     * Call the low-level transport `is_locator_allowed()`.
-     * Must report whether the given locator is allowed by this transport.
-     */
-    RTPS_DllAPI bool is_locator_allowed(
-            const fastrtps::rtps::Locator_t& locator) const override
-    {
-        return low_level_transport_->is_locator_allowed(locator);
-    }
-
 protected:
 
     std::unique_ptr<TransportInterface> low_level_transport_;
 
 private:
 
-    std::map<fastrtps::rtps::Locator_t, ChainingReceiverResourceReferenceType> receiver_resources_;
+    std::map<fastrtps::rtps::Locator_t, ChainingReceiverResource*> receiver_resources_;
 };
 
 } // namespace rtps

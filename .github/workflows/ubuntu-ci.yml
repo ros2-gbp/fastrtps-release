@@ -24,8 +24,16 @@ on:
         type: string
         required: true
 
+  pull_request:
+    types:
+      - review_requested
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '!**/CMakeLists.txt'
+
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -35,8 +43,12 @@ jobs:
       fail-fast: false
       matrix:
         os-image:
-          - 'ubuntu-22.04'
+          - 'ubuntu-20.04'
 
+    if: ${{ (
+              !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
+              !contains(github.event.pull_request.labels.*.name, 'conflicts')
+            ) }}
     uses: ./.github/workflows/reusable-ubuntu-ci.yml
     with:
       os-image: ${{ matrix.os-image }}
@@ -44,4 +56,4 @@ jobs:
       colcon-args: ${{ inputs.colcon-args }}
       cmake-args: '-DSECURITY=ON ${{ inputs.cmake-args }}'
       ctest-args: ${{ inputs.ctest-args || '-LE xfail' }}
-      fastdds-branch: ${{ inputs.fastdds_branch || github.ref || 'master' }}
+      fastdds-branch: ${{ inputs.fastdds_branch || github.ref || '2.6.x' }}

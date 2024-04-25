@@ -42,6 +42,14 @@ jobs:
         cmake-build-type:
           - 'RelWithDebInfo'
     steps:
+      - name: Add ci-pending label if PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: eProsima/eProsima-CI/external/add_labels@v0
+        with:
+          labels: ci-pending
+          number: ${{ github.event.number }}
+          repo: eProsima/Fast-DDS
+
       - name: Sync eProsima/Fast-DDS repository
         uses: eProsima/eProsima-CI/external/checkout@v0
         with:
@@ -51,7 +59,7 @@ jobs:
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.22.6'
+          cmakeVersion: '3.16.3'
 
       - name: Install apt dependencies
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
@@ -90,6 +98,29 @@ jobs:
           destination_workspace: src
           skip_existing: 'true'
 
+      # Get Shapes Demo to make sure it keeps compiling
+      - name: Get Shapes Demo branch
+        id: get_shapes_demo_branch
+        uses: eProsima/eProsima-CI/ubuntu/get_related_branch_from_repo@v0
+        with:
+          remote_repository: eProsima/ShapesDemo
+          fallback_branch: ${{ inputs.fastdds-branch || 'master' }}
+
+      - name: Download Shapes Demo repo
+        uses: eProsima/eProsima-CI/external/checkout@v0
+        with:
+          repository: eProsima/ShapesDemo
+          path: src/shapes-demo
+          ref: ${{ steps.get_shapes_demo_branch.outputs.deduced_branch }}
+
+      # Required for Shapes Demo
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v2.13.0
+        with:
+          version: '5.15.2'
+          dir: '${{ github.workspace }}/qt_installation/'
+          modules: 'qtcharts'
+
       - name: Colcon build
         continue-on-error: false
         uses: eProsima/eProsima-CI/multiplatform/colcon_build@v0
@@ -97,7 +128,7 @@ jobs:
           colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/ci.meta
           colcon_build_args: ${{ inputs.colcon-args }}
           cmake_args: ${{ inputs.cmake-args }}
-          cmake_args_default: -DCMAKE_CXX_FLAGS="-Werror -Wall" -DFASTDDS_EXAMPLE_TESTS=ON
+          cmake_args_default: -DCMAKE_CXX_FLAGS="-Werror -Wall -Wextra -Wpedantic -Wunused-value -Woverloaded-virtual" -DFASTDDS_EXAMPLE_TESTS=ON
           cmake_build_type: ${{ matrix.cmake-build-type }}
           workspace: ${{ github.workspace }}
 

@@ -15,6 +15,7 @@
 #ifndef _FASTDDS_TCPV4_TRANSPORT_H_
 #define _FASTDDS_TCPV4_TRANSPORT_H_
 
+#include <thread>
 #include <vector>
 #include <map>
 #include <mutex>
@@ -82,10 +83,9 @@ protected:
         return asio::ip::tcp::v4();
     }
 
-    virtual bool get_ips(
+    virtual void get_ips(
             std::vector<fastrtps::rtps::IPFinder::info_IP>& locNames,
-            bool return_loopback,
-            bool force_lookup) const override;
+            bool return_loopback = false) const override;
 
     /**
      * Method to get a list of interfaces to bind the socket associated to the given locator.
@@ -98,7 +98,7 @@ protected:
 
     //! Checks if the given ip has been included in the white list to use it.
     virtual bool is_interface_allowed(
-            const std::string& iface) const override;
+            const std::string& interface) const override;
 
     //! Checks if the given interface is allowed by the white list.
     bool is_interface_allowed(

@@ -71,7 +71,6 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
         int32_t verify_depth = -1; // don't override
         std::string rsa_private_key_file;
         TLSHandShakeRole handshake_role;
-        std::string server_name;
 
         void add_verify_mode(
                 const TLSVerifyMode verify)
@@ -118,7 +117,6 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
             , verify_depth(t.verify_depth)
             , rsa_private_key_file(t.rsa_private_key_file)
             , handshake_role(t.handshake_role)
-            , server_name(t.server_name)
         {
         }
 
@@ -136,7 +134,6 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
             , verify_depth(std::move(t.verify_depth))
             , rsa_private_key_file(std::move(t.rsa_private_key_file))
             , handshake_role(std::move(t.handshake_role))
-            , server_name(std::move(t.server_name))
         {
         }
 
@@ -155,7 +152,6 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
             verify_depth = t.verify_depth;
             rsa_private_key_file = t.rsa_private_key_file;
             handshake_role = t.handshake_role;
-            server_name = t.server_name;
 
             return *this;
         }
@@ -172,12 +168,8 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
     bool calculate_crc;
     bool check_crc;
     bool apply_security;
-    bool non_blocking_send;
 
     TLSConfig tls_config;
-
-    fastdds::rtps::ThreadSettings keep_alive_thread;
-    fastdds::rtps::ThreadSettings accept_thread;
 
     uint32_t tcp_negotiation_timeout;
 

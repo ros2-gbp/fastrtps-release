@@ -192,6 +192,8 @@ private:
 
     private:
 
+        using eprosima::fastdds::dds::DomainParticipantListener::on_participant_discovery;
+
         ParticipantListener& operator =(
                 const ParticipantListener&) = delete;
         PubSubParticipant* participant_;
@@ -242,13 +244,12 @@ public:
             datawriter_qos_.properties().properties().emplace_back("fastdds.push_mode", "false");
         }
 
-#if defined(PREALLOCATED_MEMORY_MODE_TEST)
-        datawriter_qos_.historyMemoryPolicy = rtps::PREALLOCATED_MEMORY_MODE;
+#if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
+        datawriter_qos_.historyMemoryPolicy = rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 #elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
         datawriter_qos_.historyMemoryPolicy = rtps::DYNAMIC_RESERVE_MEMORY_MODE;
 #else
-        datawriter_qos_.endpoint().history_memory_policy =
-                eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        datawriter_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 #endif // if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
@@ -611,6 +612,22 @@ public:
                 });
     }
 
+    template<class _Rep,
+            class _Period
+            >
+    size_t sub_wait_liveliness_lost_for(
+            unsigned int expected_num_lost,
+            const std::chrono::duration<_Rep, _Period>& max_wait)
+    {
+        std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
+        sub_liveliness_cv_.wait_for(lock, max_wait, [this, &expected_num_lost]() -> bool
+                {
+                    return sub_times_liveliness_lost_ >= expected_num_lost;
+                });
+
+        return sub_times_liveliness_lost_;
+    }
+
     PubSubParticipant& property_policy(
             const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
     {
@@ -641,8 +658,6 @@ public:
     bool update_user_data(
             const std::vector<eprosima::fastrtps::rtps::octet>& user_data)
     {
-        // Update QoS before updating user data as statistics properties might have changed internally
-        participant_qos_ = participant_->get_qos();
         participant_qos_.user_data().data_vec(user_data);
         return ReturnCode_t::RETCODE_OK == participant_->set_qos(participant_qos_);
     }

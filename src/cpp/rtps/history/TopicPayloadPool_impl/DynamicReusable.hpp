@@ -31,7 +31,7 @@ class DynamicReusableTopicPayloadPool : public TopicPayloadPool
             uint32_t size,
             CacheChange_t& cache_change) override
     {
-        return do_get_payload(size, cache_change, true);
+        return (size > 0u) && do_get_payload(size, cache_change, true);
     }
 
 protected:
@@ -40,6 +40,10 @@ protected:
     {
         return DYNAMIC_REUSABLE_MEMORY_MODE;
     }
+
+private:
+
+    using TopicPayloadPool::get_payload;
 
 };
 

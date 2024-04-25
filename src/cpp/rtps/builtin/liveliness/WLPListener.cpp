@@ -64,7 +64,7 @@ void WLPListener::onNewCacheChangeAdded(
     CacheChange_t* change = (CacheChange_t*)changeIN;
     if (!computeKey(change))
     {
-        EPROSIMA_LOG_WARNING(RTPS_LIVELINESS, "Problem obtaining the Key");
+        logWarning(RTPS_LIVELINESS, "Problem obtaining the Key");
         return;
     }
     //Check the serializedPayload:
@@ -117,7 +117,7 @@ void WLPListener::onNewCacheChangeAdded(
 
         if (!message_ok)
         {
-            EPROSIMA_LOG_INFO(RTPS_LIVELINESS, "Ignoring incorrect WLP ParticipantDataMessage");
+            logInfo(RTPS_LIVELINESS, "Ignoring incorrect WLP ParticipantDataMessage");
             history->remove_change(change);
             return;
         }
@@ -129,7 +129,7 @@ void WLPListener::onNewCacheChangeAdded(
                     &guidP,
                     &livelinessKind))
         {
-            EPROSIMA_LOG_INFO(RTPS_LIVELINESS, "Ignoring not WLP ParticipantDataMessage");
+            logInfo(RTPS_LIVELINESS, "Ignoring not WLP ParticipantDataMessage");
             history->remove_change(change);
             return;
         }
@@ -137,7 +137,7 @@ void WLPListener::onNewCacheChangeAdded(
 
     if (guidP == reader->getGuid().guidPrefix)
     {
-        EPROSIMA_LOG_INFO(RTPS_LIVELINESS, "Message from own RTPSParticipant, ignoring");
+        logInfo(RTPS_LIVELINESS, "Message from own RTPSParticipant, ignoring");
         history->remove_change(change);
         return;
     }
@@ -145,11 +145,11 @@ void WLPListener::onNewCacheChangeAdded(
     history->getMutex()->unlock();
     if (mp_WLP->automatic_readers_)
     {
-        mp_WLP->sub_liveliness_manager_->assert_liveliness(AUTOMATIC_LIVELINESS_QOS);
+        mp_WLP->sub_liveliness_manager_->assert_liveliness(AUTOMATIC_LIVELINESS_QOS, guidP);
     }
     if (livelinessKind == MANUAL_BY_PARTICIPANT_LIVELINESS_QOS)
     {
-        mp_WLP->sub_liveliness_manager_->assert_liveliness(MANUAL_BY_PARTICIPANT_LIVELINESS_QOS);
+        mp_WLP->sub_liveliness_manager_->assert_liveliness(MANUAL_BY_PARTICIPANT_LIVELINESS_QOS, guidP);
     }
     mp_WLP->mp_builtinProtocols->mp_PDP->getMutex()->unlock();
     history->getMutex()->lock();

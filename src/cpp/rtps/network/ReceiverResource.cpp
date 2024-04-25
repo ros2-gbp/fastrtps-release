@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/network/ReceiverResource.h>
-
-#include <cassert>
-#include <thread>
-
-#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/network/ReceiverResource.h>
 #include <fastdds/rtps/messages/MessageReceiver.h>
+#include <cassert>
+#include <fastdds/dds/log/Log.hpp>
 
 #define IDSTRING "(ID:" << std::this_thread::get_id() << ") " <<
 
@@ -37,10 +34,8 @@ ReceiverResource::ReceiverResource(
     , LocatorMapsToManagedChannel(nullptr)
     , mValid(false)
     , mtx()
-    , cv_()
     , receiver(nullptr)
     , max_message_size_(max_recv_buffer_size)
-    , active_callbacks_(0)
 {
     // Internal channel is opened and assigned to this resource.
     mValid = transport.OpenInputChannel(locator, this, max_message_size_);
@@ -63,8 +58,6 @@ ReceiverResource::ReceiverResource(
 ReceiverResource::ReceiverResource(
         ReceiverResource&& rValueResource)
 {
-    std::lock_guard<std::mutex> _(mtx);
-
     Cleanup.swap(rValueResource.Cleanup);
     LocatorMapsToManagedChannel.swap(rValueResource.LocatorMapsToManagedChannel);
     receiver = rValueResource.receiver;
@@ -72,8 +65,6 @@ ReceiverResource::ReceiverResource(
     mValid = rValueResource.mValid;
     rValueResource.mValid = false;
     max_message_size_ = rValueResource.max_message_size_;
-    active_callbacks_ = rValueResource.active_callbacks_;
-    rValueResource.active_callbacks_ = 0;
 }
 
 bool ReceiverResource::SupportsLocator(
@@ -89,8 +80,7 @@ bool ReceiverResource::SupportsLocator(
 void ReceiverResource::RegisterReceiver(
         MessageReceiver* rcv)
 {
-    std::lock_guard<std::mutex> _(mtx);
-
+    std::unique_lock<std::mutex> lock(mtx);
     if (receiver == nullptr)
     {
         receiver = rcv;
@@ -100,8 +90,7 @@ void ReceiverResource::RegisterReceiver(
 void ReceiverResource::UnregisterReceiver(
         MessageReceiver* rcv)
 {
-    std::lock_guard<std::mutex> _(mtx);
-
+    std::unique_lock<std::mutex> lock(mtx);
     if (receiver == rcv)
     {
         receiver = nullptr;
@@ -116,14 +105,11 @@ void ReceiverResource::OnDataReceived(
 {
     (void)localLocator;
 
-    std::lock_guard<std::mutex> _(mtx);
-
+    std::unique_lock<std::mutex> lock(mtx);
     MessageReceiver* rcv = receiver;
 
-    if (rcv != nullptr && active_callbacks_ >= 0)
+    if (rcv != nullptr)
     {
-        ++active_callbacks_;
-
         CDRMessage_t msg(0);
         msg.wraps = true;
         msg.buffer = const_cast<octet*>(data);
@@ -133,13 +119,8 @@ void ReceiverResource::OnDataReceived(
 
         // TODO: Should we unlock in case UnregisterReceiver is called from callback ?
         rcv->processCDRMsg(remoteLocator, localLocator, &msg);
-
-        // allow disabling
-        if (--active_callbacks_ == 0)
-        {
-            cv_.notify_one();
-        }
     }
+
 }
 
 void ReceiverResource::disable()
@@ -148,15 +129,6 @@ void ReceiverResource::disable()
     {
         Cleanup();
     }
-
-    // wait until all callbacks are finished
-    std::unique_lock<std::mutex> lock(mtx);
-    cv_.wait(lock, [this]
-            {
-                return active_callbacks_ <= 0;
-            });
-    // no more callbacks
-    active_callbacks_ = -1;
 }
 
 ReceiverResource::~ReceiverResource()

@@ -146,19 +146,6 @@ public:
             bool release = true);
 
     /**
-     * Remove a specific change from the history.
-     * No Thread Safe
-     * @param removal iterator to the CacheChange_t to remove.
-     * @param[in] max_blocking_time Maximum time this method has to complete the task.
-     * @param release defaults to true and hints if the CacheChange_t should return to the pool
-     * @return iterator to the next CacheChange_t or end iterator.
-     */
-    RTPS_DllAPI virtual iterator remove_change_nts(
-            const_iterator removal,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time,
-            bool release = true);
-
-    /**
      * Remove all changes from the History
      * @return True if everything was correctly removed.
      */
@@ -171,16 +158,6 @@ public:
      */
     RTPS_DllAPI bool remove_change(
             CacheChange_t* ch);
-
-    /**
-     * Remove a specific change from the history.
-     * @param ch Pointer to the CacheChange_t.
-     * @param[in] max_blocking_time Maximum time this method has to complete the task.
-     * @return True if removed.
-     */
-    RTPS_DllAPI bool remove_change(
-            CacheChange_t* ch,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time);
 
     /**
      * Find a specific change in the history using the matches_change method criteria.
@@ -276,7 +253,7 @@ public:
      * Get the mutex
      * @return Mutex
      */
-    RTPS_DllAPI inline RecursiveTimedMutex* getMutex() const
+    RTPS_DllAPI inline RecursiveTimedMutex* getMutex()
     {
         assert(mp_mutex != nullptr);
         return mp_mutex;
@@ -321,18 +298,6 @@ protected:
 
     RTPS_DllAPI virtual void do_release_cache(
             CacheChange_t* ch) = 0;
-
-    /**
-     * @brief Removes the constness of a const_iterator to obtain a regular iterator.
-     *
-     * This function takes a const_iterator as input and returns a regular iterator by removing the constness.
-     *
-     * @param c_it The const_iterator to remove constness from.
-     *
-     * @return An iterator with the same position as the input const_iterator.
-     */
-    History::iterator remove_iterator_constness(
-            const_iterator c_it);
 
 };
 

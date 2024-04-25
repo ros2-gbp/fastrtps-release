@@ -25,7 +25,7 @@
 
 #include <fastdds/rtps/common/GuidPrefix_t.hpp>
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -41,9 +41,13 @@ class DiscoveryParticipantsAckStatus
 
 public:
 
-    DiscoveryParticipantsAckStatus() = default;
+    DiscoveryParticipantsAckStatus()
+    {
+    }
 
-    ~DiscoveryParticipantsAckStatus() = default;
+    ~DiscoveryParticipantsAckStatus()
+    {
+    }
 
     void add_or_update_participant(
             const eprosima::fastrtps::rtps::GuidPrefix_t& guid_p,

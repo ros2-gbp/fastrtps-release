@@ -68,29 +68,14 @@ const DomainParticipantListener* DomainParticipant::get_listener() const
 ReturnCode_t DomainParticipant::set_listener(
         DomainParticipantListener* listener)
 {
-    return set_listener(listener, std::chrono::seconds::max());
-}
-
-ReturnCode_t DomainParticipant::set_listener(
-        DomainParticipantListener* listener,
-        const std::chrono::seconds timeout)
-{
-    return set_listener(listener, StatusMask::all(), timeout);
+    return set_listener(listener, StatusMask::all());
 }
 
 ReturnCode_t DomainParticipant::set_listener(
         DomainParticipantListener* listener,
         const StatusMask& mask)
 {
-    return set_listener(listener, mask, std::chrono::seconds::max());
-}
-
-ReturnCode_t DomainParticipant::set_listener(
-        DomainParticipantListener* listener,
-        const StatusMask& mask,
-        const std::chrono::seconds timeout)
-{
-    ReturnCode_t ret_val = impl_->set_listener(listener, timeout);
+    ReturnCode_t ret_val = impl_->set_listener(listener);
     if (ret_val == ReturnCode_t::RETCODE_OK)
     {
         status_mask_ = mask;
@@ -219,7 +204,7 @@ MultiTopic* DomainParticipant::create_multitopic(
     static_cast<void> (type_name);
     static_cast<void> (subscription_expression);
     static_cast<void> (expression_parameters);
-    EPROSIMA_LOG_WARNING(DOMAIN_PARTICIPANT, "create_multitopic method not implemented");
+    logWarning(DOMAIN_PARTICIPANT, "create_multitopic method not implemented");
     return nullptr;
 }
 
@@ -253,7 +238,10 @@ Topic* DomainParticipant::find_topic(
         const std::string& topic_name,
         const fastrtps::Duration_t& timeout)
 {
-    return impl_->find_topic(topic_name, timeout);
+    static_cast<void> (topic_name);
+    static_cast<void> (timeout);
+    logWarning(DOMAIN_PARTICIPANT, "find_topic method not implemented");
+    return nullptr;
 }
 
 TopicDescription* DomainParticipant::lookup_topicdescription(
@@ -264,14 +252,15 @@ TopicDescription* DomainParticipant::lookup_topicdescription(
 
 const Subscriber* DomainParticipant::get_builtin_subscriber() const
 {
-    EPROSIMA_LOG_WARNING(DOMAIN_PARTICIPANT, "get_builtin_subscriber method not implemented");
+    logWarning(DOMAIN_PARTICIPANT, "get_builtin_subscriber method not implemented");
     return nullptr;
 }
 
 ReturnCode_t DomainParticipant::ignore_participant(
         const InstanceHandle_t& handle)
 {
-    return impl_->ignore_participant(handle);
+    static_cast<void> (handle);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 ReturnCode_t DomainParticipant::ignore_topic(

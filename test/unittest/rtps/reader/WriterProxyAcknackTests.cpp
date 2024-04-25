@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "rtps/security/SecurityManager.h"
 #include <chrono>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -28,8 +29,67 @@
 #include <fastrtps/rtps/resources/TimedEvent.h>
 
 #include <rtps/reader/WriterProxy.cpp>
+// Make SequenceNumberSet_t compatible with GMock macros
 
-#include "../../common/operators.hpp"
+namespace testing {
+namespace internal {
+using namespace eprosima::fastrtps::rtps;
+
+template<>
+bool AnyEq::operator ()(
+        const SequenceNumberSet_t& a,
+        const SequenceNumberSet_t& b) const
+{
+    // remember that using SequenceNumberSet_t = BitmapRange<SequenceNumber_t, SequenceNumberDiff, 256>;
+    // see test\unittest\utils\BitmapRangeTests.cpp method TestResult::Check
+
+    if (a.empty() && b.empty())
+    {
+        return true;
+    }
+
+    if (a.base() == b.base())
+    {
+        uint32_t num_bits[2];
+        uint32_t num_longs[2];
+        SequenceNumberSet_t::bitmap_type bitmap[2];
+
+        a.bitmap_get(num_bits[0], bitmap[0], num_longs[0]);
+        b.bitmap_get(num_bits[1], bitmap[1], num_longs[1]);
+
+        if (num_bits[0] != num_bits[1] || num_longs[0] != num_longs[1])
+        {
+            return false;
+        }
+        return std::equal(bitmap[0].cbegin(), bitmap[0].cbegin() + num_longs[0], bitmap[1].cbegin());
+    }
+    else
+    {
+        bool equal = true;
+
+        a.for_each([&b, &equal](const SequenceNumber_t& e)
+                {
+                    equal &= b.is_set(e);
+                });
+
+        if (!equal)
+        {
+            return false;
+        }
+
+        b.for_each([&a, &equal](const SequenceNumber_t& e)
+                {
+                    equal &= a.is_set(e);
+                });
+
+        return equal;
+    }
+}
+
+} // namespace internal
+} // namespace testing
+
+
 
 namespace eprosima {
 namespace fastrtps {
@@ -41,7 +101,6 @@ TEST(WriterProxyAcknackTests, AcknackBackoff)
     StatefulReader readerMock; // avoid annoying uninteresting call warnings
 
     // Testing the Timed events are properly configured
-    EXPECT_CALL(readerMock, getEventResource()).Times(1u);
     WriterProxy wproxy(&readerMock, RemoteLocatorsAllocationAttributes(), ResourceLimitedContainerConfig());
     wproxy.start(wattr, SequenceNumber_t());
 

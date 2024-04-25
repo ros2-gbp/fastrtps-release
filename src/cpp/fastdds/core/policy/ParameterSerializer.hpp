@@ -144,13 +144,6 @@ public:
         return true;
     }
 
-    /**
-     * This method fills the sample identity parameter to the cdr_message.
-     * The PID used is the standard PID_RELATED_SAMPLE_IDENTITY.
-     * @param cdr_message Message to be filled up.
-     * @param sample_id Sample id.
-     * @return true if operation is successful, false if the operation would overflow the maximum size of the message.
-     */
     static bool add_parameter_sample_identity(
             fastrtps::rtps::CDRMessage_t* cdr_message,
             const fastrtps::rtps::SampleIdentity& sample_id)
@@ -161,33 +154,6 @@ public:
         }
 
         fastrtps::rtps::CDRMessage::addUInt16(cdr_message, fastdds::dds::PID_RELATED_SAMPLE_IDENTITY);
-        fastrtps::rtps::CDRMessage::addUInt16(cdr_message, 24);
-        fastrtps::rtps::CDRMessage::addData(cdr_message,
-                sample_id.writer_guid().guidPrefix.value, fastrtps::rtps::GuidPrefix_t::size);
-        fastrtps::rtps::CDRMessage::addData(cdr_message,
-                sample_id.writer_guid().entityId.value, fastrtps::rtps::EntityId_t::size);
-        fastrtps::rtps::CDRMessage::addInt32(cdr_message, sample_id.sequence_number().high);
-        fastrtps::rtps::CDRMessage::addUInt32(cdr_message, sample_id.sequence_number().low);
-        return true;
-    }
-
-    /**
-     * This method fills the sample identity parameter to the cdr_message.
-     * The PID used is the legacy PID_RELATED_SAMPLE_IDENTITY: PID_CUSTOM_RELATED_SAMPLE_IDENTITY, due to backwards compatibility compliance.
-     * @param cdr_message Message to be filled up.
-     * @param sample_id Sample id.
-     * @return true if operation is successful, false if the operation would overflow the maximum size of the message.
-     */
-    static bool add_parameter_custom_related_sample_identity(
-            fastrtps::rtps::CDRMessage_t* cdr_message,
-            const fastrtps::rtps::SampleIdentity& sample_id)
-    {
-        if (cdr_message->pos + 28 > cdr_message->max_size)
-        {
-            return false;
-        }
-
-        fastrtps::rtps::CDRMessage::addUInt16(cdr_message, fastdds::dds::PID_CUSTOM_RELATED_SAMPLE_IDENTITY);
         fastrtps::rtps::CDRMessage::addUInt16(cdr_message, 24);
         fastrtps::rtps::CDRMessage::addData(cdr_message,
                 sample_id.writer_guid().guidPrefix.value, fastrtps::rtps::GuidPrefix_t::size);
@@ -613,28 +579,6 @@ inline bool ParameterSerializer<ParameterBuiltinEndpointSet_t>::read_content_fro
 }
 
 template<>
-inline bool ParameterSerializer<ParameterNetworkConfigSet_t>::add_content_to_cdr_message(
-        const ParameterNetworkConfigSet_t& parameter,
-        fastrtps::rtps::CDRMessage_t* cdr_message)
-{
-    return fastrtps::rtps::CDRMessage::addUInt32(cdr_message, parameter.netconfigSet);
-}
-
-template<>
-inline bool ParameterSerializer<ParameterNetworkConfigSet_t>::read_content_from_cdr_message(
-        ParameterNetworkConfigSet_t& parameter,
-        fastrtps::rtps::CDRMessage_t* cdr_message,
-        const uint16_t parameter_length)
-{
-    if (parameter_length != PARAMETER_NETWORKCONFIGSET_LENGTH)
-    {
-        return false;
-    }
-    parameter.length = parameter_length;
-    return fastrtps::rtps::CDRMessage::readUInt32(cdr_message, &parameter.netconfigSet);
-}
-
-template<>
 inline uint32_t ParameterSerializer<ParameterPropertyList_t>::cdr_serialized_size(
         const ParameterPropertyList_t& parameter)
 {
@@ -1039,7 +983,7 @@ inline bool ParameterSerializer<ParameterToken_t>::read_content_from_cdr_message
 
     parameter.length = parameter_length;
     uint32_t pos_ref = cdr_message->pos;
-    bool valid =  fastrtps::rtps::CDRMessage::readDataHolder(cdr_message, parameter.token);
+    bool valid =  fastrtps::rtps::CDRMessage::readDataHolder(cdr_message, parameter.token, parameter_length);
     uint32_t length_diff = cdr_message->pos - pos_ref;
     valid &= (parameter_length == length_diff);
     return valid;

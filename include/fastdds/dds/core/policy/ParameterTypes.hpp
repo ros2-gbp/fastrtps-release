@@ -148,18 +148,11 @@ enum ParameterId_t : uint16_t
     /* From table 14 of DDS-SEC 1.1 */
     PID_DATA_TAGS                           = 0x1003,
 
-    /* From Remote Procedure Call over DDS, document "ptc/2016-03-19" V1.0 */
-    PID_SERVICE_INSTANCE_NAME               = 0x0080,
-    PID_RELATED_ENTITY_GUID                 = 0x0081,
-    PID_TOPIC_ALIASES                       = 0x0082,
-    PID_RELATED_SAMPLE_IDENTITY             = 0x0083,
-
     /* eProsima Fast DDS extensions */
     PID_PERSISTENCE_GUID                    = 0x8002,
-    PID_CUSTOM_RELATED_SAMPLE_IDENTITY      = 0x800f,
+    PID_RELATED_SAMPLE_IDENTITY             = 0x800f,
     PID_DISABLE_POSITIVE_ACKS               = 0x8005,
     PID_DATASHARING                         = 0x8006,
-    PID_NETWORK_CONFIGURATION_SET           = 0x8007,
 };
 
 /*!
@@ -557,13 +550,13 @@ class ParameterVendorId_t : public Parameter_t
 public:
 
     //!Vendor Id. <br> By default, c_VendorId_eProsima.
-    fastdds::rtps::VendorId_t vendorId;
+    fastrtps::rtps::VendorId_t vendorId;
 
     /**
      * @brief Constructor without parameters
      */
     ParameterVendorId_t()
-        : vendorId(fastdds::rtps::c_VendorId_eProsima)
+        : vendorId(fastrtps::rtps::c_VendorId_eProsima)
     {
     }
 
@@ -577,7 +570,7 @@ public:
             ParameterId_t pid,
             uint16_t in_length)
         : Parameter_t(pid, in_length)
-        , vendorId(fastdds::rtps::c_VendorId_eProsima)
+        , vendorId(fastrtps::rtps::c_VendorId_eProsima)
     {
     }
 
@@ -887,41 +880,6 @@ public:
 
 #define PARAMETER_BUILTINENDPOINTSET_LENGTH 4
 
-/**
- * @ingroup PARAMETER_MODULE
- */
-class ParameterNetworkConfigSet_t : public Parameter_t
-{
-public:
-
-    //!Network Config Set <br> By default, 0.
-    fastrtps::rtps::NetworkConfigSet_t netconfigSet;
-
-    /**
-     * @brief Constructor without parameters
-     */
-    ParameterNetworkConfigSet_t()
-        : netconfigSet(0)
-    {
-    }
-
-    /**
-     * Constructor using a parameter PID and the parameter length
-     *
-     * @param pid Pid of the parameter
-     * @param in_length Its associated length
-     */
-    ParameterNetworkConfigSet_t(
-            ParameterId_t pid,
-            uint16_t in_length)
-        : Parameter_t(pid, in_length)
-        , netconfigSet(0)
-    {
-    }
-
-};
-
-#define PARAMETER_NETWORKCONFIGSET_LENGTH 4
 
 /**
  * @ingroup PARAMETER_MODULE
@@ -1123,13 +1081,6 @@ const char* const parameter_policy_physical_data_user = "fastdds.physical_data.u
 const char* const parameter_policy_physical_data_process = "fastdds.physical_data.process";
 
 /**
- * Parameter property value for enabling the monitor service
- *
- * @ingroup PARAMETER_MODULE
- */
-const char* const parameter_enable_monitor_service = "fastdds.enable_monitor_service";
-
-/**
  * @ingroup PARAMETER_MODULE
  */
 class ParameterPropertyList_t : public Parameter_t
@@ -1170,16 +1121,16 @@ public:
 
         self_type operator ++()
         {
+            self_type i = *this;
             advance();
-            return *this;
+            return i;
         }
 
         self_type operator ++(
                 int)
         {
-            self_type i = *this;
             advance();
-            return i;
+            return *this;
         }
 
         reference operator *()
@@ -1258,16 +1209,16 @@ public:
 
         self_type operator ++()
         {
+            self_type i = *this;
             advance();
-            return *this;
+            return i;
         }
 
         self_type operator ++(
                 int)
         {
-            self_type i = *this;
             advance();
-            return i;
+            return *this;
         }
 
         reference operator *()

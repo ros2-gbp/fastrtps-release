@@ -170,16 +170,8 @@ public:
     }
 
     bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override
-    {
-        return serialize(data, payload, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    bool serialize(
             void* /*data*/,
-            fastrtps::rtps::SerializedPayload_t* /*payload*/,
-            DataRepresentationId_t /*data_representation*/) override
+            fastrtps::rtps::SerializedPayload_t* /*payload*/) override
     {
         return true;
     }
@@ -192,19 +184,9 @@ public:
     }
 
     std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override
+            void* /*data*/) override
     {
-        return getSerializedSizeProvider(data, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/,
-            DataRepresentationId_t /*data_representation*/) override
-    {
-        return []()->uint32_t
-               {
-                   return 0;
-               };
+        return std::function<uint32_t()>();
     }
 
     void* createData() override
@@ -496,15 +478,15 @@ TEST(SubscriberTests, ChangeDefaultDataReaderQos)
     EXPECT_EQ(2, wqos.endpoint().entity_id);
     EXPECT_EQ(eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE, wqos.endpoint().history_memory_policy);
     // .reader_resource_limits
-    EXPECT_EQ(30u, wqos.reader_resource_limits().matched_publisher_allocation.initial);
-    EXPECT_EQ(300u, wqos.reader_resource_limits().matched_publisher_allocation.maximum);
-    EXPECT_EQ(4u, wqos.reader_resource_limits().matched_publisher_allocation.increment);
-    EXPECT_EQ(40u, wqos.reader_resource_limits().sample_infos_allocation.initial);
-    EXPECT_EQ(400u, wqos.reader_resource_limits().sample_infos_allocation.maximum);
-    EXPECT_EQ(5u, wqos.reader_resource_limits().sample_infos_allocation.increment);
-    EXPECT_EQ(50u, wqos.reader_resource_limits().outstanding_reads_allocation.initial);
-    EXPECT_EQ(500u, wqos.reader_resource_limits().outstanding_reads_allocation.maximum);
-    EXPECT_EQ(6u, wqos.reader_resource_limits().outstanding_reads_allocation.increment);
+    EXPECT_EQ(30, wqos.reader_resource_limits().matched_publisher_allocation.initial);
+    EXPECT_EQ(300, wqos.reader_resource_limits().matched_publisher_allocation.maximum);
+    EXPECT_EQ(4, wqos.reader_resource_limits().matched_publisher_allocation.increment);
+    EXPECT_EQ(40, wqos.reader_resource_limits().sample_infos_allocation.initial);
+    EXPECT_EQ(400, wqos.reader_resource_limits().sample_infos_allocation.maximum);
+    EXPECT_EQ(5, wqos.reader_resource_limits().sample_infos_allocation.increment);
+    EXPECT_EQ(50, wqos.reader_resource_limits().outstanding_reads_allocation.initial);
+    EXPECT_EQ(500, wqos.reader_resource_limits().outstanding_reads_allocation.maximum);
+    EXPECT_EQ(6, wqos.reader_resource_limits().outstanding_reads_allocation.increment);
     EXPECT_EQ(33, wqos.reader_resource_limits().max_samples_per_read);
     // .data_sharing
     EXPECT_EQ(eprosima::fastdds::dds::ON, wqos.data_sharing().kind());
@@ -638,7 +620,7 @@ void check_datareader_with_profile (
 
 TEST(SubscriberTests, CreateDataReaderWithProfile)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
             DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
@@ -665,7 +647,7 @@ TEST(SubscriberTests, CreateDataReaderWithProfile)
 
 TEST(SubscriberTests, GetDataReaderProfileQos)
 {
-    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profile.xml");
+    DomainParticipantFactory::get_instance()->load_XML_profiles_file("test_xml_profiles.xml");
     DomainParticipant* participant =
             DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
@@ -970,9 +952,9 @@ TEST(SubscriberTests, DeleteContainedEntities)
 
     ASSERT_EQ(data_reader_foo->return_loan(mock_coll, mock_seq), ReturnCode_t::RETCODE_OK);
 
-    SampleStateMask mock_sample_state_kind = ANY_SAMPLE_STATE;
-    ViewStateMask mock_view_state_kind = ANY_VIEW_STATE;
-    InstanceStateMask mock_instance_states = ANY_INSTANCE_STATE;
+    const std::vector<SampleStateKind> mock_sample_state_kind;
+    const std::vector<ViewStateKind> mock_view_state_kind;
+    const std::vector<InstanceStateKind> mock_instance_states;
     const std::string mock_query_expression;
     const std::vector<std::string> mock_query_parameters;
 

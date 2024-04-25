@@ -15,10 +15,12 @@
 #ifndef _FASTDDS_RTPS_READER_STATEFULREADER_H_
 #define _FASTDDS_RTPS_READER_STATEFULREADER_H_
 
-#include <fastdds/rtps/resources/ResourceEvent.h>
 #include <fastrtps/rtps/reader/RTPSReader.h>
 #include <fastrtps/rtps/attributes/ReaderAttributes.h>
 #include <fastrtps/rtps/common/Guid.h>
+#ifdef RETURN_VALID_PARTICIPANT
+#include <rtps/participant/RTPSParticipantImpl.h>
+#endif // ifdef RETURN_VALID_PARTICIPANT
 
 namespace eprosima {
 namespace fastrtps {
@@ -36,8 +38,9 @@ public:
 
     StatefulReader()
     {
-        ON_CALL(*this, getEventResource())
-                .WillByDefault(::testing::ReturnRef(service_));
+#ifdef RETURN_VALID_PARTICIPANT
+        participant_ = new RTPSParticipantImpl();
+#endif // ifdef RETURN_VALID_PARTICIPANT
     }
 
     StatefulReader(
@@ -49,6 +52,9 @@ public:
 
     virtual ~StatefulReader()
     {
+#ifdef RETURN_VALID_PARTICIPANT
+        delete participant_;
+#endif // ifdef RETURN_VALID_PARTICIPANT
     }
 
     // *INDENT-OFF* Uncrustify makes a mess with MOCK_METHOD macros
@@ -62,6 +68,12 @@ public:
 
     MOCK_METHOD1 (matched_writer_is_matched, bool(const GUID_t& writer_guid));
     // *INDENT-ON*
+
+    // In real class, inherited from Endpoint base class.
+    inline const GUID_t& getGuid() const
+    {
+        return guid_;
+    }
 
     ReaderTimes& getTimes()
     {
@@ -90,10 +102,13 @@ public:
 
     RTPSParticipantImpl* getRTPSParticipant() const
     {
+#ifdef RETURN_VALID_PARTICIPANT
+        return participant_;
+#else
         return nullptr;
-    }
+#endif // ifdef RETURN_VALID_PARTICIPANT
 
-    MOCK_METHOD0(getEventResource, ResourceEvent & ());
+    }
 
     bool send_sync_nts(
             CDRMessage_t* /*message*/,
@@ -106,8 +121,12 @@ public:
 
 private:
 
+    GUID_t guid_;
+
     ReaderTimes times_;
-    ResourceEvent service_;
+#ifdef RETURN_VALID_PARTICIPANT
+    RTPSParticipantImpl* participant_;
+#endif // ifdef RETURN_VALID_PARTICIPANT
 };
 
 } // namespace rtps

@@ -35,10 +35,6 @@
 #include <mutex>
 #include <map>
 
-#ifdef FASTDDS_STATISTICS
-#include <fastdds/statistics/rtps/monitor_service/interfaces/IStatusQueryable.hpp>
-#endif // ifdef FASTDDS_STATISTICS
-
 using eprosima::fastrtps::types::ReturnCode_t;
 
 namespace eprosima {
@@ -109,15 +105,13 @@ public:
             Topic* topic,
             const DataWriterQos& qos,
             DataWriterListener* listener,
-            const StatusMask& mask = StatusMask::all(),
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
+            const StatusMask& mask = StatusMask::all());
 
     DataWriter* create_datawriter_with_profile(
             Topic* topic,
             const std::string& profile_name,
             DataWriterListener* listener,
-            const StatusMask& mask = StatusMask::all(),
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
+            const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_datawriter(
             const DataWriter* writer);
@@ -204,13 +198,6 @@ public:
 
     bool can_be_deleted();
 
-#ifdef FASTDDS_STATISTICS
-    bool get_monitoring_status(
-            const uint32_t& status_id,
-            statistics::rtps::DDSEntityStatus*& status,
-            const fastrtps::rtps::GUID_t& entity_guid);
-#endif //FASTDDS_STATISTICS
-
 protected:
 
     DomainParticipantImpl* participant_;
@@ -268,8 +255,7 @@ protected:
             const TypeSupport& type,
             Topic* topic,
             const DataWriterQos& qos,
-            DataWriterListener* listener,
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool);
+            DataWriterListener* listener);
 
     static void set_qos(
             PublisherQos& to,

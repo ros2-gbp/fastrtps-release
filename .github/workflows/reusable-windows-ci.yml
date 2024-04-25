@@ -41,6 +41,14 @@ jobs:
           - 'v141'
           - 'v142'
     steps:
+      - name: Add ci-pending label if PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: eProsima/eProsima-CI/external/add_labels@v0
+        with:
+          labels: ci-pending
+          number: ${{ github.event.number }}
+          repo: eProsima/Fast-DDS
+
       - name: Sync eProsima/Fast-DDS repository
         uses: eProsima/eProsima-CI/external/checkout@v0
         with:
@@ -51,12 +59,12 @@ jobs:
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.22.6'
+          cmakeVersion: '3.16.6'
 
       - name: Install OpenSSL
         uses: eProsima/eprosima-CI/windows/install_openssl@v0
         with:
-          version: '3.1.1'
+          version: '1.1.1.2100'
 
       - name: Update OpenSSL environment variables
         run: |

@@ -19,19 +19,17 @@
 #ifndef _FASTDDS_RTPS_RTPSWRITER_H_
 #define _FASTDDS_RTPS_RTPSWRITER_H_
 
-#include <condition_variable>
-
-#include <gmock/gmock.h>
-
-#include <fastdds/rtps/common/VendorId_t.hpp>
+#include <fastrtps/rtps/attributes/WriterAttributes.h>
+#include <fastrtps/rtps/writer/WriterListener.h>
+#include <fastrtps/rtps/Endpoint.h>
+#include <fastrtps/rtps/common/CacheChange.h>
 #include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
 #include <fastdds/rtps/messages/RTPSMessageGroup.h>
 #include <fastdds/rtps/writer/DeliveryRetCode.hpp>
 #include <fastdds/rtps/writer/LocatorSelectorSender.hpp>
-#include <fastrtps/rtps/attributes/WriterAttributes.h>
-#include <fastrtps/rtps/common/CacheChange.h>
-#include <fastrtps/rtps/Endpoint.h>
-#include <fastrtps/rtps/writer/WriterListener.h>
+
+#include <condition_variable>
+#include <gmock/gmock.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -83,17 +81,6 @@ public:
     {
         listener_ = listener;
         return true;
-    }
-
-    virtual bool get_disable_positive_acks() const
-    {
-        return false;
-    }
-
-    virtual bool has_been_fully_delivered(
-            const SequenceNumber_t& /*seq_num*/) const
-    {
-        return false;
     }
 
 #ifdef FASTDDS_STATISTICS
@@ -229,15 +216,9 @@ public:
             uint32_t ack_count,
             const SequenceNumberSet_t& sn_set,
             bool final_flag,
-            bool& result,
-            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown)
+            bool& result)
     {
-        static_cast<void>(writer_guid);
-        static_cast<void>(reader_guid);
-        static_cast<void>(ack_count);
-        static_cast<void>(sn_set);
-        static_cast<void>(final_flag);
-        static_cast<void>(origin_vendor_id);
+        (void)writer_guid; (void)reader_guid; (void)ack_count; (void)sn_set; (void)final_flag;
 
         result = false;
         return true;
@@ -249,14 +230,9 @@ public:
             uint32_t ack_count,
             const SequenceNumber_t& seq_num,
             const FragmentNumberSet_t fragments_state,
-            bool& result,
-            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown)
+            bool& result)
     {
-        static_cast<void>(reader_guid);
-        static_cast<void>(ack_count);
-        static_cast<void>(seq_num);
-        static_cast<void>(fragments_state);
-        static_cast<void>(origin_vendor_id);
+        (void)reader_guid; (void)ack_count; (void)seq_num; (void)fragments_state;
 
         result = false;
         return writer_guid == m_guid;

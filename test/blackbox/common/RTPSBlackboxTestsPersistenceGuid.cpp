@@ -18,8 +18,6 @@
 
 #include <cstring>
 #include <thread>
-#include <sstream>
-#include <iomanip>
 
 #include "RTPSWithRegistrationWriter.hpp"
 #include "RTPSWithRegistrationReader.hpp"
@@ -68,27 +66,7 @@ protected:
             default:
                 break;
         }
-        std::remove(persistence_database().c_str());
-    }
-
-    std::string persistence_lastfour_guidprefix()
-    {
-        int32_t pid = static_cast<int32_t>(GET_PID());
-        uint8_t* bytes = reinterpret_cast<uint8_t*>(&pid);
-        std::stringstream gp;
-        gp << std::hex <<
-            std::setfill('0') << std::setw(2) << static_cast<uint16_t>(bytes[0]) << "." <<
-            std::setfill('0') << std::setw(2) << static_cast<uint16_t>(bytes[1]) << "." <<
-            std::setfill('0') << std::setw(2) << static_cast<uint16_t>(bytes[2]) << "." <<
-            std::setfill('0') << std::setw(2) << static_cast<uint16_t>(bytes[3]);
-        return gp.str();
-    }
-
-    std::string persistence_database()
-    {
-        std::stringstream persistence_db;
-        persistence_db << std::string("persistence_") << GET_PID() << std::string(".db");
-        return persistence_db.str();
+        std::remove("persistence.db");
     }
 
 };
@@ -107,18 +85,13 @@ protected:
  */
 TEST_P(PersistenceGuid, SetPersistenceGuidThroughRTPSLayer)
 {
-    std::string persistence_db = persistence_database();
-    std::string guidprefix_4 = persistence_lastfour_guidprefix();
-    std::stringstream guid;
     // Create RTPSWriter and configure the durability and property list
     RTPSWithRegistrationWriter<HelloWorldPubSubType> writer(TEST_TOPIC_NAME);
     writer.durability(TRANSIENT);
     writer.reliability(RELIABLE);
     writer.add_property("dds.persistence.plugin", "builtin.SQLITE3");
-    writer.add_property("dds.persistence.sqlite3.filename", persistence_db);
-    guid << "77.72.69.74.65.72.5f.70." << guidprefix_4 << "|67.75.69.64";
-    writer.add_property("dds.persistence.guid", guid.str());
-    guid.str("");
+    writer.add_property("dds.persistence.sqlite3.filename", "persistence.db");
+    writer.add_property("dds.persistence.guid", "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64");
 
     writer.init();
     ASSERT_TRUE(writer.isInitialized());
@@ -128,10 +101,8 @@ TEST_P(PersistenceGuid, SetPersistenceGuidThroughRTPSLayer)
     reader.durability(TRANSIENT);
     reader.reliability(RELIABLE);
     reader.add_property("dds.persistence.plugin", "builtin.SQLITE3");
-    reader.add_property("dds.persistence.sqlite3.filename", persistence_db);
-    guid << "77.65.61.64.65.72.5f.70." << guidprefix_4 << "|68.76.70.65";
-    reader.add_property("dds.persistence.guid", guid.str());
-    guid.str("");
+    reader.add_property("dds.persistence.sqlite3.filename", "persistence.db");
+    reader.add_property("dds.persistence.guid", "77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65");
 
     reader.init();
     ASSERT_TRUE(reader.isInitialized());
@@ -148,34 +119,25 @@ TEST_P(PersistenceGuid, SetPersistenceGuidThroughRTPSLayer)
     reader.startReception(1);
     reader.block_for_all();
 
-    std::stringstream command;
 #ifdef WIN32
     // Check if there is one entry in the writers database table with the stated persistence guid
-    command << "python check_guid.py \"" << persistence_db <<
-        "\" \"writers_histories\" \"77.72.69.74.65.72.5f.70." << guidprefix_4 << "|67.75.69.64\"";
-    int result1 = system(command.str().c_str());
-    command.str("");
+    int result1 = system(
+        "python check_guid.py \"persistence.db\" \"writers_histories\" \"77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64\"");
     ASSERT_EQ(result1, 1);
 
     // Check if there is one entry in the readers database table with the stated persistence guid
-    command << "python check_guid.py \"" << persistence_db <<
-        "\" \"readers\" \"77.65.61.64.65.72.5f.70." << guidprefix_4 << "|68.76.70.65\"";
-    int result2 = system(command.str().c_str());
-    command.str("");
+    int result2 = system(
+        "python check_guid.py \"persistence.db\" \"readers\" \"77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65\"");
     ASSERT_EQ(result2, 1);
 #else
     // Check if there is one entry in the writers database table with the stated persistence guid
-    command << "python3 check_guid.py '" << persistence_db <<
-        "' 'writers_histories' '77.72.69.74.65.72.5f.70." << guidprefix_4 << "|67.75.69.64'";
-    int result1 = system(command.str().c_str());
-    command.str("");
+    int result1 = system(
+        "python3 check_guid.py 'persistence.db' 'writers_histories' '77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64'");
     ASSERT_EQ((result1 >> 8), 1);
 
     // Check if there is one entry in the readers database table with the stated persistence guid
-    command << "python3 check_guid.py '" << persistence_db <<
-        "' 'readers' '77.65.61.64.65.72.5f.70." << guidprefix_4 << "|68.76.70.65'";
-    int result2 = system(command.str().c_str());
-    command.str("");
+    int result2 = system(
+        "python3 check_guid.py 'persistence.db' 'readers' '77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65'");
     ASSERT_EQ((result2 >> 8), 1);
 #endif // WIN32
 
@@ -197,16 +159,9 @@ TEST_P(PersistenceGuid, SetPersistenceGuidThroughRTPSLayer)
  */
 TEST_P(PersistenceGuid, CheckPrevalenceBetweenManualAndPropertyConfiguration)
 {
-    std::string persistence_db = persistence_database();
-    std::string guidprefix_4 = persistence_lastfour_guidprefix();
-    std::stringstream guid;
     // Create the persistence guid to set manually
     eprosima::fastrtps::rtps::GuidPrefix_t guidPrefix;
-    int32_t pid = static_cast<int32_t>(GET_PID());
-    guidPrefix.value[8] = reinterpret_cast<uint8_t*>(&pid)[0];
-    guidPrefix.value[9] = reinterpret_cast<uint8_t*>(&pid)[1];
-    guidPrefix.value[10] = reinterpret_cast<uint8_t*>(&pid)[2];
-    guidPrefix.value[11] = reinterpret_cast<uint8_t*>(&pid)[3];
+    guidPrefix.value[11] = 1;
     eprosima::fastrtps::rtps::EntityId_t entityId;
     entityId.value[3] = 1;
 
@@ -215,26 +170,22 @@ TEST_P(PersistenceGuid, CheckPrevalenceBetweenManualAndPropertyConfiguration)
     writer.durability(TRANSIENT);
     writer.reliability(RELIABLE);
     writer.add_property("dds.persistence.plugin", "builtin.SQLITE3");
-    writer.add_property("dds.persistence.sqlite3.filename", persistence_db);
-    guid << "77.72.69.74.65.72.5f.70." << guidprefix_4 << "|67.75.69.64";
-    writer.add_property("dds.persistence.guid", guid.str());
-    guid.str("");
+    writer.add_property("dds.persistence.sqlite3.filename", "persistence.db");
+    writer.add_property("dds.persistence.guid", "77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64");
     writer.persistence_guid_att(guidPrefix, entityId);
 
     writer.init();
     ASSERT_TRUE(writer.isInitialized());
 
-    entityId.value[3] = 2;
+    guidPrefix.value[11] = 2;
 
     // Create RTPSReader that use the already created attributes
     RTPSWithRegistrationReader<HelloWorldPubSubType> reader(TEST_TOPIC_NAME);
     reader.durability(TRANSIENT);
     reader.reliability(RELIABLE);
     reader.add_property("dds.persistence.plugin", "builtin.SQLITE3");
-    reader.add_property("dds.persistence.sqlite3.filename", persistence_db);
-    guid << "77.65.61.64.65.72.5f.70." << guidprefix_4 << "|68.76.70.65";
-    reader.add_property("dds.persistence.guid", guid.str());
-    guid.str("");
+    reader.add_property("dds.persistence.sqlite3.filename", "persistence.db");
+    reader.add_property("dds.persistence.guid", "77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65");
     reader.persistence_guid_att(guidPrefix, entityId);
 
     reader.init();
@@ -252,62 +203,46 @@ TEST_P(PersistenceGuid, CheckPrevalenceBetweenManualAndPropertyConfiguration)
     reader.startReception(1);
     reader.block_for_all();
 
-    std::stringstream command;
 #ifdef WIN32
-    // Check if there is one entry in the writers database table with the stated persistence guid
-    command << "python check_guid.py \"" << persistence_db <<
-        "\" \"writers_histories\" \"77.72.69.74.65.72.5f.70." << guidprefix_4 << "|67.75.69.64\"";
-    int result1 = system(command.str().c_str());
-    command.str("");
+    // Check if that there is no entry in the writers database table with the stated persistence guid
+    int result1 = system(
+        "python check_guid.py \"persistence.db\" \"writers_histories\" \"77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64\"");
     ASSERT_EQ(result1, 0);
 
     // Check if there is one entry in the writers database table with the stated persistence guid
-    command << "python check_guid.py \"" << persistence_db <<
-        "\" \"writers_histories\" \"00.00.00.00.00.00.00.00." << guidprefix_4 << "|0.0.0.1\"";
-    result1 = system(command.str().c_str());
-    command.str("");
+    result1 =
+            system(
+        "python check_guid.py \"persistence.db\" \"writers_histories\" \"00.00.00.00.00.00.00.00.00.00.00.01|0.0.0.1\"");
     ASSERT_EQ(result1, 1);
 
-    // Check if there is one entry in the readers database table with the stated persistence guid
-    command << "python check_guid.py \"" << persistence_db <<
-        "\" \"readers\" \"77.65.61.64.65.72.5f.70." << guidprefix_4 << "|68.76.70.65\"";
-    int result2 = system(command.str().c_str());
-    command.str("");
+    // Check if that there is no entry in the readers database table with the stated persistence guid
+    int result2 = system(
+        "python check_guid.py \"persistence.db\" \"readers\" \"77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65\"");
     ASSERT_EQ(result2, 0);
 
     // Check if there is one entry in the readers database table with the stated persistence guid
-    command << "python check_guid.py \"" << persistence_db <<
-        "\" \"readers\" \"00.00.00.00.00.00.00.00." << guidprefix_4 << "|0.0.0.2\"";
-    result2 = system(command.str().c_str());
-    command.str("");
+    result2 = system(
+        "python check_guid.py \"persistence.db\" \"readers\" \"00.00.00.00.00.00.00.00.00.00.00.02|0.0.0.1\"");
     ASSERT_EQ(result2, 1);
 #else
-    // Check if there is one entry in the writers database table with the stated persistence guid
-    command << "python3 check_guid.py '" << persistence_db <<
-        "' 'writers_histories' '77.72.69.74.65.72.5f.70." << guidprefix_4 << "|67.75.69.64'";
-    int result1 = system(command.str().c_str());
-    command.str("");
+
+    // Check if that there is no entry in the writers database table with the stated persistence guid
+    int result1 = system(
+        "python3 check_guid.py 'persistence.db' 'writers_histories' '77.72.69.74.65.72.5f.70.65.72.73.5f|67.75.69.64'");
     ASSERT_EQ((result1 >> 8), 0);
 
     // Check if there is one entry in the writers database table with the stated persistence guid
-    command << "python3 check_guid.py '" << persistence_db <<
-        "' 'writers_histories' '00.00.00.00.00.00.00.00." << guidprefix_4 << "|0.0.0.1'";
-    result1 = system(command.str().c_str());
-    command.str("");
+    result1 = system(
+        "python3 check_guid.py 'persistence.db' 'writers_histories' '00.00.00.00.00.00.00.00.00.00.00.01|0.0.0.1'");
     ASSERT_EQ((result1 >> 8), 1);
 
-    // Check if there is one entry in the readers database table with the stated persistence guid
-    command << "python3 check_guid.py '" << persistence_db <<
-        "' 'readers' '77.65.61.64.65.72.5f.70." << guidprefix_4 << "|68.76.70.65'";
-    int result2 = system(command.str().c_str());
-    command.str("");
+    // Check if that there is no entry in the readers database table with the stated persistence guid
+    int result2 = system(
+        "python3 check_guid.py 'persistence.db' 'readers' '77.65.61.64.65.72.5f.70.65.72.73.5f|68.76.70.65'");
     ASSERT_EQ((result2 >> 8), 0);
 
     // Check if there is one entry in the readers database table with the stated persistence guid
-    command << "python3 check_guid.py '" << persistence_db <<
-        "' 'readers' '00.00.00.00.00.00.00.00." << guidprefix_4 << "|0.0.0.2'";
-    result2 = system(command.str().c_str());
-    command.str("");
+    result2 = system("python3 check_guid.py 'persistence.db' 'readers' '00.00.00.00.00.00.00.00.00.00.00.02|0.0.0.1'");
     ASSERT_EQ((result2 >> 8), 1);
 #endif // WIN32
 }

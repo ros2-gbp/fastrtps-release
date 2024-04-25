@@ -138,29 +138,14 @@ public:
 
     bool serialize(
             void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override
-    {
-        return serialize(data, payload, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            eprosima::fastdds::dds::DataRepresentationId_t data_representation) override;
+            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
 
     bool deserialize(
             eprosima::fastrtps::rtps::SerializedPayload_t* payload,
             void* data) override;
 
     std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override
-    {
-        return getSerializedSizeProvider(data, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* data,
-            eprosima::fastdds::dds::DataRepresentationId_t data_representation) override;
+            void* data) override;
 
     void* createData() override;
 
@@ -215,7 +200,6 @@ typedef struct ThroughputCommandType
     e_Command m_command;
     uint32_t m_size = 0;
     uint32_t m_demand = 0;
-    uint64_t m_receivedsamples = 0;
     uint32_t m_lostsamples = 0;
     uint64_t m_lastrecsample = 0;
     uint64_t m_totaltime = 0;
@@ -254,7 +238,7 @@ public:
     ThroughputCommandDataType()
     {
         setName("ThroughputCommand");
-        m_typeSize = 4 * sizeof(uint32_t) + 3 * sizeof(uint64_t) + sizeof(double);
+        m_typeSize = 4 * sizeof(uint32_t) + 2 * sizeof(uint64_t) + sizeof(double);
         m_isGetKeyDefined = false;
     }
 
@@ -264,29 +248,14 @@ public:
 
     bool serialize(
             void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override
-    {
-        return serialize(data, payload, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload,
-            eprosima::fastdds::dds::DataRepresentationId_t data_representation) override;
+            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override;
 
     bool deserialize(
             eprosima::fastrtps::rtps::SerializedPayload_t* payload,
             void* data) override;
 
     std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override
-    {
-        return getSerializedSizeProvider(data, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* data,
-            eprosima::fastdds::dds::DataRepresentationId_t data_representation) override;
+            void* data) override;
 
     void* createData() override;
 

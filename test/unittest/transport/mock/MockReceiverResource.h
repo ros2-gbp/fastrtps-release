@@ -17,9 +17,8 @@
 
 #include <functional>
 
+#include <fastrtps/rtps/network/ReceiverResource.h>
 #include <fastrtps/rtps/messages/MessageReceiver.h>
-
-#include <rtps/network/ReceiverResource.h>
 
 namespace eprosima {
 namespace fastrtps {

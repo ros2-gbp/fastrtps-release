@@ -105,17 +105,12 @@ public:
      * @param new_change If true a new change (with new seqNum) is created and sent;
      * if false the last change is re-sent
      * @param dispose Sets change kind to NOT_ALIVE_DISPOSED_UNREGISTERED
-     * @param wparams allows to identify the change [unused]
-     *
-     * @warning this method uses the static variable reference as it does not use the parameter \c wparams
-     * and this avoids a creation of an object WriteParams.
-     * However, if in future versions this method uses this argument, it must change to the function
-     * \c write_params_default for thread safety reasons.
+     * @param wparams allows to identify the change
      */
     void announceParticipantState(
             bool new_change,
-            bool dispose = false,
-            WriteParams& wparams = WriteParams::WRITE_PARAM_DEFAULT) override;
+            bool dispose,
+            WriteParams& wparams) override;
 
     /**
      * These methods wouldn't be needed under perfect server operation

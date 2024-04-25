@@ -26,8 +26,11 @@
 #include <cstdlib>
 #include <list>
 #include <mutex>
-#include <set>
 #include <sys/types.h>
+
+#include <fastrtps/fastrtps_dll.h>
+#include <fastrtps/utils/Semaphore.h>
+#include <fastrtps/utils/shared_mutex.hpp>
 
 #if defined(_WIN32)
 #include <process.h>
@@ -35,56 +38,40 @@
 #include <unistd.h>
 #endif // if defined(_WIN32)
 
+#include <rtps/messages/RTPSMessageGroup_t.hpp>
+#include <rtps/messages/SendBuffersManager.hpp>
+
+#include <fastdds/rtps/common/Guid.h>
+
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
+
 #include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
-#include <fastdds/rtps/common/Guid.h>
-#include <fastdds/rtps/common/LocatorList.hpp>
+
 #include <fastdds/rtps/history/IChangePool.h>
 #include <fastdds/rtps/history/IPayloadPool.h>
-#include <fastdds/rtps/messages/MessageReceiver.h>
-#include <fastdds/rtps/resources/ResourceEvent.h>
-#include <fastdds/rtps/transport/SenderResource.h>
-#include <fastdds/statistics/rtps/monitor_service/interfaces/IConnectionsQueryable.hpp>
-#include <fastrtps/utils/Semaphore.h>
-#include <fastrtps/utils/shared_mutex.hpp>
 
+#include <fastdds/rtps/network/NetworkFactory.h>
+#include <fastdds/rtps/network/ReceiverResource.h>
+#include <fastdds/rtps/network/SenderResource.h>
+
+#include <fastdds/rtps/messages/MessageReceiver.h>
+
+#include <fastdds/rtps/resources/ResourceEvent.h>
 #include "../flowcontrol/FlowControllerFactory.hpp"
-#include <rtps/messages/RTPSMessageGroup_t.hpp>
-#include <rtps/messages/SendBuffersManager.hpp>
-#include <rtps/network/NetworkFactory.h>
-#include <rtps/network/ReceiverResource.h>
+
 #include <statistics/rtps/StatisticsBase.hpp>
-#include <statistics/types/monitorservice_types.h>
 
 #if HAVE_SECURITY
 #include <fastdds/rtps/Endpoint.h>
 #include <fastdds/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
 #include <rtps/security/SecurityManager.h>
-#include <rtps/security/SecurityPluginFactory.h>
 #endif // if HAVE_SECURITY
 
 namespace eprosima {
 
 namespace fastdds {
-
-#ifdef FASTDDS_STATISTICS
-
-namespace statistics {
-namespace rtps {
-
-struct IStatusQueryable;
-struct IStatusObserver;
-struct IConnectionsObserver;
-class SimpleQueryable;
-class MonitorService;
-
-} // namespace rtps
-} // namespace statistics
-
-#endif //FASTDDS_STATISTICS
-
 namespace dds {
 namespace builtin {
 
@@ -126,11 +113,7 @@ class WLP;
  * @ingroup RTPS_MODULE
  */
 class RTPSParticipantImpl
-    : public fastdds::statistics::StatisticsParticipantImpl,
-    public fastdds::statistics::rtps::IConnectionsQueryable
-#if HAVE_SECURITY
-    , private security::SecurityPluginFactory
-#endif // if HAVE_SECURITY
+    : public fastdds::statistics::StatisticsParticipantImpl
 {
     /*
        Receiver Control block is a struct we use to encapsulate the resources that take part in message reception.
@@ -337,7 +320,6 @@ public:
      */
     inline RTPSParticipantListener* getListener()
     {
-        std::lock_guard<std::recursive_mutex> _(*getParticipantMutex());
         return mp_participantListener;
     }
 
@@ -348,7 +330,6 @@ public:
     void set_listener(
             RTPSParticipantListener* listener)
     {
-        std::lock_guard<std::recursive_mutex> _(*getParticipantMutex());
         mp_participantListener = listener;
     }
 
@@ -434,8 +415,6 @@ public:
     bool is_security_enabled_for_reader(
             const ReaderAttributes& reader_attributes);
 
-    security::Logging* create_builtin_logging_plugin() override;
-
 #endif // if HAVE_SECURITY
 
     PDPSimple* pdpsimple();
@@ -508,8 +487,7 @@ public:
         return false;
     }
 
-    std::unique_ptr<RTPSMessageGroup_t> get_send_buffer(
-            const std::chrono::steady_clock::time_point& max_blocking_time);
+    std::unique_ptr<RTPSMessageGroup_t> get_send_buffer();
     void return_send_buffer(
             std::unique_ptr <RTPSMessageGroup_t>&& buffer);
 
@@ -563,7 +541,7 @@ private:
     //! BuiltinProtocols of this RTPSParticipant
     BuiltinProtocols* mp_builtinProtocols;
     //!Id counter to correctly assign the ids to writers and readers.
-    std::atomic<uint32_t> IdCounter;
+    uint32_t IdCounter;
     //! Mutex to safely access endpoints collections
     mutable shared_mutex endpoints_list_mutex;
     //!Writer List.
@@ -614,13 +592,6 @@ private:
 
     //! Determine if the RTPSParticipantImpl was initialized successfully.
     bool initialized_ = false;
-
-    //! Ignored entities collections
-    std::set<GuidPrefix_t> ignored_participants_;
-    std::set<GUID_t> ignored_writers_;
-    std::set<GUID_t> ignored_readers_;
-    //! Protect ignored entities collection concurrent access
-    mutable shared_mutex ignored_mtx_;
 
     RTPSParticipantImpl& operator =(
             const RTPSParticipantImpl&) = delete;
@@ -673,12 +644,6 @@ private:
     bool createSendResources(
             Endpoint* pend);
 
-    /** Add participant's external locators to endpoint's when none available
-        @param endpoint - Pointer to the endpoint whose external locators are to be set
-     */
-    void setup_external_locators(
-            Endpoint* endpoint);
-
     /** When we want to create a new Resource but the physical channel specified by the Locator
         can not be opened, we want to mutate the Locator to open a more or less equivalent channel.
         @param loc -  Locator we want to change
@@ -700,12 +665,6 @@ private:
 
     //!Will this participant use intraprocess only?
     bool is_intraprocess_only_;
-
-#ifdef FASTDDS_STATISTICS
-    std::unique_ptr<fastdds::statistics::rtps::MonitorService> monitor_server_;
-    std::unique_ptr<fastdds::statistics::rtps::SimpleQueryable> simple_queryable_;
-    std::atomic<const fastdds::statistics::rtps::IConnectionsObserver*> conns_observer_;
-#endif // ifdef FASTDDS_STATISTICS
 
     /*
      * Flow controller factory.
@@ -776,11 +735,6 @@ private:
      * Get default unicast locators when not provided by the user.
      */
     void get_default_unicast_locators();
-
-    bool match_local_endpoints_ = true;
-
-    bool should_match_local_endpoints(
-            const RTPSParticipantAttributes& att);
 
 public:
 
@@ -1047,71 +1001,10 @@ public:
      */
     void environment_file_has_changed();
 
-    /**
-     * @brief Query if the participant is found in the ignored collection
-     *
-     * @param[in] participant_guid Participant to be queried
-     * @return True if found in the ignored collection. False otherwise.
-     */
-    bool is_participant_ignored(
-            const GuidPrefix_t& participant_guid);
-
-    /**
-     * @brief Query if the writer is found in the ignored collection
-     *
-     * @param[in] writer_guid Writer to be queried
-     * @return True if found in the ignored collection. False otherwise.
-     */
-    bool is_writer_ignored(
-            const GUID_t& writer_guid);
-
-    /**
-     * @brief Query if the reader is found in the ignored collection
-     *
-     * @param[in] reader_guid Reader to be queried
-     * @return True if found in the ignored collection. False otherwise.
-     */
-    bool is_reader_ignored(
-            const GUID_t& reader_guid);
-
-    /**
-     * @brief Add a Participant into the corresponding ignore collection.
-     *
-     * @param[in] participant_guid Participant that is to be ignored.
-     * @return True if correctly included into the ignore collection. False otherwise.
-     */
-    bool ignore_participant(
-            const GuidPrefix_t& participant_guid);
-
-    /**
-     * @brief Add a Writer into the corresponding ignore collection.
-     *
-     * @param[in] writer_guid Writer that is to be ignored.
-     * @return True if correctly included into the ignore collection. False otherwise.
-     */
-    bool ignore_writer(
-            const GUID_t& writer_guid);
-
-    /**
-     * @brief Add a Reader into the corresponding ignore collection.
-     *
-     * @param[in] reader_guid Reader that is to be ignored.
-     * @return True if correctly included into the ignore collection. False otherwise.
-     */
-    bool ignore_reader(
-            const GUID_t& reader_guid);
-
-    /**
-     * @brief Returns registered transports' netmask filter information (transport's netmask filter kind and allowlist).
-     *
-     * @return A vector with all registered transports' netmask filter information.
-     */
-    std::vector<fastdds::rtps::TransportNetmaskFilterInfo> get_netmask_filter_info() const;
-
     template <EndpointKind_t kind, octet no_key, octet with_key>
     static bool preprocess_endpoint_attributes(
             const EntityId_t& entity_id,
-            std::atomic<uint32_t>& id_count,
+            uint32_t& id_count,
             EndpointAttributes& att,
             EntityId_t& entId);
 
@@ -1159,128 +1052,7 @@ public:
     bool unregister_in_reader(
             std::shared_ptr<fastdds::statistics::IListener> listener) override;
 
-    /**
-     * @brief Set the enabled statistics writers mask
-     *
-     * @param enabled_writers The new mask to set
-     */
-    void set_enabled_statistics_writers_mask(
-            uint32_t enabled_writers) override;
-
-    /**
-     * Creates the monitor service in this RTPSParticipant with the provided interfaces.
-     *
-     * @param sq reference to the object implementing the StatusQueryable interface.
-     * It will usually be the DDS DomainParticipant
-     *
-     * @return A const pointer to the listener (implemented within the RTPSParticipant)
-     *
-     */
-    const fastdds::statistics::rtps::IStatusObserver* create_monitor_service(
-            fastdds::statistics::rtps::IStatusQueryable& status_queryable);
-
-    /**
-     * Creates the monitor service in this RTPSParticipant with a simple default
-     * implementation of the IStatusQueryable.
-     *
-     * @return true if the monitor service could be correctly created.
-     *
-     */
-    bool create_monitor_service();
-
-    /**
-     * Returns whether the monitor service in created in this RTPSParticipant.
-     *
-     * @return true if the monitor service is created.
-     * @return false otherwise.
-     *
-     */
-    bool is_monitor_service_created() const;
-
-    /**
-     * Enables the monitor service in this RTPSParticipant.
-     *
-     * @return true if the monitor service could be correctly enabled.
-     *
-     */
-    bool enable_monitor_service() const;
-
-    /**
-     * Disables the monitor service in this RTPSParticipant. Does nothing if the service was not enabled before.
-     *
-     * @return true if the monitor service could be correctly disabled.
-     * @return false if the service could not be properly disabled or if the monitor service was not previously enabled.
-     *
-     */
-    bool disable_monitor_service() const;
-
-    /**
-     * fills in the ParticipantProxyData from a MonitorService Message
-     *
-     * @param [out] data Proxy to fill
-     * @param [in] msg MonitorService Message to get the proxy information from.
-     *
-     * @return true if the operation succeeds.
-     */
-    bool fill_discovery_data_from_cdr_message(
-            fastrtps::rtps::ParticipantProxyData& data,
-            fastdds::statistics::MonitorServiceStatusData& msg);
-
-    /**
-     * fills in the WriterProxyData from a MonitorService Message
-     *
-     * @param [out] data Proxy to fill.
-     * @param [in] msg MonitorService Message to get the proxy information from.
-     *
-     * @return true if the operation succeeds.
-     */
-    bool fill_discovery_data_from_cdr_message(
-            fastrtps::rtps::WriterProxyData& data,
-            fastdds::statistics::MonitorServiceStatusData& msg);
-
-    /**
-     * fills in the ReaderProxyData from a MonitorService Message
-     *
-     * @param [out] data Proxy to fill.
-     * @param [in] msg MonitorService Message to get the proxy information from.
-     *
-     * @return true if the operation succeeds.
-     */
-    bool fill_discovery_data_from_cdr_message(
-            fastrtps::rtps::ReaderProxyData& data,
-            fastdds::statistics::MonitorServiceStatusData& msg);
-
-    bool get_entity_connections(
-            const GUID_t&,
-            fastdds::statistics::rtps::ConnectionList& conn_list) override;
-
-    const fastdds::statistics::rtps::IConnectionsObserver* get_connections_observer()
-    {
-        return conns_observer_.load();
-    }
-
-#else
-    bool get_entity_connections(
-            const GUID_t&,
-            fastdds::statistics::rtps::ConnectionList&) override
-    {
-        return false;
-    }
-
 #endif // FASTDDS_STATISTICS
-
-    bool should_match_local_endpoints()
-    {
-        return match_local_endpoints_;
-    }
-
-    /**
-     * Method called on participant removal with the set of locators associated to the participant.
-     *
-     * @param remote_participant_locators Set of locators associated to the participant removed.
-     */
-    void update_removed_participant(
-            const LocatorList_t& remote_participant_locators);
 
 };
 } // namespace rtps

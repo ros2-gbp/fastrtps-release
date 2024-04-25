@@ -22,11 +22,11 @@
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <chrono>
-#include <cstdint>
-#include <functional>
-
 #include <fastdds/rtps/common/Time_t.h>
+
+#include <thread>
+#include <functional>
+#include <cstdint>
 
 namespace eprosima {
 namespace fastrtps {
@@ -131,12 +131,6 @@ public:
      */
     void restart_timer(
             const std::chrono::steady_clock::time_point& timeout);
-
-    /*!
-     * @brief Unregisters the event, sets its state to INACTIVE, and re-registers it.
-     * It may be seen as a blocking version of \c cancel_timer
-     */
-    void recreate_timer();
 
     /**
      * Update event interval.

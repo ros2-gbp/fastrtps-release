@@ -84,13 +84,13 @@ XMLP_ret XMLParser::parseXMLDynamicType(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing type: Type " << type << " not recognized.");
+            logError(XMLPARSER, "Error parsing type: Type " << type << " not recognized.");
             ret = XMLP_ret::XML_ERROR;
         }
 
         if (ret != XMLP_ret::XML_OK)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing type " << type << ".");
+            logError(XMLPARSER, "Error parsing type " << type << ".");
             break;
         }
     }
@@ -126,7 +126,7 @@ XMLP_ret XMLParser::parseXMLTypes(
             }
             else
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'types'. Name: " << name);
+                logError(XMLPARSER, "Invalid element found into 'types'. Name: " << name);
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -146,7 +146,7 @@ XMLP_ret XMLParser::parseXMLTypes(
             }
             else
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'types'. Name: " << name);
+                logError(XMLPARSER, "Invalid element found into 'types'. Name: " << name);
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -167,7 +167,7 @@ XMLP_ret XMLParser::parseXMLBitvalueDynamicType(
      */
     if (p_root == nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing bitmask: Node not found.");
+        logError(XMLPARSER, "Error parsing bitmask: Node not found.");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -182,14 +182,14 @@ XMLP_ret XMLParser::parseXMLBitvalueDynamicType(
         }
         catch (const std::exception&)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing bit_value position: Invalid (must be an unsigned short).");
+            logError(XMLPARSER, "Error parsing bit_value position: Invalid (must be an unsigned short).");
             return XMLP_ret::XML_ERROR;
         }
     }
 
     if (memberName == nullptr && p_dynamictype != nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing bit_value name: Not found.");
+        logError(XMLPARSER, "Error parsing bit_value name: Not found.");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -315,7 +315,7 @@ XMLP_ret XMLParser::parseXMLAliasDynamicType(
             }
             else
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing member type: Not found.");
+                logError(XMLPARSER, "Error parsing member type: Not found.");
                 ret = XMLP_ret::XML_ERROR;
             }
         }
@@ -325,7 +325,7 @@ XMLP_ret XMLParser::parseXMLAliasDynamicType(
                 (p_root->Attribute(SEQ_MAXLENGTH) != nullptr) ||
                 (p_root->Attribute(MAP_MAXLENGTH) != nullptr))
         {
-            valueBuilder = parseXMLMemberDynamicType(p_root, nullptr, types::MEMBER_ID_INVALID);
+            valueBuilder = parseXMLMemberDynamicType(p_root, nullptr, MEMBER_ID_INVALID);
         }
         else
         {
@@ -349,19 +349,19 @@ XMLP_ret XMLParser::parseXMLAliasDynamicType(
             }
             else
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing alias type: No name attribute given.");
+                logError(XMLPARSER, "Error parsing alias type: No name attribute given.");
                 ret = XMLP_ret::XML_ERROR;
             }
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing alias type: Value not recognized.");
+            logError(XMLPARSER, "Error parsing alias type: Value not recognized.");
             ret = XMLP_ret::XML_ERROR;
         }
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing alias type: Type not defined.");
+        logError(XMLPARSER, "Error parsing alias type: Type not defined.");
         ret = XMLP_ret::XML_ERROR;
     }
     return ret;
@@ -396,7 +396,7 @@ XMLP_ret XMLParser::parseXMLBitsetDynamicType(
     const char* name = p_root->Attribute(NAME);
     if (nullptr == name)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing 'bitsetDcl' type. No name attribute given.");
+        logError(XMLPARSER, "Error parsing 'bitsetDcl' type. No name attribute given.");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -410,7 +410,7 @@ XMLP_ret XMLParser::parseXMLBitsetDynamicType(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid baseType found into 'bitsetDcl'. Name: " << baseType);
+            logError(XMLPARSER, "Invalid baseType found into 'bitsetDcl'. Name: " << baseType);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -436,7 +436,7 @@ XMLP_ret XMLParser::parseXMLBitsetDynamicType(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'bitsetDcl'. Name: " << element_name);
+            logError(XMLPARSER, "Invalid element found into 'bitsetDcl'. Name: " << element_name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -460,7 +460,7 @@ p_dynamictypebuilder_t XMLParser::parseXMLBitfieldDynamicType(
      */
     if (p_root == nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing bitfield: Node not found.");
+        logError(XMLPARSER, "Error parsing bitfield: Node not found.");
         return nullptr;
     }
 
@@ -470,7 +470,7 @@ p_dynamictypebuilder_t XMLParser::parseXMLBitfieldDynamicType(
 
     if (bit_bound == nullptr && p_dynamictype != nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing bitfield bit_bound: Not found.");
+        logError(XMLPARSER, "Error parsing bitfield bit_bound: Not found.");
         return nullptr;
     }
 
@@ -509,13 +509,13 @@ p_dynamictypebuilder_t XMLParser::parseXMLBitfieldDynamicType(
             }
             else
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Failed creating bitfield, size too big: " << bit_bound);
+                logError(XMLPARSER, "Failed creating bitfield, size too big: " << bit_bound);
                 return nullptr;
             }
         }
         catch (...)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Failed creating bitfield, invalid bit_bound (must be an unsigned short): "
+            logError(XMLPARSER, "Failed creating bitfield, invalid bit_bound (must be an unsigned short): "
                     << bit_bound);
             return nullptr;
         }
@@ -566,14 +566,13 @@ p_dynamictypebuilder_t XMLParser::parseXMLBitfieldDynamicType(
     }
     else // Unsupported type?
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER,
-                "Failed creating bitfield " << memberName << ": Type " << memberType << " unsupported.");
+        logError(XMLPARSER, "Failed creating bitfield " << memberName << ": Type " << memberType << " unsupported.");
     }
 
 
     if (memberBuilder == nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Failed creating " << memberType << ": " << memberName);
+        logError(XMLPARSER, "Failed creating " << memberType << ": " << memberName);
     }
 
     if (p_dynamictype != nullptr)
@@ -648,7 +647,7 @@ XMLP_ret XMLParser::parseXMLBitmaskDynamicType(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'bitmaskDcl'. Name: " << element_name);
+            logError(XMLPARSER, "Invalid element found into 'bitmaskDcl'. Name: " << element_name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -680,7 +679,7 @@ XMLP_ret XMLParser::parseXMLEnumDynamicType(
 
     if (enumName == nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing 'enum' type. No name attribute given.");
+        logError(XMLPARSER, "Error parsing 'enum' type. No name attribute given.");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -692,7 +691,7 @@ XMLP_ret XMLParser::parseXMLEnumDynamicType(
         const char* name = literal->Attribute(NAME);
         if (name == nullptr)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing enum type: Literals must have name.");
+            logError(XMLPARSER, "Error parsing enum type: Literals must have name.");
             return XMLP_ret::XML_ERROR;
         }
 
@@ -726,7 +725,7 @@ XMLP_ret XMLParser::parseXMLStructDynamicType(
     const char* name = p_root->Attribute(NAME);
     if (nullptr == name || name[0] == '\0')
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Missing required attribute 'name' in 'structDcl'.");
+        logError(XMLPARSER, "Missing required attribute 'name' in 'structDcl'.");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -744,7 +743,7 @@ XMLP_ret XMLParser::parseXMLStructDynamicType(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid baseType found into 'structDcl'. Name: " << baseType);
+            logError(XMLPARSER, "Invalid baseType found into 'structDcl'. Name: " << baseType);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -769,7 +768,7 @@ XMLP_ret XMLParser::parseXMLStructDynamicType(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'structDcl'. Name: " << element_name);
+            logError(XMLPARSER, "Invalid element found into 'structDcl'. Name: " << element_name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -812,7 +811,7 @@ XMLP_ret XMLParser::parseXMLUnionDynamicType(
         p_dynamictypebuilder_t discriminator = getDiscriminatorTypeBuilder(disc);
         if (discriminator == nullptr)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER,
+            logError(XMLPARSER,
                     "Error parsing union discriminator: Only primitive types allowed (found type " << disc << ").");
             ret = XMLP_ret::XML_ERROR;
         }
@@ -833,7 +832,7 @@ XMLP_ret XMLParser::parseXMLUnionDynamicType(
                     const char* values = caseValue->Attribute(VALUE);
                     if (values == nullptr)
                     {
-                        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing union case value: Not found.");
+                        logError(XMLPARSER, "Error parsing union case value: Not found.");
                         return XMLP_ret::XML_ERROR;
                     }
 
@@ -863,7 +862,7 @@ XMLP_ret XMLParser::parseXMLUnionDynamicType(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing union case member: Not found.");
+                    logError(XMLPARSER, "Error parsing union case member: Not found.");
                     return XMLP_ret::XML_ERROR;
                 }
             }
@@ -873,7 +872,7 @@ XMLP_ret XMLParser::parseXMLUnionDynamicType(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing union discriminator: Not found.");
+        logError(XMLPARSER, "Error parsing union discriminator: Not found.");
         ret = XMLP_ret::XML_ERROR;
     }
 
@@ -948,7 +947,7 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
      */
     if (p_root == nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing member: Node not found.");
+        logError(XMLPARSER, "Error parsing member: Node not found.");
         return nullptr;
     }
 
@@ -958,13 +957,13 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
 
     if (memberName == nullptr && p_dynamictype != nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing member name: Not found.");
+        logError(XMLPARSER, "Error parsing member name: Not found.");
         return nullptr;
     }
 
     if (memberType == nullptr)
     {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing member type: Not found.");
+        logError(XMLPARSER, "Error parsing member type: Not found.");
         return nullptr;
     }
 
@@ -983,7 +982,7 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing member type: Not found.");
+            logError(XMLPARSER, "Error parsing member type: Not found.");
             return nullptr;
         }
     }
@@ -1005,7 +1004,7 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
         p_dynamictypebuilder_t contentType = getDiscriminatorTypeBuilder(memberType);
         if (contentType == nullptr)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing sequence element type: Cannot be recognized: " << memberType);
+            logError(XMLPARSER, "Error parsing sequence element type: Cannot be recognized: " << memberType);
             return nullptr;
         }
 
@@ -1019,7 +1018,7 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
             }
             catch (const std::exception&)
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing member sequence length in line " << p_root->GetLineNum());
+                logError(XMLPARSER, "Error parsing member sequence length in line " << p_root->GetLineNum());
                 return nullptr;
             }
         }
@@ -1066,13 +1065,13 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
             keyTypeBuilder = getDiscriminatorTypeBuilder(memberMapKeyType);
             if (keyTypeBuilder == nullptr)
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing map's key element type: Cannot be recognized.");
+                logError(XMLPARSER, "Error parsing map's key element type: Cannot be recognized.");
                 return nullptr;
             }
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing key_type element: Not found.");
+            logError(XMLPARSER, "Error parsing key_type element: Not found.");
             return nullptr;
         }
 
@@ -1083,13 +1082,13 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
             valueTypeBuilder = getDiscriminatorTypeBuilder(memberType);
             if (valueTypeBuilder == nullptr)
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing map's value element type: Cannot be recognized.");
+                logError(XMLPARSER, "Error parsing map's value element type: Cannot be recognized.");
                 return nullptr;
             }
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing value_value element: Not found.");
+            logError(XMLPARSER, "Error parsing value_value element: Not found.");
             return nullptr;
         }
 
@@ -1103,8 +1102,7 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
             }
             catch (const std::exception&)
             {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Error parsing map member sequence length in line " << p_root->GetLineNum());
+                logError(XMLPARSER, "Error parsing map member sequence length in line " << p_root->GetLineNum())
                 return nullptr;
             }
         }
@@ -1385,12 +1383,11 @@ p_dynamictypebuilder_t XMLParser::parseXMLMemberDynamicType(
     {
         if (!isArray)
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Failed creating " << memberType << ": " << (memberName ? memberName : ""));
+            logError(XMLPARSER, "Failed creating " << memberType << ": " << (memberName ? memberName : ""));
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER,
-                    "Failed creating " << memberType << " array: " << (memberName ? memberName : ""));
+            logError(XMLPARSER, "Failed creating " << memberType << " array: " << (memberName ? memberName : ""));
         }
         return nullptr;
     }

@@ -28,8 +28,7 @@ enum class NodeType
     LOG,
     REQUESTER,
     REPLIER,
-    LIBRARY_SETTINGS,
-    DOMAINPARTICIPANT_FACTORY
+    LIBRARY_SETTINGS
 };
 
 class BaseNode
@@ -50,10 +49,33 @@ public:
     BaseNode& operator =(
             const BaseNode&) = delete;
 
+    // C++11 defaulted functions
+    // Vs2013 partly support defaulted functions. Defaulted move constructors and move assignment operators are not
+    // supported.
+#if !defined(HAVE_CXX0X) || (defined(_MSC_VER) && _MSC_VER <= 1800)
+    BaseNode(
+            BaseNode&& other)
+        : data_type_(std::move(other.data_type_))
+        , parent_(std::move(other.parent_))
+        , children(std::move(other.children))
+    {
+    }
+
+    BaseNode& operator =(
+            BaseNode&& other)
+    {
+        data_type_ = std::move(other.data_type_);
+        parent_    = std::move(other.parent_);
+        children   = std::move(other.children);
+        return *this;
+    }
+
+#else
     BaseNode(
             BaseNode&&) = default;
     BaseNode& operator =(
             BaseNode&&) = default;
+#endif // if !defined(HAVE_CXX0X) || (defined(_MSC_VER) && _MSC_VER <= 1800)
 
     NodeType getType() const
     {
@@ -136,10 +158,33 @@ public:
     DataNode& operator =(
             const DataNode&) = delete;
 
+    // C++11 defaulted functions
+    // Vs2013 partly support defaulted functions. Defaulted move constructors and move assignment operators are not
+    // supported.
+#if !defined(HAVE_CXX0X) || (defined(_MSC_VER) && _MSC_VER <= 1800)
+    DataNode(
+            DataNode&& other)
+        : BaseNode(std::move(other))
+        , attributes_(std::move(other.attributes_))
+        , data_(std::move(other.data_))
+    {
+    }
+
+    DataNode& operator =(
+            DataNode&& other)
+    {
+        BaseNode::operator =(std::move(other));
+        attributes_      = std::move(other.attributes_);
+        data_             = std::move(other.data_);
+        return *this;
+    }
+
+#else
     DataNode(
             DataNode&&)            = default;
     DataNode& operator =(
             DataNode&&) = default;
+#endif // if !defined(HAVE_CXX0X) || (defined(_MSC_VER) && _MSC_VER <= 1800)
 
     T* get() const;
     std::unique_ptr<T> getData();

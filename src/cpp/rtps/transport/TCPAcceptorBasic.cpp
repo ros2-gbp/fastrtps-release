@@ -35,12 +35,12 @@ TCPAcceptorBasic::TCPAcceptorBasic(
 
 TCPAcceptorBasic::TCPAcceptorBasic(
         asio::io_service& io_service,
-        const std::string& iface,
+        const std::string& interface,
         const Locator& locator)
-    : TCPAcceptor(io_service, iface, locator)
+    : TCPAcceptor(io_service, interface, locator)
     , socket_(*io_service_)
 {
-    endpoint_ = asio::ip::tcp::endpoint(asio::ip::address::from_string(iface),
+    endpoint_ = asio::ip::tcp::endpoint(asio::ip::address_v4::from_string(interface),
                     IPLocator::getPhysicalPort(locator_));
 }
 

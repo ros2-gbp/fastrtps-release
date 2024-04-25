@@ -23,17 +23,15 @@
 #include <vector>
 
 #include <fastdds/dds/core/policy/ParameterTypes.hpp>
-#include <fastdds/rtps/attributes/ExternalLocators.hpp>
+
 #include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastdds/rtps/attributes/ThreadSettings.hpp>
 #include <fastdds/rtps/common/LocatorList.hpp>
-#include <fastdds/rtps/common/Time_t.h>
 #include <fastdds/rtps/common/Types.h>
-#include <fastdds/rtps/flowcontrol/FlowControllerConsts.hpp>
+#include <fastdds/rtps/common/Time_t.h>
 #include <fastdds/rtps/resources/ResourceManagement.h>
-#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
+#include <fastdds/rtps/flowcontrol/FlowControllerConsts.hpp>
 
 #include <fastrtps/types/TypeObject.h>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
@@ -1728,23 +1726,21 @@ public:
      * @brief Specifies the maximum number of data-samples the DataWriter (or DataReader) can manage across all the
      * instances associated with it. Represents the maximum samples the middleware can store for any one DataWriter
      * (or DataReader). <br>
-     * Value 0 means infinite resources. By default, 5000.
+     * By default, 5000.
      *
-     * @warning It is inconsistent if `max_samples < (max_instances * max_samples_per_instance)`.
+     * @warning It is inconsistent for this value to be less than max_samples_per_instance.
      */
     int32_t max_samples;
     /**
      * @brief Represents the maximum number of instances DataWriter (or DataReader) can manage. <br>
-     * Value 0 means infinite resources. By default, 10.
-     *
-     * @warning It is inconsistent if `(max_instances * max_samples_per_instance) > max_samples`.
+     * By default, 10.
      */
     int32_t max_instances;
     /**
      * @brief Represents the maximum number of samples of any one instance a DataWriter(or DataReader) can manage. <br>
-     * Value 0 means infinite resources. By default, 400.
+     * By default, 400.
      *
-     * @warning It is inconsistent if `(max_instances * max_samples_per_instance) > max_samples`.
+     * @warning It is inconsistent for this value to be greater than max_samples.
      */
     int32_t max_samples_per_instance;
     /**
@@ -2067,7 +2063,7 @@ public:
 };
 
 /**
- * Enum @ref DataRepresentationId, different kinds of topic data representation
+ * Enum DataRepresentationId, different kinds of topic data representation
  */
 typedef enum DataRepresentationId : int16_t
 {
@@ -2075,9 +2071,6 @@ typedef enum DataRepresentationId : int16_t
     XML_DATA_REPRESENTATION = 1,    //!< XML Data Representation (Unsupported)
     XCDR2_DATA_REPRESENTATION = 2    //!< Extended CDR Encoding version 2
 } DataRepresentationId_t;
-
-//! Default @ref DataRepresentationId used in Fast DDS.
-constexpr DataRepresentationId_t DEFAULT_DATA_REPRESENTATION {DataRepresentationId_t::XCDR_DATA_REPRESENTATION};
 
 /**
  * With multiple standard data Representations available, and vendor-specific extensions possible, DataWriters and
@@ -2093,7 +2086,7 @@ class DataRepresentationQosPolicy : public Parameter_t, public QosPolicy
 {
 public:
 
-    //!List of @ref DataRepresentationId. <br> By default, empty list.
+    //!List of DataRepresentationId. <br> By default, empty list.
     std::vector<DataRepresentationId_t> m_value;
 
     /**
@@ -2101,7 +2094,7 @@ public:
      */
     RTPS_DllAPI DataRepresentationQosPolicy()
         : Parameter_t(PID_DATA_REPRESENTATION, 0)
-        , QosPolicy(false)
+        , QosPolicy(true)
     {
     }
 
@@ -2683,8 +2676,6 @@ public:
                (this->throughput_controller == b.throughput_controller) &&
                (this->default_unicast_locator_list == b.default_unicast_locator_list) &&
                (this->default_multicast_locator_list == b.default_multicast_locator_list) &&
-               (this->default_external_unicast_locators == b.default_external_unicast_locators) &&
-               (this->ignore_non_matching_locators == b.ignore_non_matching_locators) &&
                QosPolicy::operator ==(b);
     }
 
@@ -2697,13 +2688,13 @@ public:
     //! Optionally allows user to define the GuidPrefix_t
     fastrtps::rtps::GuidPrefix_t prefix;
 
-    //! Participant ID <br> By default, -1.
+    //!Participant ID <br> By default, -1.
     int32_t participant_id;
 
     //! Builtin parameters.
     fastrtps::rtps::BuiltinAttributes builtin;
 
-    //! Port Parameters
+    //!Port Parameters
     fastrtps::rtps::PortParameters port;
 
     /**
@@ -2721,19 +2712,9 @@ public:
 
     /**
      * Default list of Multicast Locators to be used for any Endpoint defined inside this RTPSParticipant in the
-     * case that it was defined with NO MulticastLocators. This is usually left empty.
+     * case that it was defined with NO UnicastLocators. This is usually left empty.
      */
     rtps::LocatorList default_multicast_locator_list;
-
-    /**
-     * The collection of external locators to use for communication on user created topics.
-     */
-    rtps::ExternalLocators default_external_unicast_locators;
-
-    /**
-     * Whether locators that don't match with the announced locators should be kept.
-     */
-    bool ignore_non_matching_locators = false;
 };
 
 //! Qos Policy to configure the transport layer
@@ -2749,8 +2730,6 @@ public:
         , use_builtin_transports(true)
         , send_socket_buffer_size(0)
         , listen_socket_buffer_size(0)
-        , max_msg_size_no_frag(0)
-        , netmask_filter(fastdds::rtps::NetmaskFilterKind::AUTO)
     {
     }
 
@@ -2766,9 +2745,6 @@ public:
                (this->use_builtin_transports == b.use_builtin_transports) &&
                (this->send_socket_buffer_size == b.send_socket_buffer_size) &&
                (this->listen_socket_buffer_size == b.listen_socket_buffer_size) &&
-               (this->builtin_transports_reception_threads_ == b.builtin_transports_reception_threads_) &&
-               (this->max_msg_size_no_frag == b.max_msg_size_no_frag) &&
-               (this->netmask_filter == b.netmask_filter) &&
                QosPolicy::operator ==(b);
     }
 
@@ -2794,26 +2770,19 @@ public:
      * By default, 0.
      */
     uint32_t listen_socket_buffer_size;
-
-    //! Thread settings for the builtin transports reception threads
-    rtps::ThreadSettings builtin_transports_reception_threads_;
-
-    /*! Maximum message size used to avoid fragmentation, set ONLY in LARGE_DATA. If this value is
-     * not zero, the network factory will allow the initialization of UDP transports with maxMessageSize
-     * higher than 65500K.
-     */
-    uint32_t max_msg_size_no_frag;
-
-    //! Netmask filter configuration
-    fastdds::rtps::NetmaskFilterKind netmask_filter;
 };
 
-//! Qos Policy to configure the endpoint
+//!Qos Policy to configure the endpoint
 class RTPSEndpointQos
 {
 public:
 
-    RTPS_DllAPI RTPSEndpointQos() = default;
+    RTPS_DllAPI RTPSEndpointQos()
+        : user_defined_id(-1)
+        , entity_id(-1)
+        , history_memory_policy(fastrtps::rtps::PREALLOCATED_MEMORY_MODE)
+    {
+    }
 
     virtual RTPS_DllAPI ~RTPSEndpointQos() = default;
 
@@ -2823,37 +2792,28 @@ public:
         return (this->unicast_locator_list == b.unicast_locator_list) &&
                (this->multicast_locator_list == b.multicast_locator_list) &&
                (this->remote_locator_list == b.remote_locator_list) &&
-               (this->external_unicast_locators == b.external_unicast_locators) &&
-               (this->ignore_non_matching_locators == b.ignore_non_matching_locators) &&
                (this->user_defined_id == b.user_defined_id) &&
                (this->entity_id == b.entity_id) &&
                (this->history_memory_policy == b.history_memory_policy);
     }
 
-    //! Unicast locator list
+    //!Unicast locator list
     rtps::LocatorList unicast_locator_list;
 
-    //! Multicast locator list
+    //!Multicast locator list
     rtps::LocatorList multicast_locator_list;
 
-    //! Remote locator list
+    //!Remote locator list
     rtps::LocatorList remote_locator_list;
 
-    //! The collection of external locators to use for communication.
-    fastdds::rtps::ExternalLocators external_unicast_locators;
+    //!User Defined ID, used for StaticEndpointDiscovery. <br> By default, -1.
+    int16_t user_defined_id;
 
-    //! Whether locators that don't match with the announced locators should be kept.
-    bool ignore_non_matching_locators = false;
+    //!Entity ID, if the user wants to specify the EntityID of the endpoint. <br> By default, -1.
+    int16_t entity_id;
 
-    //! User Defined ID, used for StaticEndpointDiscovery. <br> By default, -1.
-    int16_t user_defined_id = -1;
-
-    //! Entity ID, if the user wants to specify the EntityID of the endpoint. <br> By default, -1.
-    int16_t entity_id = -1;
-
-    //! Underlying History memory policy. <br> By default, PREALLOCATED_WITH_REALLOC_MEMORY_MODE.
-    fastrtps::rtps::MemoryManagementPolicy_t history_memory_policy =
-            fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+    //!Underlying History memory policy. <br> By default, PREALLOCATED_MEMORY_MODE.
+    fastrtps::rtps::MemoryManagementPolicy_t history_memory_policy;
 };
 
 //!Qos Policy to configure the limit of the writer resources
@@ -2966,7 +2926,6 @@ public:
                 max_domains_ :
                 b.domain_ids().size());
         domain_ids_ = b.domain_ids();
-        data_sharing_listener_thread_ = b.data_sharing_listener_thread();
 
         return *this;
     }
@@ -2977,7 +2936,6 @@ public:
         return kind_ == b.kind_ &&
                shm_directory_ == b.shm_directory_ &&
                domain_ids_ == b.domain_ids_ &&
-               data_sharing_listener_thread_ == b.data_sharing_listener_thread_ &&
                Parameter_t::operator ==(b) &&
                QosPolicy::operator ==(b);
     }
@@ -3154,37 +3112,6 @@ public:
         }
     }
 
-    /**
-     * Getter for DataSharing listener thread ThreadSettings
-     *
-     * @return rtps::ThreadSettings reference
-     */
-    rtps::ThreadSettings& data_sharing_listener_thread()
-    {
-        return data_sharing_listener_thread_;
-    }
-
-    /**
-     * Getter for DataSharing listener thread ThreadSettings
-     *
-     * @return rtps::ThreadSettings reference
-     */
-    const rtps::ThreadSettings& data_sharing_listener_thread() const
-    {
-        return data_sharing_listener_thread_;
-    }
-
-    /**
-     * Setter for the DataSharing listener thread ThreadSettings
-     *
-     * @param value New ThreadSettings to be set
-     */
-    void data_sharing_listener_thread(
-            const rtps::ThreadSettings& value)
-    {
-        data_sharing_listener_thread_ = value;
-    }
-
 private:
 
     void setup(
@@ -3213,9 +3140,6 @@ private:
 
     //! Only endpoints with matching domain IDs are DataSharing compatible
     std::vector<uint64_t> domain_ids_;
-
-    //! Thread settings for the DataSharing listener thread
-    rtps::ThreadSettings data_sharing_listener_thread_;
 };
 
 

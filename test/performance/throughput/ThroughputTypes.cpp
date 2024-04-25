@@ -43,8 +43,7 @@ bool ThroughputDataType::compare_data(
 // Serialization and deserialization functions
 bool ThroughputDataType::serialize(
         void* data,
-        SerializedPayload_t* payload,
-        eprosima::fastdds::dds::DataRepresentationId_t)
+        SerializedPayload_t* payload)
 {
     static uint8_t encapsulation[4] = { 0x0, 0x1, 0x0, 0x0 };
     ThroughputType* lt = (ThroughputType*)data;
@@ -76,8 +75,7 @@ bool ThroughputDataType::deserialize(
 }
 
 std::function<uint32_t()> ThroughputDataType::getSerializedSizeProvider(
-        void*,
-        eprosima::fastdds::dds::DataRepresentationId_t)
+        void* )
 {
     // uint32_t seqnum + uint32_t buffer_size_ + actual data
     uint32_t size = m_typeSize;
@@ -100,8 +98,7 @@ void ThroughputDataType::deleteData(
 
 bool ThroughputCommandDataType::serialize(
         void* data,
-        SerializedPayload_t* p,
-        eprosima::fastdds::dds::DataRepresentationId_t)
+        SerializedPayload_t* p)
 {
     ThroughputCommandType* t = (ThroughputCommandType*)data;
     p->length = 0;
@@ -114,8 +111,6 @@ bool ThroughputCommandDataType::serialize(
     p->length += sizeof(t->m_demand);
     memcpy(&p->data[p->length], &t->m_lostsamples, sizeof(t->m_lostsamples));
     p->length += sizeof(t->m_lostsamples);
-    memcpy(&p->data[p->length], &t->m_receivedsamples, sizeof(t->m_receivedsamples));
-    p->length += sizeof(t->m_receivedsamples);
     memcpy(&p->data[p->length], &t->m_lastrecsample, sizeof(t->m_lastrecsample));
     p->length += sizeof(t->m_lastrecsample);
     memcpy(&p->data[p->length], &t->m_totaltime, sizeof(t->m_totaltime));
@@ -139,8 +134,6 @@ bool ThroughputCommandDataType::deserialize(
     p->pos += sizeof(t->m_demand);
     memcpy(&t->m_lostsamples, &p->data[p->pos], sizeof(t->m_lostsamples));
     p->pos += sizeof(t->m_lostsamples);
-    memcpy(&t->m_receivedsamples, &p->data[p->pos], sizeof(t->m_receivedsamples));
-    p->pos += sizeof(t->m_receivedsamples);
     memcpy(&t->m_lastrecsample, &p->data[p->pos], sizeof(t->m_lastrecsample));
     p->pos += sizeof(t->m_lastrecsample);
     memcpy(&t->m_totaltime, &p->data[p->pos], sizeof(t->m_totaltime));
@@ -149,15 +142,14 @@ bool ThroughputCommandDataType::deserialize(
 }
 
 std::function<uint32_t()> ThroughputCommandDataType::getSerializedSizeProvider(
-        void*,
-        eprosima::fastdds::dds::DataRepresentationId_t)
+        void*)
 {
     return []() -> uint32_t
            {
                uint32_t size = 0;
 
                size = (uint32_t)(sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t)  + sizeof(uint32_t) +
-                       sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t));
+                       sizeof(uint64_t) + sizeof(uint64_t));
 
                return size;
            };

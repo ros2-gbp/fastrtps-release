@@ -38,7 +38,7 @@ using namespace eprosima::fastrtps::types;
 
 class DynamicTypesTests : public ::testing::Test
 {
-    const std::string config_file_ = "types_profile.xml";
+    const std::string config_file_ = "types.xml";
 
 public:
 
@@ -1394,7 +1394,6 @@ TEST_F(DynamicTypesTests, DynamicType_char8_unit_tests)
     ASSERT_TRUE(DynamicDataFactory::get_instance()->is_empty());
 }
 
-#if FASTCDR_VERSION_MAJOR == 1
 TEST_F(DynamicTypesTests, DynamicType_char16_unit_tests)
 {
     {
@@ -1496,7 +1495,6 @@ TEST_F(DynamicTypesTests, DynamicType_char16_unit_tests)
     ASSERT_TRUE(DynamicTypeBuilderFactory::get_instance()->is_empty());
     ASSERT_TRUE(DynamicDataFactory::get_instance()->is_empty());
 }
-#endif // if FASTCDR_VERSION_MAJOR == 1
 
 TEST_F(DynamicTypesTests, DynamicType_byte_unit_tests)
 {
@@ -1941,7 +1939,6 @@ TEST_F(DynamicTypesTests, DynamicType_string_unit_tests)
     ASSERT_TRUE(DynamicDataFactory::get_instance()->is_empty());
 }
 
-#if FASTCDR_VERSION_MAJOR == 1
 TEST_F(DynamicTypesTests, DynamicType_wstring_unit_tests)
 {
     uint32_t length = 15;
@@ -2052,7 +2049,6 @@ TEST_F(DynamicTypesTests, DynamicType_wstring_unit_tests)
     ASSERT_TRUE(DynamicTypeBuilderFactory::get_instance()->is_empty());
     ASSERT_TRUE(DynamicDataFactory::get_instance()->is_empty());
 }
-#endif // if FASTCDR_VERSION_MAJOR == 1
 
 TEST_F(DynamicTypesTests, DynamicType_alias_unit_tests)
 {

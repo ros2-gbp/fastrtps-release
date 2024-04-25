@@ -12,21 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# empty LANGUAGES defaults to C in Ubuntu and breaks the build
-project(fastdds-tool LANGUAGES CXX)
-
-# copy fastdds.py in build dir
-if(EPROSIMA_BUILD)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/fastdds.py
-        ${CMAKE_CURRENT_BINARY_DIR}/fastdds.py COPYONLY)
-
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/discovery
-        DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/shm
-        DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/xml_ci
-        DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-endif()
+project(fastdds-tool)
 
 ###############################################################################
 # Installation
@@ -35,7 +21,7 @@ endif()
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/
     DESTINATION ${CMAKE_INSTALL_PREFIX}/tools/fastdds
     USE_SOURCE_PERMISSIONS
-    FILES_MATCHING
+    FILES_MATCHING 
         PATTERN "*.py"
         PATTERN "__pycache__" EXCLUDE
 )

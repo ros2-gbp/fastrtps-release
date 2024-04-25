@@ -25,6 +25,7 @@
 
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
+#include <fastdds/rtps/network/NetworkFactory.h>
 
 #include <fastrtps/utils/shared_mutex.hpp>
 
@@ -54,7 +55,6 @@ class WLP;
 class RTPSParticipantImpl;
 class RTPSWriter;
 class RTPSReader;
-class NetworkFactory;
 
 /**
  * Class BuiltinProtocols that contains builtin endpoints implementing the discovery and liveliness protocols.
@@ -102,10 +102,11 @@ public:
             LocatorList_t& loclist);
 
     /**
-     * Traverses the list of discover servers filtering out unsupported or not allowed remote locators
-     * @param nf NetworkFactory used to make the filtering
+     * Traverses the list of discover servers translating from remote to local locators
+     * if possible
+     * @param nf NetworkFactory used to make the translation
      */
-    void filter_server_remote_locators(
+    void transform_server_remote_locators(
             NetworkFactory& nf);
 
     //!BuiltinAttributes of the builtin protocols.

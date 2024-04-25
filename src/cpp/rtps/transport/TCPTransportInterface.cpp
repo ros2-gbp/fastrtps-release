@@ -12,61 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "TCPTransportInterface.h"
+#include <rtps/transport/TCPTransportInterface.h>
 
-#include <algorithm>
-#include <cassert>
-#include <chrono>
-#include <cstring>
-#include <map>
-#include <set>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <thread>
 #include <utility>
-#include <vector>
+#include <cstring>
+#include <algorithm>
+#include <chrono>
+#include <thread>
 
-#include <asio/executor_work_guard.hpp>
-#include <asio/io_context.hpp>
-#include <asio/ip/tcp.hpp>
-#include <asio/socket_base.hpp>
 #include <asio/steady_timer.hpp>
-#include <asio/system_error.hpp>
-#if TLS_FOUND
-#include <asio/ssl/verify_context.hpp>
-#endif // if TLS_FOUND
-
 #include <fastdds/dds/log/Log.hpp>
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/attributes/PropertyPolicy.h>
-#include <fastdds/rtps/common/CDRMessage_t.h>
-#include <fastdds/rtps/common/LocatorSelector.hpp>
-#include <fastdds/rtps/common/LocatorSelectorEntry.hpp>
-#include <fastdds/rtps/common/PortParameters.h>
-#include <fastdds/rtps/common/Types.h>
-#include <fastdds/rtps/transport/SenderResource.h>
-#include <fastdds/rtps/transport/SocketTransportDescriptor.h>
-#include <fastdds/rtps/transport/TCPTransportDescriptor.h>
-#include <fastdds/rtps/transport/TransportReceiverInterface.h>
-#include <fastrtps/config.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/utils/System.h>
-
+#include <rtps/transport/tcp/RTCPMessageManager.h>
+#include <rtps/transport/TCPSenderResource.hpp>
+#include <rtps/transport/TCPChannelResourceBasic.h>
+#include <rtps/transport/TCPAcceptorBasic.h>
+#if TLS_FOUND
+#include <rtps/transport/TCPChannelResourceSecure.h>
+#include <rtps/transport/TCPAcceptorSecure.h>
+#endif // if TLS_FOUND
 #include <statistics/rtps/messages/RTPSStatisticsMessages.hpp>
 #include <utils/SystemInfo.hpp>
-#include <utils/thread.hpp>
-#include <utils/threading.hpp>
-
-#include "tcp/RTCPHeader.h"
-#include "tcp/RTCPMessageManager.h"
-#include "TCPAcceptorBasic.h"
-#include "TCPChannelResourceBasic.h"
-#include "TCPSenderResource.hpp"
-#if TLS_FOUND
-#include "TCPAcceptorSecure.h"
-#include "TCPChannelResourceSecure.h"
-#endif // if TLS_FOUND
 
 using namespace std;
 using namespace asio;
@@ -101,7 +68,6 @@ TCPTransportDescriptor::TCPTransportDescriptor()
     , calculate_crc(true)
     , check_crc(true)
     , apply_security(false)
-    , non_blocking_send(false)
 {
 }
 
@@ -121,16 +87,18 @@ TCPTransportDescriptor::TCPTransportDescriptor(
     , check_crc(t.check_crc)
     , apply_security(t.apply_security)
     , tls_config(t.tls_config)
-    , keep_alive_thread(t.keep_alive_thread)
-    , accept_thread(t.accept_thread)
-    , non_blocking_send(t.non_blocking_send)
 {
 }
 
 TCPTransportDescriptor& TCPTransportDescriptor::operator =(
         const TCPTransportDescriptor& t)
 {
-    SocketTransportDescriptor::operator =(t);
+
+    maxMessageSize = t.maxMessageSize;
+    maxInitialPeersRange = t.maxInitialPeersRange;
+    sendBufferSize = t.sendBufferSize;
+    receiveBufferSize = t.receiveBufferSize;
+    TTL = t.TTL;
     listening_ports = t.listening_ports;
     keep_alive_frequency_ms = t.keep_alive_frequency_ms;
     keep_alive_timeout_ms = t.keep_alive_timeout_ms;
@@ -144,9 +112,6 @@ TCPTransportDescriptor& TCPTransportDescriptor::operator =(
     check_crc = t.check_crc;
     apply_security = t.apply_security;
     tls_config = t.tls_config;
-    keep_alive_thread = t.keep_alive_thread;
-    accept_thread = t.accept_thread;
-    non_blocking_send = t.non_blocking_send;
     return *this;
 }
 
@@ -166,9 +131,6 @@ bool TCPTransportDescriptor::operator ==(
            this->check_crc == t.check_crc &&
            this->apply_security == t.apply_security &&
            this->tls_config == t.tls_config &&
-           this->keep_alive_thread == t.keep_alive_thread &&
-           this->accept_thread == t.accept_thread &&
-           this->non_blocking_send == t.non_blocking_send &&
            SocketTransportDescriptor::operator ==(t));
 }
 
@@ -176,6 +138,7 @@ TCPTransportInterface::TCPTransportInterface(
         int32_t transport_kind)
     : TransportInterface(transport_kind)
     , alive_(true)
+    , non_blocking_send_(false)
 #if TLS_FOUND
     , ssl_context_(asio::ssl::context::sslv23)
 #endif // if TLS_FOUND
@@ -193,10 +156,11 @@ void TCPTransportInterface::clean()
     alive_.store(false);
 
     keep_alive_event_.cancel();
-    if (io_service_timers_thread_.joinable())
+    if (io_service_timers_thread_)
     {
         io_service_timers_.stop();
-        io_service_timers_thread_.join();
+        io_service_timers_thread_->join();
+        io_service_timers_thread_ = nullptr;
     }
 
     {
@@ -248,45 +212,12 @@ void TCPTransportInterface::clean()
         initial_peer_local_locator_socket_.reset();
     }
 
-    if (io_service_thread_.joinable())
+    if (io_service_thread_)
     {
         io_service_.stop();
-        io_service_thread_.join();
+        io_service_thread_->join();
+        io_service_thread_ = nullptr;
     }
-}
-
-Locator TCPTransportInterface::remote_endpoint_to_locator(
-        const std::shared_ptr<TCPChannelResource>& channel) const
-{
-    Locator locator;
-    asio::error_code ec;
-    auto endpoint = channel->remote_endpoint(ec);
-    if (ec)
-    {
-        LOCATOR_INVALID(locator);
-    }
-    else
-    {
-        endpoint_to_locator(endpoint, locator);
-    }
-    return locator;
-}
-
-Locator TCPTransportInterface::local_endpoint_to_locator(
-        const std::shared_ptr<TCPChannelResource>& channel) const
-{
-    Locator locator;
-    asio::error_code ec;
-    auto endpoint = channel->local_endpoint(ec);
-    if (ec)
-    {
-        LOCATOR_INVALID(locator);
-    }
-    else
-    {
-        endpoint_to_locator(endpoint, locator);
-    }
-    return locator;
 }
 
 void TCPTransportInterface::bind_socket(
@@ -354,9 +285,8 @@ uint16_t TCPTransportInterface::create_acceptor_socket(
                 final_port = static_cast<uint16_t>(acceptor->locator().port);
             }
 
-            EPROSIMA_LOG_INFO(RTCP, " OpenAndBindInput (physical: " << IPLocator::getPhysicalPort(
-                        locator) << "; logical: "
-                                                                    << IPLocator::getLogicalPort(locator) << ")");
+            logInfo(RTCP, " OpenAndBindInput (physical: " << IPLocator::getPhysicalPort(locator) << "; logical: "
+                                                          << IPLocator::getLogicalPort(locator) << ")");
 
         }
         else
@@ -368,10 +298,6 @@ uint16_t TCPTransportInterface::create_acceptor_socket(
                 if (loc.kind == LOCATOR_KIND_TCPv4)
                 {
                     IPLocator::setIPv4(loc, sInterface);
-                }
-                else if (loc.kind == LOCATOR_KIND_TCPv6)
-                {
-                    IPLocator::setIPv6(loc, sInterface);
                 }
 #if TLS_FOUND
                 if (configuration()->apply_security)
@@ -392,23 +318,22 @@ uint16_t TCPTransportInterface::create_acceptor_socket(
                     final_port = static_cast<uint16_t>(acceptor->locator().port);
                 }
 
-                EPROSIMA_LOG_INFO(RTCP, " OpenAndBindInput (physical: " << IPLocator::getPhysicalPort(
-                            locator) << "; logical: "
-                                                                        << IPLocator::getLogicalPort(locator) << ")");
+                logInfo(RTCP, " OpenAndBindInput (physical: " << IPLocator::getPhysicalPort(locator) << "; logical: "
+                                                              << IPLocator::getLogicalPort(locator) << ")");
             }
         }
     }
     catch (asio::system_error const& e)
     {
         (void)e;
-        EPROSIMA_LOG_ERROR(RTCP_MSG_OUT, "TCPTransport Error binding at port: (" << IPLocator::getPhysicalPort(
+        logError(RTCP_MSG_OUT, "TCPTransport Error binding at port: (" << IPLocator::getPhysicalPort(
                     locator) << ")" << " with msg: " << e.what());
         return false;
     }
     catch (const asio::error_code& code)
     {
         (void)code;
-        EPROSIMA_LOG_ERROR(RTCP, "TCPTransport Error binding at port: (" << IPLocator::getPhysicalPort(
+        logError(RTCP, "TCPTransport Error binding at port: (" << IPLocator::getPhysicalPort(
                     locator) << ")" << " with code: " << code);
         return false;
     }
@@ -438,13 +363,12 @@ bool TCPTransportInterface::DoInputLocatorsMatch(
 }
 
 bool TCPTransportInterface::init(
-        const fastrtps::rtps::PropertyPolicy*,
-        const uint32_t& max_msg_size_no_frag)
+        const fastrtps::rtps::PropertyPolicy* properties)
 {
     if (!apply_tls_config())
     {
         // TODO decide wether the Transport initialization should keep working after this error
-        EPROSIMA_LOG_WARNING(TLS, "Error configuring TLS, using TCP transport without security");
+        logWarning(TLS, "Error configuring TLS, using TCP transport without security");
     }
 
     /*
@@ -463,6 +387,14 @@ bool TCPTransportInterface::init(
 
     ip::tcp::endpoint local_endpoint = initial_peer_local_locator_socket_->local_endpoint();
     initial_peer_local_locator_port_ = local_endpoint.port();
+
+    // Get non_blocking_send property
+    if (properties)
+    {
+        auto s_non_blocking_send = eprosima::fastrtps::rtps::PropertyPolicyHelper::find_property(*properties,
+                        "fastdds.tcp_transport.non_blocking_send");
+        non_blocking_send_ = s_non_blocking_send && *s_non_blocking_send == "true"? true : false;
+    }
 
     // Check system buffer sizes.
     if (configuration()->sendBufferSize == 0)
@@ -489,24 +421,21 @@ bool TCPTransportInterface::init(
         }
     }
 
-    uint32_t maximumMessageSize = max_msg_size_no_frag == 0 ? s_maximumMessageSize : max_msg_size_no_frag;
-
-    if (configuration()->maxMessageSize > maximumMessageSize)
+    if (configuration()->maxMessageSize > s_maximumMessageSize)
     {
-        EPROSIMA_LOG_ERROR(RTCP_MSG_OUT,
-                "maxMessageSize cannot be greater than " << std::to_string(maximumMessageSize));
+        logError(RTCP_MSG_OUT, "maxMessageSize cannot be greater than 65000");
         return false;
     }
 
     if (configuration()->maxMessageSize > configuration()->sendBufferSize)
     {
-        EPROSIMA_LOG_ERROR(RTCP_MSG_OUT, "maxMessageSize cannot be greater than send_buffer_size");
+        logError(RTCP_MSG_OUT, "maxMessageSize cannot be greater than send_buffer_size");
         return false;
     }
 
     if (configuration()->maxMessageSize > configuration()->receiveBufferSize)
     {
-        EPROSIMA_LOG_ERROR(RTCP_MSG_OUT, "maxMessageSize cannot be greater than receive_buffer_size");
+        logError(RTCP_MSG_OUT, "maxMessageSize cannot be greater than receive_buffer_size");
         return false;
     }
 
@@ -514,6 +443,9 @@ bool TCPTransportInterface::init(
     {
         rtcp_message_manager_ = std::make_shared<RTCPMessageManager>(this);
     }
+
+    // TODO(Ricardo) Create an event that update this list.
+    get_ips(current_interfaces_);
 
     auto ioServiceFunction = [&]()
             {
@@ -524,22 +456,21 @@ bool TCPTransportInterface::init(
 #endif // if ASIO_VERSION >= 101200
                 io_service_.run();
             };
-    io_service_thread_ = create_thread(ioServiceFunction, configuration()->accept_thread, "dds.tcp_accept");
+    io_service_thread_ = std::make_shared<std::thread>(ioServiceFunction);
 
     if (0 < configuration()->keep_alive_frequency_ms)
     {
-        auto ioServiceTimersFunction = [&]()
-                {
+        io_service_timers_thread_ = std::make_shared<std::thread>([&]()
+                        {
+
 #if ASIO_VERSION >= 101200
-                    asio::executor_work_guard<asio::io_service::executor_type> work(io_service_timers_.
+                            asio::executor_work_guard<asio::io_service::executor_type> work(io_service_timers_.
                                     get_executor());
 #else
-                    io_service::work work(io_service_timers_);
+                            io_service::work work(io_service_timers_);
 #endif // if ASIO_VERSION >= 101200
-                    io_service_timers_.run();
-                };
-        io_service_timers_thread_ = create_thread(ioServiceTimersFunction,
-                        configuration()->keep_alive_thread, "dds.tcp_keep");
+                            io_service_timers_.run();
+                        });
     }
 
     return true;
@@ -601,71 +532,47 @@ Locator TCPTransportInterface::RemoteToMainLocal(
 
 bool TCPTransportInterface::transform_remote_locator(
         const Locator& remote_locator,
-        Locator& result_locator,
-        bool allowed_remote_localhost,
-        bool allowed_local_localhost) const
+        Locator& result_locator) const
 {
-    if (IsLocatorSupported(remote_locator))
+    if (!IsLocatorSupported(remote_locator))
     {
+        // remote_locator not supported
+        return false;
+    }
+
+    if (!is_local_locator(remote_locator))
+    {
+        // remote_locator is not local
         result_locator = remote_locator;
-        if (!is_local_locator(result_locator))
-        {
-            // is_local_locator will return false for multicast addresses as well as remote unicast ones.
-            return true;
-        }
-
-        // If we get here, the locator is a local unicast address
-
-        // Attempt conversion to localhost if remote transport listening on it allows it
-        if (allowed_remote_localhost)
-        {
-            Locator loopbackLocator;
-            fill_local_ip(loopbackLocator);
-            if (is_locator_allowed(loopbackLocator))
-            {
-                // Locator localhost is in the whitelist, so use localhost instead of remote_locator
-                fill_local_ip(result_locator);
-                IPLocator::setPhysicalPort(result_locator, IPLocator::getPhysicalPort(remote_locator));
-                IPLocator::setLogicalPort(result_locator, IPLocator::getLogicalPort(remote_locator));
-                return true;
-            }
-            else if (allowed_local_localhost)
-            {
-                // Abort transformation if localhost not allowed by this transport, but it is by other local transport
-                // and the remote one.
-                return false;
-            }
-        }
-
-        if (!is_locator_allowed(result_locator))
-        {
-            // Neither original remote locator nor localhost allowed: abort.
-            return false;
-        }
-
         return true;
     }
-    return false;
+
+    if (!is_locator_allowed(remote_locator))
+    {
+        // remote_locator not in the whitelist
+        return false;
+    }
+
+    fill_local_ip(result_locator);
+    if (is_locator_allowed(result_locator))
+    {
+        // Locator localhost is in the whitelist, so use localhost instead of remote_locator
+        IPLocator::setPhysicalPort(result_locator, IPLocator::getPhysicalPort(remote_locator));
+        IPLocator::setLogicalPort(result_locator, IPLocator::getLogicalPort(remote_locator));
+        return true;
+    }
+
+    // remote_locator is allowed and local. Localhost is not allowed
+    // Then, we can use remote_locator
+    result_locator = remote_locator;
+    return true;
 }
 
-void TCPTransportInterface::SenderResourceHasBeenClosed(
+void TCPTransportInterface::CloseOutputChannel(
         fastrtps::rtps::Locator_t& locator)
 {
-    // The TCPSendResource associated channel cannot be removed from the channel_resources_ map. On transport's destruction
-    // this map is consulted to send the unbind requests. If not sending it, the other participant wouldn't disconnect the
-    // socket and keep a connection status of eEstablished. This would prevent new connect calls since it thinks it's already
-    // connected.
-    // If moving this unbind send with the respective channel disconnection to this point, the following problem arises:
-    // If receiving a SenderResourceHasBeenClosed call after receiving an unbinding message from a remote participant (our participant
-    // isn't disconnecting but we want to erase this send resource), the channel cannot be disconnected here since the listening thread has
-    // taken the read mutex (permanently waiting at read asio layer). This mutex is also needed to disconnect the socket (deadlock).
-    // Socket disconnection should always be done in the listening thread (or in the transport cleanup, when receiver resources have
-    // already been destroyed and the listening thread had consequently finished).
-    // An assert() clause finding the respective channel resource cannot be made since in LARGE DATA scenario, where the PDP discovery is done
-    // via UDP, a server's send resource can be created with without any associated channel resource until receiving a connection request from
-    // the client.
-    // The send resource locator is invalidated to prevent further use of associated channel.
-    LOCATOR_INVALID(locator);
+    locator.set_Invalid_Address();
+    locator.port = 0;
 }
 
 bool TCPTransportInterface::CloseInputChannel(
@@ -769,9 +676,8 @@ bool TCPTransportInterface::OpenOutputChannel(
     // At this point, if there is no SenderResource to reuse, this is the first call to OpenOutputChannel for this locator.
     // Need to check if a channel already exists for this locator.
 
-    EPROSIMA_LOG_INFO(RTCP, "Called to OpenOutputChannel (physical: " << IPLocator::getPhysicalPort(
-                locator) << "; logical: "
-                                                                      << IPLocator::getLogicalPort(
+    logInfo(RTCP, "Called to OpenOutputChannel (physical: " << IPLocator::getPhysicalPort(locator) << "; logical: "
+                                                            << IPLocator::getLogicalPort(
                 locator) << ") @ " << IPLocator::to_string(locator));
 
     auto channel_resource = channel_resources_.find(physical_locator);
@@ -813,7 +719,7 @@ bool TCPTransportInterface::OpenOutputChannel(
         {
             std::vector<Locator> list;
             std::vector<fastrtps::rtps::IPFinder::info_IP> local_interfaces;
-            get_ips(local_interfaces, false, false);
+            get_ips(local_interfaces);
             for (const auto& interface_it : local_interfaces)
             {
                 Locator interface_loc(interface_it.locator);
@@ -835,7 +741,7 @@ bool TCPTransportInterface::OpenOutputChannel(
         if (IPLocator::getPhysicalPort(physical_locator) > listening_port || local_lower_interface)
         {
             // Client side (either Server-Client or LARGE_DATA)
-            EPROSIMA_LOG_INFO(OpenOutputChannel, "OpenOutputChannel: [CONNECT] (physical: "
+            logInfo(OpenOutputChannel, "OpenOutputChannel: [CONNECT] (physical: "
                     << IPLocator::getPhysicalPort(locator) << "; logical: "
                     << IPLocator::getLogicalPort(locator) << ") @ " << IPLocator::to_string(locator));
 
@@ -860,7 +766,7 @@ bool TCPTransportInterface::OpenOutputChannel(
         {
             // Server side LARGE_DATA
             // Act as server and wait to the other endpoint to connect. Add locator to sender_resource_list
-            EPROSIMA_LOG_INFO(OpenOutputChannel, "OpenOutputChannel: [WAIT_CONNECTION] (physical: "
+            logInfo(OpenOutputChannel, "OpenOutputChannel: [WAIT_CONNECTION] (physical: "
                     << IPLocator::getPhysicalPort(locator) << "; logical: "
                     << IPLocator::getLogicalPort(locator) << ") @ " << IPLocator::to_string(locator));
             std::lock_guard<std::mutex> channelPendingLock(channel_pending_logical_ports_mutex_);
@@ -893,8 +799,7 @@ bool TCPTransportInterface::OpenInputChannel(
                             (receiver, new ReceiverInUseCV());
             }
 
-            EPROSIMA_LOG_INFO(RTCP, " OpenInputChannel (physical: " << IPLocator::getPhysicalPort(
-                        locator) << "; logical: " << \
+            logInfo(RTCP, " OpenInputChannel (physical: " << IPLocator::getPhysicalPort(locator) << "; logical: " << \
                     IPLocator::getLogicalPort(locator) << ")");
         }
     }
@@ -955,22 +860,8 @@ void TCPTransportInterface::keep_alive()
             }
         }
        }
-       EPROSIMA_LOG_INFO(RTCP, "End perform_rtcp_management_thread " << channel->locator());
+       logInfo(RTCP, "End perform_rtcp_management_thread " << channel->locator());
      */
-}
-
-void TCPTransportInterface::create_listening_thread(
-        const std::shared_ptr<TCPChannelResource>& channel)
-{
-    std::weak_ptr<TCPChannelResource> channel_weak_ptr = channel;
-    std::weak_ptr<RTCPMessageManager> rtcp_manager_weak_ptr = rtcp_message_manager_;
-    auto fn = [this, channel_weak_ptr, rtcp_manager_weak_ptr]()
-            {
-                perform_listen_operation(channel_weak_ptr, rtcp_manager_weak_ptr);
-            };
-    uint32_t port = channel->local_endpoint().port();
-    const ThreadSettings& thr_config = configuration()->get_thread_config_for_port(port);
-    channel->thread(create_thread(fn, thr_config, "dds.tcp.%u", port));
 }
 
 void TCPTransportInterface::perform_listen_operation(
@@ -987,14 +878,10 @@ void TCPTransportInterface::perform_listen_operation(
     if (rtcp_message_manager)
     {
         channel = channel_weak.lock();
+        endpoint_to_locator(channel->remote_endpoint(), remote_locator);
 
         if (channel)
         {
-            remote_locator = remote_endpoint_to_locator(channel);
-
-            uint32_t port = channel->local_endpoint().port();
-            set_name_to_current_thread("dds.tcp.%u", port);
-
             if (channel->tcp_connection_type() == TCPChannelResource::TCPConnectionType::TCP_CONNECT_TYPE)
             {
                 rtcp_message_manager->sendConnectionRequest(channel);
@@ -1019,7 +906,7 @@ void TCPTransportInterface::perform_listen_operation(
         // Blocking receive.
         CDRMessage_t& msg = channel->message_buffer();
         fastrtps::rtps::CDRMessage::initCDRMsg(&msg);
-        if (!Receive(rtcp_manager, channel, msg.buffer, msg.max_size, msg.length, msg.msg_endian, remote_locator))
+        if (!Receive(rtcp_manager, channel, msg.buffer, msg.max_size, msg.length, remote_locator))
         {
             continue;
         }
@@ -1043,13 +930,12 @@ void TCPTransportInterface::perform_listen_operation(
             }
             else
             {
-                EPROSIMA_LOG_WARNING(RTCP,
-                        "Received Message, but no TransportReceiverInterface attached: " << logicalPort);
+                logWarning(RTCP, "Received Message, but no TransportReceiverInterface attached: " << logicalPort);
             }
         }
     }
 
-    EPROSIMA_LOG_INFO(RTCP, "End PerformListenOperation " << channel->locator());
+    logInfo(RTCP, "End PerformListenOperation " << channel->locator());
 }
 
 bool TCPTransportInterface::read_body(
@@ -1065,12 +951,12 @@ bool TCPTransportInterface::read_body(
 
     if (ec)
     {
-        EPROSIMA_LOG_WARNING(RTCP, "Error reading RTCP body: " << ec.message());
+        logWarning(RTCP, "Error reading RTCP body: " << ec.message());
         return false;
     }
     else if (*bytes_received != body_size)
     {
-        EPROSIMA_LOG_ERROR(RTCP, "Bad RTCP body size: " << *bytes_received << " (expected: " << body_size << ")");
+        logError(RTCP, "Bad RTCP body size: " << *bytes_received << " (expected: " << body_size << ")");
         return false;
     }
 
@@ -1159,7 +1045,6 @@ bool TCPTransportInterface::Receive(
         octet* receive_buffer,
         uint32_t receive_buffer_capacity,
         uint32_t& receive_buffer_size,
-        fastrtps::rtps::Endianness_t msg_endian,
         Locator& remote_locator)
 {
     bool success = false;
@@ -1184,25 +1069,23 @@ bool TCPTransportInterface::Receive(
         {
             if (ec != asio::error::eof)
             {
-                EPROSIMA_LOG_WARNING(DEBUG, "Failed to read TCP header: " << ec.message());
+                logWarning(DEBUG, "Failed to read TCP header: " << ec.message());
             }
             close_tcp_socket(channel);
             success = false;
         }
         else if (!channel->connection_status())
         {
-            EPROSIMA_LOG_WARNING(DEBUG, "Failed to read TCP header: channel disconnected while reading.");
+            logWarning(DEBUG, "Failed to read TCP header: channel disconnected while reading.");
             success = false;
         }
         else
         {
-            tcp_header.valid_endianness(msg_endian);
-
             size_t body_size = tcp_header.length - static_cast<uint32_t>(TCPHeader::size());
 
             if (body_size > receive_buffer_capacity)
             {
-                EPROSIMA_LOG_ERROR(RTCP_MSG_IN, "Size of incoming TCP message is bigger than buffer capacity: "
+                logError(RTCP_MSG_IN, "Size of incoming TCP message is bigger than buffer capacity: "
                         << static_cast<uint32_t>(body_size) << " vs. " << receive_buffer_capacity << ". "
                         << "The full message will be dropped.");
                 success = false;
@@ -1220,7 +1103,7 @@ bool TCPTransportInterface::Receive(
             }
             else
             {
-                EPROSIMA_LOG_INFO(RTCP_MSG_IN, "Received RTCP MSG. Logical Port " << tcp_header.logical_port);
+                logInfo(RTCP_MSG_IN, "Received RTCP MSG. Logical Port " << tcp_header.logical_port);
                 success = read_body(receive_buffer, receive_buffer_capacity, &receive_buffer_size,
                                 channel, body_size);
 
@@ -1229,13 +1112,14 @@ bool TCPTransportInterface::Receive(
                     if (configuration()->check_crc
                             && !check_crc(tcp_header, receive_buffer, receive_buffer_size))
                     {
-                        EPROSIMA_LOG_WARNING(RTCP_MSG_IN, "Bad TCP header CRC");
+                        logWarning(RTCP_MSG_IN, "Bad TCP header CRC");
                     }
 
                     if (tcp_header.logical_port == 0)
                     {
                         std::shared_ptr<RTCPMessageManager> rtcp_message_manager;
                         if (TCPChannelResource::eConnectionStatus::eDisconnected != channel->connection_status())
+
                         {
                             std::unique_lock<std::mutex> lock(rtcp_message_manager_mutex_);
                             rtcp_message_manager = rtcp_manager.lock();
@@ -1245,7 +1129,7 @@ bool TCPTransportInterface::Receive(
                         {
                             // The channel is not going to be deleted because we lock it for reading.
                             ResponseCode responseCode = rtcp_message_manager->processRTCPMessage(
-                                channel, receive_buffer, body_size, msg_endian);
+                                channel, receive_buffer, body_size);
 
                             if (responseCode != RETCODE_OK)
                             {
@@ -1266,13 +1150,9 @@ bool TCPTransportInterface::Receive(
                     }
                     else
                     {
-                        if (!IsLocatorValid(remote_locator))
-                        {
-                            remote_locator = remote_endpoint_to_locator(channel);
-                        }
                         IPLocator::setLogicalPort(remote_locator, tcp_header.logical_port);
-                        EPROSIMA_LOG_INFO(RTCP_MSG_IN, "[RECEIVE] From: " << remote_locator \
-                                                                          << " - " << receive_buffer_size << " bytes.");
+                        logInfo(RTCP_MSG_IN, "[RECEIVE] From: " << remote_locator \
+                                                                << " - " << receive_buffer_size << " bytes.");
                     }
                 }
                 // Error message already shown by read_body method.
@@ -1284,7 +1164,7 @@ bool TCPTransportInterface::Receive(
         if ((code == asio::error::eof) || (code == asio::error::connection_reset))
         {
             // Close the channel
-            EPROSIMA_LOG_ERROR(RTCP_MSG_IN, "ASIO [RECEIVE]: " << code.message());
+            logError(RTCP_MSG_IN, "ASIO [RECEIVE]: " << code.message());
             //channel->ConnectionLost();
             close_tcp_socket(channel);
         }
@@ -1294,7 +1174,7 @@ bool TCPTransportInterface::Receive(
     {
         (void)error;
         // Close the channel
-        EPROSIMA_LOG_ERROR(RTCP_MSG_IN, "ASIO SYSTEM_ERROR [RECEIVE]: " << error.what());
+        logError(RTCP_MSG_IN, "ASIO SYSTEM_ERROR [RECEIVE]: " << error.what());
         //channel->ConnectionLost();
         close_tcp_socket(channel);
         success = false;
@@ -1420,7 +1300,7 @@ bool TCPTransportInterface::send(
 
                 if (sent != static_cast<uint32_t>(TCPHeader::size() + send_buffer_size) || ec)
                 {
-                    EPROSIMA_LOG_WARNING(DEBUG, "Failed to send RTCP message (" << sent << " of " <<
+                    logWarning(DEBUG, "Failed to send RTCP message (" << sent << " of " <<
                             TCPHeader::size() + send_buffer_size << " b): " << ec.message());
                     success = false;
                 }
@@ -1492,15 +1372,20 @@ void TCPTransportInterface::SocketAccepted(
             }
 
             channel->set_options(configuration());
-            create_listening_thread(channel);
+            std::weak_ptr<TCPChannelResource> channel_weak_ptr = channel;
+            std::weak_ptr<RTCPMessageManager> rtcp_manager_weak_ptr = rtcp_message_manager_;
+            channel->thread(std::thread(&TCPTransportInterface::perform_listen_operation, this,
+                    channel_weak_ptr, rtcp_manager_weak_ptr));
 
-            EPROSIMA_LOG_INFO(RTCP, "Accepted connection (local: "
-                    << local_endpoint_to_locator(channel) << ", remote: "
-                    << remote_endpoint_to_locator(channel) << ")");
+            logInfo(RTCP, "Accepted connection (local: "
+                    << channel->local_endpoint().address() << ":"
+                    << channel->local_endpoint().port() << "), remote: "
+                    << channel->remote_endpoint().address() << ":"
+                    << channel->remote_endpoint().port() << ")");
         }
         else
         {
-            EPROSIMA_LOG_INFO(RTCP, "Accepting connection (" << error.message() << ")");
+            logInfo(RTCP, " Accepting connection (" << error.message() << ")");
             std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Wait a little to accept again.
         }
 
@@ -1535,15 +1420,20 @@ void TCPTransportInterface::SecureSocketAccepted(
             }
 
             secure_channel->set_options(configuration());
-            create_listening_thread(secure_channel);
+            std::weak_ptr<TCPChannelResource> channel_weak_ptr = secure_channel;
+            std::weak_ptr<RTCPMessageManager> rtcp_manager_weak_ptr = rtcp_message_manager_;
+            secure_channel->thread(std::thread(&TCPTransportInterface::perform_listen_operation, this,
+                    channel_weak_ptr, rtcp_manager_weak_ptr));
 
-            EPROSIMA_LOG_INFO(RTCP, " Accepted connection (local: "
-                    << local_endpoint_to_locator(secure_channel) << ", remote: "
-                    << remote_endpoint_to_locator(secure_channel) << ")");
+            logInfo(RTCP, " Accepted connection (local: "
+                    << socket->lowest_layer().local_endpoint().address() << ":"
+                    << socket->lowest_layer().local_endpoint().port() << "), remote: "
+                    << socket->lowest_layer().remote_endpoint().address() << ":"
+                    << socket->lowest_layer().remote_endpoint().port() << ")");
         }
         else
         {
-            EPROSIMA_LOG_INFO(RTCP, " Accepting connection (" << error.message() << ")");
+            logInfo(RTCP, " Accepting connection (" << error.message() << ")");
             std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Wait a little to accept again.
         }
 
@@ -1576,7 +1466,10 @@ void TCPTransportInterface::SocketConnected(
                 {
                     channel->change_status(TCPChannelResource::eConnectionStatus::eConnected);
                     channel->set_options(configuration());
-                    create_listening_thread(channel);
+
+                    std::weak_ptr<RTCPMessageManager> rtcp_manager_weak_ptr = rtcp_message_manager_;
+                    channel->thread(std::thread(&TCPTransportInterface::perform_listen_operation, this,
+                            channel_weak_ptr, rtcp_manager_weak_ptr));
                 }
             }
             else
@@ -1733,7 +1626,7 @@ bool TCPTransportInterface::apply_tls_config()
             }
             catch (const std::exception& e)
             {
-                EPROSIMA_LOG_ERROR(TLS, "Error configuring TLS trusted CA certificate: " << e.what());
+                logError(TLS, "Error configuring TLS trusted CA certificate: " << e.what());
                 return false; // TODO check wether this should skip the rest of the configuration
             }
         }
@@ -1746,7 +1639,7 @@ bool TCPTransportInterface::apply_tls_config()
             }
             catch (const std::exception& e)
             {
-                EPROSIMA_LOG_ERROR(TLS, "Error configuring TLS certificate: " << e.what());
+                logError(TLS, "Error configuring TLS certificate: " << e.what());
                 return false; // TODO check wether this should skip the rest of the configuration
             }
         }
@@ -1759,7 +1652,7 @@ bool TCPTransportInterface::apply_tls_config()
             }
             catch (const std::exception& e)
             {
-                EPROSIMA_LOG_ERROR(TLS, "Error configuring TLS private key: " << e.what());
+                logError(TLS, "Error configuring TLS private key: " << e.what());
                 return false; // TODO check wether this should skip the rest of the configuration
             }
         }
@@ -1772,7 +1665,7 @@ bool TCPTransportInterface::apply_tls_config()
             }
             catch (const std::exception& e)
             {
-                EPROSIMA_LOG_ERROR(TLS, "Error configuring TLS dh params: " << e.what());
+                logError(TLS, "Error configuring TLS dh params: " << e.what());
                 return false; // TODO check wether this should skip the rest of the configuration
             }
         }
@@ -1820,7 +1713,7 @@ bool TCPTransportInterface::apply_tls_config()
             }
             else
             {
-                EPROSIMA_LOG_WARNING(TLS, "Allowing SSL 2.0. This version has known vulnerabilities.");
+                logWarning(TLS, "Allowing SSL 2.0. This version has known vulnerabilities.");
             }
 
             if (config->get_option(TLSOptions::NO_SSLV3))
@@ -1872,18 +1765,6 @@ void TCPTransportInterface::update_network_interfaces()
     // TODO(jlbueno)
 }
 
-bool TCPTransportInterface::is_localhost_allowed() const
-{
-    Locator local_locator;
-    fill_local_ip(local_locator);
-    return is_locator_allowed(local_locator);
-}
-
-NetmaskFilterInfo TCPTransportInterface::netmask_filter_info() const
-{
-    return {netmask_filter_, allowed_interfaces_};
-}
-
 void TCPTransportInterface::fill_local_physical_port(
         Locator& locator) const
 {
@@ -1894,60 +1775,6 @@ void TCPTransportInterface::fill_local_physical_port(
     else
     {
         IPLocator::setPhysicalPort(locator, initial_peer_local_locator_port_);
-    }
-}
-
-void TCPTransportInterface::cleanup_sender_resources(
-        SendResourceList& send_resource_list,
-        const LocatorList& remote_participant_locators,
-        const LocatorList& participant_initial_peers) const
-{
-    // Since send resources handle physical locators, we need to convert the remote participant locators to physical
-    std::set<Locator> remote_participant_physical_locators;
-    for (const Locator& remote_participant_locator : remote_participant_locators)
-    {
-        remote_participant_physical_locators.insert(IPLocator::toPhysicalLocator(remote_participant_locator));
-
-        // Also add the WANtoLANLocator ([0][WAN] address) if the remote locator is a WAN locator. In WAN scenario,
-        //initial peer can also work with the WANtoLANLocator of the remote participant.
-        if (IPLocator::hasWan(remote_participant_locator))
-        {
-            remote_participant_physical_locators.insert(IPLocator::toPhysicalLocator(IPLocator::WanToLanLocator(
-                        remote_participant_locator)));
-        }
-    }
-
-    // Exlude initial peers.
-    for (const auto& initial_peer : participant_initial_peers)
-    {
-        if (std::find(remote_participant_physical_locators.begin(), remote_participant_physical_locators.end(),
-                IPLocator::toPhysicalLocator(initial_peer)) != remote_participant_physical_locators.end())
-        {
-            remote_participant_physical_locators.erase(IPLocator::toPhysicalLocator(initial_peer));
-        }
-    }
-
-    for (const auto& remote_participant_physical_locator : remote_participant_physical_locators)
-    {
-        if (!IsLocatorSupported(remote_participant_physical_locator))
-        {
-            continue;
-        }
-        // Remove send resources for the associated remote participant locator
-        for (auto it = send_resource_list.begin(); it != send_resource_list.end();)
-        {
-            TCPSenderResource* tcp_sender_resource = TCPSenderResource::cast(*this, it->get());
-
-            if (tcp_sender_resource)
-            {
-                if (tcp_sender_resource->locator() == remote_participant_physical_locator)
-                {
-                    it = send_resource_list.erase(it);
-                    continue;
-                }
-            }
-            ++it;
-        }
     }
 }
 

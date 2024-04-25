@@ -33,7 +33,6 @@ enum class XMLP_ret
 
 extern const char* DEFAULT_FASTRTPS_ENV_VARIABLE;
 extern const char* DEFAULT_FASTRTPS_PROFILES;
-extern const char* DEFAULT_STATISTICS_DATAWRITER_PROFILE;
 extern const char* SKIP_DEFAULT_XML_FILE;
 
 extern const char* ROOT;
@@ -42,7 +41,6 @@ extern const char* LIBRARY_SETTINGS;
 extern const char* TRANSPORT_DESCRIPTORS;
 extern const char* PROFILE_NAME;
 extern const char* DEFAULT_PROF;
-extern const char* DOMAINPARTICIPANT_FACTORY;
 extern const char* PARTICIPANT;
 extern const char* PUBLISHER;
 extern const char* SUBSCRIBER;
@@ -61,11 +59,6 @@ extern const char* SEND_BUFFER_SIZE;
 extern const char* TTL;
 extern const char* NON_BLOCKING_SEND;
 extern const char* WHITE_LIST;
-extern const char* INTERFACE;
-extern const char* NETMASK_FILTER;
-extern const char* INTERFACES;
-extern const char* ALLOWLIST;
-extern const char* BLOCKLIST;
 extern const char* MAX_MESSAGE_SIZE;
 extern const char* MAX_INITIAL_PEERS_RANGE;
 extern const char* KEEP_ALIVE_FREQUENCY;
@@ -78,8 +71,6 @@ extern const char* METADATA_LOGICAL_PORT;
 extern const char* LISTENING_PORTS;
 extern const char* CALCULATE_CRC;
 extern const char* CHECK_CRC;
-extern const char* KEEP_ALIVE_THREAD;
-extern const char* ACCEPT_THREAD;
 extern const char* TCP_NEGOTIATION_TIMEOUT;
 extern const char* SEGMENT_SIZE;
 extern const char* PORT_QUEUE_CAPACITY;
@@ -89,17 +80,7 @@ extern const char* HEALTHY_CHECK_TIMEOUT_MS;
 extern const char* DISCARD;
 extern const char* FAIL;
 extern const char* RTPS_DUMP_FILE;
-extern const char* DEFAULT_RECEPTION_THREADS;
-extern const char* RECEPTION_THREADS;
-extern const char* RECEPTION_THREAD;
-extern const char* DUMP_THREAD;
 extern const char* ON;
-extern const char* AUTO;
-extern const char* THREAD_SETTINGS;
-extern const char* SCHEDULING_POLICY;
-extern const char* PRIORITY;
-extern const char* AFFINITY;
-extern const char* STACK_SIZE;
 
 // IntraprocessDeliveryType
 extern const char* OFF;
@@ -116,17 +97,10 @@ extern const char* DATA_READER;
 /// LibrarySettings attributes
 extern const char* INTRAPROCESS_DELIVERY;
 
-/// DomainParticipantFactory Qos
-extern const char* ENTITY_FACTORY;
-extern const char* AUTOENABLE_CREATED_ENTITIES;
-extern const char* SHM_WATCHDOG_THREAD;
-extern const char* FILE_WATCH_THREADS;
-
 /// RTPS Participant attributes
 extern const char* ALLOCATION;
 extern const char* PREFIX;
 extern const char* DEF_UNI_LOC_LIST;
-extern const char* DEF_EXT_UNI_LOC_LIST;
 extern const char* DEF_MULTI_LOC_LIST;
 extern const char* SEND_SOCK_BUF_SIZE;
 extern const char* LIST_SOCK_BUF_SIZE;
@@ -143,9 +117,6 @@ extern const char* THROUGHPUT_CONT;
 extern const char* USER_TRANS;
 extern const char* USE_BUILTIN_TRANS;
 extern const char* BUILTIN_TRANS;
-extern const char* MAX_MSG_SIZE_LARGE_DATA;
-extern const char* SOCKETS_SIZE_LARGE_DATA;
-extern const char* NON_BLOCKING_LARGE_DATA;
 extern const char* PROPERTIES_POLICY;
 extern const char* NAME;
 extern const char* REMOTE_LOCATORS;
@@ -160,17 +131,11 @@ extern const char* DYNAMIC_LC;
 extern const char* MAX_PROPERTIES;
 extern const char* MAX_USER_DATA;
 extern const char* MAX_PARTITIONS;
-extern const char* TIMED_EVENTS_THREAD;
-extern const char* DISCOVERY_SERVER_THREAD;
-extern const char* SECURITY_LOG_THREAD;
-extern const char* BUILTIN_TRANSPORTS_RECEPTION_THREADS;
-extern const char* BUILTIN_CONTROLLERS_SENDER_THREAD;
 
 /// Publisher-subscriber attributes
 extern const char* TOPIC;
 extern const char* QOS;
 extern const char* TIMES;
-extern const char* EXT_UNI_LOC_LIST;
 extern const char* UNI_LOC_LIST;
 extern const char* MULTI_LOC_LIST;
 extern const char* REM_LOC_LIST;
@@ -182,10 +147,8 @@ extern const char* USER_DEF_ID;
 extern const char* ENTITY_ID;
 extern const char* MATCHED_SUBSCRIBERS_ALLOCATION;
 extern const char* MATCHED_PUBLISHERS_ALLOCATION;
-extern const char* DATA_SHARING_LISTENER_THREAD;
 
 ///
-extern const char* IGN_NON_MATCHING_LOCS;
 extern const char* PROPERTIES;
 extern const char* BIN_PROPERTIES;
 extern const char* PROPERTY;
@@ -311,9 +274,6 @@ extern const char* IGNORE_PARTICIPANT_FLAGS;
 extern const char* FILTER_DIFFERENT_HOST;
 extern const char* FILTER_DIFFERENT_PROCESS;
 extern const char* FILTER_SAME_PROCESS;
-extern const char* TYPELOOKUP_CONFIG;
-extern const char* TYPELOOKUP_USE_SERVER;
-extern const char* TYPELOOKUP_USE_CLIENT;
 extern const char* WRITER_LVESS_PROTOCOL;
 extern const char* DISCOVERY_SETTINGS;
 extern const char* _EDP;
@@ -323,7 +283,6 @@ extern const char* LEASE_ANNOUNCE;
 extern const char* INITIAL_ANNOUNCEMENTS;
 extern const char* AVOID_BUILTIN_MULTICAST;
 extern const char* SIMPLE_EDP;
-extern const char* META_EXT_UNI_LOC_LIST;
 extern const char* META_UNI_LOC_LIST;
 extern const char* META_MULTI_LOC_LIST;
 extern const char* INIT_PEERS_LIST;
@@ -455,7 +414,6 @@ extern const char* TLS_DEFAULT_VERIFY_PATH;
 extern const char* TLS_VERIFY_DEPTH;
 extern const char* TLS_RSA_PRIVATE_KEY_FILE;
 extern const char* TLS_HANDSHAKE_ROLE;
-extern const char* TLS_SERVER_NAME;
 
 // TLS HandShake Role
 extern const char* TLS_HANDSHAKE_ROLE_DEFAULT;

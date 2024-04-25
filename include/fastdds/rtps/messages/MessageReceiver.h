@@ -24,7 +24,6 @@
 #include <unordered_map>
 
 #include <fastdds/rtps/common/all_common.h>
-#include <fastdds/rtps/common/VendorId_t.hpp>
 #include <fastrtps/utils/shared_mutex.hpp>
 
 namespace eprosima {
@@ -82,7 +81,7 @@ private:
     //!Protocol version of the message
     ProtocolVersion_t source_version_;
     //!VendorID that created the message
-    fastdds::rtps::VendorId_t source_vendor_id_;
+    VendorId_t source_vendor_id_;
     //!GuidPrefix of the entity that created the message
     GuidPrefix_t source_guid_prefix_;
     //!GuidPrefix of the entity that receives the message. GuidPrefix of the RTPSParticipant.
@@ -160,7 +159,6 @@ private:
      * -Return an error if the message is malformed.
      * @param[in,out] msg      Pointer to the message
      * @param[in] smh          Pointer to the submessage header
-     * @param[out] WriterID    Writer EntityID (only for DATA messages)
      * @param[in] was_decoded  Whether the submessage being processed came from decoding a secured submessage
      * @return True if correct, false otherwise
      */
@@ -170,14 +168,12 @@ private:
      *
      * @param msg
      * @param smh
-     * @param writerID
      * @param was_decoded
      * @return
      */
     bool proc_Submsg_Data(
             CDRMessage_t* msg,
             SubmessageHeader_t* smh,
-            EntityId_t& writerID,
             bool was_decoded) const;
     bool proc_Submsg_DataFrag(
             CDRMessage_t* msg,

@@ -25,8 +25,8 @@ on:
         required: true
 
   pull_request:
-    branches:
-      - 'master'
+    types:
+      - review_requested
     paths-ignore:
       - '**.md'
       - '**.txt'
@@ -38,12 +38,14 @@ concurrency:
 
 jobs:
   windows-ci:
+    if: ${{ (
+              !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
+              !contains(github.event.pull_request.labels.*.name, 'conflicts')
+            ) }}
     uses: ./.github/workflows/reusable-windows-ci.yml
-    if: ${{ !(contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
-              contains(github.event.pull_request.labels.*.name, 'conflicts')) }}
     with:
       label: ${{ inputs.label || 'windows-ci' }}
       colcon-args: ${{ inputs.colcon-args }}
       cmake-args: '-DSECURITY=ON ${{ inputs.cmake-args }}'
       ctest-args: ${{ inputs.ctest-args }}
-      fastdds_branch: ${{ inputs.fastdds_branch || github.ref || 'master' }}
+      fastdds_branch: ${{ inputs.fastdds_branch || github.ref || '2.6.x' }}

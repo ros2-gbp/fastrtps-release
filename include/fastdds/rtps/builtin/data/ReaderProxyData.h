@@ -21,17 +21,17 @@
 #define _FASTDDS_RTPS_BUILTIN_DATA_READERPROXYDATA_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
-#include <fastdds/rtps/attributes/WriterAttributes.h>
-#include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
-#include <fastdds/rtps/common/RemoteLocators.hpp>
-#include <fastdds/rtps/common/VendorId_t.hpp>
-#if HAVE_SECURITY
-#include <fastdds/rtps/security/accesscontrol/EndpointSecurityAttributes.h>
-#endif // if HAVE_SECURITY
 #include <fastrtps/attributes/TopicAttributes.h>
 #include <fastrtps/qos/ReaderQos.h>
 
+#include <fastdds/rtps/attributes/WriterAttributes.h>
+#include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
+#include <fastdds/rtps/common/RemoteLocators.hpp>
+#include <fastdds/rtps/builtin/data/ContentFilterProperty.hpp>
+
+#if HAVE_SECURITY
+#include <fastdds/rtps/security/accesscontrol/EndpointSecurityAttributes.h>
+#endif // if HAVE_SECURITY
 
 
 namespace eprosima {
@@ -89,28 +89,6 @@ public:
     RTPS_DllAPI GUID_t& guid()
     {
         return m_guid;
-    }
-
-    RTPS_DllAPI void networkConfiguration(
-            const NetworkConfigSet_t& networkConfiguration)
-    {
-        m_networkConfiguration = networkConfiguration;
-    }
-
-    RTPS_DllAPI void networkConfiguration(
-            NetworkConfigSet_t&& networkConfiguration)
-    {
-        m_networkConfiguration = std::move(networkConfiguration);
-    }
-
-    RTPS_DllAPI const NetworkConfigSet_t& networkConfiguration() const
-    {
-        return m_networkConfiguration;
-    }
-
-    RTPS_DllAPI NetworkConfigSet_t& networkConfiguration()
-    {
-        return m_networkConfiguration;
     }
 
     RTPS_DllAPI bool has_locators() const
@@ -430,16 +408,12 @@ public:
      * @param msg Pointer to the message.
      * @param network Reference to network factory for locator validation and transformation
      * @param is_shm_transport_available Indicates whether the Reader is reachable by SHM.
-     * @param should_filter_locators Whether to retrieve the locators before the external locators filtering
-     * @param source_vendor_id VendorId of the source participant from which the message was received
      * @return true on success
      */
-    bool readFromCDRMessage(
+    RTPS_DllAPI bool readFromCDRMessage(
             CDRMessage_t* msg,
             const NetworkFactory& network,
-            bool is_shm_transport_available,
-            bool should_filter_locators,
-            fastdds::rtps::VendorId_t source_vendor_id = c_VendorId_eProsima);
+            bool is_shm_transport_available);
 
     //!
     bool m_expectsInlineQos;
@@ -485,8 +459,6 @@ private:
 
     //!GUID
     GUID_t m_guid;
-    //!Network configuration
-    NetworkConfigSet_t m_networkConfiguration;
     //!Holds locator information
     RemoteLocatorList remote_locators_;
     //!GUID_t of the Reader converted to InstanceHandle_t

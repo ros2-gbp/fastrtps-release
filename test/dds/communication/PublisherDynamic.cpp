@@ -16,27 +16,26 @@
  * @file Publisher.cpp
  */
 
-#include <chrono>
-#include <condition_variable>
-#include <fstream>
-#include <mutex>
-#include <string>
-#include <thread>
-
 #include <asio.hpp>
 
-#include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
-#include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
 #include <fastdds/dds/publisher/PublisherListener.hpp>
-#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
 #include <fastdds/dds/publisher/qos/PublisherQos.hpp>
+#include <fastdds/dds/publisher/DataWriter.hpp>
+#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+
+#include <fastrtps/types/DynamicDataFactory.h>
 #include <fastrtps/attributes/ParticipantAttributes.h>
 #include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/types/DynamicDataFactory.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include <mutex>
+#include <condition_variable>
+#include <fstream>
+#include <string>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastrtps;
@@ -114,6 +113,8 @@ public:
 #endif // if HAVE_SECURITY
 
 private:
+
+    using DomainParticipantListener::on_participant_discovery;
 
     bool exit_on_lost_liveliness_;
 };
@@ -238,7 +239,7 @@ int main(
        }
      */
 
-    xmlparser::XMLProfileManager::loadXMLFile("example_type_profile.xml");
+    xmlparser::XMLProfileManager::loadXMLFile("example_type.xml");
 
     DomainParticipantQos participant_qos;
     participant_qos.wire_protocol().builtin.typelookup_config.use_server = true;

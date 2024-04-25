@@ -83,7 +83,7 @@ public:
     /**
      * Add a specific change to all ReaderLocators.
      * @param change Pointer to the change.
-     * @param[in] max_blocking_time Maximum time this method has to complete the task.
+     * @param max_blocking_time
      */
     void unsent_change_added_to_history(
             CacheChange_t* change,
@@ -92,12 +92,10 @@ public:
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
      * @param change Pointer to the change that is going to be removed.
-     * @param[in] max_blocking_time Maximum time this method has to complete the task.
      * @return True if removed correctly.
      */
     bool change_removed_by_history(
-            CacheChange_t* change,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) override;
+            CacheChange_t* change) override;
 
     /**
      * Add a matched reader.
@@ -165,17 +163,6 @@ public:
     //!Reset the unsent changes.
     void unsent_changes_reset();
 
-    /**
-     * @brief Check if a specific change has been delivered to the transport layer at least once for every matched
-     * remote RTPSReader.
-     *
-     * @param seq_num Sequence number of the change to check.
-     * @return true if delivered.
-     * @return false otherwise.
-     */
-    bool has_been_fully_delivered(
-            const SequenceNumber_t& seq_num) const override;
-
     bool is_acked_by_all(
             const CacheChange_t* change) const override;
 
@@ -241,11 +228,6 @@ public:
         return locator_selector_;
     }
 
-#ifdef FASTDDS_STATISTICS
-    bool get_connections(
-            fastdds::statistics::rtps::ConnectionList& connection_list) override;
-#endif // ifdef FASTDDS_STATISTICS
-
 private:
 
     void init(
@@ -265,11 +247,6 @@ private:
     bool intraprocess_delivery(
             CacheChange_t* change,
             ReaderLocator& reader_locator);
-
-    //! Check if a specific sequence number has been sent to every remote RTPSReader
-    bool is_acked_by_all(
-            const SequenceNumber_t& seq_num) const;
-
 
     bool is_inline_qos_expected_ = false;
     LocatorList_t fixed_locators_;

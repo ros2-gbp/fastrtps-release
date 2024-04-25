@@ -7,11 +7,7 @@ else()
 
     # If Asio was not found, search for the header file asio.hpp in the common CMake directories.
     if(NOT Asio_FOUND)
-        if(QNX)
-            find_path(Asio_INCLUDE_DIR NAMES asio.hpp HINTS ${QNX_INSTALL_ROOT}/usr/include)
-        else()
-            find_path(Asio_INCLUDE_DIR NAMES asio.hpp)
-        endif()
+        find_path(Asio_INCLUDE_DIR NAMES asio.hpp)
     else()
         set(Asio_FOUND_PACKAGE ON)
     endif()

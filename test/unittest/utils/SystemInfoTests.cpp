@@ -32,7 +32,7 @@
 #include <gtest/gtest.h>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastrtps/types/TypesBase.h>
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 #include <utils/SystemInfo.hpp>
 
 #define SIZE 512
@@ -238,9 +238,9 @@ TEST_F(SystemInfoTests, FileWatchTest)
                         eprosima::SystemInfo::wait_for_file_closure(filename, _1s);
                         ++times_called_;
                         cv_.notify_all();
-                    }, {}, {});
+                    });
 
-    std::this_thread::sleep_for(_1s);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Read contents
     {

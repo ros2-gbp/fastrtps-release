@@ -16,13 +16,12 @@
 # Create tests                                                            #
 ###########################################################################
 
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(PythonInterp 3 REQUIRED)
 
-if(Python3_Interpreter_FOUND)
+if(PYTHONINTERP_FOUND)
 
     set(TESTS
         test_fast_discovery_closure
-        test_fast_discovery_udpv6_address
         test_fast_discovery_parse_XML_file_default_profile
         test_fast_discovery_parse_XML_file_URI_profile
         test_fast_discovery_prefix_override
@@ -58,7 +57,7 @@ if(Python3_Interpreter_FOUND)
         configure_file(${PROJECT_SOURCE_DIR}/test/certs/permissions_helloworld.smime
             ${CMAKE_CURRENT_BINARY_DIR}/permissions_helloworld.smime COPYONLY)
 
-        configure_file("test_xml_secure_discovery_server_profile.xml" "test_xml_secure_discovery_server_profile.xml" COPYONLY)
+        configure_file("test_xml_secure_discovery_server.xml" "test_xml_secure_discovery_server.xml" COPYONLY)
     endif()
 
 
@@ -97,7 +96,7 @@ if(Python3_Interpreter_FOUND)
            add_test(
                     NAME system.tools.fastdds.${TEST}
                     COMMAND powershell "-File" ${PWS_LAUNCHER}
-                            ${Python3_EXECUTABLE}
+                            ${PYTHON_EXECUTABLE}
                             ${CMAKE_CURRENT_SOURCE_DIR}/tests.py
                             $<TARGET_FILE:fast-discovery-server>
                             ${TEST}
@@ -105,7 +104,7 @@ if(Python3_Interpreter_FOUND)
         else()
             add_test(
                     NAME system.tools.fastdds.${TEST}
-                    COMMAND ${Python3_EXECUTABLE}
+                    COMMAND ${PYTHON_EXECUTABLE}
                             ${CMAKE_CURRENT_SOURCE_DIR}/tests.py
                             $<TARGET_FILE:fast-discovery-server>
                             ${TEST}
@@ -122,8 +121,8 @@ if(Python3_Interpreter_FOUND)
 
     endforeach()
 
-    configure_file("test_xml_discovery_server_profile.xml" "test_xml_discovery_server_profile.xml" COPYONLY)
-    configure_file("test_wrong_xml_discovery_server_profile.xml" "test_wrong_xml_discovery_server_profile.xml" COPYONLY)
+    configure_file("test_xml_discovery_server.xml" "test_xml_discovery_server.xml" COPYONLY)
+    configure_file("test_wrong_xml_discovery_server.xml" "test_wrong_xml_discovery_server.xml" COPYONLY)
     unset(TEST_ENVIRONMENT)
 
 endif()

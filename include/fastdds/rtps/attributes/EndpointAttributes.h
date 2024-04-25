@@ -19,7 +19,6 @@
 #ifndef _FASTDDS_ENDPOINTATTRIBUTES_H_
 #define _FASTDDS_ENDPOINTATTRIBUTES_H_
 
-#include <fastdds/rtps/attributes/ExternalLocators.hpp>
 #include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastrtps/qos/QosPolicies.h>
 
@@ -43,48 +42,48 @@ class EndpointAttributes
 {
 public:
 
-    //! Endpoint kind, default value WRITER
-    EndpointKind_t endpointKind = EndpointKind_t::WRITER;
+    //!Endpoint kind, default value WRITER
+    EndpointKind_t endpointKind;
 
-    //! Topic kind, default value NO_KEY
-    TopicKind_t topicKind = TopicKind_t::NO_KEY;
+    //!Topic kind, default value NO_KEY
+    TopicKind_t topicKind;
 
-    //! Reliability kind, default value BEST_EFFORT
-    ReliabilityKind_t reliabilityKind = ReliabilityKind_t::BEST_EFFORT;
+    //!Reliability kind, default value BEST_EFFORT
+    ReliabilityKind_t reliabilityKind;
 
-    //! Durability kind, default value VOLATILE
-    DurabilityKind_t durabilityKind = DurabilityKind_t::VOLATILE;
+    //!Durability kind, default value VOLATILE
+    DurabilityKind_t durabilityKind;
 
-    //! GUID used for persistence
+    //!GUID used for persistence
     GUID_t persistence_guid;
 
-    //! The collection of external locators to use for communication.
-    fastdds::rtps::ExternalLocators external_unicast_locators;
-
-    //! Whether locators that don't match with the announced locators should be kept.
-    bool ignore_non_matching_locators = false;
-
-    //! Unicast locator list
+    //!Unicast locator list
     LocatorList_t unicastLocatorList;
 
-    //! Multicast locator list
+    //!Multicast locator list
     LocatorList_t multicastLocatorList;
 
     //! Remote locator list.
     LocatorList_t remoteLocatorList;
 
-    //! Properties
+    //!Properties
     PropertyPolicy properties;
 
-    //!Ownership
-    OwnershipQosPolicyKind ownershipKind = SHARED_OWNERSHIP_QOS;
-
     EndpointAttributes()
+        : endpointKind(WRITER)
+        , topicKind(NO_KEY)
+        , reliabilityKind(BEST_EFFORT)
+        , durabilityKind(VOLATILE)
+        , persistence_guid()
+        , m_userDefinedID(-1)
+        , m_entityID(-1)
     {
         datasharing_.off();
     }
 
-    virtual ~EndpointAttributes() = default;
+    virtual ~EndpointAttributes()
+    {
+    }
 
     /**
      * Get the user defined ID
@@ -158,18 +157,16 @@ public:
 
 private:
 
-    //! User Defined ID, used for StaticEndpointDiscovery, default value -1.
-    int16_t m_userDefinedID = -1;
+    //!User Defined ID, used for StaticEndpointDiscovery, default value -1.
+    int16_t m_userDefinedID;
 
-    //! Entity ID, if the user want to specify the EntityID of the enpoint, default value -1.
-    int16_t m_entityID = -1;
+    //!Entity ID, if the user want to specify the EntityID of the enpoint, default value -1.
+    int16_t m_entityID;
 
 #if HAVE_SECURITY
-    //! Security attributes
     security::EndpointSecurityAttributes security_attributes_;
 #endif // HAVE_SECURITY
 
-    //! Settings for datasharing
     DataSharingQosPolicy datasharing_;
 };
 

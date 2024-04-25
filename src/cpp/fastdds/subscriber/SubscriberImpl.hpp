@@ -29,8 +29,6 @@
 #include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastrtps/types/TypesBase.h>
 
-#include <fastdds/statistics/rtps/monitor_service/interfaces/IStatusQueryable.hpp>
-
 #include <mutex>
 #include <map>
 
@@ -99,15 +97,13 @@ public:
             TopicDescription* topic,
             const DataReaderQos& reader_qos,
             DataReaderListener* listener = nullptr,
-            const StatusMask& mask = StatusMask::all(),
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
+            const StatusMask& mask = StatusMask::all());
 
     DataReader* create_datareader_with_profile(
             TopicDescription* topic,
             const std::string& profile_name,
             DataReaderListener* listener,
-            const StatusMask& mask = StatusMask::all(),
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
+            const StatusMask& mask = StatusMask::all());
 
     ReturnCode_t delete_datareader(
             const DataReader* reader);
@@ -229,13 +225,6 @@ public:
 
     bool can_be_deleted() const;
 
-#ifdef FASTDDS_STATISTICS
-    bool get_monitoring_status(
-            const uint32_t& status_id,
-            statistics::rtps::DDSEntityStatus*& status,
-            const fastrtps::rtps::GUID_t& entity_guid);
-#endif //FASTDDS_STATISTICS
-
 protected:
 
     //!Participant
@@ -309,8 +298,7 @@ protected:
             const TypeSupport& type,
             TopicDescription* topic,
             const DataReaderQos& qos,
-            DataReaderListener* listener,
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool);
+            DataReaderListener* listener);
 };
 
 } /* namespace dds */

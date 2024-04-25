@@ -161,30 +161,6 @@ public:
         return strncmp(string_data, rhs.c_str(), MAX_CHARS) != 0;
     }
 
-    template<size_t N>  bool operator < (
-            const fixed_string<N>& rhs) const noexcept
-    {
-        return 0 > compare(rhs);
-    }
-
-    template<size_t N>  bool operator > (
-            const fixed_string<N>& rhs) const noexcept
-    {
-        return 0 < compare(rhs);
-    }
-
-    bool operator < (
-            const std::string& rhs) const noexcept
-    {
-        return 0 > compare(rhs);
-    }
-
-    bool operator > (
-            const std::string& rhs) const noexcept
-    {
-        return 0 < compare(rhs);
-    }
-
     operator const char* () const noexcept {
         return c_str();
     }
@@ -192,45 +168,6 @@ public:
     size_t size() const noexcept
     {
         return string_len;
-    }
-
-    /*!
-     * Compare with a C string.
-     *
-     * @param str C string to be compared with.
-     *
-     * @return Integer value with the result of the comparison as described in `std::string::compare()`.
-     */
-    int compare(
-            const char* str) const noexcept
-    {
-        return strncmp(string_data, str, MAX_CHARS);
-    }
-
-    /*!
-     * Compare with a std::string.
-     *
-     * @param str std::string to be compared with.
-     *
-     * @return Integer value with the result of the comparison as described in `std::string::compare()`.
-     */
-    int compare(
-            const std::string& str) const noexcept
-    {
-        return strncmp(string_data, str.c_str(), MAX_CHARS);
-    }
-
-    /*!
-     * Compare with a fixed_string
-     *
-     * @param str fixed_string to be compared with.
-     *
-     * @return Integer value with the result of the comparison as described in `std::string::compare()`.
-     */
-    template<size_t N>  int compare(
-            const fixed_string<N>& str) const noexcept
-    {
-        return strncmp(string_data, str.c_str(), MAX_CHARS);
     }
 
 private:

@@ -22,11 +22,11 @@
 
 #include "RTPSMessageGroup_t.hpp"
 #include <fastdds/rtps/common/GuidPrefix_t.hpp>
-#include <fastrtps/utils/TimedMutex.hpp>
-#include <fastrtps/utils/TimedConditionVariable.hpp>
 
 #include <vector>              // std::vector
 #include <memory>              // std::unique_ptr
+#include <mutex>               // std::mutex
+#include <condition_variable>  // std::condition_variable
 
 
 namespace eprosima {
@@ -68,12 +68,10 @@ public:
     /**
      * Get one buffer from the pool.
      * @param participant Pointer to the participant asking for a buffer.
-     * @param max_blocking_time Maximum time the function can be blocked.
      * @return unique pointer to a send buffer.
      */
     std::unique_ptr<RTPSMessageGroup_t> get_buffer(
-            const RTPSParticipantImpl* participant,
-            const std::chrono::steady_clock::time_point& max_blocking_time);
+            const RTPSParticipantImpl* participant);
 
     /**
      * Return one buffer to the pool.
@@ -88,7 +86,7 @@ private:
             const RTPSParticipantImpl* participant);
 
     //!Protects all data
-    TimedMutex mutex_;
+    std::mutex mutex_;
     //!Send buffers pool
     std::vector<std::unique_ptr<RTPSMessageGroup_t>> pool_;
     //!Raw buffer shared by the buffers created inside init()
@@ -98,13 +96,13 @@ private:
     //!Whether we allow n_created_ to grow beyond the pool_ capacity.
     bool allow_growing_ = true;
     //!To wait for a buffer to be returned to the pool.
-    TimedConditionVariable available_cv_;
+    std::condition_variable available_cv_;
 };
 
 } /* namespace rtps */
 } /* namespace fastrtps */
 } /* namespace eprosima */
 
-#endif // ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+#endif
 
 #endif // RTPS_MESSAGES_SENDBUFFERSMANAGER_HPP

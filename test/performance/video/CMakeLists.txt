@@ -112,7 +112,6 @@ if(GST_FOUND)
             fastcdr
             foonathan_memory
             fastdds::optionparser
-            GTest::gtest
             ${CMAKE_THREAD_LIBS_INIT}
             ${CMAKE_DL_LIBS}
             ${GST_LIBRARIES}
@@ -129,7 +128,6 @@ if(GST_FOUND)
             fastcdr
             foonathan_memory
             fastdds::optionparser
-            GTest::gtest
             ${CMAKE_THREAD_LIBS_INIT}
             ${CMAKE_DL_LIBS}
             ${GST_LIBRARIES}
@@ -142,10 +140,10 @@ if(GST_FOUND)
     ###########################################################################
     set(
         VIDEO_TEST_LIST
-        video_interprocess_best_effort_profile
-        video_interprocess_reliable_profile
-        video_interprocess_best_effort_tcp_profile
-        video_interprocess_reliable_tcp_profile
+        interprocess_best_effort
+        interprocess_reliable
+        interprocess_best_effort_tcp
+        interprocess_reliable_tcp
     )
 
     ###########################################################################
@@ -162,15 +160,15 @@ if(GST_FOUND)
     ###########################################################################
     # Create tests                                                            #
     ###########################################################################
-    find_package(Python3 COMPONENTS Interpreter REQUIRED)
-    if(Python3_Interpreter_FOUND)
+    find_package(PythonInterp 3 REQUIRED)
+    if(PYTHONINTERP_FOUND)
         if(GST_FOUND)
             # Loop over the test names
             foreach(video_test_name ${VIDEO_TEST_LIST})
                 # Add the test
                 add_test(
                     NAME performance.video.${video_test_name}
-                    COMMAND ${Python3_EXECUTABLE}
+                    COMMAND ${PYTHON_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/video_tests.py
                     --xml_file ${CMAKE_CURRENT_SOURCE_DIR}/xml/${video_test_name}.xml
                 )
@@ -211,7 +209,7 @@ if(GST_FOUND)
                     # Add the secure verison
                     add_test(
                         NAME performance.video.${video_test_name}_security
-                        COMMAND ${Python3_EXECUTABLE}
+                        COMMAND ${PYTHON_EXECUTABLE}
                         ${CMAKE_CURRENT_SOURCE_DIR}/video_tests.py
                         --xml_file ${CMAKE_CURRENT_SOURCE_DIR}/xml/${video_test_name}.xml
                     )

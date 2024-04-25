@@ -67,10 +67,6 @@ namespace rtps {
 #define ENTITYID_DS_SERVER_VIRTUAL_WRITER 0x00030073
 #define ENTITYID_DS_SERVER_VIRTUAL_READER 0x00030074
 
-#ifdef FASTDDS_STATISTICS
-#define ENTITYID_MONITOR_SERVICE_WRITER 0x004000D2
-#endif // ifdef FASTDDS_STATISTICS
-
 //!@brief Structure EntityId_t, entity id part of GUID_t.
 //!@ingroup COMMON_MODULE
 struct RTPS_DllAPI EntityId_t
@@ -279,11 +275,9 @@ inline std::ostream& operator <<(
         std::ostream& output,
         const EntityId_t& enI)
 {
-    std::stringstream ss;
-    ss << std::hex;
-    ss << (int)enI.value[0] << "." << (int)enI.value[1] << "." << (int)enI.value[2] << "." << (int)enI.value[3];
-    ss << std::dec;
-    return output << ss.str();
+    output << std::hex;
+    output << (int)enI.value[0] << "." << (int)enI.value[1] << "." << (int)enI.value[2] << "." << (int)enI.value[3];
+    return output << std::dec;
 }
 
 inline std::istream& operator >>(
@@ -376,10 +370,6 @@ const EntityId_t c_EntityId_spdp_reliable_participant_secure_writer =
 
 const EntityId_t ds_server_virtual_writer = ENTITYID_DS_SERVER_VIRTUAL_WRITER;
 const EntityId_t ds_server_virtual_reader = ENTITYID_DS_SERVER_VIRTUAL_READER;
-
-#ifdef FASTDDS_STATISTICS
-const EntityId_t monitor_service_status_writer = ENTITYID_MONITOR_SERVICE_WRITER;
-#endif // if FASTDDS_STATISTICS
 
 } // namespace rtps
 } // namespace fastrtps
