@@ -459,6 +459,10 @@ protected:
 #endif //FASTDDS_STATISTICS
 
         DataWriterImpl* data_writer_;
+
+    private:
+
+        using fastrtps::rtps::WriterListener::onWriterMatched;
     }
     writer_listener_;
 
@@ -729,6 +733,11 @@ protected:
     bool is_relevant(
             const fastrtps::rtps::CacheChange_t& change,
             const fastrtps::rtps::GUID_t& reader_guid) const override;
+
+private:
+
+    DataWriterQos get_datawriter_qos_from_settings(
+            const DataWriterQos& qos);
 
 };
 
