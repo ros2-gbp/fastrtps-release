@@ -481,15 +481,25 @@ const ReturnCode_t PublisherImpl::get_datawriter_qos_from_profile(
     return ReturnCode_t::RETCODE_BAD_PARAMETER;
 }
 
-/* TODO
-   bool PublisherImpl::copy_from_topic_qos(
-        fastrtps::WriterQos&,
-        const fastrtps::TopicAttributes&) const
-   {
-    EPROSIMA_LOG_ERROR(PUBLISHER, "Operation not implemented");
-    return false;
-   }
- */
+ReturnCode_t PublisherImpl::copy_from_topic_qos(
+        DataWriterQos& writer_qos,
+        const TopicQos& topic_qos)
+{
+    writer_qos.durability(topic_qos.durability());
+    writer_qos.durability_service(topic_qos.durability_service());
+    writer_qos.deadline(topic_qos.deadline());
+    writer_qos.latency_budget(topic_qos.latency_budget());
+    writer_qos.liveliness(topic_qos.liveliness());
+    writer_qos.reliability(topic_qos.reliability());
+    writer_qos.destination_order(topic_qos.destination_order());
+    writer_qos.history(topic_qos.history());
+    writer_qos.resource_limits(topic_qos.resource_limits());
+    writer_qos.transport_priority(topic_qos.transport_priority());
+    writer_qos.lifespan(topic_qos.lifespan());
+    writer_qos.ownership(topic_qos.ownership());
+    writer_qos.representation(topic_qos.representation());
+    return ReturnCode_t::RETCODE_OK;
+}
 
 ReturnCode_t PublisherImpl::wait_for_acknowledgments(
         const Duration_t& max_wait)
@@ -670,8 +680,7 @@ PublisherListener* PublisherImpl::get_listener_for(
 
 #ifdef FASTDDS_STATISTICS
 bool PublisherImpl::get_monitoring_status(
-        const uint32_t& status_id,
-        statistics::rtps::DDSEntityStatus*& status,
+        statistics::MonitorServiceData& status,
         const fastrtps::rtps::GUID_t& entity_guid)
 {
     bool ret = false;
@@ -682,11 +691,21 @@ bool PublisherImpl::get_monitoring_status(
         {
             if (writer->guid() == entity_guid)
             {
-                switch (status_id)
+                switch (status._d())
                 {
                     case statistics::INCOMPATIBLE_QOS:
                     {
-                        writer->get_offered_incompatible_qos_status(*static_cast<OfferedIncompatibleQosStatus*>(status));
+                        OfferedIncompatibleQosStatus incompatible_qos_status;
+                        writer->get_offered_incompatible_qos_status(incompatible_qos_status);
+                        status.incompatible_qos_status().total_count(incompatible_qos_status.total_count);
+                        status.incompatible_qos_status().last_policy_id(incompatible_qos_status.last_policy_id);
+                        for (auto& qos : incompatible_qos_status.policies)
+                        {
+                            statistics::QosPolicyCount_s count;
+                            count.count(qos.count);
+                            count.policy_id(qos.policy_id);
+                            status.incompatible_qos_status().policies().push_back(count);
+                        }
                         ret = true;
                         break;
                     }
@@ -699,19 +718,27 @@ bool PublisherImpl::get_monitoring_status(
                        }*/
                     case statistics::LIVELINESS_LOST:
                     {
-                        writer->get_liveliness_lost_status(*static_cast<LivelinessLostStatus*>(status));
+                        LivelinessLostStatus liveliness_lost_status;
+                        writer->get_liveliness_lost_status(liveliness_lost_status);
+                        status.liveliness_lost_status().total_count(liveliness_lost_status.total_count);
                         ret = true;
                         break;
                     }
                     case statistics::DEADLINE_MISSED:
                     {
-                        writer->get_offered_deadline_missed_status(*static_cast<DeadlineMissedStatus*>(status));
+                        DeadlineMissedStatus deadline_missed_status;
+                        writer->get_offered_deadline_missed_status(deadline_missed_status);
+                        status.deadline_missed_status().total_count(deadline_missed_status.total_count);
+                        std::memcpy(
+                            status.deadline_missed_status().last_instance_handle().data(),
+                            deadline_missed_status.last_instance_handle.value,
+                            16);
                         ret = true;
                         break;
                     }
                     default:
                     {
-                        EPROSIMA_LOG_ERROR(PUBLISHER, "Queried status not available for this entity " << status_id);
+                        EPROSIMA_LOG_ERROR(PUBLISHER, "Queried status not available for this entity " << status._d());
                         break;
                     }
                 }
