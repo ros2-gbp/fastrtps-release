@@ -27,29 +27,26 @@
 #include <fastdds/dds/core/LoanableSequence.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastdds/dds/subscriber/DataReaderListener.hpp>
-#include <fastdds/dds/subscriber/SampleInfo.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
-#include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/subscriber/ReadCondition.hpp>
-
+#include <fastdds/dds/subscriber/SampleInfo.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/rtps/attributes/ReaderAttributes.h>
-#include <fastdds/rtps/common/LocatorList.hpp>
 #include <fastdds/rtps/common/Guid.h>
+#include <fastdds/rtps/common/LocatorList.hpp>
 #include <fastdds/rtps/history/IPayloadPool.h>
 #include <fastdds/rtps/reader/ReaderListener.h>
-
-#include <fastrtps/attributes/TopicAttributes.h>
-#include <fastrtps/qos/LivelinessChangedStatus.h>
-#include <fastrtps/types/TypesBase.h>
-
 #include <fastdds/subscriber/DataReaderImpl/DataReaderLoanManager.hpp>
 #include <fastdds/subscriber/DataReaderImpl/SampleInfoPool.hpp>
 #include <fastdds/subscriber/DataReaderImpl/SampleLoanManager.hpp>
 #include <fastdds/subscriber/DataReaderImpl/StateFilter.hpp>
-#include <fastdds/subscriber/SubscriberImpl.hpp>
-#include <rtps/history/ITopicPayloadPool.h>
-
 #include <fastdds/subscriber/history/DataReaderHistory.hpp>
+#include <fastdds/subscriber/SubscriberImpl.hpp>
+#include <fastrtps/attributes/TopicAttributes.h>
+#include <fastrtps/qos/LivelinessChangedStatus.h>
+#include <fastrtps/types/TypesBase.h>
+
+#include <rtps/history/ITopicPayloadPool.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -199,7 +196,8 @@ public:
             SampleInfoSeq& sample_infos);
 
     /**
-     * @brief Returns information about the first untaken sample.
+     * @brief Returns information about the first untaken sample. This method is meant to be called prior to
+     * a read() or take() operation as it does not modify the status condition of the entity.
      * @param [out] info Pointer to a SampleInfo structure to store first untaken sample information.
      * @return true if sample info was returned. false if there is no sample to take.
      */
@@ -451,6 +449,10 @@ protected:
 #endif //FASTDDS_STATISTICS
 
         DataReaderImpl* data_reader_;
+
+    private:
+
+        using fastrtps::rtps::ReaderListener::onReaderMatched;
     }
     reader_listener_;
 
@@ -646,6 +648,10 @@ protected:
 private:
 
     void update_rtps_reader_qos();
+
+    DataReaderQos get_datareader_qos_from_settings(
+            const DataReaderQos& qos);
+
 
 };
 
