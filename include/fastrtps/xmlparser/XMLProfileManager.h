@@ -247,18 +247,7 @@ public:
      * FastDDS's Domain calls this method automatically on its destructor, but
      * if using XMLProfileManager outside of FastDDS, it should be called manually.
      */
-    RTPS_DllAPI static void DeleteInstance()
-    {
-        participant_factory_profiles_.clear();
-        participant_profiles_.clear();
-        publisher_profiles_.clear();
-        subscriber_profiles_.clear();
-        requester_profiles_.clear();
-        replier_profiles_.clear();
-        topic_profiles_.clear();
-        xml_files_.clear();
-        transport_profiles_.clear();
-    }
+    RTPS_DllAPI static void DeleteInstance();
 
     /**
      * Retrieves a DynamicPubSubType for the given dynamic type name.
@@ -266,24 +255,14 @@ public:
      * XMLProfileManager::DeleteDynamicPubSubType method.
      */
     RTPS_DllAPI static types::DynamicPubSubType* CreateDynamicPubSubType(
-            const std::string& type_name)
-    {
-        if (dynamic_types_.find(type_name) != dynamic_types_.end())
-        {
-            return new types::DynamicPubSubType(dynamic_types_[type_name]->build());
-        }
-        return nullptr;
-    }
+            const std::string& type_name);
 
     /**
      * Deletes the given DynamicPubSubType previously created by calling
      * XMLProfileManager::CreateDynamicPubSubType method.
      */
     RTPS_DllAPI static void DeleteDynamicPubSubType(
-            types::DynamicPubSubType* type)
-    {
-        delete type;
-    }
+            types::DynamicPubSubType* type);
 
 private:
 
