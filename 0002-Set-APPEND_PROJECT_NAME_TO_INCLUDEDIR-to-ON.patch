@@ -1,4 +1,4 @@
-From d52a5c8c1d00154a25d8bb0c185625c5a0eef978 Mon Sep 17 00:00:00 2001
+From 7f6481e5d2c99b50cf85a6ad1017c82b59c6740a Mon Sep 17 00:00:00 2001
 From: Shane Loretz <shane.loretz@gmail.com>
 Date: Mon, 21 Mar 2022 14:16:31 -0700
 Subject: [PATCH 2/2] Set APPEND_PROJECT_NAME_TO_INCLUDEDIR to ON
@@ -20,5 +20,5 @@ index adfa6050..bfa61d45 100644
  
  %make_build
 -- 
-2.44.0.769.g3c40516874-goog
+2.34.1
 
