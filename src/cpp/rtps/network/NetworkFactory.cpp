@@ -82,6 +82,20 @@ bool NetworkFactory::build_send_resources(
     return returned_value;
 }
 
+bool NetworkFactory::build_send_resources(
+        SendResourceList& sender_resource_list,
+        const LocatorSelectorEntry& locator_selector_entry)
+{
+    bool returned_value = false;
+
+    for (auto& transport : mRegisteredTransports)
+    {
+        returned_value |= transport->OpenOutputChannels(sender_resource_list, locator_selector_entry);
+    }
+
+    return returned_value;
+}
+
 bool NetworkFactory::BuildReceiverResources(
         Locator_t& local,
         std::vector<std::shared_ptr<ReceiverResource>>& returned_resources_list,
@@ -446,30 +460,27 @@ bool NetworkFactory::configureInitialPeerLocator(
 }
 
 bool NetworkFactory::getDefaultUnicastLocators(
-        uint32_t domain_id,
         LocatorList_t& locators,
-        const RTPSParticipantAttributes& m_att) const
+        uint32_t port) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
     {
-        result |= transport->getDefaultUnicastLocators(locators, calculate_well_known_port(domain_id, m_att, false));
+        result |= transport->getDefaultUnicastLocators(locators, port);
     }
     return result;
 }
 
 bool NetworkFactory::fill_default_locator_port(
-        uint32_t domain_id,
         Locator_t& locator,
-        const RTPSParticipantAttributes& m_att,
-        bool is_multicast) const
+        uint32_t port) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
     {
         if (transport->IsLocatorSupported(locator))
         {
-            result |= transport->fillUnicastLocator(locator, calculate_well_known_port(domain_id, m_att, is_multicast));
+            result |= transport->fillUnicastLocator(locator, port);
         }
     }
     return result;

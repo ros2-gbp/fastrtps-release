@@ -156,6 +156,10 @@ class PubSubWriter
 
     private:
 
+        using eprosima::fastdds::dds::DomainParticipantListener::on_participant_discovery;
+        using eprosima::fastdds::dds::DomainParticipantListener::on_publisher_discovery;
+        using eprosima::fastdds::dds::DomainParticipantListener::on_subscriber_discovery;
+
         ParticipantListener& operator =(
                 const ParticipantListener&) = delete;
 
@@ -1532,6 +1536,13 @@ public:
             std::vector<uint16_t> domain_id = std::vector<uint16_t>())
     {
         datawriter_qos_.data_sharing().on(directory, domain_id);
+        return *this;
+    }
+
+    PubSubWriter& set_events_thread_settings(
+            const eprosima::fastdds::rtps::ThreadSettings& settings)
+    {
+        participant_qos_.timed_events_thread(settings);
         return *this;
     }
 
