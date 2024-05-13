@@ -77,6 +77,8 @@ class TCPTransportInterface : public TransportInterface
 
     std::atomic<bool> alive_;
 
+    using TransportInterface::transform_remote_locator;
+
 protected:
 
     asio::io_service io_service_;
@@ -317,6 +319,28 @@ public:
     bool OpenOutputChannel(
             SendResourceList& send_resource_list,
             const Locator&) override;
+
+    /**
+     * Must open the channel that maps to/from the given locator selector entry. This method must allocate,
+     * reserve and mark any resources that are needed for said channel.
+     *
+     * @param sender_resource_list Participant's send resource list.
+     * @param locator_selector_entry Locator selector entry with the remote entity locators.
+     *
+     * @return true if the channel was correctly opened or if finding an already opened one.
+     */
+    bool OpenOutputChannels(
+            SendResourceList& sender_resource_list,
+            const fastrtps::rtps::LocatorSelectorEntry& locator_selector_entry) override;
+
+    /**
+     * Acts like OpenOutputChannel but ensures that a new CONNECT channel is created for the given locator
+     * if no other channel is already opened for it.
+     * It is used with the initial peers and locators belonging to DS servers.
+     */
+    bool CreateInitialConnect(
+            SendResourceList& send_resource_list,
+            const Locator&);
 
     /**
      * Converts a given remote locator (that is, a locator referring to a remote
