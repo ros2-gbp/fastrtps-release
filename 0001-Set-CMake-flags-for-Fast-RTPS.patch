@@ -1,4 +1,4 @@
-From 00c10a119b796a2c0952d0bf6fb141742c44d756 Mon Sep 17 00:00:00 2001
+From 4fa6691f5ee1d46cf045f8fb9a64af5d74e2d79b Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Steven!=20Ragnar=C3=B6k?=
  <nuclearsandwich@users.noreply.github.com>
 Date: Sat, 12 Feb 2022 10:38:44 -0500
@@ -22,5 +22,5 @@ index 284a0714..8ab6ca9a 100755
  
  override_dh_auto_build:
 -- 
-2.44.0.769.g3c40516874-goog
+2.34.1
 

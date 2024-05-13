@@ -1,4 +1,4 @@
-From cb7c22dad63b9e3f0d12225ab1c7502a3d87da62 Mon Sep 17 00:00:00 2001
+From 9d6a2e4ba7d2ee657c3c90c0d77ade1917a4d3bd Mon Sep 17 00:00:00 2001
 From: Shane Loretz <shane.loretz@gmail.com>
 Date: Mon, 21 Mar 2022 14:16:17 -0700
 Subject: [PATCH 2/2] Set APPEND_PROJECT_NAME_TO_INCLUDEDIR to ON
@@ -20,5 +20,5 @@ index 8ab6ca9a..a9647859 100755
  
  override_dh_auto_build:
 -- 
-2.44.0.769.g3c40516874-goog
+2.34.1
 
