@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <fastdds/dds/core/policy/QosPolicies.hpp>
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
+#include <fastdds/rtps/transport/PortBasedTransportDescriptor.hpp>
 #include <fastrtps/xmlparser/XMLParser.h>
 
 using namespace eprosima::fastrtps;
@@ -112,6 +115,22 @@ public:
 
     static XMLP_ret propertiesPolicy_wrapper(
             tinyxml2::XMLElement* elem,
+            OwnershipQosPolicy& ownershipQos,
+            uint8_t ident)
+    {
+        return getXMLOwnershipQos(elem, ownershipQos, ident);
+    }
+
+    static XMLP_ret propertiesPolicy_wrapper(
+            tinyxml2::XMLElement* elem,
+            OwnershipStrengthQosPolicy& ownershipStrengthQos,
+            uint8_t ident)
+    {
+        return getXMLOwnershipStrengthQos(elem, ownershipStrengthQos, ident);
+    }
+
+    static XMLP_ret propertiesPolicy_wrapper(
+            tinyxml2::XMLElement* elem,
             PropertyPolicy& propertiesPolicy,
             uint8_t ident)
     {
@@ -137,9 +156,10 @@ public:
     static XMLP_ret getXMLBuiltinTransports_wrapper(
             tinyxml2::XMLElement* elem,
             eprosima::fastdds::rtps::BuiltinTransports* bt,
-            uint8_t ident)
+            uint8_t ident,
+            eprosima::fastdds::rtps::BuiltinTransportsOptions* bt_opts = nullptr)
     {
-        return getXMLBuiltinTransports(elem, bt, ident);
+        return getXMLBuiltinTransports(elem, bt, bt_opts, ident);
     }
 
     static XMLP_ret getXMLguidPrefix_wrapper(
@@ -206,12 +226,28 @@ public:
         return getXMLUint(elem, ui16, ident);
     }
 
+    static XMLP_ret getXMLUint_wrapper(
+            tinyxml2::XMLElement* elem,
+            uint64_t* ui64,
+            uint8_t ident)
+    {
+        return getXMLUint(elem, ui64, ident);
+    }
+
     static XMLP_ret getXMLBuiltinAttributes_wrapper(
             tinyxml2::XMLElement* elem,
             BuiltinAttributes& builtin,
             uint8_t ident)
     {
         return getXMLBuiltinAttributes(elem, builtin, ident);
+    }
+
+    static XMLP_ret getXMLTypeLookupSettings_wrapper(
+            tinyxml2::XMLElement* elem,
+            TypeLookupSettings& settings,
+            uint8_t ident)
+    {
+        return getXMLTypeLookupSettings(elem, settings, ident);
     }
 
     static XMLP_ret getXMLThroughputController_wrapper(
@@ -478,6 +514,13 @@ public:
         return parse_tls_config(p_root, tcp_transport);
     }
 
+    static XMLP_ret parseXMLReceptionThreads_wrapper(
+            tinyxml2::XMLElement& p_root,
+            eprosima::fastdds::rtps::PortBasedTransportDescriptor::ReceptionThreadsConfigMap& reception_threads)
+    {
+        return parseXMLReceptionThreads(p_root, reception_threads);
+    }
+
     static XMLP_ret parseXMLLibrarySettings_wrapper(
             tinyxml2::XMLElement* p_root)
     {
@@ -559,6 +602,28 @@ public:
             BaseNode& rootNode)
     {
         return parseXMLTopicData(p_root, rootNode);
+    }
+
+    static XMLP_ret getXMLThreadSettings_wrapper(
+            tinyxml2::XMLElement* p_root,
+            eprosima::fastdds::rtps::ThreadSettings& thread_settings)
+    {
+        return getXMLThreadSettings(*p_root, thread_settings);
+    }
+
+    static XMLP_ret getXMLThreadSettingsWithPort_wrapper(
+            tinyxml2::XMLElement* p_root,
+            eprosima::fastdds::rtps::ThreadSettings& thread_settings,
+            uint32_t& port)
+    {
+        return getXMLThreadSettingsWithPort(*p_root, thread_settings, port);
+    }
+
+    static XMLP_ret getXMLEntityFactoryQos_wrapper(
+            tinyxml2::XMLElement* p_root,
+            eprosima::fastdds::dds::EntityFactoryQosPolicy& entity_factory)
+    {
+        return getXMLEntityFactoryQos(*p_root, entity_factory);
     }
 
 };

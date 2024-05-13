@@ -16,6 +16,7 @@
 #define _FASTDDS_RTPS_DOMAIN_H_
 
 #include <fastdds/rtps/common/Types.h>
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 
 #include <fastdds/rtps/participant/RTPSParticipant.h>
@@ -43,6 +44,12 @@ class RTPSDomainImpl;
 class RTPSDomain
 {
 public:
+
+    static void set_filewatch_thread_config(
+            const fastdds::rtps::ThreadSettings&,
+            const fastdds::rtps::ThreadSettings&)
+    {
+    }
 
     static void stopAll()
     {
@@ -109,9 +116,10 @@ public:
     static RTPSReader* createRTPSReader(
             RTPSParticipant*,
             ReaderAttributes&,
-            ReaderHistory*,
+            ReaderHistory* history,
             ReaderListener* listen = nullptr)
     {
+        reader_->setHistory(history);
         reader_->setListener(listen);
         return reader_;
     }
@@ -120,9 +128,10 @@ public:
             RTPSParticipant*,
             ReaderAttributes&,
             const std::shared_ptr<IPayloadPool>&,
-            ReaderHistory*,
+            ReaderHistory* history,
             ReaderListener* listen = nullptr)
     {
+        reader_->setHistory(history);
         reader_->setListener(listen);
         return reader_;
     }
@@ -132,9 +141,10 @@ public:
             const EntityId_t&,
             ReaderAttributes&,
             const std::shared_ptr<IPayloadPool>&,
-            ReaderHistory*,
+            ReaderHistory* history,
             ReaderListener* listen = nullptr)
     {
+        reader_->setHistory(history);
         reader_->setListener(listen);
         return reader_;
     }
@@ -155,16 +165,6 @@ public:
             uint32_t maxRTPSParticipantId)
     {
         m_maxRTPSParticipantID = maxRTPSParticipantId;
-    }
-
-    static RTPSParticipant* clientServerEnvironmentCreationOverride(
-            uint32_t,
-            bool,
-            const RTPSParticipantAttributes&,
-            RTPSParticipantListener* listen /*= nullptr*/)
-    {
-        participant_->set_listener(listen);
-        return participant_;
     }
 
     static inline uint32_t getNewId()

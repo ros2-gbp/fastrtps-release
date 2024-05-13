@@ -96,7 +96,7 @@ void TCPChannelResourceBasic::connect(
         }
         catch (const std::system_error& error)
         {
-            logError(RTCP, "Openning socket " << error.what());
+            EPROSIMA_LOG_ERROR(RTCP, "Openning socket " << error.what());
         }
     }
 }
@@ -153,7 +153,7 @@ size_t TCPChannelResourceBasic::send(
     {
         std::lock_guard<std::mutex> send_guard(send_mutex_);
 
-        if (parent_->get_non_blocking_send() &&
+        if (parent_->configuration()->non_blocking_send &&
                 !check_socket_send_buffer(header_size + size, socket_->native_handle()))
         {
             return 0;
@@ -182,7 +182,18 @@ asio::ip::tcp::endpoint TCPChannelResourceBasic::remote_endpoint() const
 
 asio::ip::tcp::endpoint TCPChannelResourceBasic::local_endpoint() const
 {
-    std::error_code ec;
+    return socket_->local_endpoint();
+}
+
+asio::ip::tcp::endpoint TCPChannelResourceBasic::remote_endpoint(
+        asio::error_code& ec) const
+{
+    return socket_->remote_endpoint(ec);
+}
+
+asio::ip::tcp::endpoint TCPChannelResourceBasic::local_endpoint(
+        asio::error_code& ec) const
+{
     return socket_->local_endpoint(ec);
 }
 

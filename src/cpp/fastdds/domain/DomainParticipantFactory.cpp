@@ -17,24 +17,28 @@
  *
  */
 
+#include <thread>
+
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/domain/qos/DomainParticipantFactoryQos.hpp>
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/domain/DomainParticipantImpl.hpp>
+#include <fastdds/log/LogResources.hpp>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/RTPSDomain.h>
+#include <fastdds/utils/QosConverters.hpp>
 #include <fastrtps/types/DynamicDataFactory.h>
 #include <fastrtps/types/DynamicTypeBuilderFactory.h>
 #include <fastrtps/types/TypeObjectFactory.h>
+#include <fastrtps/xmlparser/XMLEndpointParser.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 
-#include <fastdds/domain/DomainParticipantImpl.hpp>
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
+#include <rtps/RTPSDomainImpl.hpp>
 #include <statistics/fastdds/domain/DomainParticipantImpl.hpp>
+#include <utils/shared_memory/SharedMemWatchdog.hpp>
 #include <utils/SystemInfo.hpp>
-
-// We include boost through this internal header, to ensure we use our custom boost config file
-#include <utils/shared_memory/SharedMemSegment.hpp>
-#include <boost/interprocess/sync/interprocess_mutex.hpp>
 
 using namespace eprosima::fastrtps::xmlparser;
 
@@ -48,60 +52,12 @@ namespace eprosima {
 namespace fastdds {
 namespace dds {
 
-/**
- * @brief Fill DomainParticipantQos from a given attributes RTPSParticipantAttributes object
- *
- * For the case of the non-binary properties, instead of the RTPSParticipantAttributes overriding the
- * property list in the DomainParticipantQos, a merge is performed in the following manner:
- *
- * - If any property from the RTPSParticipantAttributes is not in the DomainParticipantQos, then it is appended
- *   to the DomainParticipantQos.
- * - If any property from the RTPSParticipantAttributes property is also in the DomainParticipantQos, then the
- *   value in the DomainParticipantQos is overridden with that of the RTPSParticipantAttributes.
- *
- * @param[in, out] qos The DomainParticipantQos to set
- * @param[in] attr The RTPSParticipantAttributes from which the @c qos is set.
- */
-static void set_qos_from_attributes(
-        DomainParticipantQos& qos,
-        const eprosima::fastrtps::rtps::RTPSParticipantAttributes& attr)
-{
-    qos.user_data().setValue(attr.userData);
-    qos.allocation() = attr.allocation;
-    qos.wire_protocol().prefix = attr.prefix;
-    qos.wire_protocol().participant_id = attr.participantID;
-    qos.wire_protocol().builtin = attr.builtin;
-    qos.wire_protocol().port = attr.port;
-    qos.wire_protocol().throughput_controller = attr.throughputController;
-    qos.wire_protocol().default_unicast_locator_list = attr.defaultUnicastLocatorList;
-    qos.wire_protocol().default_multicast_locator_list = attr.defaultMulticastLocatorList;
-    qos.transport().user_transports = attr.userTransports;
-    qos.transport().use_builtin_transports = attr.useBuiltinTransports;
-    qos.transport().send_socket_buffer_size = attr.sendSocketBufferSize;
-    qos.transport().listen_socket_buffer_size = attr.listenSocketBufferSize;
-    qos.name() = attr.getName();
-    qos.flow_controllers() = attr.flow_controllers;
-
-    // Merge attributes and qos properties
-    for (auto property : attr.properties.properties())
-    {
-        std::string* property_value = fastrtps::rtps::PropertyPolicyHelper::find_property(
-            qos.properties(), property.name());
-        if (nullptr == property_value)
-        {
-            qos.properties().properties().emplace_back(property);
-        }
-        else
-        {
-            *property_value = property.value();
-        }
-    }
-    qos.properties().binary_properties() = attr.properties.binary_properties();
-}
-
 DomainParticipantFactory::DomainParticipantFactory()
     : default_xml_profiles_loaded(false)
     , default_participant_qos_(PARTICIPANT_QOS_DEFAULT)
+    , topic_pool_(fastrtps::rtps::TopicPayloadPoolRegistry::instance())
+    , rtps_domain_(fastrtps::rtps::RTPSDomainImpl::get_instance())
+    , log_resources_(detail::get_log_resources())
 {
 }
 
@@ -131,33 +87,19 @@ DomainParticipantFactory::~DomainParticipantFactory()
 
 DomainParticipantFactory* DomainParticipantFactory::get_instance()
 {
-    /*
-     * The first time an interprocess synchronization object is created by boost, a singleton is instantiated and
-     * its destructor is registered with std::atexit(&atexit_work).
-     *
-     * We need to ensure that the boost singleton is destroyed after the instance of DomainParticipantFactory, to
-     * ensure that the interprocess objects keep working until all the participants are destroyed.
-     *
-     * We achieve this behavior by having an static instance of an auxiliary struct that instantiates a synchronization
-     * object on the constructor, just to ensure that the boost singleton is instantiated before the
-     * DomainParticipantFactory.
-     */
-    struct AuxiliaryBoostFunctor
-    {
-        AuxiliaryBoostFunctor()
+    return get_shared_instance().get();
+}
+
+std::shared_ptr<DomainParticipantFactory> DomainParticipantFactory::get_shared_instance()
+{
+    // Note we need a custom deleter, since the destructor is protected.
+    static std::shared_ptr<DomainParticipantFactory> instance(
+        new DomainParticipantFactory(),
+        [](DomainParticipantFactory* p)
         {
-            boost::interprocess::interprocess_mutex mtx;
-        }
-
-    };
-    static AuxiliaryBoostFunctor boost_functor;
-
-    // Keep a reference to the topic payload pool to avoid it to be destroyed before our own instance
-    using pool_registry_ref = eprosima::fastrtps::rtps::TopicPayloadPoolRegistry::reference;
-    static pool_registry_ref topic_pool_registry = eprosima::fastrtps::rtps::TopicPayloadPoolRegistry::instance();
-
-    static DomainParticipantFactory instance;
-    return &instance;
+            delete p;
+        });
+    return instance;
 }
 
 ReturnCode_t DomainParticipantFactory::delete_participant(
@@ -228,29 +170,37 @@ DomainParticipant* DomainParticipantFactory::create_participant(
             new eprosima::fastdds::statistics::dds::DomainParticipantImpl(dom_part, did, pqos, listen);
 #endif // FASTDDS_STATISTICS
 
+    if (fastrtps::rtps::GUID_t::unknown() != dom_part_impl->guid())
     {
-        std::lock_guard<std::mutex> guard(mtx_participants_);
-        using VectorIt = std::map<DomainId_t, std::vector<DomainParticipantImpl*>>::iterator;
-        VectorIt vector_it = participants_.find(did);
-
-        if (vector_it == participants_.end())
         {
-            // Insert the vector
-            std::vector<DomainParticipantImpl*> new_vector;
-            auto pair_it = participants_.insert(std::make_pair(did, std::move(new_vector)));
-            vector_it = pair_it.first;
+            std::lock_guard<std::mutex> guard(mtx_participants_);
+            using VectorIt = std::map<DomainId_t, std::vector<DomainParticipantImpl*>>::iterator;
+            VectorIt vector_it = participants_.find(did);
+
+            if (vector_it == participants_.end())
+            {
+                // Insert the vector
+                std::vector<DomainParticipantImpl*> new_vector;
+                auto pair_it = participants_.insert(std::make_pair(did, std::move(new_vector)));
+                vector_it = pair_it.first;
+            }
+
+            vector_it->second.push_back(dom_part_impl);
         }
 
-        vector_it->second.push_back(dom_part_impl);
+        if (factory_qos_.entity_factory().autoenable_created_entities)
+        {
+            if (ReturnCode_t::RETCODE_OK != dom_part->enable())
+            {
+                delete_participant(dom_part);
+                return nullptr;
+            }
+        }
     }
-
-    if (factory_qos_.entity_factory().autoenable_created_entities)
+    else
     {
-        if (ReturnCode_t::RETCODE_OK != dom_part->enable())
-        {
-            delete_participant(dom_part);
-            return nullptr;
-        }
+        delete dom_part_impl;
+        return nullptr;
     }
 
     return dom_part;
@@ -269,7 +219,7 @@ DomainParticipant* DomainParticipantFactory::create_participant_with_profile(
     if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr))
     {
         DomainParticipantQos qos = default_participant_qos_;
-        set_qos_from_attributes(qos, attr.rtps);
+        utils::set_qos_from_attributes(qos, attr.rtps);
         return create_participant(did, qos, listen, mask);
     }
 
@@ -288,7 +238,7 @@ DomainParticipant* DomainParticipantFactory::create_participant_with_profile(
     if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr))
     {
         DomainParticipantQos qos = default_participant_qos_;
-        set_qos_from_attributes(qos, attr.rtps);
+        utils::set_qos_from_attributes(qos, attr.rtps);
         return create_participant(attr.domainId, qos, listen, mask);
     }
 
@@ -363,10 +313,10 @@ ReturnCode_t DomainParticipantFactory::get_participant_qos_from_profile(
         DomainParticipantQos& qos) const
 {
     ParticipantAttributes attr;
-    if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr))
+    if (XMLP_ret::XML_OK == XMLProfileManager::fillParticipantAttributes(profile_name, attr, false))
     {
         qos = default_participant_qos_;
-        set_qos_from_attributes(qos, attr.rtps);
+        utils::set_qos_from_attributes(qos, attr.rtps);
         return ReturnCode_t::RETCODE_OK;
     }
 
@@ -375,18 +325,32 @@ ReturnCode_t DomainParticipantFactory::get_participant_qos_from_profile(
 
 ReturnCode_t DomainParticipantFactory::load_profiles()
 {
-    if (false == default_xml_profiles_loaded)
+    // NOTE: This could be done with a bool atomic to avoid taking the mutex in most cases, however the use of
+    // atomic over mutex is not deterministically better, and this way is easier to read and understand.
+
+    // Only load profiles once, if not, wait for profiles to be loaded
+    std::lock_guard<std::mutex> _(default_xml_profiles_loaded_mtx_);
+    if (!default_xml_profiles_loaded)
     {
         SystemInfo::set_environment_file();
         XMLProfileManager::loadDefaultXMLFile();
-        // Only load profile once
+
+        // Change as already loaded
         default_xml_profiles_loaded = true;
+
+        // Only change factory qos when not explicitly set by the user
+        if (factory_qos_ == PARTICIPANT_FACTORY_QOS_DEFAULT)
+        {
+            XMLProfileManager::getDefaultDomainParticipantFactoryQos(factory_qos_);
+        }
 
         // Only change default participant qos when not explicitly set by the user
         if (default_participant_qos_ == PARTICIPANT_QOS_DEFAULT)
         {
             reset_default_participant_qos();
         }
+
+        RTPSDomain::set_filewatch_thread_config(factory_qos_.file_watch_threads(), factory_qos_.file_watch_threads());
     }
 
     return ReturnCode_t::RETCODE_OK;
@@ -397,7 +361,7 @@ ReturnCode_t DomainParticipantFactory::load_XML_profiles_file(
 {
     if (XMLP_ret::XML_ERROR == XMLProfileManager::loadXMLFile(xml_profile_file))
     {
-        logError(DOMAIN, "Problem loading XML file '" << xml_profile_file << "'");
+        EPROSIMA_LOG_ERROR(DOMAIN, "Problem loading XML file '" << xml_profile_file << "'");
         return ReturnCode_t::RETCODE_ERROR;
     }
     return ReturnCode_t::RETCODE_OK;
@@ -409,7 +373,19 @@ ReturnCode_t DomainParticipantFactory::load_XML_profiles_string(
 {
     if (XMLP_ret::XML_ERROR == XMLProfileManager::loadXMLString(data, length))
     {
-        logError(DOMAIN, "Problem loading XML string");
+        EPROSIMA_LOG_ERROR(DOMAIN, "Problem loading XML string");
+        return ReturnCode_t::RETCODE_ERROR;
+    }
+    return ReturnCode_t::RETCODE_OK;
+}
+
+ReturnCode_t DomainParticipantFactory::check_xml_static_discovery(
+        std::string& xml_file)
+{
+    eprosima::fastrtps::xmlparser::XMLEndpointParser parser;
+    if (XMLP_ret::XML_OK != parser.loadXMLFile(xml_file))
+    {
+        EPROSIMA_LOG_ERROR(DOMAIN, "Error parsing xml file");
         return ReturnCode_t::RETCODE_ERROR;
     }
     return ReturnCode_t::RETCODE_OK;
@@ -446,7 +422,7 @@ void DomainParticipantFactory::reset_default_participant_qos()
     {
         eprosima::fastrtps::ParticipantAttributes attr;
         XMLProfileManager::getDefaultParticipantAttributes(attr);
-        set_qos_from_attributes(default_participant_qos_, attr.rtps);
+        utils::set_qos_from_attributes(default_participant_qos_, attr.rtps);
     }
 }
 
@@ -458,6 +434,8 @@ void DomainParticipantFactory::set_qos(
     (void) first_time;
     //As all the Qos can always be updated and none of them need to be sent
     to = from;
+
+    rtps::SharedMemWatchdog::set_thread_settings(to.shm_watchdog_thread());
 }
 
 ReturnCode_t DomainParticipantFactory::check_qos(

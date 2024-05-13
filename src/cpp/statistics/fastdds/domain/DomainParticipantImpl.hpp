@@ -39,6 +39,7 @@
 #include <fastdds/domain/DomainParticipantImpl.hpp>
 
 #include "DomainParticipantStatisticsListener.hpp"
+#include <statistics/rtps/monitor-service/Interfaces.hpp>
 
 namespace efd = eprosima::fastdds::dds;
 
@@ -48,22 +49,23 @@ namespace eprosima {
 namespace fastdds {
 namespace statistics {
 
-enum EventKind : uint32_t;
+class MonitorServiceStatusData;
 
 namespace dds {
 
 class PublisherImpl;
 
-class DomainParticipantImpl : public efd::DomainParticipantImpl
+class DomainParticipantImpl : public efd::DomainParticipantImpl,
+    public rtps::IStatusQueryable
 {
 public:
 
     /**
      * @brief This operation enables a Statistics DataWriter
-     * @param topic_name Name of the topic associated to the Statistics DataWriter
-     * @param dwqos DataWriterQos to be set
-     * @return RETCODE_UNSUPPORTED if the FASTDDS_STATISTICS CMake option has not been set,
-     * RETCODE_BAD_PARAMETER if the topic name provided does not correspond to any Statistics DataWriter,
+     *
+     * @param[in] topic_name Name of the topic associated to the Statistics DataWriter
+     * @param[in] dwqos DataWriterQos to be set
+     * @return RETCODE_BAD_PARAMETER if the topic name provided does not correspond to any Statistics DataWriter,
      * RETCODE_INCONSISTENT_POLICY if the DataWriterQos provided is inconsistent,
      * RETCODE_OK if the DataWriter has been created or if it has been created previously,
      * and RETCODE_ERROR otherwise
@@ -73,8 +75,23 @@ public:
             const efd::DataWriterQos& dwqos);
 
     /**
+     * @brief This operation enables a Statistics DataWriter from a provided XML defined profile
+     *
+     * @param[in] profile_name Name for the profile to be used to fill the QoS structure.
+     * @param[in] topic_name Name of the statistics topic to be enabled.
+     * @return RETCODE_BAD_PARAMETER if the topic name provided does not correspond to any Statistics DataWriter,
+     * RETCODE_INCONSISTENT_POLICY if the DataWriterQos provided is inconsistent,
+     * RETCODE_OK if the DataWriter has been created or if it has been created previously,
+     * and RETCODE_ERROR otherwise
+     */
+    ReturnCode_t enable_statistics_datawriter_with_profile(
+            const std::string& profile_name,
+            const std::string& topic_name);
+
+    /**
      * @brief This operation disables a Statistics DataWriter
-     * @param topic_name Name of the topic associated to the Statistics DataWriter
+     *
+     * @param[in] topic_name Name of the topic associated to the Statistics DataWriter
      * @return RETCODE_UNSUPPORTED if the FASTDDS_STATISTICS CMake option has not been set,
      * RETCODE_BAD_PARAMETER if the topic name provided does not correspond to any Statistics DataWriter,
      * RETCODE_OK if the DataWriter has been correctly deleted or does not exist,
@@ -85,6 +102,7 @@ public:
 
     /**
      * @brief This operation enables the DomainParticipantImpl
+     *
      * @return RETCODE_OK if successful
      */
     ReturnCode_t enable() override;
@@ -98,6 +116,84 @@ public:
      */
     static bool is_statistics_topic_name(
             const std::string& topic_name) noexcept;
+
+    /**
+     * @brief This override calls the parent method and returns builtin publishers to nullptr
+     *
+     * @return RETCODE_OK if successful
+     */
+    ReturnCode_t delete_contained_entities() override;
+
+    /**
+     * Enables the monitor service in this DomainParticipant.
+     *
+     * @return RETCODE_OK if the monitor service could be correctly enabled.
+     * @return RETCODE_ERROR if the monitor service could not be enabled properly.
+     * @return RETCODE_UNSUPPORTED if FASTDDS_STATISTICS is not enabled.
+     *
+     */
+    ReturnCode_t enable_monitor_service();
+
+    /**
+     * Disables the monitor service in this DomainParticipant. Does nothing if the service was not enabled before.
+     *
+     * @return RETCODE_OK if the monitor service could be correctly disabled.
+     * @return RETCODE_NOT_ENABLED if the monitor service was not previously enabled.
+     * @return RETCODE_ERROR if the service could not be properly disabled.
+     * @return RETCODE_UNSUPPORTED if FASTDDS_STATISTICS is not enabled.
+     *
+     */
+    ReturnCode_t disable_monitor_service();
+
+    /**
+     * fills in the ParticipantProxyData from a MonitorService Message
+     *
+     * @param [out] data Proxy to fill
+     * @param [in] msg MonitorService Message to get the proxy information from.
+     *
+     * @return RETCODE_OK if the operation succeeds.
+     * @return RETCODE_ERROR if the  operation fails.
+     */
+    ReturnCode_t fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::ParticipantProxyData& data,
+            fastdds::statistics::MonitorServiceStatusData& msg);
+
+    /**
+     * fills in the WriterProxyData from a MonitorService Message
+     *
+     * @param [out] data Proxy to fill.
+     * @param [in] msg MonitorService Message to get the proxy information from.
+     *
+     * @return RETCODE_OK if the operation succeeds.
+     * @return RETCODE_ERROR if the  operation fails.
+     */
+    ReturnCode_t fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::WriterProxyData& data,
+            fastdds::statistics::MonitorServiceStatusData& msg);
+
+    /**
+     * fills in the ReaderProxyData from a MonitorService Message
+     *
+     * @param [out] data Proxy to fill.
+     * @param [in] msg MonitorService Message to get the proxy information from.
+     *
+     * @return RETCODE_OK if the operation succeeds.
+     * @return RETCODE_ERROR if the  operation fails.
+     */
+    ReturnCode_t fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::ReaderProxyData& data,
+            fastdds::statistics::MonitorServiceStatusData& msg);
+
+    /**
+     * Gets the status observer for that entity
+     *
+     * @return status observer
+     */
+
+    const rtps::IStatusObserver* get_status_observer()
+    {
+        return status_observer_.load();
+    }
 
 protected:
 
@@ -189,9 +285,17 @@ protected:
     bool delete_topic_and_type(
             const std::string& topic_name) noexcept;
 
+    /**
+     * @brief Implementation of the IStatusQueryable interface.
+     */
+    bool get_monitoring_status(
+            const fastrtps::rtps::GUID_t& entity_guid,
+            eprosima::fastdds::statistics::MonitorServiceData&) override;
+
     efd::Publisher* builtin_publisher_ = nullptr;
     PublisherImpl* builtin_publisher_impl_ = nullptr;
     std::shared_ptr<DomainParticipantStatisticsListener> statistics_listener_;
+    std::atomic<const rtps::IStatusObserver*> status_observer_{nullptr};
 
     friend class efd::DomainParticipantFactory;
 };

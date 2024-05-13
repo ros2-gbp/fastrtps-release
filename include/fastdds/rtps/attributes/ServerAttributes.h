@@ -117,8 +117,8 @@ typedef std::list<RemoteServerAttributes> RemoteServerList_t;
 template<class charT>
 struct server_ostream_separators
 {
-    static const charT* list_separator;
-    static const charT* locator_separator;
+    RTPS_DllAPI static const charT* list_separator;
+    RTPS_DllAPI static const charT* locator_separator;
 };
 
 #ifndef _MSC_VER
@@ -142,7 +142,7 @@ std::basic_ostream<charT>& operator <<(
     }
     if (!sa.metatrafficMulticastLocatorList.empty())
     {
-        output << server_ostream_separators<charT>::locator_separator << sa.metatrafficUnicastLocatorList;
+        output << server_ostream_separators<charT>::locator_separator << sa.metatrafficMulticastLocatorList;
     }
     return output;
 }
@@ -158,7 +158,7 @@ std::basic_ostream<charT>& operator <<(
     return output;
 }
 
-// port used if the ros environment variable doesn't specified one
+// port used if the ros environment variable doesn't specify one
 constexpr uint16_t DEFAULT_ROS2_SERVER_PORT = 11811;
 // default server base guidPrefix
 const char* const DEFAULT_ROS2_SERVER_GUIDPREFIX = "44.53.00.5f.45.50.52.4f.53.49.4d.41";

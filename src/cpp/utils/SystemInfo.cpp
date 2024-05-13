@@ -26,15 +26,39 @@
 #include <sys/stat.h>
 #endif // _WIN32
 
+#include <chrono>
 #include <fstream>
+#include <iomanip>
+#include <mutex>
 #include <string>
+#include <thread>
+#include <time.h>
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
+
 #include <fastrtps/types/TypesBase.h>
+#include <fastrtps/utils/IPFinder.h>
+#include <utils/threading.hpp>
 
 namespace eprosima {
 
+using IPFinder = fastrtps::rtps::IPFinder;
 using ReturnCode_t = fastrtps::types::ReturnCode_t;
+
+SystemInfo::SystemInfo()
+{
+    // From ctime(3) linux man page:
+    // According to POSIX.1-2004, localtime() is required to behave as though tzset(3) was called, while
+    // localtime_r() does not have this requirement. For portable code tzset(3) should be called before
+    // localtime_r().
+#if (_POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) || \
+    defined(_POSIX_SOURCE) || defined(__unix__)
+    tzset();
+#endif // if (_POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) ||
+       // defined(_POSIX_SOURCE) || defined(__unix__)
+
+    update_interfaces();
+}
 
 ReturnCode_t SystemInfo::get_env(
         const std::string& env_name,
@@ -196,7 +220,9 @@ const std::string& SystemInfo::get_environment_file()
 
 FileWatchHandle SystemInfo::watch_file(
         std::string filename,
-        std::function<void()> callback)
+        std::function<void()> callback,
+        const fastdds::rtps::ThreadSettings& watch_thread_config,
+        const fastdds::rtps::ThreadSettings& callback_thread_config)
 {
 #if defined(_WIN32) || defined(__unix__)
     return FileWatchHandle (new filewatch::FileWatch<std::string>(filename,
@@ -211,10 +237,12 @@ FileWatchHandle SystemInfo::watch_file(
                                // No-op
                                break;
                        }
-                   }));
+                   }, watch_thread_config, callback_thread_config));
 #else // defined(_WIN32) || defined(__unix__)
     static_cast<void>(filename);
     static_cast<void>(callback);
+    static_cast<void>(watch_thread_config);
+    static_cast<void>(callback_thread_config);
     return FileWatchHandle();
 #endif // defined(_WIN32) || defined(__unix__)
 }
@@ -228,6 +256,96 @@ void SystemInfo::stop_watching_file(
     static_cast<void>(handle);
 }
 
+std::string SystemInfo::get_timestamp(
+        const char* format)
+{
+    std::stringstream stream;
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::chrono::system_clock::duration tp = now.time_since_epoch();
+    tp -= std::chrono::duration_cast<std::chrono::seconds>(tp);
+    auto ms = static_cast<unsigned>(tp / std::chrono::milliseconds(1));
+
+#if defined(_WIN32)
+    struct tm timeinfo;
+    localtime_s(&timeinfo, &now_c);
+    //#elif defined(__clang__) && !defined(std::put_time) // TODO arm64 doesn't seem to support std::put_time
+    //    (void)now_c;
+    //    (void)ms;
+#elif (_POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) || \
+    defined(_POSIX_SOURCE) || defined(__unix__)
+    std::tm timeinfo;
+    localtime_r(&now_c, &timeinfo);
+#else
+    std::tm timeinfo = *localtime(&now_c);
+#endif // if defined(_WIN32)
+    stream << std::put_time(&timeinfo, format) << "." << std::setw(3) << std::setfill('0') << ms;
+    return stream.str();
+}
+
+bool SystemInfo::update_interfaces()
+{
+    std::vector<IPFinder::info_IP> ifaces;
+    auto ret = IPFinder::getIPs(&ifaces, true);
+    if (ret)
+    {
+        std::lock_guard<std::mutex> lock(interfaces_mtx_);
+        // Copy fetched interfaces to attribute
+        interfaces_ = ifaces;
+        // Set to true when successful, but not to false if lookup failed (may have been successfully cached before)
+        cached_interfaces_ = true;
+    }
+    return ret;
+}
+
+bool SystemInfo::get_ips(
+        std::vector<IPFinder::info_IP>& vec_name,
+        bool return_loopback,
+        bool force_lookup)
+{
+    if (force_lookup)
+    {
+        return IPFinder::getIPs(&vec_name, return_loopback);
+    }
+    else
+    {
+        {
+            std::lock_guard<std::mutex> lock(interfaces_mtx_);
+            if (cached_interfaces_)
+            {
+                for (const auto& iface : interfaces_)
+                {
+                    if (return_loopback || (iface.type != IPFinder::IPTYPE::IP4_LOCAL &&
+                            iface.type != IPFinder::IPTYPE::IP6_LOCAL))
+                    {
+                        vec_name.push_back(iface);
+                    }
+                }
+                return true;
+            }
+        }
+        // Interfaces not cached, perform lookup
+        return IPFinder::getIPs(&vec_name, return_loopback);
+    }
+}
+
 std::string SystemInfo::environment_file_;
+bool SystemInfo::cached_interfaces_;
+std::vector<IPFinder::info_IP> SystemInfo::interfaces_;
+std::mutex SystemInfo::interfaces_mtx_;
 
 } // eprosima
+
+// threading.hpp implementations
+#ifdef _WIN32
+#include "threading/threading_win32.ipp"
+#include "thread_impl/thread_impl_win32.ipp"
+#elif defined(__APPLE__)
+#include "threading/threading_osx.ipp"
+#include "thread_impl/thread_impl_pthread.ipp"
+#elif defined(_POSIX_SOURCE) || defined(__QNXNTO__) || defined(__ANDROID__)
+#include "threading/threading_pthread.ipp"
+#include "thread_impl/thread_impl_pthread.ipp"
+#else
+#include "threading/threading_empty.ipp"
+#endif // Platform selection

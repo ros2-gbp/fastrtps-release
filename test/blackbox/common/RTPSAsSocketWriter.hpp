@@ -24,7 +24,6 @@
 #include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastrtps/rtps/writer/RTPSWriter.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
 #include <fastrtps/rtps/writer/WriterListener.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/rtps/history/WriterHistory.h>
@@ -64,8 +63,8 @@ public:
         mw << magicword << "_" << asio::ip::host_name() << "_" << GET_PID();
         magicword_ = mw.str();
 
-        // By default, memory mode is preallocated (the most restritive)
-        hattr_.memoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
+        hattr_.memoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         writer_attr_.times.heartbeatPeriod.seconds = 0;
@@ -137,17 +136,29 @@ public:
             eprosima::fastrtps::rtps::CacheChange_t* ch = writer_->new_change([&]() -> uint32_t
                             {
                                 size_t current_alignment =  4 + magicword_.size() + 1;
+#if FASTCDR_VERSION_MAJOR == 1
                                 return (uint32_t)(current_alignment + type::getCdrSerializedSize(*it,
                                 current_alignment));
+#else
+                                eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastdds::rtps::
+                                        DEFAULT_XCDR_VERSION);
+                                return (uint32_t)(current_alignment +
+                                calculator.calculate_serialized_size(*it, current_alignment));
+#endif // FASTCDR_VERSION_MAJOR == 1
                             }
                             , eprosima::fastrtps::rtps::ALIVE);
 
             eprosima::fastcdr::FastBuffer buffer((char*)ch->serializedPayload.data, ch->serializedPayload.max_size);
-            eprosima::fastcdr::Cdr cdr(buffer);
+            eprosima::fastcdr::Cdr cdr(buffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
+                    eprosima::fastcdr::CdrVersion::DDS_CDR);
 
             cdr << magicword_;
             cdr << *it;
+#if FASTCDR_VERSION_MAJOR == 1
             ch->serializedPayload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
+#else
+            ch->serializedPayload.length = static_cast<uint32_t>(cdr.get_serialized_data_length());
+#endif // FASTCDR_VERSION_MAJOR == 1
 
             history_->add_change(ch);
             it = msgs.erase(it);
@@ -307,13 +318,7 @@ public:
 
     bool get_disable_positive_acks()
     {
-        bool ret_val = false;
-        auto stateful_writer = dynamic_cast<eprosima::fastrtps::rtps::StatefulWriter*>(writer_);
-        if (stateful_writer)
-        {
-            ret_val = stateful_writer->get_disable_positive_acks();
-        }
-        return ret_val;
+        return writer_->get_disable_positive_acks();
     }
 
 private:

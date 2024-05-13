@@ -23,6 +23,7 @@
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
+#include <fastdds/rtps/common/CdrSerialization.hpp>
 #include <fastdds/rtps/writer/StatefulWriter.h>
 #include <fastdds/rtps/writer/RTPSWriter.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
@@ -131,7 +132,7 @@ TypeLookupManager::~TypeLookupManager()
 bool TypeLookupManager::init_typelookup_service(
         RTPSParticipantImpl* participant)
 {
-    logInfo(TYPELOOKUP_SERVICE, "Initializing TypeLookup Service");
+    EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Initializing TypeLookup Service");
     participant_ = participant;
     bool retVal = create_endpoints();
     /*
@@ -169,13 +170,13 @@ bool TypeLookupManager::assign_remote_endpoints(
     temp_reader_proxy_data_.m_qos.m_durability.kind = fastrtps::VOLATILE_DURABILITY_QOS;
     temp_reader_proxy_data_.m_qos.m_reliability.kind = fastrtps::RELIABLE_RELIABILITY_QOS;
 
-    logInfo(TYPELOOKUP_SERVICE, "for RTPSParticipant: " << pdata.m_guid);
+    EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "for RTPSParticipant: " << pdata.m_guid);
 
     auxendp &= BUILTIN_ENDPOINT_TYPELOOKUP_SERVICE_REQUEST_DATA_WRITER;
 
     if (auxendp != 0 && builtin_request_reader_ != nullptr)
     {
-        logInfo(TYPELOOKUP_SERVICE, "Adding remote writer to the local Builtin Request Reader");
+        EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Adding remote writer to the local Builtin Request Reader");
         temp_writer_proxy_data_.guid().entityId = fastrtps::rtps::c_EntityId_TypeLookup_request_writer;
         temp_writer_proxy_data_.persistence_guid().entityId = fastrtps::rtps::c_EntityId_TypeLookup_request_writer;
         builtin_request_reader_->matched_writer_add(temp_writer_proxy_data_);
@@ -186,7 +187,7 @@ bool TypeLookupManager::assign_remote_endpoints(
 
     if (auxendp != 0 && builtin_reply_reader_ != nullptr)
     {
-        logInfo(TYPELOOKUP_SERVICE, "Adding remote writer to the local Builtin Reply Reader");
+        EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Adding remote writer to the local Builtin Reply Reader");
         temp_writer_proxy_data_.guid().entityId = fastrtps::rtps::c_EntityId_TypeLookup_reply_writer;
         temp_writer_proxy_data_.persistence_guid().entityId = fastrtps::rtps::c_EntityId_TypeLookup_reply_writer;
         builtin_reply_reader_->matched_writer_add(temp_writer_proxy_data_);
@@ -197,7 +198,7 @@ bool TypeLookupManager::assign_remote_endpoints(
 
     if (auxendp != 0 && builtin_request_writer_ != nullptr)
     {
-        logInfo(TYPELOOKUP_SERVICE, "Adding remote reader to the local Builtin Request Writer");
+        EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Adding remote reader to the local Builtin Request Writer");
         temp_reader_proxy_data_.guid().entityId = fastrtps::rtps::c_EntityId_TypeLookup_request_reader;
         builtin_request_writer_->matched_reader_add(temp_reader_proxy_data_);
     }
@@ -207,7 +208,7 @@ bool TypeLookupManager::assign_remote_endpoints(
 
     if (auxendp != 0 && builtin_reply_writer_ != nullptr)
     {
-        logInfo(TYPELOOKUP_SERVICE, "Adding remote reader to the local Builtin Reply Writer");
+        EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Adding remote reader to the local Builtin Reply Writer");
         temp_reader_proxy_data_.guid().entityId = fastrtps::rtps::c_EntityId_TypeLookup_reply_reader;
         builtin_reply_writer_->matched_reader_add(temp_reader_proxy_data_);
     }
@@ -221,7 +222,7 @@ void TypeLookupManager::remove_remote_endpoints(
     GUID_t tmp_guid;
     tmp_guid.guidPrefix = pdata->m_guid.guidPrefix;
 
-    logInfo(TYPELOOKUP_SERVICE, "for RTPSParticipant: " << pdata->m_guid);
+    EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "for RTPSParticipant: " << pdata->m_guid);
     uint32_t endp = pdata->m_availableBuiltinEndpoints;
     uint32_t partdet = endp;
     uint32_t auxendp = endp;
@@ -230,7 +231,7 @@ void TypeLookupManager::remove_remote_endpoints(
 
     if ((auxendp != 0 || partdet != 0) && builtin_request_reader_ != nullptr)
     {
-        logInfo(TYPELOOKUP_SERVICE, "Removing remote writer from the local Builtin Request Reader");
+        EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Removing remote writer from the local Builtin Request Reader");
         tmp_guid.entityId = fastrtps::rtps::c_EntityId_TypeLookup_request_writer;
         builtin_request_reader_->matched_writer_remove(tmp_guid);
     }
@@ -240,7 +241,7 @@ void TypeLookupManager::remove_remote_endpoints(
 
     if ((auxendp != 0 || partdet != 0) && builtin_reply_reader_ != nullptr)
     {
-        logInfo(TYPELOOKUP_SERVICE, "Removing remote writer from the local Builtin Reply Reader");
+        EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Removing remote writer from the local Builtin Reply Reader");
         tmp_guid.entityId = fastrtps::rtps::c_EntityId_TypeLookup_reply_writer;
         builtin_reply_reader_->matched_writer_remove(tmp_guid);
     }
@@ -250,7 +251,7 @@ void TypeLookupManager::remove_remote_endpoints(
 
     if ((auxendp != 0 || partdet != 0) && builtin_request_writer_ != nullptr)
     {
-        logInfo(TYPELOOKUP_SERVICE, "Removing remote reader from the local Builtin Request Writer");
+        EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Removing remote reader from the local Builtin Request Writer");
         tmp_guid.entityId = fastrtps::rtps::c_EntityId_TypeLookup_request_reader;
         builtin_request_writer_->matched_reader_remove(tmp_guid);
     }
@@ -260,7 +261,7 @@ void TypeLookupManager::remove_remote_endpoints(
 
     if ((auxendp != 0 || partdet != 0) && builtin_reply_writer_ != nullptr)
     {
-        logInfo(TYPELOOKUP_SERVICE, "Removing remote reader from the local Builtin Reply Writer");
+        EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Removing remote reader from the local Builtin Reply Writer");
         tmp_guid.entityId = fastrtps::rtps::c_EntityId_TypeLookup_reply_reader;
         builtin_reply_writer_->matched_reader_remove(tmp_guid);
     }
@@ -327,6 +328,8 @@ bool TypeLookupManager::create_endpoints()
 {
     bool ret = true;
 
+    const RTPSParticipantAttributes& pattr = participant_->getRTPSParticipantAttributes();
+
     // Built-in history attributes.
     HistoryAttributes hatt;
     hatt.initialReservedCaches = 20;
@@ -336,8 +339,10 @@ bool TypeLookupManager::create_endpoints()
     WriterAttributes watt;
     watt.endpoint.unicastLocatorList = builtin_protocols_->m_metatrafficUnicastLocatorList;
     watt.endpoint.multicastLocatorList = builtin_protocols_->m_metatrafficMulticastLocatorList;
+    watt.endpoint.external_unicast_locators = builtin_protocols_->m_att.metatraffic_external_unicast_locators;
+    watt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     watt.endpoint.remoteLocatorList = builtin_protocols_->m_initialPeersList;
-    watt.matched_readers_allocation = participant_->getRTPSParticipantAttributes().allocation.participants;
+    watt.matched_readers_allocation = pattr.allocation.participants;
     watt.endpoint.topicKind = fastrtps::rtps::NO_KEY;
     watt.endpoint.reliabilityKind = fastrtps::rtps::RELIABLE;
     watt.endpoint.durabilityKind = fastrtps::rtps::VOLATILE;
@@ -358,11 +363,11 @@ bool TypeLookupManager::create_endpoints()
                     true))
         {
             builtin_request_writer_ = dynamic_cast<StatefulWriter*>(req_writer);
-            logInfo(TYPELOOKUP_SERVICE, "Builtin Typelookup request writer created.");
+            EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Builtin Typelookup request writer created.");
         }
         else
         {
-            logError(TYPELOOKUP_SERVICE, "Typelookup request writer creation failed.");
+            EPROSIMA_LOG_ERROR(TYPELOOKUP_SERVICE, "Typelookup request writer creation failed.");
             ret = false;
         }
     }
@@ -383,11 +388,11 @@ bool TypeLookupManager::create_endpoints()
                     true))
         {
             builtin_reply_writer_ = dynamic_cast<StatefulWriter*>(rep_writer);
-            logInfo(TYPELOOKUP_SERVICE, "Builtin Typelookup reply writer created.");
+            EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Builtin Typelookup reply writer created.");
         }
         else
         {
-            logError(TYPELOOKUP_SERVICE, "Typelookup reply writer creation failed.");
+            EPROSIMA_LOG_ERROR(TYPELOOKUP_SERVICE, "Typelookup reply writer creation failed.");
             ret = false;
         }
     }
@@ -395,8 +400,10 @@ bool TypeLookupManager::create_endpoints()
     ReaderAttributes ratt;
     ratt.endpoint.unicastLocatorList = builtin_protocols_->m_metatrafficUnicastLocatorList;
     ratt.endpoint.multicastLocatorList = builtin_protocols_->m_metatrafficMulticastLocatorList;
+    ratt.endpoint.external_unicast_locators = builtin_protocols_->m_att.metatraffic_external_unicast_locators;
+    ratt.endpoint.ignore_non_matching_locators = pattr.ignore_non_matching_locators;
     ratt.endpoint.remoteLocatorList = builtin_protocols_->m_initialPeersList;
-    ratt.matched_writers_allocation = participant_->getRTPSParticipantAttributes().allocation.participants;
+    ratt.matched_writers_allocation = pattr.allocation.participants;
     ratt.expectsInlineQos = true;
     ratt.endpoint.topicKind = fastrtps::rtps::NO_KEY;
     ratt.endpoint.reliabilityKind = fastrtps::rtps::RELIABLE;
@@ -421,11 +428,11 @@ bool TypeLookupManager::create_endpoints()
                     true))
         {
             builtin_request_reader_ = dynamic_cast<StatefulReader*>(req_reader);
-            logInfo(TYPELOOKUP_SERVICE, "Builtin Typelookup request reader created.");
+            EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Builtin Typelookup request reader created.");
         }
         else
         {
-            logError(TYPELOOKUP_SERVICE, "Typelookup request reader creation failed.");
+            EPROSIMA_LOG_ERROR(TYPELOOKUP_SERVICE, "Typelookup request reader creation failed.");
             ret = false;
         }
     }
@@ -449,11 +456,11 @@ bool TypeLookupManager::create_endpoints()
                     true))
         {
             builtin_reply_reader_ = dynamic_cast<StatefulReader*>(rep_reader);
-            logInfo(TYPELOOKUP_SERVICE, "Builtin Typelookup reply reader created.");
+            EPROSIMA_LOG_INFO(TYPELOOKUP_SERVICE, "Builtin Typelookup reply reader created.");
         }
         else
         {
-            logError(TYPELOOKUP_SERVICE, "Typelookup reply reader creation failed.");
+            EPROSIMA_LOG_ERROR(TYPELOOKUP_SERVICE, "Typelookup reply reader creation failed.");
             ret = false;
         }
     }
@@ -575,7 +582,9 @@ bool TypeLookupManager::send_request(
     CacheChange_t* change = builtin_request_writer_->new_change(
         [&req]()
         {
-            return static_cast<uint32_t>(TypeLookup_Request::getCdrSerializedSize(req) + 4);
+            eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
+            size_t current_alignment {0};
+            return static_cast<uint32_t>(calculator.calculate_serialized_size(req, current_alignment) + 4);
         },
         ALIVE);
 
@@ -596,7 +605,7 @@ bool TypeLookupManager::send_request(
         payload.max_size = change->serializedPayload.max_size - 4;
         payload.data = change->serializedPayload.data + 4;
 
-        bool serialize_ret = request_type_.serialize(&req, &payload);
+        bool serialize_ret = request_type_.serialize(&req, &payload, DataRepresentationId_t::XCDR2_DATA_REPRESENTATION);
         if (!serialize_ret)
         {
             payload.data = nullptr;
@@ -622,7 +631,9 @@ bool TypeLookupManager::send_reply(
     CacheChange_t* change = builtin_reply_writer_->new_change(
         [&rep]()
         {
-            return static_cast<uint32_t>(TypeLookup_Reply::getCdrSerializedSize(rep) + 4);
+            eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
+            size_t current_alignment {0};
+            return static_cast<uint32_t>(calculator.calculate_serialized_size(rep, current_alignment) + 4);
         },
         ALIVE);
 
@@ -643,7 +654,7 @@ bool TypeLookupManager::send_reply(
         payload.max_size = change->serializedPayload.max_size - 4;
         payload.data = change->serializedPayload.data + 4;
 
-        bool serialize_ret = reply_type_.serialize(&rep, &payload);
+        bool serialize_ret = reply_type_.serialize(&rep, &payload, DataRepresentationId_t::XCDR2_DATA_REPRESENTATION);
         if (!serialize_ret)
         {
             payload.data = nullptr;

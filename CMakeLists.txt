@@ -15,8 +15,7 @@
 ###############################################################################
 # CMake build rules for Fast DDS
 ###############################################################################
-cmake_minimum_required(VERSION 3.16.3)
-cmake_policy(VERSION 3.16.3...3.20.3)
+cmake_minimum_required(VERSION 3.20)
 
 # Set CMAKE_BUILD_TYPE to Release by default.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -30,7 +29,7 @@ endif()
 ###############################################################################
 # Project                                                                     #
 ###############################################################################
-project(fastrtps VERSION "2.6.8" LANGUAGES C CXX)
+project(fastrtps VERSION "2.14.1" LANGUAGES C CXX)
 
 set(PROJECT_NAME_LARGE "Fast RTPS")
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
@@ -87,6 +86,19 @@ else()
 endif()
 
 ###############################################################################
+# CCache on Windows on CI
+###############################################################################
+if (MSVC AND CMAKE_CXX_COMPILER_LAUNCHER STREQUAL "ccache")
+    foreach(config DEBUG RELWITHDEBINFO)
+        foreach(lang C CXX)
+            set(flags_var "CMAKE_${lang}_FLAGS_${config}")
+            string(REPLACE "/Zi" "/Z7" ${flags_var} "${${flags_var}}")
+            set(${flags_var} "${${flags_var}}")
+        endforeach()
+    endforeach()
+endif()
+
+###############################################################################
 # GCC colors if using CCache
 ###############################################################################
 if("${CMAKE_CXX_COMPILER_LAUNCHER}" STREQUAL "ccache" AND
@@ -98,13 +110,72 @@ endif()
 ###############################################################################
 # Test system configuration
 ###############################################################################
+
 include(${PROJECT_SOURCE_DIR}/cmake/common/check_configuration.cmake)
 
 set(FORCE_CXX "11" CACHE STRING "C++ standard fulfillment selection")
-check_stdcxx()
+check_stdcxx(${FORCE_CXX})
 
-check_compile_feature()
 check_endianness()
+
+###############################################################################
+# Activate Sanitizers
+###############################################################################
+option(SANITIZER "Enable Thread or Address sanitizers" OFF)
+string(TOUPPER ${SANITIZER} SANITIZER)
+
+if (SANITIZER)
+    if(${SANITIZER} STREQUAL "ADDRESS")
+        message(STATUS "Enabling address sanitizer...")
+        # Warning/Error messages
+        if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
+            message(WARNING "Address sanitizer results with an optimized (non-Debug) build may be misleading")
+        endif()
+
+        if("${CMAKE_C_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang")
+            message(STATUS "Building with llvm Address sanitizer Tools")
+
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+
+        elseif(CMAKE_COMPILER_IS_GNUCXX)
+            message(STATUS "Building with Address sanitizer Tools")
+
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+
+        else()
+            message(FATAL_ERROR "Address sanitizer requires Clang or GCC. Aborting.")
+        endif()
+
+    elseif(${SANITIZER} STREQUAL "THREAD")
+        message(STATUS "Enabling thread sanitizer...")
+        # Warning/Error messages
+        if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
+            message(WARNING "Thread sanitizer results with an optimized (non-Debug) build may be misleading")
+        endif()
+
+        if("${CMAKE_C_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang")
+            message(STATUS "Building with llvm Thread sanitizer Tools")
+
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread")
+
+        elseif(CMAKE_COMPILER_IS_GNUCXX)
+            message(STATUS "Building with Thread sanitizer Tools")
+
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
+
+        else()
+            message(FATAL_ERROR "Thread sanitizer requires Clang or GCC. Aborting.")
+        endif()
+
+    else()
+        message(WARNING "Sanitizer option not supported. Continuing without any code instrumentation... ")
+
+    endif()
+endif()
 
 ###############################################################################
 # Installation paths
@@ -122,7 +193,7 @@ if(APPEND_PROJECT_NAME_TO_INCLUDEDIR)
 endif()
 set(INCLUDE_INSTALL_DIR "${_include_dir}" CACHE PATH "Installation directory for C++ headers")
 unset(_include_dir)
-set(LIB_INSTALL_DIR lib/ CACHE PATH "Installation directory for libraries")
+set(LIB_INSTALL_DIR lib${LIB_SUFFIX}/ CACHE PATH "Installation directory for libraries")
 set(DATA_INSTALL_DIR share/ CACHE PATH "Installation directory for data")
 if(WIN32)
     set(DOC_DIR "doc")
@@ -185,10 +256,14 @@ include_directories(thirdparty/filewatch)
 ###############################################################################
 option(SECURITY "Activate security" OFF)
 
-if(SECURITY)
-    find_package(OpenSSL REQUIRED)
+if(QNX)
+    set(OPENSSL_FOUND 1)
 else()
-    find_package(OpenSSL)
+    if(SECURITY)
+        find_package(OpenSSL REQUIRED)
+    else()
+        find_package(OpenSSL)
+    endif()
 endif()
 
 if(OPENSSL_FOUND)
@@ -206,6 +281,20 @@ if(SECURITY OR TLS_FOUND)
     set(LINK_SSL 1)
 else()
     set(LINK_SSL 0)
+endif()
+
+if(SECURITY AND QNX)
+    add_library(OpenSSL::SSL INTERFACE IMPORTED)
+    add_library(OpenSSL::Crypto INTERFACE IMPORTED)
+
+    set_target_properties(OpenSSL::SSL PROPERTIES
+        INTERFACE_LINK_LIBRARIES ssl
+    )
+    set_target_properties(OpenSSL::Crypto PROPERTIES
+        INTERFACE_LINK_LIBRARIES crypto
+    )
+
+    set(OPENSSL_LIBRARIES ssl crypto)
 endif()
 
 option(SQLITE3_SUPPORT "Activate SQLITE3 support" ON)
@@ -247,12 +336,21 @@ option(LOG_NO_WARNING "Do not compile Warning Log level" OFF)
 
 option(LOG_NO_ERROR "Do not compile Error Log level" OFF)
 
+option(ENABLE_OLD_LOG_MACROS "Compile logInfo, logWarning and logError macros" ON)
+
 cmake_dependent_option(
     FASTDDS_ENFORCE_LOG_INFO
     "The LOG_NO_INFO option must be enforced regardless of selected configuration"
     OFF
     "NOT LOG_NO_INFO"
     OFF)
+
+# This name changes are required because ON is not considered as a C++ option, instead 1 is required
+if(ENABLE_OLD_LOG_MACROS)
+    set(ENABLE_OLD_LOG_MACROS_ 1)
+else()
+    set(ENABLE_OLD_LOG_MACROS_ 0)
+endif()
 
 if(LOG_NO_INFO)
     set(HAVE_LOG_NO_INFO 1)
@@ -284,7 +382,7 @@ endif()
 ###############################################################################
 # Fast DDS statistics tool default setup
 ###############################################################################
-option(FASTDDS_STATISTICS "Enable Fast DDS Statistics Module" OFF)
+option(FASTDDS_STATISTICS "Enable Fast DDS Statistics Module" ON)
 
 ###############################################################################
 # Compile library.
@@ -458,11 +556,22 @@ install(FILES ${PROJECT_SOURCE_DIR}/LICENSE
     COMPONENT licenses
     )
 
+# Install xml validators
+install(FILES ${PROJECT_SOURCE_DIR}/resources/xsd/fastRTPS_profiles.xsd
+    DESTINATION ${DATA_INSTALL_DIR}
+    COMPONENT xsd
+    )
+
+install(FILES ${PROJECT_SOURCE_DIR}/resources/xsd/fastdds_static_discovery.xsd
+    DESTINATION ${DATA_INSTALL_DIR}
+    COMPONENT xsd
+    )
+
 option(INSTALL_EXAMPLES "Install example" OFF)
 
 if(INSTALL_EXAMPLES)
   # Install examples
-  install(DIRECTORY ${PROJECT_SOURCE_DIR}/examples/C++
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/examples/cpp
       DESTINATION examples/
       COMPONENT examples
       PATTERN "examples/CMakeLists.txt" EXCLUDE

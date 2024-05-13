@@ -22,12 +22,13 @@
 #ifndef _TYPEIDENTIFIERTYPES_H_
 #define _TYPEIDENTIFIERTYPES_H_
 
-#include <fastrtps/types/TypesBase.h>
-#include <fastrtps/types/TypeObjectHashId.h>
 #include <stdint.h>
 #include <array>
 #include <string>
 #include <vector>
+
+#include <fastrtps/types/TypesBase.h>
+#include <fastrtps/types/TypeObjectHashId.h>
 
 namespace eprosima {
 namespace fastcdr {
@@ -125,12 +126,15 @@ public:
         return m_bound;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StringSTypeDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const StringSTypeDefn& data,
             size_t current_alignment = 0);
@@ -140,6 +144,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StringSTypeDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -147,8 +153,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StringSTypeDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const StringSTypeDefn& x,
@@ -236,12 +245,15 @@ public:
         return m_bound;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StringLTypeDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const StringLTypeDefn& data,
             size_t current_alignment = 0);
@@ -251,6 +263,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StringLTypeDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -258,8 +272,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StringLTypeDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const StringLTypeDefn& x,
@@ -375,12 +392,15 @@ public:
         return m_element_flags;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainCollectionHeader::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const PlainCollectionHeader& data,
             size_t current_alignment = 0);
@@ -390,6 +410,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainCollectionHeader::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -397,8 +419,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainCollectionHeader::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const PlainCollectionHeader& x,
@@ -546,12 +571,15 @@ public:
         return m_element_identifier;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainSequenceSElemDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const PlainSequenceSElemDefn& data,
             size_t current_alignment = 0);
@@ -561,6 +589,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainSequenceSElemDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -568,8 +598,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainSequenceSElemDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const PlainSequenceSElemDefn& x,
@@ -718,12 +751,15 @@ public:
         return m_element_identifier;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainSequenceLElemDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const PlainSequenceLElemDefn& data,
             size_t current_alignment = 0);
@@ -733,6 +769,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainSequenceLElemDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -740,8 +778,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainSequenceLElemDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const PlainSequenceLElemDefn& x,
@@ -900,12 +941,15 @@ public:
         return m_element_identifier;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainArraySElemDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const PlainArraySElemDefn& data,
             size_t current_alignment = 0);
@@ -915,6 +959,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainArraySElemDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -922,8 +968,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainArraySElemDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const PlainArraySElemDefn& x,
@@ -1082,12 +1131,15 @@ public:
         return m_element_identifier;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainArrayLElemDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const PlainArrayLElemDefn& data,
             size_t current_alignment = 0);
@@ -1097,6 +1149,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainArrayLElemDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -1104,8 +1158,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainArrayLElemDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const PlainArrayLElemDefn& x,
@@ -1307,12 +1364,15 @@ public:
         return m_key_identifier;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainMapSTypeDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const PlainMapSTypeDefn& data,
             size_t current_alignment = 0);
@@ -1322,6 +1382,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainMapSTypeDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -1329,8 +1391,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainMapSTypeDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const PlainMapSTypeDefn& x,
@@ -1534,12 +1599,15 @@ public:
         return m_key_identifier;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainMapLTypeDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const PlainMapLTypeDefn& data,
             size_t current_alignment = 0);
@@ -1549,6 +1617,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainMapLTypeDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -1556,8 +1626,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::PlainMapLTypeDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const PlainMapLTypeDefn& x,
@@ -1711,12 +1784,15 @@ public:
         return m_scc_index;
     }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StronglyConnectedComponentId::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const StronglyConnectedComponentId& data,
             size_t current_alignment = 0);
@@ -1726,6 +1802,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StronglyConnectedComponentId::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -1733,8 +1811,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::StronglyConnectedComponentId::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const StronglyConnectedComponentId& x,
@@ -1792,12 +1873,15 @@ public:
     RTPS_DllAPI virtual ExtendedTypeDefn& operator =(
             ExtendedTypeDefn&& x);
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
     /*!
      * @brief This function returns the serialized size of a data depending on the buffer alignment.
      * @param data Data which is calculated its serialized size.
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::ExtendedTypeDefn::getCdrSerializedSize()",
+            "In favor of version using eprosima::fastcdr::calculate_serialized_size.")
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const ExtendedTypeDefn& data,
             size_t current_alignment = 0);
@@ -1807,6 +1891,8 @@ public:
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::ExtendedTypeDefn::serialize()",
+            "In favor of version using eprosima::fastcdr::serialize.")
     RTPS_DllAPI virtual void serialize(
             eprosima::fastcdr::Cdr& cdr) const;
 
@@ -1814,8 +1900,11 @@ public:
      * @brief This function deserializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
+    FASTDDS_SER_METHOD_DEPRECATED(3, "eprosima::fastrtps::types::ExtendedTypeDefn::deserialize()",
+            "In favor of version using eprosima::fastcdr::deserialize.")
     RTPS_DllAPI virtual void deserialize(
             eprosima::fastcdr::Cdr& cdr);
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     RTPS_DllAPI bool consistent(
             const ExtendedTypeDefn& x,

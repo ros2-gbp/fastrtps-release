@@ -18,19 +18,33 @@
 
 #include <cstdlib>
 #include <memory>
-#include <fastrtps/fastrtps_dll.h>
+
+#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
-#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/resources/ResourceEvent.h>
+#include <fastrtps/fastrtps_dll.h>
 #include <fastrtps/qos/ReaderQos.h>
 #include <fastrtps/qos/WriterQos.h>
 
 #include <gmock/gmock.h>
 
+#include <statistics/rtps/monitor-service/Interfaces.hpp>
+
 namespace eprosima {
 
 namespace fastdds {
+
+#ifdef FASTDDS_STATISTICS
+
+namespace statistics {
+
+class MonitorServiceStatusData;
+
+} // namespace statistics
+
+#endif // FASTDDS_STATISTICS
+
 namespace dds {
 namespace builtin {
 
@@ -104,6 +118,39 @@ public:
         return true;
     }
 
+    void set_enabled_statistics_writers_mask(
+            uint32_t /*enabled_writers*/)
+    {
+    }
+
+    bool fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::ParticipantProxyData& /*data*/,
+            fastdds::statistics::MonitorServiceStatusData& /*msg*/)
+    {
+        return true;
+    }
+
+    bool fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::WriterProxyData& /*data*/,
+            fastdds::statistics::MonitorServiceStatusData& /*msg*/)
+    {
+        return true;
+    }
+
+    bool fill_discovery_data_from_cdr_message(
+            fastrtps::rtps::ReaderProxyData& /*data*/,
+            fastdds::statistics::MonitorServiceStatusData& /*msg*/)
+    {
+        return true;
+    }
+
+    MOCK_CONST_METHOD0(enable_monitor_service, bool());
+    MOCK_CONST_METHOD0(disable_monitor_service, bool());
+
+    MOCK_METHOD0(is_monitor_service_created, bool());
+    MOCK_METHOD1(create_monitor_service, fastdds::statistics::rtps::IStatusObserver* (
+                fastdds::statistics::rtps::IStatusQueryable&));
+
 #endif // FASTDDS_STATISTICS
 
 
@@ -131,7 +178,7 @@ public:
                 const GUID_t& pguid,
                 int16_t userDefinedId));
 
-    ResourceEvent& get_resource_event()
+    ResourceEvent& get_resource_event() const
     {
         return mp_event_thr;
     }
@@ -164,11 +211,19 @@ public:
                 const TopicAttributes& topicAtt,
                 const ReaderQos& rqos));
 
+    MOCK_METHOD1(ignore_participant, bool(
+                const GuidPrefix_t& participant_guid));
+
     MOCK_METHOD4(updateReader, bool(
                 RTPSReader * Reader,
                 const TopicAttributes& topicAtt,
                 const ReaderQos& rqos,
                 const fastdds::rtps::ContentFilterProperty* content_filter));
+
+    std::vector<fastdds::rtps::TransportNetmaskFilterInfo> get_netmask_filter_info() const
+    {
+        return {};
+    }
 
     const RTPSParticipantAttributes& getRTPSParticipantAttributes()
     {
@@ -194,7 +249,7 @@ public:
 
     RTPSParticipantListener* listener_;
     const GUID_t m_guid;
-    ResourceEvent mp_event_thr;
+    mutable ResourceEvent mp_event_thr;
     RTPSParticipantAttributes attributes_;
 };
 

@@ -139,17 +139,6 @@ public:
     EquivalenceHash& hash();
 
     /*!
-     * @brief This function returns the serialized size of a data depending on the buffer alignment.
-     * @param data Data which is calculated its serialized size.
-     * @param current_alignment Buffer alignment.
-     * @return Serialized size.
-     */
-    static size_t getCdrSerializedSize(
-            const TypeObjectHashId& data,
-            size_t current_alignment = 0);
-
-
-    /*!
      * @brief This function serializes an object using CDR serialization.
      * @param cdr CDR serialization object.
      */
@@ -162,8 +151,6 @@ public:
      */
     void deserialize(
             eprosima::fastcdr::Cdr& cdr);
-
-
 
     /*!
      * @brief This function returns the maximum serialized size of the Key of an object

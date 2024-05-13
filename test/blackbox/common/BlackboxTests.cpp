@@ -80,7 +80,7 @@ public:
     {
         //Log::Reset();
         eprosima::fastdds::dds::Log::KillThread();
-        eprosima::fastrtps::rtps::RTPSDomain::stopAll();
+        // Please, do not remove RTPSDomain before DomainParticipantFactory
     }
 
 };
@@ -92,12 +92,15 @@ int main(
     testing::InitGoogleTest(&argc, argv);
     testing::AddGlobalTestEnvironment(new BlackboxEnvironment);
 
+    if (!::testing::GTEST_FLAG(list_tests))
+    {
 #if HAVE_SECURITY
-    blackbox_security_init();
+        blackbox_security_init();
 #endif // if HAVE_SECURITY
 #if TLS_FOUND
-    tls_init();
+        tls_init();
 #endif // if TLS_FOUND
+    }
 
     return RUN_ALL_TESTS();
 }

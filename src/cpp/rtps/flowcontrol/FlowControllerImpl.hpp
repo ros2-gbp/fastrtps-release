@@ -1,18 +1,22 @@
 #ifndef _RTPS_FLOWCONTROL_FLOWCONTROLLERIMPL_HPP_
 #define _RTPS_FLOWCONTROL_FLOWCONTROLLERIMPL_HPP_
 
-#include "FlowController.hpp"
-#include <fastdds/rtps/common/Guid.h>
-#include <fastdds/rtps/writer/RTPSWriter.h>
-
 #include <atomic>
 #include <cassert>
 #include <chrono>
-#include <condition_variable>
 #include <map>
-#include <mutex>
-#include <thread>
 #include <unordered_map>
+
+#include "FlowController.hpp"
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
+#include <fastdds/rtps/common/Guid.h>
+#include <fastdds/rtps/writer/RTPSWriter.h>
+#include <fastrtps/utils/TimedConditionVariable.hpp>
+#include <fastrtps/utils/TimedMutex.hpp>
+
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <utils/thread.hpp>
+#include <utils/threading.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -130,10 +134,14 @@ private:
         void add_change(
                 fastrtps::rtps::CacheChange_t* change) noexcept
         {
-            change->writer_info.previous = tail.writer_info.previous;
-            change->writer_info.previous->writer_info.next = change;
-            tail.writer_info.previous = change;
-            change->writer_info.next = &tail;
+            bool expected = false;
+            if (change->writer_info.is_linked.compare_exchange_strong(expected, true))
+            {
+                change->writer_info.previous = tail.writer_info.previous;
+                change->writer_info.previous->writer_info.next = change;
+                tail.writer_info.previous = change;
+                change->writer_info.next = &tail;
+            }
         }
 
         void add_list(
@@ -203,7 +211,7 @@ struct FlowControllerAsyncPublishMode
         if (running)
         {
             {
-                std::unique_lock<std::mutex> lock(changes_interested_mutex);
+                std::unique_lock<fastrtps::TimedMutex> lock(changes_interested_mutex);
                 running = false;
                 cv.notify_one();
             }
@@ -218,7 +226,7 @@ struct FlowControllerAsyncPublishMode
     }
 
     bool wait(
-            std::unique_lock<std::mutex>& lock)
+            std::unique_lock<fastrtps::TimedMutex>& lock)
     {
         cv.wait(lock);
         return false;
@@ -234,16 +242,16 @@ struct FlowControllerAsyncPublishMode
     {
     }
 
-    std::thread thread;
+    eprosima::thread thread;
 
     std::atomic_bool running {false};
 
-    std::condition_variable cv;
+    fastrtps::TimedConditionVariable cv;
 
     fastrtps::rtps::RTPSMessageGroup group;
 
     //! Mutex for interested samples to be added.
-    std::mutex changes_interested_mutex;
+    fastrtps::TimedMutex changes_interested_mutex;
 
     //! Used to warning async thread a writer wants to remove a sample.
     std::atomic<uint32_t> writers_interested_in_remove = {0};
@@ -315,7 +323,7 @@ struct FlowControllerLimitedAsyncPublishMode : public FlowControllerAsyncPublish
      * @return false if the condition_variable was awaken because a new change was added. true if the condition_variable was awaken because the bandwidth limitation has to be reset.
      */
     bool wait(
-            std::unique_lock<std::mutex>& lock)
+            std::unique_lock<fastrtps::TimedMutex>& lock)
     {
         auto lapse = std::chrono::steady_clock::now() - last_period_;
         bool reset_limit = true;
@@ -607,14 +615,14 @@ struct FlowControllerHighPrioritySchedule
                 if (-10 > priority || 10 < priority)
                 {
                     priority = 10;
-                    logError(RTPS_WRITER,
+                    EPROSIMA_LOG_ERROR(RTPS_WRITER,
                             "Wrong value for fastdds.sfc.priority property. Range is [-10, 10]. Priority set to lowest (10)");
                 }
             }
             else
             {
                 priority = 10;
-                logError(RTPS_WRITER,
+                EPROSIMA_LOG_ERROR(RTPS_WRITER,
                         "Not numerical value for fastdds.sfc.priority property. Priority set to lowest (10)");
             }
         }
@@ -727,14 +735,14 @@ struct FlowControllerPriorityWithReservationSchedule
                 if (-10 > priority || 10 < priority)
                 {
                     priority = 10;
-                    logError(RTPS_WRITER,
+                    EPROSIMA_LOG_ERROR(RTPS_WRITER,
                             "Wrong value for fastdds.sfc.priority property. Range is [-10, 10]. Priority set to lowest (10)");
                 }
             }
             else
             {
                 priority = 10;
-                logError(RTPS_WRITER,
+                EPROSIMA_LOG_ERROR(RTPS_WRITER,
                         "Not numerical value for fastdds.sfc.priority property. Priority set to lowest (10)");
             }
         }
@@ -753,14 +761,14 @@ struct FlowControllerPriorityWithReservationSchedule
                 if (100 < reservation)
                 {
                     reservation = 0;
-                    logError(RTPS_WRITER,
+                    EPROSIMA_LOG_ERROR(RTPS_WRITER,
                             "Wrong value for fastdds.sfc.bandwidth_reservation property. Range is [0, 100]. Reservation set to lowest (0)");
                 }
             }
             else
             {
                 reservation = 0;
-                logError(RTPS_WRITER,
+                EPROSIMA_LOG_ERROR(RTPS_WRITER,
                         "Not numerical value for fastdds.sfc.bandwidth_reservation property. Reservation set to lowest (0)");
             }
         }
@@ -922,11 +930,20 @@ public:
 
     FlowControllerImpl(
             fastrtps::rtps::RTPSParticipantImpl* participant,
-            const FlowControllerDescriptor* descriptor
-            )
+            const FlowControllerDescriptor* descriptor,
+            uint32_t async_index,
+            ThreadSettings thread_settings)
         : participant_(participant)
         , async_mode(participant, descriptor)
+        , participant_id_(0)
+        , async_index_(async_index)
+        , thread_settings_(thread_settings)
     {
+        if (nullptr != participant)
+        {
+            participant_id_ = static_cast<uint32_t>(participant->getRTPSParticipantAttributes().participantID);
+        }
+
         uint32_t limitation = get_max_payload();
 
         if ((std::numeric_limits<uint32_t>::max)() != limitation)
@@ -956,7 +973,7 @@ public:
     void register_writer(
             fastrtps::rtps::RTPSWriter* writer) override
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock<fastrtps::TimedMutex> lock(mutex_);
         auto ret = writers_.insert({ writer->getGuid(), writer});
         (void)ret;
         assert(ret.second);
@@ -971,7 +988,7 @@ public:
     void unregister_writer(
             fastrtps::rtps::RTPSWriter* writer) override
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock<fastrtps::TimedMutex> lock(mutex_);
         writers_.erase(writer->getGuid());
         unregister_writer_impl(writer);
     }
@@ -1015,13 +1032,16 @@ public:
      * If currently the CacheChange_t is managed by this object, remove it.
      * This funcion should be called when a CacheChange_t is removed from the writer's history.
      *
-     * @param Pointer to the change which should be removed if it is currently managed by this object.
+     * @param[in] change Pointer to the change which should be removed if it is currently managed by this object.
+     * @param[in] max_blocking_time Maximum time this method has to complete the task.
+     * @return true if the sample could be removed. false otherwise.
      */
-    void remove_change(
-            fastrtps::rtps::CacheChange_t* change) override
+    bool remove_change(
+            fastrtps::rtps::CacheChange_t* change,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) override
     {
         assert(nullptr != change);
-        remove_change_impl(change);
+        return remove_change_impl(change, max_blocking_time);
     }
 
     uint32_t get_max_payload() override
@@ -1042,7 +1062,10 @@ private:
         if (async_mode.running.compare_exchange_strong(expected, true))
         {
             // Code for initializing the asynchronous thread.
-            async_mode.thread = std::thread(&FlowControllerImpl::run, this);
+            async_mode.thread = create_thread([this]()
+                            {
+                                run();
+                            }, thread_settings_, "dds.asyn.%u.%u", participant_id_, async_index_);
         }
     }
 
@@ -1061,7 +1084,7 @@ private:
     register_writer_impl(
             fastrtps::rtps::RTPSWriter* writer)
     {
-        std::unique_lock<std::mutex> in_lock(async_mode.changes_interested_mutex);
+        std::unique_lock<fastrtps::TimedMutex> in_lock(async_mode.changes_interested_mutex);
         sched.register_writer(writer);
     }
 
@@ -1078,7 +1101,7 @@ private:
     unregister_writer_impl(
             fastrtps::rtps::RTPSWriter* writer)
     {
-        std::unique_lock<std::mutex> in_lock(async_mode.changes_interested_mutex);
+        std::unique_lock<fastrtps::TimedMutex> in_lock(async_mode.changes_interested_mutex);
         sched.unregister_writer(writer);
     }
 
@@ -1100,16 +1123,25 @@ private:
     enqueue_new_sample_impl(
             fastrtps::rtps::RTPSWriter* writer,
             fastrtps::rtps::CacheChange_t* change,
-            const std::chrono::time_point<std::chrono::steady_clock>& /* TODO max_blocking_time*/)
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
     {
-        assert(nullptr == change->writer_info.previous &&
-                nullptr == change->writer_info.next);
+        bool ret_value = false;
+        assert(!change->writer_info.is_linked.load());
         // Sync delivery failed. Try to store for asynchronous delivery.
-        std::unique_lock<std::mutex> lock(async_mode.changes_interested_mutex);
-        sched.add_new_sample(writer, change);
-        async_mode.cv.notify_one();
+#if HAVE_STRICT_REALTIME
+        std::unique_lock<fastrtps::TimedMutex> lock(async_mode.changes_interested_mutex, std::defer_lock);
+        if (lock.try_lock_until(max_blocking_time))
+#else
+        static_cast<void>(max_blocking_time);
+        std::unique_lock<fastrtps::TimedMutex> lock(async_mode.changes_interested_mutex);
+#endif // if HAVE_STRICT_REALTIME{
+        {
+            sched.add_new_sample(writer, change);
+            async_mode.cv.notify_one();
+            ret_value = true;
+        }
 
-        return true;
+        return ret_value;
     }
 
     /*! This function is used when PublishMode = FlowControllerPureSyncPublishMode.
@@ -1140,17 +1172,32 @@ private:
             fastrtps::rtps::CacheChange_t* change,
             const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
     {
+        bool ret_value = false;
         // This call should be made with writer's mutex locked.
         fastrtps::rtps::LocatorSelectorSender& locator_selector = writer->get_general_locator_selector();
-        std::lock_guard<fastrtps::rtps::LocatorSelectorSender> lock(locator_selector);
-        fastrtps::rtps::RTPSMessageGroup group(participant_, writer, &locator_selector);
-        if (fastrtps::rtps::DeliveryRetCode::DELIVERED !=
-                writer->deliver_sample_nts(change, group, locator_selector, max_blocking_time))
+#if HAVE_STRICT_REALTIME
+        std::unique_lock<fastrtps::rtps::LocatorSelectorSender> lock(locator_selector, std::defer_lock);
+        if (lock.try_lock_until(max_blocking_time))
+#else
+        std::unique_lock<fastrtps::rtps::LocatorSelectorSender> lock(locator_selector);
+#endif // if HAVE_STRICT_REALTIME{
         {
-            return enqueue_new_sample_impl(writer, change, max_blocking_time);
+            try
+            {
+                fastrtps::rtps::RTPSMessageGroup group(participant_, writer, &locator_selector, max_blocking_time);
+                ret_value = true;
+                if (fastrtps::rtps::DeliveryRetCode::DELIVERED !=
+                        writer->deliver_sample_nts(change, group, locator_selector, max_blocking_time))
+                {
+                    ret_value =  enqueue_new_sample_impl(writer, change, max_blocking_time);
+                }
+            }
+            catch (fastrtps::rtps::RTPSMessageGroup::timeout&)
+            {
+            }
         }
 
-        return true;
+        return ret_value;
     }
 
     /*!
@@ -1176,24 +1223,27 @@ private:
     add_old_sample_impl(
             fastrtps::rtps::RTPSWriter* writer,
             fastrtps::rtps::CacheChange_t* change,
-            const std::chrono::time_point<std::chrono::steady_clock>& /* TODO max_blocking_time*/)
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
     {
-        // This comparison is thread-safe, because we ensure the change to a problematic state is always protected for
-        // its writer's mutex.
-        // Problematic states:
-        // - Being added: change both pointers from nullptr to a pointer values.
-        // - Being removed: change both pointer from pointer values to nullptr.
-        if (nullptr == change->writer_info.previous &&
-                nullptr == change->writer_info.next)
-        {
-            std::unique_lock<std::mutex> lock(async_mode.changes_interested_mutex);
-            sched.add_old_sample(writer, change);
-            async_mode.cv.notify_one();
+        bool ret_value = false;
 
-            return true;
+        if (!change->writer_info.is_linked.load())
+        {
+#if HAVE_STRICT_REALTIME
+            std::unique_lock<fastrtps::TimedMutex> lock(async_mode.changes_interested_mutex, std::defer_lock);
+            if (lock.try_lock_until(max_blocking_time))
+#else
+            static_cast<void>(max_blocking_time);
+            std::unique_lock<fastrtps::TimedMutex> lock(async_mode.changes_interested_mutex);
+#endif // if HAVE_STRICT_REALTIME{
+            {
+                sched.add_old_sample(writer, change);
+                async_mode.cv.notify_one();
+                ret_value = true;
+            }
         }
 
-        return false;
+        return ret_value;
     }
 
     /*! This function is used when PublishMode = FlowControllerPureSyncPublishMode.
@@ -1215,50 +1265,78 @@ private:
      * @note Before calling this function, the change's writer mutex have to be locked.
      */
     template<typename PubMode = PublishMode>
-    typename std::enable_if<!std::is_same<FlowControllerPureSyncPublishMode, PubMode>::value, void>::type
+    typename std::enable_if<!std::is_same<FlowControllerPureSyncPublishMode, PubMode>::value, bool>::type
     remove_change_impl(
-            fastrtps::rtps::CacheChange_t* change)
+            fastrtps::rtps::CacheChange_t* change,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
     {
-        // This comparison is thread-safe, because we ensure the change to a problematic state is always protected for
-        // its writer's mutex.
-        // Problematic states:
-        // - Being added: change both pointers from nullptr to a pointer values.
-        // - Being removed: change both pointer from pointer values to nullptr.
-        if (nullptr != change->writer_info.previous ||
-                nullptr != change->writer_info.next)
+        bool ret_value = true;
+        if (change->writer_info.is_linked.load())
         {
             ++async_mode.writers_interested_in_remove;
-            std::unique_lock<std::mutex> lock(mutex_);
-            std::unique_lock<std::mutex> interested_lock(async_mode.changes_interested_mutex);
-
-            // When blocked, both pointer are different than nullptr or equal.
-            assert((nullptr != change->writer_info.previous &&
-                    nullptr != change->writer_info.next) ||
-                    (nullptr == change->writer_info.previous &&
-                    nullptr == change->writer_info.next));
-            if (nullptr != change->writer_info.previous &&
-                    nullptr != change->writer_info.next)
+#if HAVE_STRICT_REALTIME
+            std::unique_lock<fastrtps::TimedMutex> lock(mutex_, std::defer_lock);
+            if (lock.try_lock_until(max_blocking_time))
+#else
+            static_cast<void>(max_blocking_time);
+            std::unique_lock<fastrtps::TimedMutex> lock(mutex_);
+#endif // if HAVE_STRICT_REALTIME
             {
+#if HAVE_STRICT_REALTIME
+                std::unique_lock<fastrtps::TimedMutex> interested_lock(async_mode.changes_interested_mutex,
+                        std::defer_lock);
+                if (interested_lock.try_lock_until(max_blocking_time))
+#else
+                std::unique_lock<fastrtps::TimedMutex> interested_lock(async_mode.changes_interested_mutex);
+#endif // if HAVE_STRICT_REALTIME
+                {
 
-                // Try to join previous node and next node.
-                change->writer_info.previous->writer_info.next = change->writer_info.next;
-                change->writer_info.next->writer_info.previous = change->writer_info.previous;
-                change->writer_info.previous = nullptr;
-                change->writer_info.next = nullptr;
+                    // When blocked, both pointer are different than nullptr or equal.
+                    assert((nullptr != change->writer_info.previous &&
+                            nullptr != change->writer_info.next) ||
+                            (nullptr == change->writer_info.previous &&
+                            nullptr == change->writer_info.next));
+                    if (change->writer_info.is_linked.load())
+                    {
+
+                        // Try to join previous node and next node.
+                        change->writer_info.previous->writer_info.next = change->writer_info.next;
+                        change->writer_info.next->writer_info.previous = change->writer_info.previous;
+                        change->writer_info.previous = nullptr;
+                        change->writer_info.next = nullptr;
+                        change->writer_info.is_linked.store(false);
+                    }
+                }
+#if HAVE_STRICT_REALTIME
+                else
+                {
+                    ret_value = !change->writer_info.is_linked.load();
+                }
+#endif // if HAVE_STRICT_REALTIME
             }
+#if HAVE_STRICT_REALTIME
+            else
+            {
+                ret_value = !change->writer_info.is_linked.load();
+            }
+#endif // if HAVE_STRICT_REALTIME
             --async_mode.writers_interested_in_remove;
         }
+
+        return ret_value;
     }
 
     /*! This function is used when PublishMode = FlowControllerPureSyncPublishMode.
      *  In this case there is no async mechanism.
      */
     template<typename PubMode = PublishMode>
-    typename std::enable_if<std::is_same<FlowControllerPureSyncPublishMode, PubMode>::value, void>::type
+    typename std::enable_if<std::is_same<FlowControllerPureSyncPublishMode, PubMode>::value, bool>::type
     remove_change_impl(
-            fastrtps::rtps::CacheChange_t*) const
+            fastrtps::rtps::CacheChange_t*,
+            const std::chrono::time_point<std::chrono::steady_clock>&)
     {
         // Do nothing.
+        return true;
     }
 
     /*!
@@ -1274,12 +1352,12 @@ private:
                 continue;
             }
 
-            std::unique_lock<std::mutex> lock(mutex_);
+            std::unique_lock<fastrtps::TimedMutex> lock(mutex_);
             fastrtps::rtps::CacheChange_t* change_to_process = nullptr;
 
             //Check if we have to sleep.
             {
-                std::unique_lock<std::mutex> in_lock(async_mode.changes_interested_mutex);
+                std::unique_lock<fastrtps::TimedMutex> in_lock(async_mode.changes_interested_mutex);
                 // Add interested changes into the queue.
                 sched.add_interested_changes_to_queue_nts();
 
@@ -1337,6 +1415,7 @@ private:
                 next->writer_info.previous = previous;
                 change_to_process->writer_info.previous = nullptr;
                 change_to_process->writer_info.next = nullptr;
+                change_to_process->writer_info.is_linked.store(false);
 
                 fastrtps::rtps::DeliveryRetCode ret_delivery = current_writer->deliver_sample_nts(
                     change_to_process, async_mode.group, locator_selector,
@@ -1345,6 +1424,7 @@ private:
                 if (fastrtps::rtps::DeliveryRetCode::DELIVERED != ret_delivery)
                 {
                     // If delivery fails, put the change again in the queue.
+                    change_to_process->writer_info.is_linked.store(true);
                     previous->writer_info.next = change_to_process;
                     next->writer_info.previous = change_to_process;
                     change_to_process->writer_info.previous = previous;
@@ -1371,7 +1451,7 @@ private:
 
                 // Add interested changes into the queue.
                 {
-                    std::unique_lock<std::mutex> in_lock(async_mode.changes_interested_mutex);
+                    std::unique_lock<fastrtps::TimedMutex> in_lock(async_mode.changes_interested_mutex);
                     sched.add_interested_changes_to_queue_nts();
                 }
 
@@ -1396,7 +1476,7 @@ private:
         return (std::numeric_limits<uint32_t>::max)();
     }
 
-    std::mutex mutex_;
+    fastrtps::TimedMutex mutex_;
 
     fastrtps::rtps::RTPSParticipantImpl* participant_ = nullptr;
 
@@ -1406,6 +1486,12 @@ private:
 
     // async_mode must be destroyed before sched.
     publish_mode async_mode;
+
+    uint32_t participant_id_ = 0;
+    uint32_t async_index_ = 0;
+
+    //! Thread settings for the sender thread
+    ThreadSettings thread_settings_;
 };
 
 } // namespace rtps

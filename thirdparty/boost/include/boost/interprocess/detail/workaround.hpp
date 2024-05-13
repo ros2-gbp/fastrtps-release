@@ -96,16 +96,34 @@
    //////////////////////////////////////////////////////
    // _POSIX_SEMAPHORES (POSIX.1b/POSIX.4)
    //////////////////////////////////////////////////////
-   #if ( defined(_POSIX_SEMAPHORES) && ((_POSIX_SEMAPHORES + 0) > 0) ) ||\
-       ( defined(__FreeBSD__) && (__FreeBSD__ >= 4)) || \
-         defined(__APPLE__)
-      #define BOOST_INTERPROCESS_POSIX_NAMED_SEMAPHORES
-      //MacOsX declares _POSIX_SEMAPHORES but sem_init returns ENOSYS
-      #if !defined(__APPLE__)
-         #define BOOST_INTERPROCESS_POSIX_UNNAMED_SEMAPHORES
+   #if !defined(BOOST_FASTDDS_PATCHES)
+      #if ( defined(_POSIX_SEMAPHORES) && ((_POSIX_SEMAPHORES + 0) > 0) ) ||\
+          ( defined(__FreeBSD__) && (__FreeBSD__ >= 4)) || \
+            defined(__APPLE__)
+         #define BOOST_INTERPROCESS_POSIX_NAMED_SEMAPHORES
+         //MacOsX declares _POSIX_SEMAPHORES but sem_init returns ENOSYS
+         #if !defined(__APPLE__)
+            #define BOOST_INTERPROCESS_POSIX_UNNAMED_SEMAPHORES
+         #endif
+         #if defined(__osf__) || defined(__vms)
+            #define BOOST_INTERPROCESS_FILESYSTEM_BASED_POSIX_SEMAPHORES
+         #endif
       #endif
-      #if defined(__osf__) || defined(__vms)
-         #define BOOST_INTERPROCESS_FILESYSTEM_BASED_POSIX_SEMAPHORES
+   #else
+      #if ( defined(_POSIX_SEMAPHORES) && ((_POSIX_SEMAPHORES + 0) > 0) ) ||\
+          ( defined(__FreeBSD__) && (__FreeBSD__ >= 4)) || \
+            defined(__APPLE__)
+         // Android does not implement sem_open/sem_close
+         #if !defined(__ANDROID__)
+            #define BOOST_INTERPROCESS_POSIX_NAMED_SEMAPHORES
+         #endif
+         //MacOsX declares _POSIX_SEMAPHORES but sem_init returns ENOSYS
+         #if !defined(__APPLE__)
+            #define BOOST_INTERPROCESS_POSIX_UNNAMED_SEMAPHORES
+         #endif
+         #if defined(__osf__) || defined(__vms)
+            #define BOOST_INTERPROCESS_FILESYSTEM_BASED_POSIX_SEMAPHORES
+         #endif
       #endif
    #endif
 
@@ -200,6 +218,10 @@
    #define BOOST_INTERPROCESS_FORCEINLINE inline
 #else
    #define BOOST_INTERPROCESS_FORCEINLINE BOOST_FORCEINLINE
+#endif
+
+#if !defined(BOOST_INTERPROCESS_ATEXIT)
+   #define BOOST_INTERPROCESS_ATEXIT(f) std::atexit((f))
 #endif
 
 #endif   //#ifndef BOOST_INTERPROCESS_DETAIL_WORKAROUND_HPP

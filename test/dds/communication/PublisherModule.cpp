@@ -15,18 +15,21 @@
 /**
  * @file PublisherModule.cpp
  */
-#include <asio.hpp>
 
 #include "PublisherModule.hpp"
 
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/publisher/qos/PublisherQos.hpp>
-#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
-#include <fastdds/dds/publisher/Publisher.hpp>
-#include <fastdds/dds/publisher/DataWriter.hpp>
-
+#include <chrono>
 #include <fstream>
 #include <string>
+#include <thread>
+
+#include <asio.hpp>
+
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/publisher/DataWriter.hpp>
+#include <fastdds/dds/publisher/Publisher.hpp>
+#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+#include <fastdds/dds/publisher/qos/PublisherQos.hpp>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastrtps::rtps;
@@ -65,7 +68,7 @@ bool PublisherModule::init(
 
     if (participant_ == nullptr)
     {
-        logError(PUBLISHER_MODULE, "Error creating publisher participant");
+        EPROSIMA_LOG_ERROR(PUBLISHER_MODULE, "Error creating publisher participant");
         return false;
     }
 
@@ -89,14 +92,14 @@ bool PublisherModule::init(
     publisher_ = participant_->create_publisher(PUBLISHER_QOS_DEFAULT, this);
     if (publisher_ == nullptr)
     {
-        logError(PUBLISHER_MODULE, "Error creating publisher");
+        EPROSIMA_LOG_ERROR(PUBLISHER_MODULE, "Error creating publisher");
         return false;
     }
 
     topic_ = participant_->create_topic(topic_name.str(), type_.get_type_name(), TOPIC_QOS_DEFAULT);
     if (topic_ == nullptr)
     {
-        logError(PUBLISHER_MODULE, "Error creating publisher topic");
+        EPROSIMA_LOG_ERROR(PUBLISHER_MODULE, "Error creating publisher topic");
         return false;
     }
 
@@ -108,7 +111,7 @@ bool PublisherModule::init(
     writer_ = publisher_->create_datawriter(topic_, wqos, this);
     if (writer_ == nullptr)
     {
-        logError(PUBLISHER_MODULE, "Error creating publisher datawriter");
+        EPROSIMA_LOG_ERROR(PUBLISHER_MODULE, "Error creating publisher datawriter");
         return false;
     }
     std::cout << "Writer created correctly in topic " << topic_->get_name()
@@ -164,7 +167,7 @@ void PublisherModule::run(
                 data->message("HelloWorld");
             }
         }
-        logInfo(PUBLISHER_MODULE, "Publisher writting index " << index);
+        EPROSIMA_LOG_INFO(PUBLISHER_MODULE, "Publisher writting index " << index);
         writer_->write(sample);
 
         if (index == samples)

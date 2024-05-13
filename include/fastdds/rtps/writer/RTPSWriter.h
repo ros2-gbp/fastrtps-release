@@ -25,17 +25,21 @@
 #include <mutex>
 #include <vector>
 
-#include <fastdds/rtps/Endpoint.h>
 #include <fastdds/rtps/attributes/HistoryAttributes.h>
 #include <fastdds/rtps/attributes/WriterAttributes.h>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
+#include <fastdds/rtps/common/CdrSerialization.hpp>
+#include <fastdds/rtps/common/VendorId_t.hpp>
+#include <fastdds/rtps/Endpoint.h>
 #include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
 #include <fastdds/rtps/messages/RTPSMessageGroup.h>
-#include "DeliveryRetCode.hpp"
-#include "LocatorSelectorSender.hpp"
+#include <fastdds/statistics/rtps/monitor_service/connections_fwd.hpp>
+#include <fastdds/statistics/rtps/StatisticsCommon.hpp>
 #include <fastrtps/qos/LivelinessLostStatus.h>
 
-#include <fastdds/statistics/rtps/StatisticsCommon.hpp>
+
+#include "DeliveryRetCode.hpp"
+#include "LocatorSelectorSender.hpp"
 
 namespace eprosima {
 
@@ -122,7 +126,14 @@ public:
     {
         return new_change([data]() -> uint32_t
                        {
+#if FASTCDR_VERSION_MAJOR == 1
                            return (uint32_t)T::getCdrSerializedSize(data);
+#else
+                           eprosima::fastcdr::CdrSizeCalculator calculator(
+                               eprosima::fastdds::rtps::DEFAULT_XCDR_VERSION);
+                           size_t current_alignment {0};
+                           return (uint32_t)calculator.calculate_serialized_size(data, current_alignment);
+#endif // if FASTCDR_VERSION_MAJOR == 1
                        }, changeKind, handle);
     }
 
@@ -193,6 +204,20 @@ public:
      * @return The content filter used on this writer.
      */
     RTPS_DllAPI virtual const fastdds::rtps::IReaderDataFilter* reader_data_filter() const = 0;
+
+    /**
+     * @brief Check if a specific change has been delivered to the transport layer of every matched remote RTPSReader
+     * at least once.
+     *
+     * @param seq_num Sequence number of the change to check.
+     * @return true if delivered. False otherwise.
+     */
+    RTPS_DllAPI virtual bool has_been_fully_delivered(
+            const SequenceNumber_t& seq_num) const
+    {
+        static_cast<void>(seq_num);
+        return false;
+    }
 
     /**
      * Check if a specific change has been acknowledged by all Readers.
@@ -281,6 +306,17 @@ public:
             unsigned int max = 0);
 
     /**
+     * @brief Returns if disable positive ACKs QoS is enabled.
+     *
+     * @return Best effort writers always return false.
+     *         Reliable writers override this method.
+     */
+    RTPS_DllAPI virtual bool get_disable_positive_acks() const
+    {
+        return false;
+    }
+
+    /**
      * Tries to remove a change waiting a maximum of the provided microseconds.
      * @param max_blocking_time_point Maximum time to wait for.
      * @param lock Lock of the Change list.
@@ -304,7 +340,7 @@ public:
 
 #ifdef FASTDDS_STATISTICS
 
-    /*
+    /**
      * Add a listener to receive statistics backend callbacks
      * @param listener
      * @return true if successfully added
@@ -312,13 +348,30 @@ public:
     RTPS_DllAPI bool add_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener);
 
-    /*
+    /**
      * Remove a listener from receiving statistics backend callbacks
      * @param listener
      * @return true if successfully removed
      */
     RTPS_DllAPI bool remove_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener);
+
+    /**
+     * @brief Set the enabled statistics writers mask
+     *
+     * @param enabled_writers The new mask to set
+     */
+    RTPS_DllAPI void set_enabled_statistics_writers_mask(
+            uint32_t enabled_writers);
+
+    /**
+     * @brief Get the connection list of this writer
+     *
+     * @param [out] connection_list of the writer
+     * @return True if could be retrieved
+     */
+    RTPS_DllAPI virtual bool get_connections(
+            fastdds::statistics::rtps::ConnectionList& connection_list) = 0;
 
 #endif // FASTDDS_STATISTICS
 
@@ -360,6 +413,7 @@ public:
      * @param[in] final_flag       Final flag field of the submessage.
      * @param[out] result          true if the writer could process the submessage.
      *                             Only valid when returned value is true.
+     * @param[in] origin_vendor_id VendorId of the source participant from which the message was received
      * @return true when the submessage was destinated to this writer, false otherwise.
      */
     virtual bool process_acknack(
@@ -368,9 +422,14 @@ public:
             uint32_t ack_count,
             const SequenceNumberSet_t& sn_set,
             bool final_flag,
-            bool& result)
+            bool& result,
+            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown)
     {
-        (void)reader_guid; (void)ack_count; (void)sn_set; (void)final_flag;
+        static_cast<void>(reader_guid);
+        static_cast<void>(ack_count);
+        static_cast<void>(sn_set);
+        static_cast<void>(final_flag);
+        static_cast<void>(origin_vendor_id);
 
         result = false;
         return writer_guid == m_guid;
@@ -385,6 +444,7 @@ public:
      * @param[in] fragments_state  Fragment number bitmap field of the submessage.
      * @param[out] result          true if the writer could process the submessage.
      *                             Only valid when returned value is true.
+     * @param[in] origin_vendor_id VendorId of the source participant from which the message was received
      * @return true when the submessage was destinated to this writer, false otherwise.
      */
     virtual bool process_nack_frag(
@@ -393,9 +453,14 @@ public:
             uint32_t ack_count,
             const SequenceNumber_t& seq_num,
             const FragmentNumberSet_t fragments_state,
-            bool& result)
+            bool& result,
+            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown)
     {
-        (void)reader_guid; (void)ack_count; (void)seq_num; (void)fragments_state;
+        static_cast<void>(reader_guid);
+        static_cast<void>(ack_count);
+        static_cast<void>(seq_num);
+        static_cast<void>(fragments_state);
+        static_cast<void>(origin_vendor_id);
 
         result = false;
         return writer_guid == m_guid;
@@ -502,7 +567,7 @@ protected:
     /**
      * Add a change to the unsent list.
      * @param change Pointer to the change to add.
-     * @param max_blocking_time
+     * @param[in] max_blocking_time Maximum time this method has to complete the task.
      */
     virtual void unsent_change_added_to_history(
             CacheChange_t* change,
@@ -511,10 +576,12 @@ protected:
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
      * @param a_change Pointer to the change that is going to be removed.
+     * @param[in] max_blocking_time Maximum time this method has to complete the task.
      * @return True if removed correctly.
      */
     virtual bool change_removed_by_history(
-            CacheChange_t* a_change) = 0;
+            CacheChange_t* a_change,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) = 0;
 
     bool is_datasharing_compatible_with(
             const ReaderProxyData& rdata) const;
@@ -542,7 +609,8 @@ protected:
                 }
                 else
                 {
-                    logError(RTPS_WRITER, "Error sending fragment (" << change->sequenceNumber << ", " << frag << ")");
+                    EPROSIMA_LOG_ERROR(RTPS_WRITER,
+                            "Error sending fragment (" << change->sequenceNumber << ", " << frag << ")");
                     break;
                 }
             }
@@ -556,7 +624,7 @@ protected:
             }
             else
             {
-                logError(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
+                EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
             }
         }
 

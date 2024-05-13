@@ -13,9 +13,7 @@
 // limitations under the License.
 
 #include <cstdint>
-#include <fstream>
 #include <mutex>
-#include <set>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -53,6 +51,10 @@ public:
         }
         else
         {
+#ifdef __APPLE__
+            // TODO: fix IPv6 issues related with zone ID
+            GTEST_SKIP() << "UDPv6 tests are disabled in Mac";
+#endif // ifdef __APPLE__
             test_transport_ = std::make_shared<UDPv6TransportDescriptor>();
         }
     }
@@ -514,29 +516,10 @@ TEST_P(TransportUDP, whitelisting_udp_localhost_alone)
     }
 }
 
-void deliver_datagram_from_file(
-        const std::set<eprosima::fastdds::rtps::TransportReceiverInterface*>& receivers,
-        const char* filename)
-{
-    std::basic_ifstream<char> file(filename, std::ios::binary | std::ios::in);
-
-    file.seekg(0, file.end);
-    size_t file_size = file.tellg();
-    file.seekg(0, file.beg);
-
-    std::vector<uint8_t> buf(file_size);
-    file.read(reinterpret_cast<char*>(buf.data()), file_size);
-
-    eprosima::fastdds::rtps::Locator loc;
-    for (const auto& rec : receivers)
-    {
-        rec->OnDataReceived(buf.data(), static_cast<uint32_t>(file_size), loc, loc);
-    }
-}
-
 TEST(TransportUDP, DatagramInjection)
 {
     using eprosima::fastdds::rtps::DatagramInjectionTransportDescriptor;
+    using eprosima::fastdds::rtps::DatagramInjectionTransport;
 
     auto low_level_transport = std::make_shared<UDPv4TransportDescriptor>();
     auto transport = std::make_shared<DatagramInjectionTransportDescriptor>(low_level_transport);
@@ -548,10 +531,10 @@ TEST(TransportUDP, DatagramInjection)
     auto receivers = transport->get_receivers();
     ASSERT_FALSE(receivers.empty());
 
-    deliver_datagram_from_file(receivers, "datagrams/16784.bin");
-    deliver_datagram_from_file(receivers, "datagrams/20140.bin");
-    deliver_datagram_from_file(receivers, "datagrams/20574.bin");
-    deliver_datagram_from_file(receivers, "datagrams/20660.bin");
+    DatagramInjectionTransport::deliver_datagram_from_file(receivers, "datagrams/16784.bin");
+    DatagramInjectionTransport::deliver_datagram_from_file(receivers, "datagrams/20140.bin");
+    DatagramInjectionTransport::deliver_datagram_from_file(receivers, "datagrams/20574.bin");
+    DatagramInjectionTransport::deliver_datagram_from_file(receivers, "datagrams/20660.bin");
 }
 
 TEST(TransportUDP, MaliciousManipulatedDataOctetsToNextHeaderIgnore)

@@ -162,13 +162,15 @@ public:
      * @param reader_qos QoS of the DataReader.
      * @param listener Pointer to the listener (default: nullptr)
      * @param mask StatusMask that holds statuses the listener responds to (default: all).
+     * @param payload_pool IPayloadPool shared pointer that defines reader payload (default: nullptr).
      * @return Pointer to the created DataReader. nullptr if failed.
      */
     RTPS_DllAPI DataReader* create_datareader(
             TopicDescription* topic,
             const DataReaderQos& reader_qos,
             DataReaderListener* listener = nullptr,
-            const StatusMask& mask = StatusMask::all());
+            const StatusMask& mask = StatusMask::all(),
+            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
 
     /**
      * This operation creates a DataReader. The returned DataReader will be attached and belongs to the Subscriber.
@@ -177,13 +179,15 @@ public:
      * @param profile_name DataReader profile name.
      * @param listener Pointer to the listener (default: nullptr)
      * @param mask StatusMask that holds statuses the listener responds to (default: all).
+     * @param payload_pool IPayloadPool shared pointer that defines reader payload (default: nullptr).
      * @return Pointer to the created DataReader. nullptr if failed.
      */
     RTPS_DllAPI DataReader* create_datareader_with_profile(
             TopicDescription* topic,
             const std::string& profile_name,
             DataReaderListener* listener = nullptr,
-            const StatusMask& mask = StatusMask::all());
+            const StatusMask& mask = StatusMask::all(),
+            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool = nullptr);
 
     /**
      * This operation deletes a DataReader that belongs to the Subscriber.
@@ -230,6 +234,7 @@ public:
      * @param view_states Vector of ViewStateKind
      * @param instance_states Vector of InstanceStateKind
      * @return RETCODE_OK
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_datareaders(
             std::vector<DataReader*>& readers,
@@ -249,6 +254,7 @@ public:
      * attached to the Subscriber.
      *
      * @return RETCODE_OK
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t begin_access();
 
@@ -257,6 +263,7 @@ public:
      * the Subscriber.
      *
      * @return RETCODE_OK
+     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t end_access();
 

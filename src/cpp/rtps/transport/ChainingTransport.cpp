@@ -20,6 +20,12 @@ namespace eprosima {
 namespace fastdds {
 namespace rtps {
 
+void ChainingReceiverResourceDeleter::operator ()(
+        ChainingReceiverResource* p)
+{
+    delete p;
+}
+
 bool ChainingTransport::OpenInputChannel(
         const fastrtps::rtps::Locator_t& loc,
         TransportReceiverInterface* receiver_interface,
@@ -30,7 +36,7 @@ bool ChainingTransport::OpenInputChannel(
     if (iterator == receiver_resources_.end())
     {
         ChainingReceiverResource* receiver_resource = new ChainingReceiverResource(*this, receiver_interface);
-        receiver_resources_.emplace(loc, receiver_resource);
+        receiver_resources_.emplace(loc, ChainingReceiverResourceReferenceType(receiver_resource));
         return low_level_transport_->OpenInputChannel(loc, receiver_resource, max_message_size);
     }
 

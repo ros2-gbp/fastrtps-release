@@ -21,17 +21,18 @@
 
 #include <functional>
 
-#include <fastdds/rtps/Endpoint.h>
 #include <fastdds/rtps/attributes/ReaderAttributes.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/common/SequenceNumber.h>
 #include <fastdds/rtps/common/Time_t.h>
+#include <fastdds/rtps/common/VendorId_t.hpp>
+#include <fastdds/rtps/Endpoint.h>
 #include <fastdds/rtps/history/ReaderHistory.h>
 #include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
+#include <fastdds/statistics/rtps/monitor_service/connections_fwd.hpp>
+#include <fastdds/statistics/rtps/StatisticsCommon.hpp>
 #include <fastrtps/qos/LivelinessChangedStatus.h>
 #include <fastrtps/utils/TimedConditionVariable.hpp>
-
-#include <fastdds/statistics/rtps/StatisticsCommon.hpp>
 
 namespace eprosima {
 namespace fastrtps {
@@ -148,6 +149,7 @@ public:
      * @param lastSN
      * @param finalFlag
      * @param livelinessFlag
+     * @param origin_vendor_id
      * @return true if the reader accepts messages from the.
      */
     RTPS_DllAPI virtual bool processHeartbeatMsg(
@@ -156,19 +158,22 @@ public:
             const SequenceNumber_t& firstSN,
             const SequenceNumber_t& lastSN,
             bool finalFlag,
-            bool livelinessFlag) = 0;
+            bool livelinessFlag,
+            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown) = 0;
 
     /**
      * Processes a new GAP message.
      * @param writerGUID
      * @param gapStart
      * @param gapList
+     * @param origin_vendor_id
      * @return true if the reader accepts messages from the.
      */
     RTPS_DllAPI virtual bool processGapMsg(
             const GUID_t& writerGUID,
             const SequenceNumber_t& gapStart,
-            const SequenceNumberSet_t& gapList) = 0;
+            const SequenceNumberSet_t& gapList,
+            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown) = 0;
 
     /**
      * Method to indicate the reader that some change has been removed due to HistoryQos requirements.
@@ -361,7 +366,7 @@ public:
 
 #ifdef FASTDDS_STATISTICS
 
-    /*
+    /**
      * Add a listener to receive statistics backend callbacks
      * @param listener
      * @return true if successfully added
@@ -369,13 +374,30 @@ public:
     RTPS_DllAPI bool add_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener);
 
-    /*
+    /**
      * Remove a listener from receiving statistics backend callbacks
      * @param listener
      * @return true if successfully removed
      */
     RTPS_DllAPI bool remove_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener);
+
+    /**
+     * @brief Set the enabled statistics writers mask
+     *
+     * @param enabled_writers The new mask to set
+     */
+    RTPS_DllAPI void set_enabled_statistics_writers_mask(
+            uint32_t enabled_writers);
+
+    /**
+     * @brief Get the connection list of this reader
+     *
+     * @param [out] connection_list of the reader
+     * @return True if could be retrieved
+     */
+    RTPS_DllAPI virtual bool get_connections(
+            fastdds::statistics::rtps::ConnectionList& connection_list) = 0;
 
 #endif // FASTDDS_STATISTICS
 

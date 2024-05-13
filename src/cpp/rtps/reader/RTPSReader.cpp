@@ -130,6 +130,7 @@ void RTPSReader::init(
             datasharing_listener_.reset(new DataSharingListener(
                         notification,
                         att.endpoint.data_sharing_configuration().shm_directory(),
+                        att.data_sharing_listener_thread,
                         att.matched_writers_allocation,
                         this));
 
@@ -143,12 +144,12 @@ void RTPSReader::init(
     mp_history->mp_reader = this;
     mp_history->mp_mutex = &mp_mutex;
 
-    logInfo(RTPS_READER, "RTPSReader created correctly");
+    EPROSIMA_LOG_INFO(RTPS_READER, "RTPSReader created correctly");
 }
 
 RTPSReader::~RTPSReader()
 {
-    logInfo(RTPS_READER, "Removing reader " << this->getGuid().entityId; );
+    EPROSIMA_LOG_INFO(RTPS_READER, "Removing reader " << this->getGuid().entityId; );
 
     for (auto it = mp_history->changesBegin(); it != mp_history->changesEnd(); ++it)
     {
@@ -171,7 +172,7 @@ bool RTPSReader::reserveCache(
     CacheChange_t* reserved_change = nullptr;
     if (!change_pool_->reserve_cache(reserved_change))
     {
-        logWarning(RTPS_READER, "Problem reserving cache from pool");
+        EPROSIMA_LOG_WARNING(RTPS_READER, "Problem reserving cache from pool");
         return false;
     }
 
@@ -179,7 +180,7 @@ bool RTPSReader::reserveCache(
     if (!payload_pool_->get_payload(payload_size, *reserved_change))
     {
         change_pool_->release_cache(reserved_change);
-        logWarning(RTPS_READER, "Problem reserving payload from pool");
+        EPROSIMA_LOG_WARNING(RTPS_READER, "Problem reserving payload from pool");
         return false;
     }
 
@@ -251,7 +252,7 @@ void RTPSReader::add_persistence_guid(
         auto spourious_record = history_state_->history_record.find(guid);
         if (spourious_record != history_state_->history_record.end())
         {
-            logInfo(RTPS_READER, "Sporious record found, changing guid "
+            EPROSIMA_LOG_INFO(RTPS_READER, "Sporious record found, changing guid "
                     << guid << " for persistence guid " << persistence_guid);
             update_last_notified(guid, spourious_record->second);
             history_state_->history_record.erase(spourious_record);
@@ -381,9 +382,10 @@ uint64_t RTPSReader::get_unread_count(
         for (auto it = mp_history->changesBegin(); 0 < total_unread_ && it != mp_history->changesEnd(); ++it)
         {
             CacheChange_t* change = *it;
-            if (!change->isRead)
+            if (!change->isRead && get_last_notified(change->writerGUID) >= change->sequenceNumber)
             {
                 change->isRead = true;
+                assert(0 < total_unread_);
                 --total_unread_;
             }
         }
@@ -445,6 +447,12 @@ bool RTPSReader::remove_statistics_listener(
         std::shared_ptr<fastdds::statistics::IListener> listener)
 {
     return remove_statistics_listener_impl(listener);
+}
+
+void RTPSReader::set_enabled_statistics_writers_mask(
+        uint32_t enabled_writers)
+{
+    set_enabled_statistics_writers_mask_impl(enabled_writers);
 }
 
 #endif // FASTDDS_STATISTICS

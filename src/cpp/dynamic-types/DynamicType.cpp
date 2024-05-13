@@ -87,7 +87,7 @@ ReturnCode_t DynamicType::apply_annotation(
     }
     else
     {
-        logError(DYN_TYPES, "Error applying annotation. The input descriptor isn't consistent.");
+        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation. The input descriptor isn't consistent.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -128,13 +128,13 @@ ReturnCode_t DynamicType::apply_annotation_to_member(
         }
         else
         {
-            logError(DYN_TYPES, "Error applying annotation to member. MemberId not found.");
+            EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation to member. MemberId not found.");
             return ReturnCode_t::RETCODE_BAD_PARAMETER;
         }
     }
     else
     {
-        logError(DYN_TYPES, "Error applying annotation to member. The input descriptor isn't consistent.");
+        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation to member. The input descriptor isn't consistent.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -153,7 +153,7 @@ ReturnCode_t DynamicType::apply_annotation_to_member(
     }
     else
     {
-        logError(DYN_TYPES, "Error applying annotation to member. MemberId not found.");
+        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation to member. MemberId not found.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -191,7 +191,7 @@ ReturnCode_t DynamicType::copy_from_builder(
         {
             DynamicTypeMember* newMember = new DynamicTypeMember(it->second);
             newMember->set_parent(this);
-            is_key_defined_ = newMember->key_annotation();
+            is_key_defined_ |= newMember->key_annotation();
             member_by_id_.insert(std::make_pair(newMember->get_id(), newMember));
             member_by_name_.insert(std::make_pair(newMember->get_name(), newMember));
         }
@@ -200,7 +200,7 @@ ReturnCode_t DynamicType::copy_from_builder(
     }
     else
     {
-        logError(DYN_TYPES, "Error copying DynamicType, invalid input type");
+        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error copying DynamicType, invalid input type");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -228,7 +228,7 @@ ReturnCode_t DynamicType::get_descriptor(
     }
     else
     {
-        logError(DYN_TYPES, "Error getting TypeDescriptor, invalid input descriptor");
+        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error getting TypeDescriptor, invalid input descriptor");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -245,14 +245,7 @@ TypeDescriptor* DynamicType::get_descriptor()
 
 bool DynamicType::key_annotation() const
 {
-    for (auto anIt = descriptor_->annotation_.begin(); anIt != descriptor_->annotation_.end(); ++anIt)
-    {
-        if ((*anIt)->key_annotation())
-        {
-            return true;
-        }
-    }
-    return false;
+    return descriptor_->annotation_get_key();
 }
 
 bool DynamicType::equals(
@@ -338,7 +331,7 @@ ReturnCode_t DynamicType::get_member_by_name(
     }
     else
     {
-        logWarning(DYN_TYPES, "Error getting member by name, member not found.");
+        EPROSIMA_LOG_WARNING(DYN_TYPES, "Error getting member by name, member not found.");
         return ReturnCode_t::RETCODE_ERROR;
     }
 }
@@ -362,7 +355,7 @@ ReturnCode_t DynamicType::get_member(
     }
     else
     {
-        logWarning(DYN_TYPES, "Error getting member, member not found.");
+        EPROSIMA_LOG_WARNING(DYN_TYPES, "Error getting member, member not found.");
         return ReturnCode_t::RETCODE_ERROR;
     }
 }
@@ -390,7 +383,7 @@ ReturnCode_t DynamicType::get_annotation(
     }
     else
     {
-        logWarning(DYN_TYPES, "Error getting annotation, annotation not found.");
+        EPROSIMA_LOG_WARNING(DYN_TYPES, "Error getting annotation, annotation not found.");
         return ReturnCode_t::RETCODE_ERROR;
     }
 }
@@ -522,7 +515,7 @@ size_t DynamicType::get_size() const
             }
         }
     }
-    logError(DYN_TYPES, "Called get_size() within a non primitive type! This is a program's logic error.");
+    EPROSIMA_LOG_ERROR(DYN_TYPES, "Called get_size() within a non primitive type! This is a program's logic error.");
     return 0;
 }
 

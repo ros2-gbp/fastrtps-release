@@ -16,7 +16,7 @@
 #define __TRANSPORT_UDPSENDERRESOURCE_HPP__
 
 #include <fastdds/rtps/common/Locator.h>
-#include <fastdds/rtps/network/SenderResource.h>
+#include <fastdds/rtps/transport/SenderResource.h>
 
 #include <rtps/transport/ChainingSenderResource.hpp>
 #include <rtps/transport/UDPTransportInterface.h>
@@ -43,7 +43,7 @@ public:
         // Implementation functions are bound to the right transport parameters
         clean_up = [this, &transport]()
                 {
-                    transport.CloseOutputChannel(socket_);
+                    transport.SenderResourceHasBeenClosed(socket_);
                 };
 
         send_lambda_ = [this, &transport](

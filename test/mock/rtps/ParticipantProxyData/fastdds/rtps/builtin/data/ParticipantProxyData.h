@@ -18,16 +18,16 @@
 #ifndef _FASTDDS_RTPS_BUILTIN_DATA_PARTICIPANTPROXYDATA_H_
 #define _FASTDDS_RTPS_BUILTIN_DATA_PARTICIPANTPROXYDATA_H_
 
+#include <fastdds/rtps/common/VendorId_t.hpp>
+#include <fastrtps/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 #include <fastrtps/rtps/common/CDRMessage_t.h>
 #include <fastrtps/rtps/common/Guid.h>
 #include <fastrtps/rtps/common/Locator.h>
 #include <fastrtps/rtps/common/RemoteLocators.hpp>
 #include <fastrtps/rtps/common/Token.h>
-#include <fastrtps/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
-
 #if HAVE_SECURITY
 #include <fastrtps/rtps/security/accesscontrol/ParticipantSecurityAttributes.h>
-#endif
+#endif // if HAVE_SECURITY
 
 namespace eprosima {
 namespace fastrtps {
@@ -35,31 +35,46 @@ namespace rtps {
 
 class ParticipantProxyData
 {
-    public:
+public:
 
-        ParticipantProxyData(const RTPSParticipantAllocationAttributes& allocation = c_default_RTPSParticipantAllocationAttributes)
-            : m_availableBuiltinEndpoints(0)
-            , metatraffic_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
-            , m_VendorId(c_VendorId_Unknown)
-        {}
+    ParticipantProxyData(
+            const RTPSParticipantAllocationAttributes& allocation = c_default_RTPSParticipantAllocationAttributes)
+        : m_availableBuiltinEndpoints(0)
+        , metatraffic_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
+        , default_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
+        , m_VendorId(c_VendorId_Unknown)
+    {
+    }
 
-        ~ParticipantProxyData()
-        {
-        }
+    ~ParticipantProxyData()
+    {
+    }
 
-        bool writeToCDRMessage(CDRMessage_t* /*msg*/, bool /*write_encapsulation*/) { return true; }
-        bool readFromCDRMessage(CDRMessage_t* /*msg*/) { return true; }
+    bool writeToCDRMessage(
+            CDRMessage_t* /*msg*/,
+            bool /*write_encapsulation*/)
+    {
+        return true;
+    }
 
-        GUID_t m_guid;
-        uint32_t m_availableBuiltinEndpoints;
-        RemoteLocatorList metatraffic_locators;
-        VendorId_t m_VendorId;
+    bool readFromCDRMessage(
+            CDRMessage_t* /*msg*/,
+            fastdds::rtps::VendorId_t /*source_vendor_id*/)
+    {
+        return true;
+    }
+
+    GUID_t m_guid;
+    uint32_t m_availableBuiltinEndpoints;
+    RemoteLocatorList metatraffic_locators;
+    RemoteLocatorList default_locators;
+    fastdds::rtps::VendorId_t m_VendorId;
 #if HAVE_SECURITY
-        IdentityToken identity_token_;
-        PermissionsToken permissions_token_;
-        security::ParticipantSecurityAttributesMask security_attributes_ = 0UL;
-        security::PluginParticipantSecurityAttributesMask plugin_security_attributes_ = 0UL;
-#endif
+    IdentityToken identity_token_;
+    PermissionsToken permissions_token_;
+    security::ParticipantSecurityAttributesMask security_attributes_ = 0UL;
+    security::PluginParticipantSecurityAttributesMask plugin_security_attributes_ = 0UL;
+#endif // if HAVE_SECURITY
 };
 
 } // namespace rtps

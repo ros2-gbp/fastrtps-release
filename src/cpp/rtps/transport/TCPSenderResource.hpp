@@ -16,7 +16,7 @@
 #define __TRANSPORT_TCPSENDERRESOURCE_HPP__
 
 #include <fastdds/rtps/common/LocatorsIterator.hpp>
-#include <fastdds/rtps/network/SenderResource.h>
+#include <fastdds/rtps/transport/SenderResource.h>
 
 #include <rtps/transport/ChainingSenderResource.hpp>
 #include <rtps/transport/TCPChannelResource.h>
@@ -39,7 +39,7 @@ public:
         // Implementation functions are bound to the right transport parameters
         clean_up = [this, &transport]()
                 {
-                    transport.CloseOutputChannel(locator_);
+                    transport.SenderResourceHasBeenClosed(locator_);
                 };
 
         send_lambda_ = [this, &transport](
@@ -68,7 +68,7 @@ public:
     }
 
     static TCPSenderResource* cast(
-            TransportInterface& transport,
+            const TransportInterface& transport,
             SenderResource* sender_resource)
     {
         TCPSenderResource* returned_resource = nullptr;

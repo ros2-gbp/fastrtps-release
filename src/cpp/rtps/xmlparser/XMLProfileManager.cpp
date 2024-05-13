@@ -12,20 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#include <tinyxml2.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastrtps/xmlparser/XMLTree.h>
-#include <fastdds/dds/log/Log.hpp>
 
 #include <cstdlib>
 #ifdef _WIN32
 #include <windows.h>
 #endif // ifdef _WIN32
 
+#include <tinyxml2.h>
+
+#include <fastdds/dds/domain/qos/DomainParticipantFactoryQos.hpp>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/xmlparser/XMLTree.h>
+
 using namespace eprosima::fastrtps;
+using namespace eprosima::fastdds;
 using namespace ::xmlparser;
 
 LibrarySettingsAttributes XMLProfileManager::library_settings_;
+std::map<std::string, up_participantfactory_t> XMLProfileManager::participant_factory_profiles_;
+dds::DomainParticipantFactoryQos default_participant_factory_qos;
 std::map<std::string, up_participant_t> XMLProfileManager::participant_profiles_;
 ParticipantAttributes default_participant_attributes;
 std::map<std::string, up_publisher_t> XMLProfileManager::publisher_profiles_;
@@ -51,7 +57,7 @@ XMLP_ret XMLProfileManager::fillParticipantAttributes(
     {
         if (log_error)
         {
-            logError(XMLPARSER, "Profile '" << profile_name << "' not found");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Profile '" << profile_name << "' not found");
         }
         return XMLP_ret::XML_ERROR;
     }
@@ -69,7 +75,7 @@ XMLP_ret XMLProfileManager::fillPublisherAttributes(
     {
         if (log_error)
         {
-            logError(XMLPARSER, "Profile '" << profile_name << "' not found");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Profile '" << profile_name << "' not found");
         }
         return XMLP_ret::XML_ERROR;
     }
@@ -87,7 +93,7 @@ XMLP_ret XMLProfileManager::fillSubscriberAttributes(
     {
         if (log_error)
         {
-            logError(XMLPARSER, "Profile '" << profile_name << "' not found");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Profile '" << profile_name << "' not found");
         }
         return XMLP_ret::XML_ERROR;
     }
@@ -102,7 +108,7 @@ XMLP_ret XMLProfileManager::fillTopicAttributes(
     topic_map_iterator_t it = topic_profiles_.find(profile_name);
     if (it == topic_profiles_.end())
     {
-        logError(XMLPARSER, "Profile '" << profile_name << "' not found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Profile '" << profile_name << "' not found");
         return XMLP_ret::XML_ERROR;
     }
     atts = *(it->second);
@@ -116,7 +122,7 @@ XMLP_ret XMLProfileManager::fillRequesterAttributes(
     requester_map_iterator_t it = requester_profiles_.find(profile_name);
     if (it == requester_profiles_.end())
     {
-        logError(XMLPARSER, "Profile '" << profile_name << "' not found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Profile '" << profile_name << "' not found");
         return XMLP_ret::XML_ERROR;
     }
     atts = *(it->second);
@@ -130,7 +136,7 @@ XMLP_ret XMLProfileManager::fillReplierAttributes(
     replier_map_iterator_t it = replier_profiles_.find(profile_name);
     if (it == replier_profiles_.end())
     {
-        logError(XMLPARSER, "Profile '" << profile_name << "' not found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Profile '" << profile_name << "' not found");
         return XMLP_ret::XML_ERROR;
     }
     atts = *(it->second);
@@ -147,6 +153,30 @@ void XMLProfileManager::getDefaultPublisherAttributes(
         PublisherAttributes& publisher_attributes)
 {
     publisher_attributes = default_publisher_attributes;
+}
+
+XMLP_ret XMLProfileManager::fillDomainParticipantFactoryQos(
+        const std::string& profile_name,
+        dds::DomainParticipantFactoryQos& qos,
+        bool log_error)
+{
+    part_factory_map_iterator_t it = participant_factory_profiles_.find(profile_name);
+    if (it == participant_factory_profiles_.end())
+    {
+        if (log_error)
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Profile '" << profile_name << "' not found");
+        }
+        return XMLP_ret::XML_ERROR;
+    }
+    qos = *(it->second);
+    return XMLP_ret::XML_OK;
+}
+
+void XMLProfileManager::getDefaultDomainParticipantFactoryQos(
+        dds::DomainParticipantFactoryQos& qos)
+{
+    qos = default_participant_factory_qos;
 }
 
 void XMLProfileManager::getDefaultSubscriberAttributes(
@@ -205,18 +235,18 @@ XMLP_ret XMLProfileManager::loadXMLProfiles(
     up_base_node_t root_node;
     if (strcmp(profiles.Name(), PROFILES) != 0)
     {
-        logError(XMLPARSER, "<profiles> element not found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "<profiles> element not found");
         return XMLP_ret::XML_ERROR;
     }
 
     if (XMLParser::loadXMLProfiles(profiles, root_node) == XMLP_ret::XML_OK)
     {
-        logInfo(XMLPARSER, "Node parsed successfully");
+        EPROSIMA_LOG_INFO(XMLPARSER, "Node parsed successfully");
         return XMLProfileManager::extractProfiles(std::move(root_node), "-XML Node-");
     }
     else
     {
-        logError(XMLPARSER, "Error parsing profiles");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing profiles");
         return XMLP_ret::XML_ERROR;
     }
 }
@@ -236,11 +266,11 @@ XMLP_ret XMLProfileManager::loadXMLNode(
 
     if (!root_node)
     {
-        logError(XMLPARSER, "Error parsing node");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing node");
         return XMLP_ret::XML_ERROR;
     }
 
-    logInfo(XMLPARSER, "Node parsed successfully");
+    EPROSIMA_LOG_INFO(XMLPARSER, "Node parsed successfully");
 
     if (NodeType::PROFILES == root_node->getType())
     {
@@ -282,14 +312,14 @@ XMLP_ret XMLProfileManager::loadXMLFile(
 {
     if (filename.empty())
     {
-        logError(XMLPARSER, "Error loading XML file, filename empty");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error loading XML file, filename empty");
         return XMLP_ret::XML_ERROR;
     }
 
     xmlfile_map_iterator_t it = xml_files_.find(filename);
     if (it != xml_files_.end() && XMLP_ret::XML_OK == it->second)
     {
-        logInfo(XMLPARSER, "XML file '" << filename << "' already parsed");
+        EPROSIMA_LOG_INFO(XMLPARSER, "XML file '" << filename << "' already parsed");
         return XMLP_ret::XML_OK;
     }
 
@@ -299,13 +329,13 @@ XMLP_ret XMLProfileManager::loadXMLFile(
     {
         if (filename != std::string(DEFAULT_FASTRTPS_PROFILES))
         {
-            logError(XMLPARSER, "Error parsing '" << filename << "'");
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing '" << filename << "'");
         }
         xml_files_.emplace(filename, XMLP_ret::XML_ERROR);
         return XMLP_ret::XML_ERROR;
     }
 
-    logInfo(XMLPARSER, "File '" << filename << "' parsed successfully");
+    EPROSIMA_LOG_INFO(XMLPARSER, "File '" << filename << "' parsed successfully");
 
     if (NodeType::ROOT == root_node->getType())
     {
@@ -334,7 +364,7 @@ XMLP_ret XMLProfileManager::loadXMLString(
     XMLP_ret loaded_ret = XMLParser::loadXML(data, length, root_node);
     if (!root_node || loaded_ret != XMLP_ret::XML_OK)
     {
-        logError(XMLPARSER, "Error parsing string");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing string");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -357,6 +387,22 @@ XMLP_ret XMLProfileManager::loadXMLString(
     return loaded_ret;
 }
 
+types::DynamicPubSubType* XMLProfileManager::CreateDynamicPubSubType(
+        const std::string& type_name)
+{
+    if (dynamic_types_.find(type_name) != dynamic_types_.end())
+    {
+        return new types::DynamicPubSubType(dynamic_types_[type_name]->build());
+    }
+    return nullptr;
+}
+
+void XMLProfileManager::DeleteDynamicPubSubType(
+        types::DynamicPubSubType* type)
+{
+    delete type;
+}
+
 XMLP_ret XMLProfileManager::extractProfiles(
         up_base_node_t profiles,
         const std::string& filename)
@@ -368,7 +414,18 @@ XMLP_ret XMLProfileManager::extractProfiles(
     XMLP_ret ret = XMLP_ret::XML_OK;
     for (auto&& profile: profiles->getChildren())
     {
-        if (NodeType::PARTICIPANT == profile->getType())
+        if (NodeType::DOMAINPARTICIPANT_FACTORY == profile->getType())
+        {
+            if (XMLP_ret::XML_OK == extractDomainParticipantFactoryProfile(profile, filename))
+            {
+                ++profile_count;
+            }
+            else
+            {
+                ret = XMLP_ret::XML_NOK;
+            }
+        }
+        else if (NodeType::PARTICIPANT == profile->getType())
         {
             if (XMLP_ret::XML_OK == extractParticipantProfile(profile, filename))
             {
@@ -440,13 +497,46 @@ XMLP_ret XMLProfileManager::extractProfiles(
 
     if (profile_count == 0)
     {
-        logError(XMLProfileManager, "Could not extract any profile")
+        EPROSIMA_LOG_ERROR(XMLProfileManager, "Could not extract any profile");
         ret = XMLP_ret::XML_ERROR;
     }
 
     xml_files_.emplace(filename, ret);
 
     return ret;
+}
+
+XMLP_ret XMLProfileManager::extractDomainParticipantFactoryProfile(
+        up_base_node_t& profile,
+        const std::string& filename)
+{
+    static_cast<void>(filename);
+    std::string profile_name = "";
+
+    p_node_participantfactory_t node_factory = dynamic_cast<p_node_participantfactory_t>(profile.get());
+    node_att_map_cit_t it = node_factory->getAttributes().find(PROFILE_NAME);
+    if (it == node_factory->getAttributes().end() || it->second.empty())
+    {
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    profile_name = it->second;
+
+    std::pair<part_factory_map_iterator_t, bool> emplace = participant_factory_profiles_.emplace(profile_name,
+                    node_factory->getData());
+    if (false == emplace.second)
+    {
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    it = node_factory->getAttributes().find(DEFAULT_PROF);
+    if (it != node_factory->getAttributes().end() && it->second == "true") // Set as default profile
+    {
+        default_participant_factory_qos = *(emplace.first->second.get());
+    }
+    return XMLP_ret::XML_OK;
 }
 
 XMLP_ret XMLProfileManager::extractParticipantProfile(
@@ -460,7 +550,7 @@ XMLP_ret XMLProfileManager::extractParticipantProfile(
     node_att_map_cit_t it = node_part->getAttributes().find(PROFILE_NAME);
     if (it == node_part->getAttributes().end() || it->second.empty())
     {
-        logError(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -469,7 +559,7 @@ XMLP_ret XMLProfileManager::extractParticipantProfile(
     std::pair<part_map_iterator_t, bool> emplace = participant_profiles_.emplace(profile_name, node_part->getData());
     if (false == emplace.second)
     {
-        logError(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -493,7 +583,7 @@ XMLP_ret XMLProfileManager::extractPublisherProfile(
     node_att_map_cit_t it = node_part->getAttributes().find(PROFILE_NAME);
     if (it == node_part->getAttributes().end() || it->second.empty())
     {
-        logError(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -502,7 +592,7 @@ XMLP_ret XMLProfileManager::extractPublisherProfile(
     std::pair<publ_map_iterator_t, bool> emplace = publisher_profiles_.emplace(profile_name, node_part->getData());
     if (false == emplace.second)
     {
-        logError(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -526,7 +616,7 @@ XMLP_ret XMLProfileManager::extractSubscriberProfile(
     node_att_map_cit_t it = node_part->getAttributes().find(PROFILE_NAME);
     if (it == node_part->getAttributes().end() || it->second.empty())
     {
-        logError(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -535,7 +625,7 @@ XMLP_ret XMLProfileManager::extractSubscriberProfile(
     std::pair<subs_map_iterator_t, bool> emplace = subscriber_profiles_.emplace(profile_name, node_part->getData());
     if (false == emplace.second)
     {
-        logError(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -557,7 +647,8 @@ bool XMLProfileManager::insertTransportById(
         transport_profiles_[transport_id] = transport;
         return true;
     }
-    logError(XMLPARSER, "Error adding the transport " << transport_id << ". There is other transport with the same id");
+    EPROSIMA_LOG_ERROR(XMLPARSER,
+            "Error adding the transport " << transport_id << ". There is other transport with the same id");
     return false;
 }
 
@@ -591,7 +682,7 @@ bool XMLProfileManager::insertDynamicTypeByName(
         dynamic_types_[type_name] = type;
         return true;
     }
-    logError(XMLPARSER, "Error adding the type " << type_name << ". There is other type with the same name.");
+    EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding the type " << type_name << ". There is other type with the same name.");
     return false;
 }
 
@@ -616,7 +707,7 @@ XMLP_ret XMLProfileManager::extractTopicProfile(
     node_att_map_cit_t it = node_topic->getAttributes().find(PROFILE_NAME);
     if (it == node_topic->getAttributes().end() || it->second.empty())
     {
-        logError(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -625,7 +716,7 @@ XMLP_ret XMLProfileManager::extractTopicProfile(
     std::pair<topic_map_iterator_t, bool> emplace = topic_profiles_.emplace(profile_name, node_topic->getData());
     if (false == emplace.second)
     {
-        logError(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -649,7 +740,7 @@ XMLP_ret XMLProfileManager::extractRequesterProfile(
     node_att_map_cit_t it = node_requester->getAttributes().find(PROFILE_NAME);
     if (it == node_requester->getAttributes().end() || it->second.empty())
     {
-        logError(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -659,7 +750,7 @@ XMLP_ret XMLProfileManager::extractRequesterProfile(
                     node_requester->getData());
     if (false == emplace.second)
     {
-        logError(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -677,7 +768,7 @@ XMLP_ret XMLProfileManager::extractReplierProfile(
     node_att_map_cit_t it = node_replier->getAttributes().find(PROFILE_NAME);
     if (it == node_replier->getAttributes().end() || it->second.empty())
     {
-        logError(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile from file '" << filename << "': no name found");
         return XMLP_ret::XML_ERROR;
     }
 
@@ -686,9 +777,33 @@ XMLP_ret XMLProfileManager::extractReplierProfile(
     std::pair<replier_map_iterator_t, bool> emplace = replier_profiles_.emplace(profile_name, node_replier->getData());
     if (false == emplace.second)
     {
-        logError(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error adding profile '" << profile_name << "' from file '" << filename << "'");
         return XMLP_ret::XML_ERROR;
     }
 
     return XMLP_ret::XML_OK;
+}
+
+void XMLProfileManager::DeleteInstance()
+{
+    participant_factory_profiles_.clear();
+    participant_profiles_.clear();
+    publisher_profiles_.clear();
+    subscriber_profiles_.clear();
+    requester_profiles_.clear();
+    replier_profiles_.clear();
+    topic_profiles_.clear();
+    xml_files_.clear();
+    transport_profiles_.clear();
+
+    // Delete the registered dynamic types builders
+    {
+        namespace dyn_types = eprosima::fastrtps::types;
+        auto factory = dyn_types::DynamicTypeBuilderFactory::get_instance();
+        for (auto&& type : dynamic_types_)
+        {
+            factory->delete_builder(type.second);
+        }
+        dynamic_types_.clear();
+    }
 }

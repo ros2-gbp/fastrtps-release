@@ -62,6 +62,7 @@ using eprosima::fastdds::rtps::UDPv4TransportDescriptor;
 using eprosima::fastdds::rtps::UDPv6TransportDescriptor;
 
 using SampleLostStatusFunctor = std::function<void (const eprosima::fastdds::dds::SampleLostStatus&)>;
+using SampleRejectedStatusFunctor = std::function<void (const eprosima::fastdds::dds::SampleRejectedStatus&)>;
 
 template<class TypeSupport>
 class PubSubReader
@@ -248,6 +249,15 @@ protected:
             reader_.set_sample_lost_status(status);
         }
 
+        void on_sample_rejected(
+                eprosima::fastdds::dds::DataReader* datareader,
+                const eprosima::fastdds::dds::SampleRejectedStatus& status) override
+        {
+            (void)datareader;
+
+            reader_.set_sample_rejected_status(status);
+        }
+
         unsigned int missed_deadlines() const
         {
             return times_deadline_missed_;
@@ -329,8 +339,9 @@ public:
             datareader_qos_.data_sharing().off();
         }
 
-        // By default, memory mode is preallocated (the most restritive)
-        datareader_qos_.endpoint().history_memory_policy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
+        datareader_qos_.endpoint().history_memory_policy =
+                eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 
         // By default, heartbeat period delay is 100 milliseconds.
         datareader_qos_.reliable_reader_qos().times.heartbeatResponseDelay.seconds = 0;
@@ -348,6 +359,11 @@ public:
     eprosima::fastdds::dds::DataReader& get_native_reader() const
     {
         return *datareader_;
+    }
+
+    eprosima::fastdds::dds::Subscriber& get_native_subscriber() const
+    {
+        return *subscriber_;
     }
 
     void init()
@@ -438,6 +454,19 @@ public:
         return initialized_;
     }
 
+    bool delete_datareader()
+    {
+        ReturnCode_t ret(ReturnCode_t::RETCODE_ERROR);
+
+        if (subscriber_ && datareader_)
+        {
+            ret = subscriber_->delete_datareader(datareader_);
+            datareader_ = nullptr;
+        }
+
+        return (ReturnCode_t::RETCODE_OK == ret);
+    }
+
     virtual void destroy()
     {
         if (participant_ != nullptr)
@@ -471,7 +500,7 @@ public:
     }
 
     eprosima::fastrtps::rtps::SequenceNumber_t startReception(
-            std::list<type>& msgs)
+            const std::list<type>& msgs)
     {
         mutex_.lock();
         total_msgs_ = msgs;
@@ -488,6 +517,7 @@ public:
         while (ret);
 
         receiving_.store(true);
+        std::lock_guard<std::mutex> lock(mutex_);
         return get_last_sequence_received();
     }
 
@@ -542,13 +572,13 @@ public:
     }
 
     size_t block_for_unread_count_of(
-            size_t n_unread)
+            uint64_t n_unread)
     {
         block([this, n_unread]() -> bool
                 {
                     return current_unread_count_ >= n_unread;
                 });
-        return current_unread_count_;
+        return static_cast<size_t>(current_unread_count_);
     }
 
     void block(
@@ -940,6 +970,14 @@ public:
         return *this;
     }
 
+    PubSubReader& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports,
+            const eprosima::fastdds::rtps::BuiltinTransportsOptions& options)
+    {
+        participant_qos_.setup_transports(transports, options);
+        return *this;
+    }
+
     PubSubReader& setup_large_data_tcp(
             bool v6 = false,
             const uint16_t& port = 0,
@@ -1017,6 +1055,13 @@ public:
     PubSubReader& disable_builtin_transport()
     {
         participant_qos_.transport().use_builtin_transports = false;
+        return *this;
+    }
+
+    PubSubReader& set_wire_protocol_qos(
+            const eprosima::fastdds::dds::WireProtocolConfigQos& qos)
+    {
+        participant_qos_.wire_protocol() = qos;
         return *this;
     }
 
@@ -1407,6 +1452,12 @@ public:
         return *this;
     }
 
+    PubSubReader& ownership_exclusive()
+    {
+        datareader_qos_.ownership().kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
+        return *this;
+    }
+
     PubSubReader& load_participant_attr(
             const std::string& /*xml*/)
     {
@@ -1533,6 +1584,13 @@ public:
             bool use_wlp)
     {
         participant_qos_.wire_protocol().builtin.use_WriterLivelinessProtocol = use_wlp;
+        return *this;
+    }
+
+    PubSubReader& data_representation(
+            const std::vector<eprosima::fastdds::dds::DataRepresentationId_t>& values)
+    {
+        datareader_qos_.type_consistency().representation.m_value = values;
         return *this;
     }
 
@@ -1743,6 +1801,22 @@ public:
         return *this;
     }
 
+    void set_sample_rejected_status(
+            const eprosima::fastdds::dds::SampleRejectedStatus& status)
+    {
+        if (sample_rejected_status_functor_)
+        {
+            sample_rejected_status_functor_(status);
+        }
+    }
+
+    PubSubReader& sample_rejected_status_functor(
+            SampleRejectedStatusFunctor functor)
+    {
+        sample_rejected_status_functor_ = functor;
+        return *this;
+    }
+
     const eprosima::fastrtps::rtps::GUID_t& participant_guid() const
     {
         return participant_guid_;
@@ -1755,9 +1829,19 @@ public:
         return status;
     }
 
-private:
+    eprosima::fastdds::dds::TypeSupport get_type_support()
+    {
+        return type_;
+    }
 
-    void receive_one(
+    eprosima::fastdds::dds::DomainParticipant* get_participant()
+    {
+        return participant_;
+    }
+
+protected:
+
+    virtual void receive_one(
             eprosima::fastdds::dds::DataReader* datareader,
             bool& returnedValue)
     {
@@ -1857,8 +1941,6 @@ private:
     //! functor to check which API to retrieve samples
     std::function<void (eprosima::fastdds::dds::DataReader* datareader, bool&)> receive_;
 
-protected:
-
     void receive(
             eprosima::fastdds::dds::DataReader* datareader,
             bool& returnedValue)
@@ -1941,7 +2023,7 @@ protected:
     std::map<LastSeqInfo, eprosima::fastrtps::rtps::SequenceNumber_t> last_seq;
     std::atomic<size_t> current_processed_count_;
     std::atomic<size_t> number_samples_expected_;
-    std::atomic<size_t> current_unread_count_;
+    std::atomic<uint64_t> current_unread_count_;
     bool discovery_result_;
 
     std::string xml_file_ = "";
@@ -1996,6 +2078,8 @@ protected:
 
     //! Functor called when called SampleLostStatus listener.
     SampleLostStatusFunctor sample_lost_status_functor_;
+    //! Functor called when called SampleRejectedStatus listener.
+    SampleRejectedStatusFunctor sample_rejected_status_functor_;
 };
 
 template<class TypeSupport>
@@ -2158,6 +2242,13 @@ protected:
                 eprosima::fastdds::dds::SampleLostStatus status;
                 ASSERT_EQ(ReturnCode_t::RETCODE_OK, reader_.datareader_->get_sample_lost_status(status));
                 reader_.set_sample_lost_status(status);
+            }
+
+            if (triggered_statuses.is_active(eprosima::fastdds::dds::StatusMask::sample_rejected()))
+            {
+                eprosima::fastdds::dds::SampleRejectedStatus status;
+                ASSERT_EQ(ReturnCode_t::RETCODE_OK, reader_.datareader_->get_sample_rejected_status(status));
+                reader_.set_sample_rejected_status(status);
             }
 
             // We also have to process the subscriber

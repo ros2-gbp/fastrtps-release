@@ -21,6 +21,7 @@
 
 #include <fastrtps/rtps/common/CacheChange.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
+#include <fastdds/dds/core/status/SampleRejectedStatus.hpp>
 #include <fastrtps/utils/TimedMutex.hpp>
 
 #include <mutex>
@@ -57,6 +58,11 @@ public:
 
     MOCK_METHOD0(getHistorySize, size_t());
 
+    MOCK_METHOD3(get_change, bool(
+            const SequenceNumber_t& seq,
+            const GUID_t& guid,
+            CacheChange_t** change));
+
     MOCK_METHOD1(get_earliest_change, bool(
             CacheChange_t** change));
 
@@ -90,8 +96,24 @@ public:
         return true;
     }
 
+    virtual bool received_change(
+            CacheChange_t*,
+            size_t,
+            fastdds::dds::SampleRejectedStatusKind&)
+    {
+        return true;
+    }
+
     virtual bool completed_change(
             rtps::CacheChange_t*)
+    {
+        return true;
+    }
+
+    virtual bool completed_change(
+            rtps::CacheChange_t*,
+            size_t,
+            fastdds::dds::SampleRejectedStatusKind&)
     {
         return true;
     }
@@ -104,7 +126,7 @@ public:
         return ret;
     }
 
-    inline RecursiveTimedMutex* getMutex()
+    inline RecursiveTimedMutex* getMutex() const
     {
         return mp_mutex;
     }
@@ -125,6 +147,11 @@ public:
         return m_changes.cend();
     }
 
+    iterator changesEnd()
+    {
+        return m_changes.end();
+    }
+
     virtual iterator remove_change_nts(
             const_iterator removal,
             bool release = true)
@@ -133,10 +160,42 @@ public:
         return m_changes.erase(removal);
     }
 
+    virtual iterator remove_change_nts(
+            const_iterator removal,
+            const std::chrono::time_point<std::chrono::steady_clock>&,
+            bool release = true)
+    {
+        return remove_change_nts(removal, release);
+    }
+
     virtual void writer_unmatched(
             const GUID_t& /*writer_guid*/,
             const SequenceNumber_t& /*last_notified_seq*/)
     {
+    }
+
+    virtual void writer_update_its_ownership_strength_nts(
+            const GUID_t& writer_guid,
+            const uint32_t ownership_strength)
+    {
+        static_cast<void>(writer_guid);
+        static_cast<void>(ownership_strength);
+    }
+
+    bool matches_change(
+            const CacheChange_t* inner_change,
+            CacheChange_t* outer_change)
+    {
+        return inner_change->sequenceNumber == outer_change->sequenceNumber &&
+               inner_change->writerGUID == outer_change->writerGUID;
+    }
+
+    iterator remove_iterator_constness(
+            const_iterator c_it)
+    {
+        iterator it = m_changes.begin();
+        std::advance(it, std::distance<const_iterator>(m_changes.cbegin(), c_it));
+        return it;
     }
 
     HistoryAttributes m_att;

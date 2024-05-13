@@ -86,11 +86,13 @@ public:
 
     constexpr static size_t data_size = 250;
 
+#if FASTCDR_VERSION_MAJOR == 1
     static size_t getCdrSerializedSize(
             const TestDataType&)
     {
         return TestDataType::data_size;
     }
+#endif
 
 };
 
@@ -173,6 +175,22 @@ TEST(RTPSWriterTests, WriterWithCustomPayloadPool_DoesNotInitializePool_WhenDyna
 
 } // namespace rtps
 } // namespace fastrtps
+} // namespace eprosima
+
+namespace eprosima {
+namespace fastcdr {
+template<>
+size_t calculate_serialized_size(
+        eprosima::fastcdr::CdrSizeCalculator&,
+        const eprosima::fastrtps::rtps::TestDataType&,
+        size_t& current_alignment)
+{
+    size_t calculated_size {eprosima::fastrtps::rtps::TestDataType::data_size};
+    current_alignment += calculated_size;
+    return calculated_size;
+}
+
+} // namespace fastcdr
 } // namespace eprosima
 
 int main(

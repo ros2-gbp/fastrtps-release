@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 3.20)
 
-project(fastrtps_allocation_test VERSION 1)
+project(fastrtps_allocation_test VERSION 1 LANGUAGES CXX)
 
 # Default to C++11
 if(NOT CMAKE_CXX_STANDARD)
@@ -33,7 +33,7 @@ if (osrf_testing_tools_cpp_FOUND)
     file(GLOB ALLOCTEST_EXAMPLE_SOURCES_CXX "*.cxx")
     file(GLOB ALLOCTEST_EXAMPLE_SOURCES_CPP "*.cpp")
 
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test_xml_profiles.xml
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test_xml_profile.xml
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
         )
     file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test.sh

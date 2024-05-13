@@ -65,12 +65,12 @@ jobs:
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install brew dependencies
         uses: eProsima/eProsima-CI/macos/install_brew_packages@v0
         with:
-          packages: llvm asio tinyxml2 openssl@1.1
+          packages: llvm asio tinyxml2 openssl@3.0
           update: false
           upgrade: false
 

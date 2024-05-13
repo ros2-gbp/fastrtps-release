@@ -43,7 +43,7 @@ jobs:
       fail-fast: false
       matrix:
         os-image:
-          - 'ubuntu-20.04'
+          - 'ubuntu-22.04'
 
     if: ${{ (
               !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
@@ -56,4 +56,4 @@ jobs:
       colcon-args: ${{ inputs.colcon-args }}
       cmake-args: '-DSECURITY=ON ${{ inputs.cmake-args }}'
       ctest-args: ${{ inputs.ctest-args || '-LE xfail' }}
-      fastdds-branch: ${{ inputs.fastdds_branch || github.ref || '2.6.x' }}
+      fastdds-branch: ${{ inputs.fastdds_branch || github.ref || 'master' }}

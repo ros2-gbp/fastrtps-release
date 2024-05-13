@@ -20,6 +20,7 @@ namespace xmlparser {
 
 const char* DEFAULT_FASTRTPS_ENV_VARIABLE = "FASTRTPS_DEFAULT_PROFILES_FILE";
 const char* DEFAULT_FASTRTPS_PROFILES = "DEFAULT_FASTRTPS_PROFILES.xml";
+const char* DEFAULT_STATISTICS_DATAWRITER_PROFILE = "GENERIC_STATISTICS_PROFILE";
 const char* SKIP_DEFAULT_XML_FILE = "SKIP_DEFAULT_XML_FILE";
 
 const char* ROOT = "dds";
@@ -28,6 +29,7 @@ const char* LIBRARY_SETTINGS = "library_settings";
 const char* TRANSPORT_DESCRIPTORS = "transport_descriptors";
 const char* PROFILE_NAME = "profile_name";
 const char* DEFAULT_PROF = "is_default_profile";
+const char* DOMAINPARTICIPANT_FACTORY = "domainparticipant_factory";
 const char* PARTICIPANT = "participant";
 const char* PUBLISHER = "publisher";
 const char* SUBSCRIBER = "subscriber";
@@ -46,6 +48,11 @@ const char* SEND_BUFFER_SIZE = "sendBufferSize";
 const char* TTL = "TTL";
 const char* NON_BLOCKING_SEND = "non_blocking_send";
 const char* WHITE_LIST = "interfaceWhiteList";
+const char* INTERFACE = "interface";
+const char* NETMASK_FILTER = "netmask_filter";
+const char* INTERFACES = "interfaces";
+const char* ALLOWLIST = "allowlist";
+const char* BLOCKLIST = "blocklist";
 const char* MAX_MESSAGE_SIZE = "maxMessageSize";
 const char* MAX_INITIAL_PEERS_RANGE = "maxInitialPeersRange";
 const char* KEEP_ALIVE_FREQUENCY = "keep_alive_frequency_ms";
@@ -58,6 +65,8 @@ const char* METADATA_LOGICAL_PORT = "metadata_logical_port";
 const char* LISTENING_PORTS = "listening_ports";
 const char* CALCULATE_CRC = "calculate_crc";
 const char* CHECK_CRC = "check_crc";
+const char* KEEP_ALIVE_THREAD = "keep_alive_thread";
+const char* ACCEPT_THREAD = "accept_thread";
 const char* TCP_NEGOTIATION_TIMEOUT = "tcp_negotiation_timeout";
 const char* SEGMENT_SIZE = "segment_size";
 const char* PORT_QUEUE_CAPACITY = "port_queue_capacity";
@@ -67,7 +76,17 @@ const char* HEALTHY_CHECK_TIMEOUT_MS = "healthy_check_timeout_ms";
 const char* DISCARD = "DISCARD";
 const char* FAIL = "FAIL";
 const char* RTPS_DUMP_FILE = "rtps_dump_file";
+const char* DEFAULT_RECEPTION_THREADS = "default_reception_threads";
+const char* RECEPTION_THREADS = "reception_threads";
+const char* RECEPTION_THREAD = "reception_thread";
+const char* DUMP_THREAD = "dump_thread";
 const char* ON = "ON";
+const char* AUTO = "AUTO";
+const char* THREAD_SETTINGS = "thread_settings";
+const char* SCHEDULING_POLICY = "scheduling_policy";
+const char* PRIORITY = "priority";
+const char* AFFINITY = "affinity";
+const char* STACK_SIZE = "stack_size";
 
 const char* OFF = "OFF";
 const char* USER_DATA_ONLY = "USER_DATA_ONLY";
@@ -80,12 +99,19 @@ const char* TYPE = "type";
 const char* DATA_WRITER = "data_writer";
 const char* DATA_READER = "data_reader";
 
+/// DomainParticipantFactory Qos
+const char* ENTITY_FACTORY = "entity_factory";
+const char* AUTOENABLE_CREATED_ENTITIES = "autoenable_created_entities";
+const char* SHM_WATCHDOG_THREAD = "shm_watchdog_thread";
+const char* FILE_WATCH_THREADS = "file_watch_threads";
+
 /// RTPS Domain attributes
 const char* INTRAPROCESS_DELIVERY = "intraprocess_delivery";
 
 /// RTPS Participant attributes
 const char* ALLOCATION = "allocation";
 const char* PREFIX = "prefix";
+const char* DEF_EXT_UNI_LOC_LIST = "default_external_unicast_locators";
 const char* DEF_UNI_LOC_LIST = "defaultUnicastLocatorList";
 const char* DEF_MULTI_LOC_LIST = "defaultMulticastLocatorList";
 const char* SEND_SOCK_BUF_SIZE = "sendSocketBufferSize";
@@ -101,6 +127,9 @@ const char* THROUGHPUT_CONT = "throughputController";
 const char* USER_TRANS = "userTransports";
 const char* USE_BUILTIN_TRANS = "useBuiltinTransports";
 const char* BUILTIN_TRANS = "builtinTransports";
+const char* MAX_MSG_SIZE_LARGE_DATA = "max_msg_size";
+const char* SOCKETS_SIZE_LARGE_DATA = "sockets_size";
+const char* NON_BLOCKING_LARGE_DATA = "non_blocking";
 const char* PROPERTIES_POLICY = "propertiesPolicy";
 const char* NAME = "name";
 const char* REMOTE_LOCATORS = "remote_locators";
@@ -115,11 +144,17 @@ const char* DYNAMIC_LC = "dynamic";
 const char* MAX_PROPERTIES = "max_properties";
 const char* MAX_USER_DATA = "max_user_data";
 const char* MAX_PARTITIONS = "max_partitions";
+const char* TIMED_EVENTS_THREAD = "timed_events_thread";
+const char* DISCOVERY_SERVER_THREAD = "discovery_server_thread";
+const char* SECURITY_LOG_THREAD = "security_log_thread";
+const char* BUILTIN_TRANSPORTS_RECEPTION_THREADS = "builtin_transports_reception_threads";
+const char* BUILTIN_CONTROLLERS_SENDER_THREAD = "builtin_controllers_sender_thread";
 
 /// Publisher-subscriber attributes
 const char* TOPIC = "topic";
 const char* QOS = "qos";
 const char* TIMES = "times";
+const char* EXT_UNI_LOC_LIST = "external_unicast_locators";
 const char* UNI_LOC_LIST = "unicastLocatorList";
 const char* MULTI_LOC_LIST = "multicastLocatorList";
 const char* REM_LOC_LIST = "remoteLocatorList";
@@ -131,8 +166,10 @@ const char* USER_DEF_ID = "userDefinedID";
 const char* ENTITY_ID = "entityID";
 const char* MATCHED_SUBSCRIBERS_ALLOCATION = "matchedSubscribersAllocation";
 const char* MATCHED_PUBLISHERS_ALLOCATION = "matchedPublishersAllocation";
+const char* DATA_SHARING_LISTENER_THREAD = "data_sharing_listener_thread";
 
 ///
+const char* IGN_NON_MATCHING_LOCS = "ignore_non_matching_locators";
 const char* PROPERTIES = "properties";
 const char* BIN_PROPERTIES = "binary_properties";
 const char* PROPERTY = "property";
@@ -173,6 +210,7 @@ const char* SECONDS = "sec";
 const char* NANOSECONDS = "nanosec";
 const char* SHARED = "SHARED";
 const char* EXCLUSIVE = "EXCLUSIVE";
+
 // For backward compatibility we allow any DURATION_XXX in duration_t element and any subelement
 // const char* DURATION_INFINITY = R"xsd(\s*DURATION_INFINITY\s*)xsd";
 // const char* DURATION_INFINITE_SEC = R"xsd(\s*(DURATION_INFINITY|DURATION_INFINITE_SEC)\s*)xsd";
@@ -261,6 +299,9 @@ const char* IGNORE_PARTICIPANT_FLAGS = "ignoreParticipantFlags";
 const char* FILTER_DIFFERENT_HOST = "FILTER_DIFFERENT_HOST";
 const char* FILTER_DIFFERENT_PROCESS = "FILTER_DIFFERENT_PROCESS";
 const char* FILTER_SAME_PROCESS = "FILTER_SAME_PROCESS";
+const char* TYPELOOKUP_CONFIG = "typelookup_config";
+const char* TYPELOOKUP_USE_SERVER = "use_server";
+const char* TYPELOOKUP_USE_CLIENT = "use_client";
 const char* WRITER_LVESS_PROTOCOL = "use_WriterLivelinessProtocol";
 const char* DISCOVERY_SETTINGS = "discovery_config";
 const char* _EDP = "EDP";
@@ -270,6 +311,7 @@ const char* LEASE_ANNOUNCE = "leaseAnnouncement";
 const char* INITIAL_ANNOUNCEMENTS = "initialAnnouncements";
 const char* AVOID_BUILTIN_MULTICAST = "avoid_builtin_multicast";
 const char* SIMPLE_EDP = "simpleEDP";
+const char* META_EXT_UNI_LOC_LIST = "metatraffic_external_unicast_locators";
 const char* META_UNI_LOC_LIST = "metatrafficUnicastLocatorList";
 const char* META_MULTI_LOC_LIST = "metatrafficMulticastLocatorList";
 const char* INIT_PEERS_LIST = "initialPeersList";
@@ -400,6 +442,7 @@ const char* TLS_DEFAULT_VERIFY_PATH = "default_verify_path";
 const char* TLS_VERIFY_DEPTH = "verify_depth";
 const char* TLS_RSA_PRIVATE_KEY_FILE = "rsa_private_key_file";
 const char* TLS_HANDSHAKE_ROLE = "handshake_role";
+const char* TLS_SERVER_NAME = "server_name";
 
 // TLS HandShake Role
 const char* TLS_HANDSHAKE_ROLE_DEFAULT = "DEFAULT";

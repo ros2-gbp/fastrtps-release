@@ -130,19 +130,24 @@ public:
     }
 
     bool get_datawriters(
-            std::vector<DataWriter*>& /*writers*/) const
+            std::vector<DataWriter*>& writers) const
     {
-        return false;
+        return impl_->get_datawriters(writers);
     }
 
     bool has_datawriters() const
     {
-        return false;
+        return impl_->has_datawriters();
     }
 
     ReturnCode_t delete_contained_entities()
     {
         return impl_->delete_contained_entities();
+    }
+
+    PublisherImpl* get_impl()
+    {
+        return impl_;
     }
 
 protected:

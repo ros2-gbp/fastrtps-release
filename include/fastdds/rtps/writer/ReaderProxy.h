@@ -300,16 +300,19 @@ public:
     }
 
     /**
-     * Called when an ACKNACK is received to set a new value for the count of the last received ACKNACK.
+     * Called when an ACKNACK is received to set a new value for the minimum count accepted for following received
+     * ACKNACKs.
+     *
      * @param acknack_count The count of the received ACKNACK.
-     * @return true if internal count changed (i.e. new ACKNACK is accepted)
+     * @return true if internal count changed (i.e. received ACKNACK is accepted)
      */
     bool check_and_set_acknack_count(
             uint32_t acknack_count)
     {
-        if (last_acknack_count_ < acknack_count)
+        if (acknack_count >= next_expected_acknack_count_)
         {
-            last_acknack_count_ = acknack_count;
+            next_expected_acknack_count_ = acknack_count;
+            ++next_expected_acknack_count_;
             return true;
         }
 
@@ -354,9 +357,14 @@ public:
     void update_nack_supression_interval(
             const Duration_t& interval);
 
-    LocatorSelectorEntry* locator_selector_entry()
+    LocatorSelectorEntry* general_locator_selector_entry()
     {
-        return locator_info_.locator_selector_entry();
+        return locator_info_.general_locator_selector_entry();
+    }
+
+    LocatorSelectorEntry* async_locator_selector_entry()
+    {
+        return locator_info_.async_locator_selector_entry();
     }
 
     RTPSMessageSenderInterface* message_sender()
@@ -400,6 +408,20 @@ public:
         active_ = active;
     }
 
+    /**
+     * @brief Check if the sequence number given has been delivered at least once to the transport layer.
+     *
+     * @param seq_number Sequence number of the change to check.
+     * @param found The sequence number has been found in the list of changes pending to be sent/ack.
+     *              This flag allows to differentiate the case when the change is not found from the one that is found
+     *              but it has not been delivered yet.
+     * @return true if the change has been delivered.
+     * @return false otherwise.
+     */
+    bool has_been_delivered(
+            const SequenceNumber_t& seq_number,
+            bool& found) const;
+
 private:
 
     //!Is this proxy active? I.e. does it have a remote reader associated?
@@ -423,8 +445,8 @@ private:
     TimedEvent* initial_heartbeat_event_;
     //! Are timed events enabled?
     std::atomic_bool timers_enabled_;
-    //! Last ack/nack count
-    uint32_t last_acknack_count_;
+    //! Next expected ack/nack count
+    uint32_t next_expected_acknack_count_;
     //! Last  NACKFRAG count.
     uint32_t last_nackfrag_count_;
 
