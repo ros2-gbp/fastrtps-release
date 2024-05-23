@@ -209,6 +209,13 @@ size_t TCPChannelResourceSecure::send(
 
     if (eConnecting < connection_status_)
     {
+        if (parent_->get_non_blocking_send() &&
+                !check_socket_send_buffer(header_size + size,
+                secure_socket_->lowest_layer().native_handle()))
+        {
+            return 0;
+        }
+
         std::vector<asio::const_buffer> buffers;
         if (header_size > 0)
         {
@@ -257,12 +264,22 @@ asio::ip::tcp::endpoint TCPChannelResourceSecure::local_endpoint() const
     return secure_socket_->lowest_layer().local_endpoint();
 }
 
+asio::ip::tcp::endpoint TCPChannelResourceSecure::remote_endpoint(
+        asio::error_code& ec) const
+{
+    return secure_socket_->lowest_layer().remote_endpoint(ec);
+}
+
+asio::ip::tcp::endpoint TCPChannelResourceSecure::local_endpoint(
+        asio::error_code& ec) const
+{
+    return secure_socket_->lowest_layer().local_endpoint(ec);
+}
+
 void TCPChannelResourceSecure::set_options(
         const TCPTransportDescriptor* options)
 {
-    secure_socket_->lowest_layer().set_option(socket_base::receive_buffer_size(options->receiveBufferSize));
-    secure_socket_->lowest_layer().set_option(socket_base::send_buffer_size(options->sendBufferSize));
-    secure_socket_->lowest_layer().set_option(ip::tcp::no_delay(options->enable_tcp_nodelay));
+    TCPChannelResource::set_socket_options(secure_socket_->lowest_layer(), options);
 }
 
 void TCPChannelResourceSecure::set_tls_verify_mode(

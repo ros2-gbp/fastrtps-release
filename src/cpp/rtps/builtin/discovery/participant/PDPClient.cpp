@@ -45,6 +45,7 @@
 #include <rtps/builtin/discovery/participant/DS/PDPSecurityInitiatorListener.hpp>
 #include <rtps/builtin/discovery/participant/timedevent/DSClientEvent.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
+#include <fastdds/rtps/transport/TCPTransportDescriptor.h>
 #include <utils/SystemInfo.hpp>
 #include <vector>
 
@@ -443,6 +444,15 @@ bool PDPClient::create_ds_pdp_reliable_endpoints(
     {
         eprosima::shared_lock<eprosima::shared_mutex> disc_lock(mp_builtin->getDiscoveryMutex());
 
+        // TCP Clients need to handle logical ports
+        if (mp_RTPSParticipant->has_tcp_transports())
+        {
+            for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
+            {
+                mp_RTPSParticipant->create_tcp_connections(it.metatrafficUnicastLocatorList);
+            }
+        }
+
         for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
             mp_RTPSParticipant->createSenderResources(it.metatrafficMulticastLocatorList);
@@ -472,7 +482,6 @@ bool PDPClient::create_ds_pdp_reliable_endpoints(
     return true;
 }
 
-// the ParticipantProxyData* pdata must be the one kept in PDP database
 void PDPClient::assignRemoteEndpoints(
         ParticipantProxyData* pdata)
 {
@@ -488,8 +497,7 @@ void PDPClient::assignRemoteEndpoints(
             {
                 if (data_matches_with_prefix(svr.guidPrefix, *pdata))
                 {
-                    std::unique_lock<std::recursive_mutex> lock(*getMutex());
-                    svr.proxy = pdata;
+                    svr.is_connected = true;
                 }
             }
         }
@@ -517,11 +525,11 @@ void PDPClient::notifyAboveRemoteEndpoints(
         {
             if (data_matches_with_prefix(svr.guidPrefix, pdata))
             {
-                if (nullptr == svr.proxy)
+                if (!svr.is_connected && nullptr != get_participant_proxy_data(svr.guidPrefix))
                 {
-                    //! try to retrieve the participant proxy data from an unmangled prefix in case
-                    //! we could not fill svr.proxy in assignRemoteEndpoints()
-                    svr.proxy = get_participant_proxy_data(svr.guidPrefix);
+                    //! mark proxy as connected from an unmangled prefix in case
+                    //! it could not be done in assignRemoteEndpoints()
+                    svr.is_connected = true;
                 }
 
                 match_pdp_reader_nts_(svr, pdata.m_guid.guidPrefix);
@@ -596,7 +604,7 @@ void PDPClient::removeRemoteEndpoints(
             if (svr.guidPrefix == pdata->m_guid.guidPrefix)
             {
                 std::unique_lock<std::recursive_mutex> lock(*getMutex());
-                svr.proxy = nullptr; // reasign when we receive again server DATA(p)
+                svr.is_connected = false;
                 is_server = true;
                 mp_sync->restart_timer(); // enable announcement and sync mechanism till this server reappears
             }
@@ -768,11 +776,11 @@ void PDPClient::announceParticipantState(
                     for (auto& svr : mp_builtin->m_DiscoveryServers)
                     {
                         // if we are matched to a server report demise
-                        if (svr.proxy != nullptr)
+                        if (svr.is_connected)
                         {
                             //locators.push_back(svr.metatrafficMulticastLocatorList);
                             locators.push_back(svr.metatrafficUnicastLocatorList);
-                            remote_readers.emplace_back(svr.proxy->m_guid.guidPrefix,
+                            remote_readers.emplace_back(svr.guidPrefix,
                                     endpoints->reader.reader_->getGuid().entityId);
                         }
                     }
@@ -805,7 +813,7 @@ void PDPClient::announceParticipantState(
                     {
                         // non-pinging announcements like lease duration ones must be
                         // broadcast to all servers
-                        if (svr.proxy == nullptr || !_serverPing)
+                        if (!svr.is_connected || !_serverPing)
                         {
                             locators.push_back(svr.metatrafficMulticastLocatorList);
                             locators.push_back(svr.metatrafficUnicastLocatorList);
@@ -843,8 +851,20 @@ void PDPClient::update_remote_servers_list()
     {
         eprosima::shared_lock<eprosima::shared_mutex> disc_lock(mp_builtin->getDiscoveryMutex());
 
+        // TCP Clients need to handle logical ports
+        bool set_logicals = mp_RTPSParticipant->has_tcp_transports();
+
         for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
+            if (!endpoints->reader.reader_->matched_writer_is_matched(it.GetPDPWriter()) ||
+                    !endpoints->writer.writer_->matched_reader_is_matched(it.GetPDPReader()))
+            {
+                if (set_logicals)
+                {
+                    mp_RTPSParticipant->create_tcp_connections(it.metatrafficUnicastLocatorList);
+                }
+            }
+
             if (!endpoints->reader.reader_->matched_writer_is_matched(it.GetPDPWriter()))
             {
                 match_pdp_writer_nts_(it);

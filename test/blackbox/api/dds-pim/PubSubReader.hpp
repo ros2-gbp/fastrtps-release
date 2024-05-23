@@ -49,6 +49,8 @@
 #include <fastdds/rtps/transport/UDPTransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
+#include <fastdds/rtps/transport/TCPv4TransportDescriptor.h>
+#include <fastdds/rtps/transport/TCPv6TransportDescriptor.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
 #include <fastrtps/utils/IPLocator.h>
@@ -139,6 +141,9 @@ protected:
 #endif // if HAVE_SECURITY
 
     private:
+
+        using eprosima::fastdds::dds::DomainParticipantListener::on_participant_discovery;
+        using eprosima::fastdds::dds::DomainParticipantListener::on_publisher_discovery;
 
         ParticipantListener& operator =(
                 const ParticipantListener&) = delete;
@@ -952,6 +957,80 @@ public:
         return *this;
     }
 
+    PubSubReader& setup_large_data_tcp(
+            bool v6 = false,
+            const uint16_t& port = 0,
+            const uint32_t& tcp_negotiation_timeout = 0)
+    {
+        participant_qos_.transport().use_builtin_transports = false;
+
+        /* Transports configuration */
+        // UDP transport for PDP over multicast
+        // TCP transport for EDP and application data (The listening port must to be unique for
+        // each participant in the same host)
+        uint16_t tcp_listening_port = port;
+        if (v6)
+        {
+            auto pdp_transport = std::make_shared<eprosima::fastdds::rtps::UDPv6TransportDescriptor>();
+            participant_qos_.transport().user_transports.push_back(pdp_transport);
+
+            auto data_transport = std::make_shared<eprosima::fastdds::rtps::TCPv6TransportDescriptor>();
+            data_transport->add_listener_port(tcp_listening_port);
+            data_transport->calculate_crc = false;
+            data_transport->check_crc = false;
+            data_transport->apply_security = false;
+            data_transport->enable_tcp_nodelay = true;
+            data_transport->tcp_negotiation_timeout = tcp_negotiation_timeout;
+            participant_qos_.transport().user_transports.push_back(data_transport);
+        }
+        else
+        {
+            auto pdp_transport = std::make_shared<eprosima::fastdds::rtps::UDPv4TransportDescriptor>();
+            participant_qos_.transport().user_transports.push_back(pdp_transport);
+
+            auto data_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+            data_transport->add_listener_port(tcp_listening_port);
+            data_transport->calculate_crc = false;
+            data_transport->check_crc = false;
+            data_transport->apply_security = false;
+            data_transport->enable_tcp_nodelay = true;
+            data_transport->tcp_negotiation_timeout = tcp_negotiation_timeout;
+            participant_qos_.transport().user_transports.push_back(data_transport);
+        }
+
+        /* Locators */
+        eprosima::fastrtps::rtps::Locator_t pdp_locator;
+        eprosima::fastrtps::rtps::Locator_t tcp_locator;
+        if (v6)
+        {
+            // Define locator for PDP over multicast
+            pdp_locator.kind = LOCATOR_KIND_UDPv6;
+            eprosima::fastrtps::rtps::IPLocator::setIPv6(pdp_locator, "ff1e::ffff:efff:1");
+            // Define locator for EDP and user data
+            tcp_locator.kind = LOCATOR_KIND_TCPv6;
+            eprosima::fastrtps::rtps::IPLocator::setIPv6(tcp_locator, "::");
+            eprosima::fastrtps::rtps::IPLocator::setPhysicalPort(tcp_locator, tcp_listening_port);
+            eprosima::fastrtps::rtps::IPLocator::setLogicalPort(tcp_locator, 0);
+        }
+        else
+        {
+            // Define locator for PDP over multicast
+            pdp_locator.kind = LOCATOR_KIND_UDPv4;
+            eprosima::fastrtps::rtps::IPLocator::setIPv4(pdp_locator, "239.255.0.1");
+            // Define locator for EDP and user data
+            tcp_locator.kind = LOCATOR_KIND_TCPv4;
+            eprosima::fastrtps::rtps::IPLocator::setIPv4(tcp_locator, "0.0.0.0");
+            eprosima::fastrtps::rtps::IPLocator::setPhysicalPort(tcp_locator, tcp_listening_port);
+            eprosima::fastrtps::rtps::IPLocator::setLogicalPort(tcp_locator, 0);
+        }
+
+        participant_qos_.wire_protocol().builtin.metatrafficMulticastLocatorList.push_back(pdp_locator);
+        participant_qos_.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(tcp_locator);
+        participant_qos_.wire_protocol().default_unicast_locator_list.push_back(tcp_locator);
+
+        return *this;
+    }
+
     PubSubReader& disable_builtin_transport()
     {
         participant_qos_.transport().use_builtin_transports = false;
@@ -1005,6 +1084,13 @@ public:
     PubSubReader& expect_no_allocs()
     {
         // TODO(Mcc): Add no allocations check code when feature is completely ready
+        return *this;
+    }
+
+    PubSubReader& expect_inline_qos(
+            bool expect)
+    {
+        datareader_qos_.expects_inline_qos(expect);
         return *this;
     }
 
@@ -1196,6 +1282,7 @@ public:
             uint32_t sockerBufferSize)
     {
         participant_qos_.transport().listen_socket_buffer_size = sockerBufferSize;
+        participant_qos_.transport().send_socket_buffer_size = sockerBufferSize;
         return *this;
     }
 

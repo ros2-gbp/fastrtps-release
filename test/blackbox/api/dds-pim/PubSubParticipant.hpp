@@ -192,6 +192,8 @@ private:
 
     private:
 
+        using eprosima::fastdds::dds::DomainParticipantListener::on_participant_discovery;
+
         ParticipantListener& operator =(
                 const ParticipantListener&) = delete;
         PubSubParticipant* participant_;
@@ -609,6 +611,22 @@ public:
                 {
                     return sub_times_liveliness_lost_ >= num_lost;
                 });
+    }
+
+    template<class _Rep,
+            class _Period
+            >
+    size_t sub_wait_liveliness_lost_for(
+            unsigned int expected_num_lost,
+            const std::chrono::duration<_Rep, _Period>& max_wait)
+    {
+        std::unique_lock<std::mutex> lock(sub_liveliness_mutex_);
+        sub_liveliness_cv_.wait_for(lock, max_wait, [this, &expected_num_lost]() -> bool
+                {
+                    return sub_times_liveliness_lost_ >= expected_num_lost;
+                });
+
+        return sub_times_liveliness_lost_;
     }
 
     PubSubParticipant& property_policy(
