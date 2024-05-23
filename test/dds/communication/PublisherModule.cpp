@@ -15,21 +15,18 @@
 /**
  * @file PublisherModule.cpp
  */
+#include <asio.hpp>
 
 #include "PublisherModule.hpp"
 
-#include <chrono>
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/publisher/qos/PublisherQos.hpp>
+#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
+#include <fastdds/dds/publisher/Publisher.hpp>
+#include <fastdds/dds/publisher/DataWriter.hpp>
+
 #include <fstream>
 #include <string>
-#include <thread>
-
-#include <asio.hpp>
-
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/publisher/DataWriter.hpp>
-#include <fastdds/dds/publisher/Publisher.hpp>
-#include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
-#include <fastdds/dds/publisher/qos/PublisherQos.hpp>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastrtps::rtps;

@@ -78,8 +78,8 @@
 #endif // if defined(_WIN32)
 
 using namespace eprosima::fastdds::dds;
-using namespace eprosima::fastdds::rtps;
 using namespace eprosima::fastrtps::rtps;
+using namespace eprosima::fastdds::rtps;
 
 static constexpr LoanableCollection::size_type num_test_elements = 10;
 
@@ -96,10 +96,6 @@ public:
     void SetUp() override
     {
         type_.reset(new FooTypeSupport());
-
-        std::ostringstream topic_name_s;
-        topic_name_s << "footopic" << "_" << asio::ip::host_name() << "_" << GET_PID();
-        topic_name = topic_name_s.str();
     }
 
     void TearDown() override
@@ -147,9 +143,7 @@ protected:
             const TopicQos& tqos = TOPIC_QOS_DEFAULT,
             const DomainParticipantQos& part_qos = PARTICIPANT_QOS_DEFAULT)
     {
-        participant_ =
-                DomainParticipantFactory::get_instance()->create_participant(
-            (uint32_t)GET_PID() % 230, part_qos);
+        participant_ = DomainParticipantFactory::get_instance()->create_participant(0, part_qos);
         ASSERT_NE(participant_, nullptr);
 
         subscriber_ = participant_->create_subscriber(sqos);
@@ -160,7 +154,7 @@ protected:
 
         type_.register_type(participant_);
 
-        topic_ = participant_->create_topic(topic_name, type_.get_type_name(), tqos);
+        topic_ = participant_->create_topic("footopic", type_.get_type_name(), tqos);
         ASSERT_NE(topic_, nullptr);
 
         data_reader_ = subscriber_->create_datareader(topic_, rqos, rlistener);
@@ -565,8 +559,6 @@ protected:
     TypeSupport type_;
     bool destroy_entities_ = true;
 
-    std::string topic_name;
-
     InstanceHandle_t handle_ok_ = HANDLE_NIL;
     InstanceHandle_t handle_wrong_ = HANDLE_NIL;
 
@@ -610,18 +602,16 @@ TEST_F(DataReaderTests, get_guid)
         ParticipantFilteringFlags_t::FILTER_DIFFERENT_PROCESS);
 
     DomainParticipant* listener_participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, participant_qos,
-        &discovery_listener,
-        StatusMask::none());
+            DomainParticipantFactory::get_instance()->create_participant(0, participant_qos,
+                    &discovery_listener,
+                    StatusMask::none());
 
     DomainParticipantFactoryQos factory_qos;
     DomainParticipantFactory::get_instance()->get_qos(factory_qos);
     factory_qos.entity_factory().autoenable_created_entities = false;
     DomainParticipantFactory::get_instance()->set_qos(factory_qos);
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, participant_qos);
+            DomainParticipantFactory::get_instance()->create_participant(0, participant_qos);
     ASSERT_NE(participant, nullptr);
 
     Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
@@ -630,7 +620,7 @@ TEST_F(DataReaderTests, get_guid)
     TypeSupport type(new FooTypeSupport());
     type.register_type(participant);
 
-    Topic* topic = participant->create_topic(topic_name, type.get_type_name(), TOPIC_QOS_DEFAULT);
+    Topic* topic = participant->create_topic("footopic", type.get_type_name(), TOPIC_QOS_DEFAULT);
     ASSERT_NE(topic, nullptr);
 
     DataReader* datareader = subscriber->create_datareader(topic, DATAREADER_QOS_DEFAULT);
@@ -2140,7 +2130,7 @@ TEST_F(DataReaderTests, check_read_take_iteration)
         EXPECT_EQ(data_reader_->take_instance(data, infos, 1, handles[i]),
                 ReturnCode_t::RETCODE_OK);
 
-        EXPECT_EQ(static_cast<int>(i), std::atoi(data[0].message().data()));
+        EXPECT_EQ(i, std::atoi(data[0].message().data()));
 
         EXPECT_EQ(ReturnCode_t::RETCODE_OK, data_reader_->return_loan(data, infos));
     }
@@ -2606,8 +2596,7 @@ public:
 TEST_F(DataReaderUnsupportedTests, UnsupportedDataReaderMethods)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
 
     Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
@@ -2754,8 +2743,7 @@ TEST_F(DataReaderTests, read_samples_with_future_changes)
 TEST_F(DataReaderTests, delete_contained_entities)
 {
     DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(
-        (uint32_t)GET_PID() % 230, PARTICIPANT_QOS_DEFAULT);
+            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
     ASSERT_NE(participant, nullptr);
 
     Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
@@ -2764,7 +2752,7 @@ TEST_F(DataReaderTests, delete_contained_entities)
     TypeSupport type(new FooTypeSupport());
     type.register_type(participant);
 
-    Topic* topic = participant->create_topic(topic_name, type.get_type_name(), TOPIC_QOS_DEFAULT);
+    Topic* topic = participant->create_topic("footopic", type.get_type_name(), TOPIC_QOS_DEFAULT);
     ASSERT_NE(topic, nullptr);
 
     DataReader* data_reader = subscriber->create_datareader(topic, DATAREADER_QOS_DEFAULT);
@@ -3541,7 +3529,8 @@ TEST_F(DataReaderTests, CustomPoolCreation)
     std::shared_ptr<CustomPayloadPool> payload_pool = std::make_shared<CustomPayloadPool>();
 
     DataReader* data_reader =
-            subscriber->create_datareader(topic, reader_qos, nullptr, StatusMask::all(), payload_pool);
+            subscriber->create_datareader_with_payload_pool(
+        topic, reader_qos, payload_pool, nullptr, StatusMask::all());
 
     DataWriterQos writer_qos = DATAWRITER_QOS_DEFAULT;
     writer_qos.reliability().kind = eprosima::fastdds::dds::BEST_EFFORT_RELIABILITY_QOS;
@@ -3561,108 +3550,6 @@ TEST_F(DataReaderTests, CustomPoolCreation)
 
     participant->delete_contained_entities();
 
-    DomainParticipantFactory::get_instance()->delete_participant(participant);
-}
-
-// Check DataReaderQos inmutabilities
-TEST_F(DataReaderTests, UpdateInmutableQos)
-{
-    /* Test setup */
-    DomainParticipant* participant =
-            DomainParticipantFactory::get_instance()->create_participant(0, PARTICIPANT_QOS_DEFAULT);
-    ASSERT_NE(participant, nullptr);
-
-    Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
-    ASSERT_NE(subscriber, nullptr);
-
-    TypeSupport type(new FooTypeSupport());
-    type.register_type(participant);
-
-    Topic* topic = participant->create_topic("footopic", type.get_type_name(), TOPIC_QOS_DEFAULT);
-    ASSERT_NE(topic, nullptr);
-
-    DataReader* data_reader = subscriber->create_datareader(topic, DATAREADER_QOS_DEFAULT);
-    ASSERT_NE(data_reader, nullptr);
-
-    /* Test actions */
-    // Resource limits
-    DataReaderQos reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.resource_limits().max_samples = reader_qos.resource_limits().max_samples - 1;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    // History
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.history().kind = KEEP_ALL_HISTORY_QOS;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.history().depth = reader_qos.history().depth + 1;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    // Durability
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.durability().kind = TRANSIENT_LOCAL_DURABILITY_QOS;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    // Liveliness
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.liveliness().kind = MANUAL_BY_TOPIC_LIVELINESS_QOS;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.liveliness().lease_duration = Duration_t{123, 123};
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.liveliness().announcement_period = Duration_t{123, 123};
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    // Relibility
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.reliability().kind = RELIABLE_RELIABILITY_QOS;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    // Ownsership
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.ownership().kind = EXCLUSIVE_OWNERSHIP_QOS;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    // Destination order (currently reports unsupported)
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.destination_order().kind = BY_SOURCE_TIMESTAMP_DESTINATIONORDER_QOS;
-    ASSERT_EQ(ReturnCode_t::RETCODE_UNSUPPORTED, data_reader->set_qos(reader_qos));
-
-    // Reader resource limits
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.reader_resource_limits().matched_publisher_allocation.maximum =
-            reader_qos.reader_resource_limits().matched_publisher_allocation.maximum - 1;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    // Datasharing
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.data_sharing().off();
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.data_sharing().automatic(".");
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.data_sharing().add_domain_id(static_cast<uint16_t>(12));
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.data_sharing().data_sharing_listener_thread().priority =
-            reader_qos.data_sharing().data_sharing_listener_thread().priority + 1;
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    // Unique network flows
-    reader_qos = DATAREADER_QOS_DEFAULT;
-    reader_qos.properties().properties().push_back({"fastdds.unique_network_flows", "true"});
-    ASSERT_EQ(ReturnCode_t::RETCODE_IMMUTABLE_POLICY, data_reader->set_qos(reader_qos));
-
-    /* Cleanup */
-    participant->delete_contained_entities();
     DomainParticipantFactory::get_instance()->delete_participant(participant);
 }
 
@@ -3729,182 +3616,6 @@ TEST_F(DataReaderTests, history_depth_max_samples_per_instance_warning)
     participant->delete_contained_entities();
     DomainParticipantFactory::get_instance()->delete_participant(participant);
     Log::KillThread();
-}
-
-struct LoanableType
-{
-    static constexpr uint32_t initialization_value()
-    {
-        return 27u;
-    }
-
-    uint32_t index = initialization_value();
-};
-
-class DataRepresentationTestsTypeSupport : public TopicDataType
-{
-public:
-
-    typedef LoanableType type;
-
-    DataRepresentationTestsTypeSupport()
-        : TopicDataType()
-    {
-        m_typeSize = 4u + sizeof(LoanableType);
-        setName("LoanableType");
-    }
-
-    bool serialize(
-            void* /*data*/,
-            eprosima::fastrtps::rtps::SerializedPayload_t* /*payload*/) override
-    {
-        return true;
-    }
-
-    bool serialize(
-            void* /*data*/,
-            eprosima::fastrtps::rtps::SerializedPayload_t* /*payload*/,
-            DataRepresentationId_t /*data_representation*/) override
-    {
-        return true;
-    }
-
-    bool deserialize(
-            eprosima::fastrtps::rtps::SerializedPayload_t* /*payload*/,
-            void* /*data*/) override
-    {
-        return true;
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/) override
-    {
-        return [this]()
-               {
-                   return m_typeSize;
-               };
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/,
-            DataRepresentationId_t /*data_representation*/) override
-    {
-        return [this]()
-               {
-                   return m_typeSize;
-               };
-    }
-
-    void* createData() override
-    {
-        return nullptr;
-    }
-
-    void deleteData(
-            void* /*data*/) override
-    {
-    }
-
-    bool getKey(
-            void* /*data*/,
-            eprosima::fastrtps::rtps::InstanceHandle_t* /*ihandle*/,
-            bool /*force_md5*/) override
-    {
-        return true;
-    }
-
-    bool is_bounded() const override
-    {
-        return true;
-    }
-
-    MOCK_CONST_METHOD1(custom_is_plain_with_rep, bool(DataRepresentationId_t data_representation_id));
-
-    bool is_plain(
-            DataRepresentationId_t data_representation_id) const override
-    {
-        return custom_is_plain_with_rep(data_representation_id);
-    }
-
-    MOCK_CONST_METHOD0(custom_is_plain, bool());
-
-    bool is_plain() const override
-    {
-        return custom_is_plain();
-    }
-
-};
-
-TEST_F(DataReaderTests, data_type_is_plain_data_representation)
-{
-    /* Create a participant, topic, and a subscriber */
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0,
-                    PARTICIPANT_QOS_DEFAULT);
-    ASSERT_NE(participant, nullptr);
-
-    DataRepresentationTestsTypeSupport* type = new DataRepresentationTestsTypeSupport();
-    TypeSupport ts (type);
-    ts.register_type(participant);
-
-    Topic* topic = participant->create_topic("plain_topic", "LoanableType", TOPIC_QOS_DEFAULT);
-    ASSERT_NE(topic, nullptr);
-
-    Subscriber* subscriber = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT);
-    ASSERT_NE(subscriber, nullptr);
-
-    /* Define XCDR1 only data representation QoS to force "is_plain" call */
-    DataReaderQos qos_xcdr = DATAREADER_QOS_DEFAULT;
-    qos_xcdr.endpoint().history_memory_policy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-    qos_xcdr.type_consistency().representation.m_value.clear();
-    qos_xcdr.type_consistency().representation.m_value.push_back(DataRepresentationId_t::XCDR_DATA_REPRESENTATION);
-
-    /* Expect the "is_plain" method called with default data representation (XCDR1) */
-    EXPECT_CALL(*type, custom_is_plain()).Times(0);
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR_DATA_REPRESENTATION)).Times(
-        testing::AtLeast(1)).WillRepeatedly(testing::Return(true));
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR2_DATA_REPRESENTATION)).Times(0);
-
-    /* Create a datareader will trigger the "is_plain" call */
-    DataReader* datareader_xcdr = subscriber->create_datareader(topic, qos_xcdr);
-    ASSERT_NE(datareader_xcdr, nullptr);
-
-    testing::Mock::VerifyAndClearExpectations(&type);
-
-    /* Define XCDR2 data representation QoS to force "is_plain" call */
-    DataReaderQos qos_xcdr2 = DATAREADER_QOS_DEFAULT;
-    qos_xcdr2.endpoint().history_memory_policy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-    qos_xcdr2.type_consistency().representation.m_value.clear();
-    qos_xcdr2.type_consistency().representation.m_value.push_back(DataRepresentationId_t::XCDR2_DATA_REPRESENTATION);
-
-    /* Expect the "is_plain" method called with XCDR2 data representation */
-    EXPECT_CALL(*type, custom_is_plain()).Times(0);
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR_DATA_REPRESENTATION)).Times(0);
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR2_DATA_REPRESENTATION)).Times(
-        testing::AtLeast(1)).WillRepeatedly(testing::Return(true));
-
-    /* Create a datareader will trigger the "is_plain" call */
-    DataReader* datareader_xcdr2 = subscriber->create_datareader(topic, qos_xcdr2);
-    ASSERT_NE(datareader_xcdr2, nullptr);
-
-    /* NOT Define data representation QoS to force "is_plain" call */
-    DataReaderQos qos_no_xcdr = DATAREADER_QOS_DEFAULT;
-    qos_no_xcdr.endpoint().history_memory_policy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-    qos_no_xcdr.type_consistency().representation.m_value.clear();
-
-    /* Expect the "is_plain" method called with both data representation */
-    EXPECT_CALL(*type, custom_is_plain()).Times(0);
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR_DATA_REPRESENTATION)).Times(
-        testing::AtLeast(1)).WillRepeatedly(testing::Return(true));
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR2_DATA_REPRESENTATION)).Times(
-        testing::AtLeast(1)).WillRepeatedly(testing::Return(true));
-
-    /* Create a datareader will trigger the "is_plain" call */
-    DataReader* datareader_no_xcdr = subscriber->create_datareader(topic, qos_no_xcdr);
-    ASSERT_NE(datareader_no_xcdr, nullptr);
-
-    /* Tear down */
-    participant->delete_contained_entities();
-    DomainParticipantFactory::get_instance()->delete_participant(participant);
 }
 
 int main(

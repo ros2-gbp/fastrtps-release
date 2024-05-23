@@ -23,7 +23,6 @@
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
-#include <fastdds/rtps/common/CdrSerialization.hpp>
 #include <fastdds/rtps/writer/StatefulWriter.h>
 #include <fastdds/rtps/writer/RTPSWriter.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
@@ -582,9 +581,7 @@ bool TypeLookupManager::send_request(
     CacheChange_t* change = builtin_request_writer_->new_change(
         [&req]()
         {
-            eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-            size_t current_alignment {0};
-            return static_cast<uint32_t>(calculator.calculate_serialized_size(req, current_alignment) + 4);
+            return static_cast<uint32_t>(TypeLookup_Request::getCdrSerializedSize(req) + 4);
         },
         ALIVE);
 
@@ -605,7 +602,7 @@ bool TypeLookupManager::send_request(
         payload.max_size = change->serializedPayload.max_size - 4;
         payload.data = change->serializedPayload.data + 4;
 
-        bool serialize_ret = request_type_.serialize(&req, &payload, DataRepresentationId_t::XCDR2_DATA_REPRESENTATION);
+        bool serialize_ret = request_type_.serialize(&req, &payload);
         if (!serialize_ret)
         {
             payload.data = nullptr;
@@ -631,9 +628,7 @@ bool TypeLookupManager::send_reply(
     CacheChange_t* change = builtin_reply_writer_->new_change(
         [&rep]()
         {
-            eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-            size_t current_alignment {0};
-            return static_cast<uint32_t>(calculator.calculate_serialized_size(rep, current_alignment) + 4);
+            return static_cast<uint32_t>(TypeLookup_Reply::getCdrSerializedSize(rep) + 4);
         },
         ALIVE);
 
@@ -654,7 +649,7 @@ bool TypeLookupManager::send_reply(
         payload.max_size = change->serializedPayload.max_size - 4;
         payload.data = change->serializedPayload.data + 4;
 
-        bool serialize_ret = reply_type_.serialize(&rep, &payload, DataRepresentationId_t::XCDR2_DATA_REPRESENTATION);
+        bool serialize_ret = reply_type_.serialize(&rep, &payload);
         if (!serialize_ret)
         {
             payload.data = nullptr;

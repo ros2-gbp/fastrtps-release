@@ -21,45 +21,38 @@ endif()
 
 set(DYNAMIC_TYPES_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/AnnotationDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/AnnotationParameterValue.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/BuiltinAnnotationsTypeObject.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicData.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicDataFactory.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicDataPtr.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicPubSubType.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicType.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilder.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilderFactory.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilderPtr.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeMember.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicPubSubType.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypePtr.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/MemberDescriptor.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicDataPtr.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilder.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilderPtr.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeBuilderFactory.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/DynamicTypeMember.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeDescriptor.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/MemberDescriptor.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/AnnotationParameterValue.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeIdentifier.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeIdentifierTypes.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeNamesGenerator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeObject.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeObjectFactory.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeObjectHashId.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeNamesGenerator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypesBase.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/FileConsumer.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/BuiltinAnnotationsTypeObject.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/string_convert.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/TopicDataType.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/FileConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/string_convert.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
 
 # External sources
@@ -80,28 +73,24 @@ endif()
 set(DYNAMIC_TYPES_TEST_SOURCE
     DynamicTypesTests.cpp
     idl/Basic.cxx
-    idl/Basicv1.cxx
     idl/BasicPubSubTypes.cxx
     idl/BasicTypeObject.cxx
     ${DYNAMIC_TYPES_SOURCE}
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/publisher/qos/WriterQos.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/qos/ReaderQos.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/ThreadSettings.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/FlowControllerConsts.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/PortBasedTransportDescriptor.cpp
+
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLProfileManager.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLParser.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLDynamicParser.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLElementParser.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLParser.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLParserCommon.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLProfileManager.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/UnitsParser.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/publisher/qos/WriterQos.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/qos/ReaderQos.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/FlowControllerConsts.cpp
     )
 
 set(DYNAMIC_COMPLEX_TYPES_TEST_SOURCE
     DynamicComplexTypesTests.cpp
     idl/Test.cxx
-    idl/Testv1.cxx
     idl/TestPubSubTypes.cxx
     idl/TestTypeObject.cxx
     ${DYNAMIC_TYPES_SOURCE}
@@ -110,7 +99,6 @@ set(DYNAMIC_COMPLEX_TYPES_TEST_SOURCE
 set(DYNAMIC_TYPES_4_2_TEST_SOURCE
     DynamicTypes_4_2_Tests.cpp
     idl/new_features_4_2.cxx
-    idl/new_features_4_2v1.cxx
     idl/new_features_4_2PubSubTypes.cxx
     idl/new_features_4_2TypeObject.cxx
     ${DYNAMIC_TYPES_SOURCE}
@@ -149,7 +137,7 @@ target_link_libraries(DynamicTypesTests GTest::gtest
 if(QNX)
     target_link_libraries(DynamicTypesTests socket)
 endif()
-gtest_discover_tests(DynamicTypesTests)
+add_gtest(DynamicTypesTests SOURCES ${DYNAMIC_TYPES_TEST_SOURCE})
 
 
 add_executable(DynamicComplexTypesTests ${DYNAMIC_COMPLEX_TYPES_TEST_SOURCE})
@@ -173,7 +161,7 @@ target_link_libraries(DynamicComplexTypesTests GTest::gtest
 if(QNX)
     target_link_libraries(DynamicComplexTypesTests socket)
 endif()
-gtest_discover_tests(DynamicComplexTypesTests)
+add_gtest(DynamicComplexTypesTests SOURCES ${DYNAMIC_COMPLEX_TYPES_TEST_SOURCE})
 
 
 add_executable(DynamicTypes_4_2_Tests ${DYNAMIC_TYPES_4_2_TEST_SOURCE})
@@ -197,6 +185,12 @@ target_include_directories(DynamicTypes_4_2_Tests PRIVATE
 if(QNX)
     target_link_libraries(DynamicTypes_4_2_Tests socket)
 endif()
-gtest_discover_tests(DynamicTypes_4_2_Tests)
+add_gtest(DynamicTypes_4_2_Tests SOURCES ${DYNAMIC_TYPES_4_2_TEST_SOURCE})
 
 configure_file("types_profile.xml" "types_profile.xml" COPYONLY)
+
+if(ANDROID)
+    set_property(TARGET DynamicComplexTypesTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET DynamicTypes_4_2_Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET DynamicTypesTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

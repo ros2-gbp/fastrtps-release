@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <limits>
 #include <memory>
 #include <thread>
 
@@ -21,6 +22,7 @@
 #include "mock/MockTCPChannelResource.h"
 #include "mock/MockTCPv4Transport.h"
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/common/LocatorList.hpp>
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
 #include <fastrtps/utils/Semaphore.h>
@@ -80,6 +82,74 @@ public:
     std::unique_ptr<std::thread> senderThread;
     std::unique_ptr<std::thread> receiverThread;
 };
+
+TEST_F(TCPv4Tests, wrong_configuration_values)
+{
+    // Too big sendBufferSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.sendBufferSize = std::numeric_limits<uint32_t>::max();
+        TCPv4Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // Too big receiveBufferSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.receiveBufferSize = std::numeric_limits<uint32_t>::max();
+        TCPv4Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // Too big maxMessageSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.maxMessageSize = std::numeric_limits<uint32_t>::max();
+        TCPv4Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // maxMessageSize bigger than receiveBufferSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.maxMessageSize = 10;
+        wrong_descriptor.receiveBufferSize = 5;
+        TCPv4Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // maxMessageSize bigger than sendBufferSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.maxMessageSize = 10;
+        wrong_descriptor.sendBufferSize = 5;
+        TCPv4Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // Buffer sizes automatically decrease
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.sendBufferSize = static_cast<uint32_t>(std::numeric_limits<int32_t>::max());
+        wrong_descriptor.receiveBufferSize = static_cast<uint32_t>(std::numeric_limits<int32_t>::max());
+        wrong_descriptor.maxMessageSize = 1470;
+        TCPv4Transport transportUnderTest(wrong_descriptor);
+        ASSERT_TRUE(transportUnderTest.init());
+        auto* final_cfg = transportUnderTest.configuration();
+        EXPECT_GE(final_cfg->sendBufferSize, final_cfg->maxMessageSize);
+        // The system could allow for the send buffer to be MAX_INT, so we cannot check it to be strictly lower
+        EXPECT_LE(final_cfg->sendBufferSize, wrong_descriptor.sendBufferSize);
+        EXPECT_GE(final_cfg->receiveBufferSize, final_cfg->maxMessageSize);
+        // The system could allow for the receive buffer to be MAX_INT, so we cannot check it to be strictly lower
+        EXPECT_LE(final_cfg->receiveBufferSize, wrong_descriptor.receiveBufferSize);
+        eprosima::fastdds::dds::Log::Flush();
+    }
+}
 
 TEST_F(TCPv4Tests, locators_with_kind_1_supported)
 {
@@ -478,95 +548,6 @@ static void GetIP4s(
             {
                 loc.locator.kind = LOCATOR_KIND_TCPv4;
             });
-}
-
-// Send and receive between allowed interfaces (the first available except the local) added by name
-TEST_F(TCPv4Tests, send_and_receive_between_allowed_interfaces_ports_by_name)
-{
-    std::vector<IPFinder::info_IP> interfaces;
-
-    GetIP4s(interfaces);
-
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
-    std::regex filter("RTCP(?!_SEQ)");
-    eprosima::fastdds::dds::Log::SetCategoryFilter(filter);
-    TCPv4TransportDescriptor recvDescriptor;
-    std::cout << "Adding to whitelist: " << interfaces[0].dev << " " << interfaces[0].name << " " <<
-        interfaces[0].locator << std::endl;
-    recvDescriptor.interfaceWhiteList.emplace_back(interfaces[0].dev);
-
-    recvDescriptor.add_listener_port(g_default_port);
-    TCPv4Transport receiveTransportUnderTest(recvDescriptor);
-    receiveTransportUnderTest.init();
-
-    TCPv4TransportDescriptor sendDescriptor;
-    sendDescriptor.interfaceWhiteList.emplace_back(interfaces[0].dev);
-
-    TCPv4Transport sendTransportUnderTest(sendDescriptor);
-    sendTransportUnderTest.init();
-
-    Locator_t inputLocator;
-    inputLocator.kind = LOCATOR_KIND_TCPv4;
-    inputLocator.port = g_default_port;
-    inputLocator.set_address(interfaces[0].locator);
-    IPLocator::setLogicalPort(inputLocator, 7410);
-
-    LocatorList_t locator_list;
-    locator_list.push_back(inputLocator);
-
-    Locator_t outputLocator;
-    outputLocator.kind = LOCATOR_KIND_TCPv4;
-    outputLocator.set_address(interfaces[0].locator);
-    outputLocator.port = g_default_port;
-    IPLocator::setLogicalPort(outputLocator, 7410);
-
-    {
-        MockReceiverResource receiver(receiveTransportUnderTest, inputLocator);
-        MockMessageReceiver* msg_recv = dynamic_cast<MockMessageReceiver*>(receiver.CreateMessageReceiver());
-        ASSERT_TRUE(receiveTransportUnderTest.IsInputChannelOpen(inputLocator));
-
-        SendResourceList send_resource_list;
-        ASSERT_TRUE(sendTransportUnderTest.OpenOutputChannel(send_resource_list, outputLocator));
-        ASSERT_FALSE(send_resource_list.empty());
-        octet message[5] = { 'H', 'e', 'l', 'l', 'o' };
-        bool bOk = false;
-        std::function<void()> recCallback = [&]()
-                {
-                    EXPECT_EQ(memcmp(message, msg_recv->data, 5), 0);
-                    bOk = true;
-                };
-
-        msg_recv->setCallback(recCallback);
-
-        bool bFinish(false);
-        auto sendThreadFunction = [&]()
-                {
-                    Locators input_begin(locator_list.begin());
-                    Locators input_end(locator_list.end());
-
-                    bool sent =
-                            send_resource_list.at(0)->send(message, 5, &input_begin, &input_end,
-                                    (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
-                    while (!bFinish && !sent)
-                    {
-                        Locators input_begin2(locator_list.begin());
-                        Locators input_end2(locator_list.end());
-
-                        sent =
-                                send_resource_list.at(0)->send(message, 5, &input_begin2, &input_end2,
-                                        (std::chrono::steady_clock::now() + std::chrono::microseconds(100)));
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                    }
-                    EXPECT_TRUE(sent);
-                    //EXPECT_TRUE(transportUnderTest.send(message, 5, outputLocator, inputLocator));
-                };
-
-        senderThread.reset(new std::thread(sendThreadFunction));
-        std::this_thread::sleep_for(std::chrono::seconds(10));
-        bFinish = true;
-        senderThread->join();
-        ASSERT_TRUE(bOk);
-    }
 }
 
 TEST_F(TCPv4Tests, check_TCPv4_interface_whitelist_initialization)
@@ -1333,14 +1314,13 @@ TEST_F(TCPv4Tests, secure_non_blocking_send)
     eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Kind::Info);
 
     uint16_t port = g_default_port;
-    uint32_t msg_size = eprosima::fastdds::rtps::s_minimumSocketBuffer;
+    uint32_t msg_size = 64ul * 1024ul;
     // Create a TCP Server transport
     using TLSOptions = TCPTransportDescriptor::TLSConfig::TLSOptions;
     using TLSVerifyMode = TCPTransportDescriptor::TLSConfig::TLSVerifyMode;
     TCPv4TransportDescriptor senderDescriptor;
     senderDescriptor.add_listener_port(port);
     senderDescriptor.apply_security = true;
-    senderDescriptor.non_blocking_send = true;
     senderDescriptor.sendBufferSize = msg_size;
     senderDescriptor.tls_config.password = "fastddspwd";
     senderDescriptor.tls_config.cert_chain_file = "fastdds.crt";
@@ -1352,7 +1332,9 @@ TEST_F(TCPv4Tests, secure_non_blocking_send)
     senderDescriptor.tls_config.add_option(TLSOptions::NO_SSLV2);
     senderDescriptor.tls_config.add_option(TLSOptions::NO_COMPRESSION);
     MockTCPv4Transport senderTransportUnderTest(senderDescriptor);
-    senderTransportUnderTest.init();
+    eprosima::fastrtps::rtps::RTPSParticipantAttributes att;
+    att.properties.properties().emplace_back("fastdds.tcp_transport.non_blocking_send", "true");
+    senderTransportUnderTest.init(&att.properties);
 
     // Create a TCP Client socket.
     // The creation of a reception transport for testing this functionality is not
@@ -1432,9 +1414,8 @@ TEST_F(TCPv4Tests, secure_non_blocking_send)
        a connection. This channel will not be present in the server's channel_resources_ map
        as communication lacks most of the discovery messages using a raw socket as participant.
      */
-    // auto sender_unbound_channel_resources = senderTransportUnderTest.get_unbound_channel_resources();
     auto sender_unbound_channel_resources = senderTransportUnderTest.get_unbound_channel_resources();
-    ASSERT_TRUE(sender_unbound_channel_resources.size() == 1u);
+    ASSERT_TRUE(sender_unbound_channel_resources.size() == 1);
     auto sender_channel_resource =
             std::static_pointer_cast<TCPChannelResourceBasic>(sender_unbound_channel_resources[0]);
 
@@ -1808,7 +1789,6 @@ TEST_F(TCPv4Tests, header_read_interrumption)
     octet* buffer = {};
     uint32_t receive_buffer_capacity = 65500;
     uint32_t receive_buffer_size = 0;
-    Endianness_t msg_endian{Endianness_t::LITTLEEND};
 
     // Simulate channel connection
     channel->connect(nullptr);
@@ -1822,8 +1802,7 @@ TEST_F(TCPv4Tests, header_read_interrumption)
 
     // Start TCP segment reception
     // Should get stuck in receive_header until channel is disabled
-    transportUnderTest.Receive(rtcp_manager, channel, buffer, receive_buffer_capacity, receive_buffer_size, msg_endian,
-            locator);
+    transportUnderTest.Receive(rtcp_manager, channel, buffer, receive_buffer_capacity, receive_buffer_size, locator);
     thread.join();
 }
 
@@ -1847,6 +1826,22 @@ TEST_F(TCPv4Tests, autofill_port)
 
     EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports[0] != 0);
     EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports.size() == 1);
+
+    uint16_t port = 12345;
+    TCPv4TransportDescriptor test_descriptor_multiple_autofill;
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    test_descriptor_multiple_autofill.add_listener_port(port);
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    TCPv4Transport transportUnderTest_multiple_autofill(test_descriptor_multiple_autofill);
+    transportUnderTest_multiple_autofill.init();
+
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[0] != 0);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[1] == port);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[2] != 0);
+    EXPECT_TRUE(
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[0] !=
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[2]);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports.size() == 3);
 }
 
 // This test verifies server's channel resources mapping keys uniqueness, where keys are clients locators.
@@ -1883,7 +1878,7 @@ TEST_F(TCPv4Tests, client_announced_local_port_uniqueness)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    ASSERT_EQ(receiveTransportUnderTest.get_channel_resources().size(), 2u);
+    ASSERT_EQ(receiveTransportUnderTest.get_channel_resources().size(), 2);
 }
 
 #ifndef _WIN32
@@ -1892,14 +1887,15 @@ TEST_F(TCPv4Tests, client_announced_local_port_uniqueness)
 TEST_F(TCPv4Tests, non_blocking_send)
 {
     uint16_t port = g_default_port;
-    uint32_t msg_size = eprosima::fastdds::rtps::s_minimumSocketBuffer;
+    uint32_t msg_size = 64ul * 1024ul;
     // Create a TCP Server transport
     TCPv4TransportDescriptor senderDescriptor;
     senderDescriptor.add_listener_port(port);
-    senderDescriptor.non_blocking_send = true;
     senderDescriptor.sendBufferSize = msg_size;
     MockTCPv4Transport senderTransportUnderTest(senderDescriptor);
-    senderTransportUnderTest.init();
+    eprosima::fastrtps::rtps::RTPSParticipantAttributes att;
+    att.properties.properties().emplace_back("fastdds.tcp_transport.non_blocking_send", "true");
+    senderTransportUnderTest.init(&att.properties);
 
     // Create a TCP Client socket.
     // The creation of a reception transport for testing this functionality is not
@@ -1947,7 +1943,7 @@ TEST_F(TCPv4Tests, non_blocking_send)
        as communication lacks most of the discovery messages using a raw socket as participant.
      */
     auto sender_unbound_channel_resources = senderTransportUnderTest.get_unbound_channel_resources();
-    ASSERT_TRUE(sender_unbound_channel_resources.size() == 1u);
+    ASSERT_TRUE(sender_unbound_channel_resources.size() == 1);
     auto sender_channel_resource =
             std::static_pointer_cast<TCPChannelResourceBasic>(sender_unbound_channel_resources[0]);
 
@@ -2087,11 +2083,11 @@ TEST_F(TCPv4Tests, opening_output_channel_with_same_locator_as_local_listening_p
     // If the remote address is lower than the local one, no channel must be created but it must be added to the send_resource_list
     ASSERT_TRUE(transportUnderTest.OpenOutputChannel(send_resource_list, lowerOutputChannelLocator));
     ASSERT_FALSE(transportUnderTest.is_output_channel_open_for(lowerOutputChannelLocator));
-    ASSERT_EQ(send_resource_list.size(), 1u);
+    ASSERT_EQ(send_resource_list.size(), 1);
     // If the remote address is higher than the local one, a CONNECT channel must be created and added to the send_resource_list
     ASSERT_TRUE(transportUnderTest.OpenOutputChannel(send_resource_list, higherOutputChannelLocator));
     ASSERT_TRUE(transportUnderTest.is_output_channel_open_for(higherOutputChannelLocator));
-    ASSERT_EQ(send_resource_list.size(), 2u);
+    ASSERT_EQ(send_resource_list.size(), 2);
 }
 
 // This test verifies that the send resource list is correctly cleaned both in LAN and WAN cases.
@@ -2152,7 +2148,7 @@ TEST_F(TCPv4Tests, remove_from_send_resource_list)
             IPLocator::setWan(wrong_output_locator, g_test_wan_address);
         }
         wrong_remote_participant_physical_locators.push_back(wrong_output_locator);
-        send_transport_under_test.cleanup_sender_resources(
+        send_transport_under_test.CloseOutputChannel(
             send_resource_list,
             wrong_remote_participant_physical_locators,
             initial_peer_list);
@@ -2161,7 +2157,7 @@ TEST_F(TCPv4Tests, remove_from_send_resource_list)
         // Using the correct locator should remove the channel resource
         LocatorList_t remote_participant_physical_locators;
         remote_participant_physical_locators.push_back(discovery_locator);
-        send_transport_under_test.cleanup_sender_resources(
+        send_transport_under_test.CloseOutputChannel(
             send_resource_list,
             remote_participant_physical_locators,
             initial_peer_list);
@@ -2176,7 +2172,7 @@ TEST_F(TCPv4Tests, remove_from_send_resource_list)
             IPLocator::setWan(initial_peer_locator, g_test_wan_address);
         }
         remote_participant_physical_locators.push_back(initial_peer_locator);
-        send_transport_under_test.cleanup_sender_resources(
+        send_transport_under_test.CloseOutputChannel(
             send_resource_list,
             remote_participant_physical_locators,
             initial_peer_list);

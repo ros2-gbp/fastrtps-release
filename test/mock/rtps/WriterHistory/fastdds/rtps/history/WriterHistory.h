@@ -50,15 +50,11 @@ public:
     {
     }
 
-    virtual ~WriterHistory() = default;
-
     using iterator = std::vector<CacheChange_t*>::iterator;
 
     // *INDENT-OFF* Uncrustify makes a mess with MOCK_METHOD macros
     MOCK_METHOD1(add_change_mock, bool(CacheChange_t*));
     // *INDENT-ON*
-
-    MOCK_METHOD2(add_change, bool(CacheChange_t * a_change, WriteParams & wparams));
 
     bool add_change(
             CacheChange_t* change)
@@ -87,15 +83,9 @@ public:
 
     MOCK_METHOD1(remove_change_mock, bool(CacheChange_t*));
 
-    MOCK_METHOD2(remove_change_mock, bool(CacheChange_t*,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time));
-
     MOCK_METHOD0(getHistorySize, size_t());
 
     MOCK_METHOD0(remove_min_change, bool());
-
-    MOCK_METHOD1(remove_min_change, bool(
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time));
 
     MOCK_METHOD3(add_change_, bool(
             CacheChange_t* a_change,
@@ -133,28 +123,6 @@ public:
         bool ret = remove_change_mock(change);
         delete change;
         return ret;
-    }
-
-    bool remove_change(
-            CacheChange_t* change,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
-    {
-        bool ret = remove_change_mock(change, max_blocking_time);
-        delete change;
-        return ret;
-    }
-
-    virtual bool remove_change_g(
-            fastrtps::rtps::CacheChange_t* a_change)
-    {
-        return remove_change(a_change);
-    }
-
-    virtual bool remove_change_g(
-            fastrtps::rtps::CacheChange_t* a_change,
-            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
-    {
-        return remove_change(a_change, max_blocking_time);
     }
 
     void wait_for_more_samples_than(

@@ -45,6 +45,7 @@
 #include <rtps/builtin/discovery/participant/DS/PDPSecurityInitiatorListener.hpp>
 #include <rtps/builtin/discovery/participant/timedevent/DSClientEvent.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
+#include <fastdds/rtps/transport/TCPTransportDescriptor.h>
 #include <utils/SystemInfo.hpp>
 #include <vector>
 
@@ -443,11 +444,19 @@ bool PDPClient::create_ds_pdp_reliable_endpoints(
     {
         eprosima::shared_lock<eprosima::shared_mutex> disc_lock(mp_builtin->getDiscoveryMutex());
 
+        // TCP Clients need to handle logical ports
+        if (mp_RTPSParticipant->has_tcp_transports())
+        {
+            for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
+            {
+                mp_RTPSParticipant->create_tcp_connections(it.metatrafficUnicastLocatorList);
+            }
+        }
+
         for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
-            auto entry = LocatorSelectorEntry::create_fully_selected_entry(
-                it.metatrafficUnicastLocatorList, it.metatrafficMulticastLocatorList);
-            mp_RTPSParticipant->createSenderResources(entry);
+            mp_RTPSParticipant->createSenderResources(it.metatrafficMulticastLocatorList);
+            mp_RTPSParticipant->createSenderResources(it.metatrafficUnicastLocatorList);
 
 #if HAVE_SECURITY
             if (!mp_RTPSParticipant->is_secure())
@@ -842,14 +851,18 @@ void PDPClient::update_remote_servers_list()
     {
         eprosima::shared_lock<eprosima::shared_mutex> disc_lock(mp_builtin->getDiscoveryMutex());
 
+        // TCP Clients need to handle logical ports
+        bool set_logicals = mp_RTPSParticipant->has_tcp_transports();
+
         for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
             if (!endpoints->reader.reader_->matched_writer_is_matched(it.GetPDPWriter()) ||
                     !endpoints->writer.writer_->matched_reader_is_matched(it.GetPDPReader()))
             {
-                auto entry = LocatorSelectorEntry::create_fully_selected_entry(
-                    it.metatrafficUnicastLocatorList, it.metatrafficMulticastLocatorList);
-                mp_RTPSParticipant->createSenderResources(entry);
+                if (set_logicals)
+                {
+                    mp_RTPSParticipant->create_tcp_connections(it.metatrafficUnicastLocatorList);
+                }
             }
 
             if (!endpoints->reader.reader_->matched_writer_is_matched(it.GetPDPWriter()))

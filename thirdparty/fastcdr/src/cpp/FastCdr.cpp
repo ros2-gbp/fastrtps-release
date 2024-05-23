@@ -21,66 +21,66 @@ using namespace ::exception;
 
 FastCdr::state::state(
         const FastCdr& fastcdr)
-    : current_position_(fastcdr.current_position_)
+    : m_currentPosition(fastcdr.m_currentPosition)
 {
 }
 
 FastCdr::state::state(
         const state& current_state)
-    : current_position_(current_state.current_position_)
+    : m_currentPosition(current_state.m_currentPosition)
 {
 }
 
 FastCdr::FastCdr(
-        FastBuffer& cdr_buffer)
-    : cdr_buffer_(cdr_buffer)
-    , current_position_(cdr_buffer.begin())
-    , last_position_(cdr_buffer.end())
+        FastBuffer& cdrBuffer)
+    : m_cdrBuffer(cdrBuffer)
+    , m_currentPosition(cdrBuffer.begin())
+    , m_lastPosition(cdrBuffer.end())
 {
 }
 
 bool FastCdr::jump(
-        size_t num_bytes)
+        size_t numBytes)
 {
-    bool ret_value = false;
+    bool returnedValue = false;
 
-    if (((last_position_ - current_position_) >= num_bytes) || resize(num_bytes))
+    if (((m_lastPosition - m_currentPosition) >= numBytes) || resize(numBytes))
     {
-        current_position_ += num_bytes;
-        ret_value = true;
+        m_currentPosition += numBytes;
+        returnedValue = true;
     }
 
-    return ret_value;
+    return returnedValue;
 }
 
-char* FastCdr::get_current_position()
+char* FastCdr::getCurrentPosition()
 {
-    return &current_position_;
+    return &m_currentPosition;
 }
 
-FastCdr::state FastCdr::get_state()
+FastCdr::state FastCdr::getState()
 {
     return FastCdr::state(*this);
 }
 
-void FastCdr::set_state(
+void FastCdr::setState(
         FastCdr::state& current_state)
 {
-    current_position_ >> current_state.current_position_;
+    m_currentPosition >> current_state.m_currentPosition;
 }
 
 void FastCdr::reset()
 {
-    current_position_ = cdr_buffer_.begin();
+    m_currentPosition = m_cdrBuffer.begin();
 }
 
 bool FastCdr::resize(
-        size_t min_size_inc)
+        size_t minSizeInc)
 {
-    if (cdr_buffer_.resize(min_size_inc))
+    if (m_cdrBuffer.resize(minSizeInc))
     {
-        current_position_ << cdr_buffer_.begin();
-        last_position_ = cdr_buffer_.end();
+        m_currentPosition << m_cdrBuffer.begin();
+        m_lastPosition = m_cdrBuffer.end();
         return true;
     }
 
@@ -92,13 +92,13 @@ FastCdr& FastCdr::serialize(
 {
     uint8_t value = 0;
 
-    if (((last_position_ - current_position_) >= sizeof(uint8_t)) || resize(sizeof(uint8_t)))
+    if (((m_lastPosition - m_currentPosition) >= sizeof(uint8_t)) || resize(sizeof(uint8_t)))
     {
         if (bool_t)
         {
             value = 1;
         }
-        current_position_++ << value;
+        m_currentPosition++ << value;
 
         return *this;
     }
@@ -121,14 +121,14 @@ FastCdr& FastCdr::serialize(
         FastCdr::state state_before_error(*this);
         serialize(length);
 
-        if (((last_position_ - current_position_) >= length) || resize(length))
+        if (((m_lastPosition - m_currentPosition) >= length) || resize(length))
         {
-            current_position_.memcopy(string_t, length);
-            current_position_ += length;
+            m_currentPosition.memcopy(string_t, length);
+            m_currentPosition += length;
         }
         else
         {
-            set_state(state_before_error);
+            setState(state_before_error);
             throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
         }
     }
@@ -143,52 +143,52 @@ FastCdr& FastCdr::serialize(
 FastCdr& FastCdr::serialize(
         const wchar_t* string_t)
 {
-    uint32_t bytes_length = 0;
+    uint32_t bytesLength = 0;
     size_t wstrlen = 0;
 
     if (string_t != nullptr)
     {
         wstrlen = wcslen(string_t);
-        bytes_length = size_to_uint32(wstrlen * 4);
+        bytesLength = size_to_uint32(wstrlen * 4);
     }
 
-    if (bytes_length > 0)
+    if (bytesLength > 0)
     {
         FastCdr::state state_(*this);
         serialize(size_to_uint32(wstrlen));
 
-        if (((last_position_ - current_position_) >= bytes_length) || resize(bytes_length))
+        if (((m_lastPosition - m_currentPosition) >= bytesLength) || resize(bytesLength))
         {
 #if defined(_WIN32)
-            serialize_array(string_t, wstrlen);
+            serializeArray(string_t, wstrlen);
 #else
-            current_position_.memcopy(string_t, bytes_length);
-            current_position_ += bytes_length; // size on bytes
+            m_currentPosition.memcopy(string_t, bytesLength);
+            m_currentPosition += bytesLength; // size on bytes
 #endif // if defined(_WIN32)
         }
         else
         {
-            set_state(state_);
+            setState(state_);
             throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
         }
     }
     else
     {
-        serialize(bytes_length);
+        serialize(bytesLength);
     }
 
     return *this;
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const bool* bool_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*bool_t) * num_elements;
+    size_t totalSize = sizeof(*bool_t) * numElements;
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
-        for (size_t count = 0; count < num_elements; ++count)
+        for (size_t count = 0; count < numElements; ++count)
         {
             uint8_t value = 0;
 
@@ -196,7 +196,7 @@ FastCdr& FastCdr::serialize_array(
             {
                 value = 1;
             }
-            current_position_++ << value;
+            m_currentPosition++ << value;
         }
 
         return *this;
@@ -205,32 +205,32 @@ FastCdr& FastCdr::serialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const char* char_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*char_t) * num_elements;
+    size_t totalSize = sizeof(*char_t) * numElements;
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
-        current_position_.memcopy(char_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.memcopy(char_t, totalSize);
+        m_currentPosition += totalSize;
         return *this;
     }
 
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const int16_t* short_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*short_t) * num_elements;
+    size_t totalSize = sizeof(*short_t) * numElements;
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
-        current_position_.memcopy(short_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.memcopy(short_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -238,16 +238,16 @@ FastCdr& FastCdr::serialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const int32_t* long_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*long_t) * num_elements;
+    size_t totalSize = sizeof(*long_t) * numElements;
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
-        current_position_.memcopy(long_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.memcopy(long_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -255,27 +255,27 @@ FastCdr& FastCdr::serialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const wchar_t* wchar,
-        size_t num_elements)
+        size_t numElements)
 {
-    for (size_t count = 0; count < num_elements; ++count)
+    for (size_t count = 0; count < numElements; ++count)
     {
         serialize(wchar[count]);
     }
     return *this;
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const int64_t* longlong_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*longlong_t) * num_elements;
+    size_t totalSize = sizeof(*longlong_t) * numElements;
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
-        current_position_.memcopy(longlong_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.memcopy(longlong_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -283,16 +283,16 @@ FastCdr& FastCdr::serialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const float* float_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*float_t) * num_elements;
+    size_t totalSize = sizeof(*float_t) * numElements;
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
-        current_position_.memcopy(float_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.memcopy(float_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -300,16 +300,16 @@ FastCdr& FastCdr::serialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const double* double_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*double_t) * num_elements;
+    size_t totalSize = sizeof(*double_t) * numElements;
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
-        current_position_.memcopy(double_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.memcopy(double_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -317,33 +317,33 @@ FastCdr& FastCdr::serialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::serialize_array(
+FastCdr& FastCdr::serializeArray(
         const long double* ldouble_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = 16 * num_elements;
+    size_t totalSize = 16 * numElements;
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
 #if FASTCDR_HAVE_FLOAT128 && FASTCDR_SIZEOF_LONG_DOUBLE < 16
-        for (size_t idx = 0; idx < num_elements; ++idx)
+        for (size_t idx = 0; idx < numElements; ++idx)
         {
             __float128 tmp = ldouble_t[idx];
-            current_position_ << tmp;
-            current_position_ += 16;
+            m_currentPosition << tmp;
+            m_currentPosition += 16;
         }
 #else
 #if FASTCDR_SIZEOF_LONG_DOUBLE == 16
-        current_position_.memcopy(ldouble_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.memcopy(ldouble_t, totalSize);
+        m_currentPosition += totalSize;
 #else
 #if FASTCDR_SIZEOF_LONG_DOUBLE == 8
-        for (size_t idx = 0; idx < num_elements; ++idx)
+        for (size_t idx = 0; idx < numElements; ++idx)
         {
-            current_position_ << static_cast<long double>(0);
-            current_position_ += 8;
-            current_position_ << ldouble_t[idx];
-            current_position_ += 8;
+            m_currentPosition << static_cast<long double>(0);
+            m_currentPosition += 8;
+            m_currentPosition << ldouble_t[idx];
+            m_currentPosition += 8;
         }
 #else
 #error unsupported long double type and no __float128 available
@@ -362,9 +362,9 @@ FastCdr& FastCdr::deserialize(
 {
     uint8_t value = 0;
 
-    if ((last_position_ - current_position_) >= sizeof(uint8_t))
+    if ((m_lastPosition - m_currentPosition) >= sizeof(uint8_t))
     {
-        current_position_++ >> value;
+        m_currentPosition++ >> value;
 
         if (value == 1)
         {
@@ -396,18 +396,18 @@ FastCdr& FastCdr::deserialize(
         string_t = NULL;
         return *this;
     }
-    else if ((last_position_ - current_position_) >= length)
+    else if ((m_lastPosition - m_currentPosition) >= length)
     {
         // Allocate memory.
         string_t =
-                reinterpret_cast<char*>(calloc(length + ((&current_position_)[length - 1] == '\0' ? 0 : 1),
+                reinterpret_cast<char*>(calloc(length + ((&m_currentPosition)[length - 1] == '\0' ? 0 : 1),
                 sizeof(char)));
-        memcpy(string_t, &current_position_, length);
-        current_position_ += length;
+        memcpy(string_t, &m_currentPosition, length);
+        m_currentPosition += length;
         return *this;
     }
 
-    set_state(state_before_error);
+    setState(state_before_error);
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
@@ -424,7 +424,7 @@ FastCdr& FastCdr::deserialize(
         string_t = NULL;
         return *this;
     }
-    else if ((last_position_ - current_position_) >= length)
+    else if ((m_lastPosition - m_currentPosition) >= length)
     {
         // Allocate memory.
         string_t = reinterpret_cast<wchar_t*>(calloc(length + 1, sizeof(wchar_t))); // WStrings never serialize terminating zero
@@ -433,93 +433,93 @@ FastCdr& FastCdr::deserialize(
         for (size_t idx = 0; idx < length; ++idx)
         {
             uint32_t temp;
-            current_position_ >> temp;
+            m_currentPosition >> temp;
             string_t[idx] = static_cast<wchar_t>(temp);
-            current_position_ += 4;
+            m_currentPosition += 4;
         }
 #else
-        memcpy(string_t, &current_position_, length * sizeof(wchar_t));
-        current_position_ += length * sizeof(wchar_t);
+        memcpy(string_t, &m_currentPosition, length * sizeof(wchar_t));
+        m_currentPosition += length * sizeof(wchar_t);
 #endif // if defined(_WIN32)
 
         return *this;
     }
 
-    set_state(state_before_error);
+    setState(state_before_error);
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-const char* FastCdr::read_string(
+const char* FastCdr::readString(
         uint32_t& length)
 {
-    const char* ret_value = "";
+    const char* returnedValue = "";
     state state_before_error(*this);
 
     *this >> length;
 
     if (length == 0)
     {
-        return ret_value;
+        return returnedValue;
     }
-    else if ((last_position_ - current_position_) >= length)
+    else if ((m_lastPosition - m_currentPosition) >= length)
     {
-        ret_value = &current_position_;
-        current_position_ += length;
-        if (ret_value[length - 1] == '\0')
+        returnedValue = &m_currentPosition;
+        m_currentPosition += length;
+        if (returnedValue[length - 1] == '\0')
         {
             --length;
         }
-        return ret_value;
+        return returnedValue;
     }
 
-    set_state(state_before_error);
+    setState(state_before_error);
     throw eprosima::fastcdr::exception::NotEnoughMemoryException(
               eprosima::fastcdr::exception::NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-std::wstring FastCdr::read_wstring(
+std::wstring FastCdr::readWString(
         uint32_t& length)
 {
-    std::wstring ret_value = L"";
+    std::wstring returnedValue = L"";
     state state_(*this);
 
     *this >> length;
-    uint32_t bytes_length = length * 4;
+    uint32_t bytesLength = length * 4;
 
-    if (bytes_length == 0)
+    if (bytesLength == 0)
     {
-        return ret_value;
+        return returnedValue;
     }
-    else if ((last_position_ - current_position_) >= bytes_length)
+    else if ((m_lastPosition - m_currentPosition) >= bytesLength)
     {
 
-        ret_value.resize(length);
-        deserialize_array(const_cast<wchar_t*>(ret_value.c_str()), length);
-        if (ret_value[length - 1] == L'\0')
+        returnedValue.resize(length);
+        deserializeArray(const_cast<wchar_t*>(returnedValue.c_str()), length);
+        if (returnedValue[length - 1] == L'\0')
         {
             --length;
-            ret_value.erase(length);
+            returnedValue.erase(length);
         }
-        return ret_value;
+        return returnedValue;
     }
 
-    set_state(state_);
+    setState(state_);
     throw eprosima::fastcdr::exception::NotEnoughMemoryException(
               eprosima::fastcdr::exception::NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         bool* bool_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*bool_t) * num_elements;
+    size_t totalSize = sizeof(*bool_t) * numElements;
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
-        for (size_t count = 0; count < num_elements; ++count)
+        for (size_t count = 0; count < numElements; ++count)
         {
             uint8_t value = 0;
-            current_position_++ >> value;
+            m_currentPosition++ >> value;
 
             if (value == 1)
             {
@@ -537,32 +537,32 @@ FastCdr& FastCdr::deserialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         char* char_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*char_t) * num_elements;
+    size_t totalSize = sizeof(*char_t) * numElements;
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
-        current_position_.rmemcopy(char_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.rmemcopy(char_t, totalSize);
+        m_currentPosition += totalSize;
         return *this;
     }
 
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         int16_t* short_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*short_t) * num_elements;
+    size_t totalSize = sizeof(*short_t) * numElements;
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
-        current_position_.rmemcopy(short_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.rmemcopy(short_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -570,16 +570,16 @@ FastCdr& FastCdr::deserialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         int32_t* long_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*long_t) * num_elements;
+    size_t totalSize = sizeof(*long_t) * numElements;
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
-        current_position_.rmemcopy(long_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.rmemcopy(long_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -587,12 +587,12 @@ FastCdr& FastCdr::deserialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         wchar_t* wchar,
-        size_t num_elements)
+        size_t numElements)
 {
     uint32_t value = 0;
-    for (size_t count = 0; count < num_elements; ++count)
+    for (size_t count = 0; count < numElements; ++count)
     {
         deserialize(value);
         wchar[count] = static_cast<wchar_t>(value);
@@ -600,16 +600,16 @@ FastCdr& FastCdr::deserialize_array(
     return *this;
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         int64_t* longlong_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*longlong_t) * num_elements;
+    size_t totalSize = sizeof(*longlong_t) * numElements;
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
-        current_position_.rmemcopy(longlong_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.rmemcopy(longlong_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -617,16 +617,16 @@ FastCdr& FastCdr::deserialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         float* float_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*float_t) * num_elements;
+    size_t totalSize = sizeof(*float_t) * numElements;
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
-        current_position_.rmemcopy(float_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.rmemcopy(float_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -634,16 +634,16 @@ FastCdr& FastCdr::deserialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         double* double_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = sizeof(*double_t) * num_elements;
+    size_t totalSize = sizeof(*double_t) * numElements;
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
-        current_position_.rmemcopy(double_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.rmemcopy(double_t, totalSize);
+        m_currentPosition += totalSize;
 
         return *this;
     }
@@ -651,33 +651,33 @@ FastCdr& FastCdr::deserialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::deserialize_array(
+FastCdr& FastCdr::deserializeArray(
         long double* ldouble_t,
-        size_t num_elements)
+        size_t numElements)
 {
-    size_t total_size = 16 * num_elements;
+    size_t totalSize = 16 * numElements;
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
 #if FASTCDR_HAVE_FLOAT128 && FASTCDR_SIZEOF_LONG_DOUBLE < 16
-        for (size_t idx = 0; idx < num_elements; ++idx)
+        for (size_t idx = 0; idx < numElements; ++idx)
         {
             __float128 tmp;
-            current_position_ >> tmp;
-            current_position_ += 16;
+            m_currentPosition >> tmp;
+            m_currentPosition += 16;
             ldouble_t[idx] = static_cast<long double>(tmp);
         }
 #else
 #if FASTCDR_SIZEOF_LONG_DOUBLE == 16
-        current_position_.rmemcopy(ldouble_t, total_size);
-        current_position_ += total_size;
+        m_currentPosition.rmemcopy(ldouble_t, totalSize);
+        m_currentPosition += totalSize;
 #else
 #if FASTCDR_SIZEOF_LONG_DOUBLE == 8
-        for (size_t idx = 0; idx < num_elements; ++idx)
+        for (size_t idx = 0; idx < numElements; ++idx)
         {
-            current_position_ += 8;
-            current_position_ >> ldouble_t[idx];
-            current_position_ += 8;
+            m_currentPosition += 8;
+            m_currentPosition >> ldouble_t[idx];
+            m_currentPosition += 8;
         }
 #else
 #error unsupported long double type and no __float128 available
@@ -691,16 +691,16 @@ FastCdr& FastCdr::deserialize_array(
     throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
 }
 
-FastCdr& FastCdr::serialize_bool_sequence(
+FastCdr& FastCdr::serializeBoolSequence(
         const std::vector<bool>& vector_t)
 {
     state state_before_error(*this);
 
     *this << static_cast<int32_t>(vector_t.size());
 
-    size_t total_size = vector_t.size() * sizeof(bool);
+    size_t totalSize = vector_t.size() * sizeof(bool);
 
-    if (((last_position_ - current_position_) >= total_size) || resize(total_size))
+    if (((m_lastPosition - m_currentPosition) >= totalSize) || resize(totalSize))
     {
         for (size_t count = 0; count < vector_t.size(); ++count)
         {
@@ -711,35 +711,35 @@ FastCdr& FastCdr::serialize_bool_sequence(
             {
                 value = 1;
             }
-            current_position_++ << value;
+            m_currentPosition++ << value;
         }
     }
     else
     {
-        set_state(state_before_error);
+        setState(state_before_error);
         throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
     }
 
     return *this;
 }
 
-FastCdr& FastCdr::deserialize_bool_sequence(
+FastCdr& FastCdr::deserializeBoolSequence(
         std::vector<bool>& vector_t)
 {
-    uint32_t sequence_length = 0;
+    uint32_t seqLength = 0;
     state state_before_error(*this);
 
-    *this >> sequence_length;
+    *this >> seqLength;
 
-    size_t total_size = sequence_length * sizeof(bool);
+    size_t totalSize = seqLength * sizeof(bool);
 
-    if ((last_position_ - current_position_) >= total_size)
+    if ((m_lastPosition - m_currentPosition) >= totalSize)
     {
-        vector_t.resize(sequence_length);
-        for (uint32_t count = 0; count < sequence_length; ++count)
+        vector_t.resize(seqLength);
+        for (uint32_t count = 0; count < seqLength; ++count)
         {
             uint8_t value = 0;
-            current_position_++ >> value;
+            m_currentPosition++ >> value;
 
             if (value == 1)
             {
@@ -753,61 +753,61 @@ FastCdr& FastCdr::deserialize_bool_sequence(
     }
     else
     {
-        set_state(state_before_error);
+        setState(state_before_error);
         throw NotEnoughMemoryException(NotEnoughMemoryException::NOT_ENOUGH_MEMORY_MESSAGE_DEFAULT);
     }
 
     return *this;
 }
 
-FastCdr& FastCdr::deserialize_string_sequence(
+FastCdr& FastCdr::deserializeStringSequence(
         std::string*& sequence_t,
-        size_t& num_elements)
+        size_t& numElements)
 {
-    uint32_t sequence_length = 0;
+    uint32_t seqLength = 0;
     state state_before_error(*this);
 
-    deserialize(sequence_length);
+    deserialize(seqLength);
 
     try
     {
-        sequence_t = new std::string[sequence_length];
-        deserialize_array(sequence_t, sequence_length);
+        sequence_t = new std::string[seqLength];
+        deserializeArray(sequence_t, seqLength);
     }
     catch (eprosima::fastcdr::exception::Exception& ex)
     {
         delete [] sequence_t;
         sequence_t = NULL;
-        set_state(state_before_error);
+        setState(state_before_error);
         ex.raise();
     }
 
-    num_elements = sequence_length;
+    numElements = seqLength;
     return *this;
 }
 
-FastCdr& FastCdr::deserialize_wstring_sequence(
+FastCdr& FastCdr::deserializeWStringSequence(
         std::wstring*& sequence_t,
-        size_t& num_elements)
+        size_t& numElements)
 {
-    uint32_t sequence_length = 0;
+    uint32_t seqLength = 0;
     state state_before_error(*this);
 
-    deserialize(sequence_length);
+    deserialize(seqLength);
 
     try
     {
-        sequence_t = new std::wstring[sequence_length];
-        deserialize_array(sequence_t, sequence_length);
+        sequence_t = new std::wstring[seqLength];
+        deserializeArray(sequence_t, seqLength);
     }
     catch (eprosima::fastcdr::exception::Exception& ex)
     {
         delete [] sequence_t;
         sequence_t = NULL;
-        set_state(state_before_error);
+        setState(state_before_error);
         ex.raise();
     }
 
-    num_elements = sequence_length;
+    numElements = seqLength;
     return *this;
 }

@@ -44,7 +44,7 @@ HelloWorldSubscriber::HelloWorldSubscriber()
     , subscriber_(nullptr)
     , topic_(nullptr)
     , reader_(nullptr)
-    , type_(new AdvancedConfigurationPubSubType())
+    , type_(new HelloWorldPubSubType())
 {
 }
 
@@ -68,74 +68,65 @@ bool HelloWorldSubscriber::init(
         bool transient,
         int hops,
         const std::string& partitions,
-        bool use_ownership,
-        const std::string& profile)
+        bool use_ownership)
 {
     DomainParticipantQos pqos;
     pqos.name("Participant_sub");
 
-    if (profile.empty())
+    // TRANSPORT CONFIG
+    // If it is set, not use default and set the transport
+    if (transport != DEFAULT || hops > 0 )
     {
-        // TRANSPORT CONFIG
-        // If it is set, not use default and set the transport
-        if (transport != DEFAULT || hops > 0 )
+        pqos.transport().use_builtin_transports = false;
+
+        switch ( transport )
         {
-            pqos.transport().use_builtin_transports = false;
-
-            switch ( transport )
+            case SHM:
             {
-                case SHM:
-                {
-                    auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
-                    pqos.transport().user_transports.push_back(shm_transport);
-                }
-                break;
-                case UDPv4:
-                {
-                    auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-                    pqos.transport().user_transports.push_back(udp_transport);
-                }
-                break;
-                case UDPv6:
-                {
-                    auto udp_transport = std::make_shared<UDPv6TransportDescriptor>();
-                    pqos.transport().user_transports.push_back(udp_transport);
-                }
-                break;
-                case DEFAULT:
-                default:
-                {
-                    // mimick default transport selection
-                    auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-                    pqos.transport().user_transports.push_back(udp_transport);
-    #ifdef SHM_TRANSPORT_BUILTIN
-                    auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
-                    pqos.transport().user_transports.push_back(shm_transport);
-    #endif // SHM_TRANSPORT_BUILTIN
-                }
+                auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
+                pqos.transport().user_transports.push_back(shm_transport);
             }
-
-            if ( hops > 0 )
+            break;
+            case UDPv4:
             {
-                for (auto& transportDescriptor : pqos.transport().user_transports)
-                {
-                    SocketTransportDescriptor* pT = dynamic_cast<SocketTransportDescriptor*>(transportDescriptor.get());
-                    if (pT)
-                    {
-                        pT->TTL = (uint8_t)std::min(hops, 255);
-                    }
-                }
+                auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+                pqos.transport().user_transports.push_back(udp_transport);
+            }
+            break;
+            case UDPv6:
+            {
+                auto udp_transport = std::make_shared<UDPv6TransportDescriptor>();
+                pqos.transport().user_transports.push_back(udp_transport);
+            }
+            break;
+            case DEFAULT:
+            default:
+            {
+                // mimick default transport selection
+                auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+                pqos.transport().user_transports.push_back(udp_transport);
+#ifdef SHM_TRANSPORT_BUILTIN
+                auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
+                pqos.transport().user_transports.push_back(shm_transport);
+#endif // SHM_TRANSPORT_BUILTIN
             }
         }
 
-        // CREATE THE PARTICIPANT
-        participant_ = DomainParticipantFactory::get_instance()->create_participant(domain, pqos);
+        if ( hops > 0 )
+        {
+            for (auto& transportDescriptor : pqos.transport().user_transports)
+            {
+                SocketTransportDescriptor* pT = dynamic_cast<SocketTransportDescriptor*>(transportDescriptor.get());
+                if (pT)
+                {
+                    pT->TTL = (uint8_t)std::min(hops, 255);
+                }
+            }
+        }
     }
-    else
-    {
-        // Create participant from xml profile
-        participant_ = DomainParticipantFactory::get_instance()->create_participant_with_profile(profile);
-    }
+
+    // CREATE THE PARTICIPANT
+    participant_ = DomainParticipantFactory::get_instance()->create_participant(domain, pqos);
 
     if (participant_ == nullptr)
     {
@@ -169,7 +160,7 @@ bool HelloWorldSubscriber::init(
     // CREATE THE TOPIC
     topic_ = participant_->create_topic(
         topic_name,
-        "AdvancedConfiguration",
+        "HelloWorld",
         TOPIC_QOS_DEFAULT);
 
     if (topic_ == nullptr)
@@ -288,9 +279,7 @@ void HelloWorldSubscriber::SubListener::on_data_available(
         {
             samples_++;
             // Print your structure data here.
-            std::cout << "Sample received: " << hello_.message().data() << "  " << hello_.index() <<
-                "  (" << static_cast<int>(hello_.data().size()) << " Bytes)" << std::endl;
-
+            std::cout << "Message " << hello_.message().data() << " " << hello_.index() << " RECEIVED" << std::endl;
             if (max_messages_ > 0 && (samples_ >= max_messages_))
             {
                 stop();

@@ -17,13 +17,12 @@
  *
  */
 
-#include <cassert>
-#include <limits>
-#include <thread>
-
 #include <fastdds/rtps/common/EntityId_t.hpp>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/messages/MessageReceiver.h>
+
+#include <cassert>
+#include <limits>
 
 #include <fastdds/core/policy/ParameterList.hpp>
 #include <fastdds/dds/log/Log.hpp>
@@ -1157,7 +1156,7 @@ bool MessageReceiver::proc_Submsg_Heartbeat(
 
     //Look for the correct reader and writers:
     findAllReaders(readerGUID.entityId,
-            [was_decoded, &writerGUID, &HBCount, &firstSN, &lastSN, finalFlag, livelinessFlag, this](RTPSReader* reader)
+            [was_decoded, &writerGUID, &HBCount, &firstSN, &lastSN, finalFlag, livelinessFlag](RTPSReader* reader)
             {
                 // Only used when HAVE_SECURITY is defined
                 static_cast<void>(was_decoded);
@@ -1165,8 +1164,7 @@ bool MessageReceiver::proc_Submsg_Heartbeat(
                 if (was_decoded || !reader->getAttributes().security_attributes().is_submessage_protected)
 #endif  // HAVE_SECURITY
                 {
-                    reader->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag,
-                    source_vendor_id_);
+                    reader->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag);
                 }
             });
 
@@ -1217,7 +1215,7 @@ bool MessageReceiver::proc_Submsg_Acknack(
 #endif  // HAVE_SECURITY
         {
             bool result;
-            if (it->process_acknack(writerGUID, readerGUID, Ackcount, SNSet, finalFlag, result, source_vendor_id_))
+            if (it->process_acknack(writerGUID, readerGUID, Ackcount, SNSet, finalFlag, result))
             {
                 if (!result)
                 {
@@ -1265,7 +1263,7 @@ bool MessageReceiver::proc_Submsg_Gap(
     }
 
     findAllReaders(readerGUID.entityId,
-            [was_decoded, &writerGUID, &gapStart, &gapList, this](RTPSReader* reader)
+            [was_decoded, &writerGUID, &gapStart, &gapList](RTPSReader* reader)
             {
                 // Only used when HAVE_SECURITY is defined
                 static_cast<void>(was_decoded);
@@ -1273,7 +1271,7 @@ bool MessageReceiver::proc_Submsg_Gap(
                 if (was_decoded || !reader->getAttributes().security_attributes().is_submessage_protected)
 #endif  // HAVE_SECURITY
                 {
-                    reader->processGapMsg(writerGUID, gapStart, gapList, source_vendor_id_);
+                    reader->processGapMsg(writerGUID, gapStart, gapList);
                 }
             });
 
@@ -1417,7 +1415,7 @@ bool MessageReceiver::proc_Submsg_NackFrag(
 #endif  // HAVE_SECURITY
         {
             bool result;
-            if (it->process_nack_frag(writerGUID, readerGUID, Ackcount, writerSN, fnState, result, source_vendor_id_))
+            if (it->process_nack_frag(writerGUID, readerGUID, Ackcount, writerSN, fnState, result))
             {
                 if (!result)
                 {

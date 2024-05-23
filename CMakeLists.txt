@@ -15,7 +15,8 @@
 ###############################################################################
 # CMake build rules for Fast DDS
 ###############################################################################
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.16.3)
+cmake_policy(VERSION 3.16.3...3.20.3)
 
 # Set CMAKE_BUILD_TYPE to Release by default.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -29,7 +30,7 @@ endif()
 ###############################################################################
 # Project                                                                     #
 ###############################################################################
-project(fastrtps VERSION "2.14.1" LANGUAGES C CXX)
+project(fastrtps VERSION "2.10.4" LANGUAGES C CXX)
 
 set(PROJECT_NAME_LARGE "Fast RTPS")
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
@@ -193,7 +194,7 @@ if(APPEND_PROJECT_NAME_TO_INCLUDEDIR)
 endif()
 set(INCLUDE_INSTALL_DIR "${_include_dir}" CACHE PATH "Installation directory for C++ headers")
 unset(_include_dir)
-set(LIB_INSTALL_DIR lib${LIB_SUFFIX}/ CACHE PATH "Installation directory for libraries")
+set(LIB_INSTALL_DIR lib/ CACHE PATH "Installation directory for libraries")
 set(DATA_INSTALL_DIR share/ CACHE PATH "Installation directory for data")
 if(WIN32)
     set(DOC_DIR "doc")
@@ -556,13 +557,8 @@ install(FILES ${PROJECT_SOURCE_DIR}/LICENSE
     COMPONENT licenses
     )
 
-# Install xml validators
+# Install xml validator
 install(FILES ${PROJECT_SOURCE_DIR}/resources/xsd/fastRTPS_profiles.xsd
-    DESTINATION ${DATA_INSTALL_DIR}
-    COMPONENT xsd
-    )
-
-install(FILES ${PROJECT_SOURCE_DIR}/resources/xsd/fastdds_static_discovery.xsd
     DESTINATION ${DATA_INSTALL_DIR}
     COMPONENT xsd
     )

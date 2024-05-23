@@ -40,12 +40,16 @@
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
-#include <fastdds/publisher/DataWriterImpl.hpp>
 #include <fastdds/rtps/writer/RTPSWriter.h>
 #include <fastdds/rtps/writer/StatefulWriter.h>
 
+#include <fastdds/publisher/DataWriterImpl.hpp>
+
 #include "../../common/CustomPayloadPool.hpp"
 #include "../../logging/mock/MockConsumer.h"
+
+#include <mutex>
+#include <condition_variable>
 
 namespace eprosima {
 namespace fastdds {
@@ -101,16 +105,8 @@ public:
     }
 
     bool serialize(
-            void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override
-    {
-        return serialize(data, payload, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    bool serialize(
             void* /*data*/,
-            fastrtps::rtps::SerializedPayload_t* /*payload*/,
-            DataRepresentationId_t /*data_representation*/) override
+            fastrtps::rtps::SerializedPayload_t* /*payload*/) override
     {
         return true;
     }
@@ -123,14 +119,7 @@ public:
     }
 
     std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override
-    {
-        return getSerializedSizeProvider(data, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/,
-            DataRepresentationId_t /*data_representation*/) override
+            void* /*data*/) override
     {
         return []()->uint32_t
                {
@@ -212,14 +201,6 @@ public:
         return true;
     }
 
-    bool serialize(
-            void* /*data*/,
-            fastrtps::rtps::SerializedPayload_t* /*payload*/,
-            DataRepresentationId_t /*data_representation*/) override
-    {
-        return true;
-    }
-
     bool deserialize(
             fastrtps::rtps::SerializedPayload_t* /*payload*/,
             void* /*data*/) override
@@ -229,16 +210,6 @@ public:
 
     std::function<uint32_t()> getSerializedSizeProvider(
             void* /*data*/) override
-    {
-        return []()->uint32_t
-               {
-                   return 0;
-               };
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/,
-            DataRepresentationId_t /*data_representation*/) override
     {
         return []()->uint32_t
                {
@@ -287,14 +258,6 @@ public:
         return true;
     }
 
-    bool serialize(
-            void* /*data*/,
-            fastrtps::rtps::SerializedPayload_t* /*payload*/,
-            DataRepresentationId_t /*data_representation*/) override
-    {
-        return true;
-    }
-
     bool deserialize(
             fastrtps::rtps::SerializedPayload_t* /*payload*/,
             void* /*data*/) override
@@ -304,13 +267,6 @@ public:
 
     std::function<uint32_t()> getSerializedSizeProvider(
             void* /*data*/) override
-    {
-        return std::function<uint32_t()>();
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/,
-            DataRepresentationId_t /*data_representation*/) override
     {
         return std::function<uint32_t()>();
     }
@@ -1324,7 +1280,6 @@ class LoanableTypeSupport : public TopicDataType
 public:
 
     typedef LoanableType type;
-    using TopicDataType::is_plain;
 
     LoanableTypeSupport()
         : TopicDataType()
@@ -1340,14 +1295,6 @@ public:
         return true;
     }
 
-    bool serialize(
-            void* /*data*/,
-            fastrtps::rtps::SerializedPayload_t* /*payload*/,
-            DataRepresentationId_t /*data_representation*/) override
-    {
-        return true;
-    }
-
     bool deserialize(
             fastrtps::rtps::SerializedPayload_t* /*payload*/,
             void* /*data*/) override
@@ -1357,16 +1304,6 @@ public:
 
     std::function<uint32_t()> getSerializedSizeProvider(
             void* /*data*/) override
-    {
-        return [this]()
-               {
-                   return m_typeSize;
-               };
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/,
-            DataRepresentationId_t /*data_representation*/) override
     {
         return [this]()
                {
@@ -1398,12 +1335,6 @@ public:
     }
 
     bool is_plain() const override
-    {
-        return true;
-    }
-
-    bool is_plain(
-            DataRepresentationId_t) const override
     {
         return true;
     }
@@ -1505,18 +1436,10 @@ class LoanableTypeSupportTesting : public LoanableTypeSupport
 {
 public:
 
-    using LoanableTypeSupport::is_plain;
-
     bool is_plain_result = true;
     bool construct_sample_result = true;
 
     bool is_plain() const override
-    {
-        return is_plain_result;
-    }
-
-    bool is_plain(
-            DataRepresentationId_t) const override
     {
         return is_plain_result;
     }
@@ -2084,7 +2007,9 @@ TEST(DataWriterTests, CustomPoolCreation)
 
     DataWriterQos writer_qos = DATAWRITER_QOS_DEFAULT;
 
-    DataWriter* data_writer = publisher->create_datawriter(topic, writer_qos, nullptr, StatusMask::all(), payload_pool);
+    DataWriter* data_writer =
+            publisher->create_datawriter_with_payload_pool(
+        topic, writer_qos, payload_pool, nullptr, StatusMask::all());
 
     ASSERT_NE(data_writer, nullptr);
     ASSERT_NE(data_reader, nullptr);
@@ -2167,88 +2092,6 @@ TEST(DataWriterTests, history_depth_max_samples_per_instance_warning)
     participant->delete_contained_entities();
     DomainParticipantFactory::get_instance()->delete_participant(participant);
     Log::KillThread();
-}
-
-class DataRepresentationTestsTypeSupport : public LoanableTypeSupport
-{
-public:
-
-    bool is_bounded() const override
-    {
-        return true;
-    }
-
-    MOCK_CONST_METHOD1(custom_is_plain_with_rep, bool(DataRepresentationId_t data_representation_id));
-
-    bool is_plain(
-            DataRepresentationId_t data_representation_id) const override
-    {
-        return custom_is_plain_with_rep(data_representation_id);
-    }
-
-    MOCK_CONST_METHOD0(custom_is_plain, bool());
-
-    bool is_plain() const override
-    {
-        return custom_is_plain();
-    }
-
-};
-
-TEST(DataWriterTests, data_type_is_plain_data_representation)
-{
-    /* Create a participant, topic, and a publisher */
-    DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(0,
-                    PARTICIPANT_QOS_DEFAULT);
-    ASSERT_NE(participant, nullptr);
-
-    DataRepresentationTestsTypeSupport* type = new DataRepresentationTestsTypeSupport();
-    TypeSupport ts (type);
-    ts.register_type(participant);
-
-    Topic* topic = participant->create_topic("plain_topic", "LoanableType", TOPIC_QOS_DEFAULT);
-    ASSERT_NE(topic, nullptr);
-
-    Publisher* publisher = participant->create_publisher(PUBLISHER_QOS_DEFAULT);
-    ASSERT_NE(publisher, nullptr);
-
-    /* Define default data representation (XCDR1) QoS to force "is_plain" call */
-    DataWriterQos qos_xcdr = DATAWRITER_QOS_DEFAULT;
-    qos_xcdr.endpoint().history_memory_policy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-
-    /* Expect the "is_plain" method called with default data representation (XCDR1) */
-    EXPECT_CALL(*type, custom_is_plain()).Times(0);
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR_DATA_REPRESENTATION)).Times(
-        testing::AtLeast(1)).WillRepeatedly(testing::Return(true));
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR2_DATA_REPRESENTATION)).Times(0);
-
-    /* Create a datawriter will trigger the "is_plain" call */
-    DataWriter* datawriter_xcdr = publisher->create_datawriter(topic, qos_xcdr);
-    ASSERT_NE(datawriter_xcdr, nullptr);
-
-    testing::Mock::VerifyAndClearExpectations(&type);
-
-    /* Define XCDR2 data representation QoS to force "is_plain" call */
-    DataWriterQos qos_xcdr2 = DATAWRITER_QOS_DEFAULT;
-    qos_xcdr2.endpoint().history_memory_policy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-    qos_xcdr2.representation().m_value.clear();
-    qos_xcdr2.representation().m_value.push_back(DataRepresentationId_t::XCDR2_DATA_REPRESENTATION);
-
-    /* Expect the "is_plain" method called with XCDR2 data representation */
-    EXPECT_CALL(*type, custom_is_plain()).Times(0);
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR_DATA_REPRESENTATION)).Times(0);
-    EXPECT_CALL(*type, custom_is_plain_with_rep(DataRepresentationId_t::XCDR2_DATA_REPRESENTATION)).Times(
-        testing::AtLeast(1)).WillRepeatedly(testing::Return(true));
-
-    /* Create a datawriter will trigger the "is_plain" call */
-    DataWriter* datawriter_xcdr2 = publisher->create_datawriter(topic, qos_xcdr2);
-    ASSERT_NE(datawriter_xcdr2, nullptr);
-
-    testing::Mock::VerifyAndClearExpectations(&type);
-
-    /* Tear down */
-    participant->delete_contained_entities();
-    DomainParticipantFactory::get_instance()->delete_participant(participant);
 }
 
 } // namespace dds

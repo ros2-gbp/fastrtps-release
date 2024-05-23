@@ -24,7 +24,6 @@
 
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/SerializedPayload.h>
-#include <fastdds/rtps/common/VendorId_t.hpp>
 
 namespace eprosima {
 namespace fastcdr {
@@ -101,7 +100,7 @@ public:
      * @param _vendorId New value for member vendorId
      */
     inline void vendorId(
-            const fastdds::rtps::VendorId_t& _vendorId)
+            const fastrtps::rtps::VendorId_t& _vendorId)
     {
         m_vendorId = _vendorId;
     }
@@ -110,7 +109,7 @@ public:
      * @brief This function returns the value of member vendorId
      * @return Value of member vendorId
      */
-    inline fastdds::rtps::VendorId_t vendorId() const
+    inline fastrtps::rtps::VendorId_t vendorId() const
     {
         return m_vendorId;
     }
@@ -119,7 +118,7 @@ public:
      * @brief This function returns a reference to member vendorId
      * @return Reference to member vendorId
      */
-    inline fastdds::rtps::VendorId_t& vendorId()
+    inline fastrtps::rtps::VendorId_t& vendorId()
     {
         return m_vendorId;
     }
@@ -187,7 +186,7 @@ public:
 private:
 
     fastrtps::rtps::ProtocolVersion_t m_protocolVersion;
-    fastdds::rtps::VendorId_t m_vendorId;
+    fastrtps::rtps::VendorId_t m_vendorId;
     Locator m_transportLocator;
 };
 /*!

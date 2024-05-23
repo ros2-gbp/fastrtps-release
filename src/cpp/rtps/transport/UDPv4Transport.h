@@ -123,10 +123,9 @@ protected:
             const Locator& loc,
             uint16_t port) override;
     asio::ip::udp generate_protocol() const override;
-    bool get_ips(
+    void get_ips(
             std::vector<fastrtps::rtps::IPFinder::info_IP>& locNames,
-            bool return_loopback,
-            bool force_lookup) const override;
+            bool return_loopback = false) override;
     const std::string& localhost_name() override;
     eProsimaUDPSocket OpenAndBindInputSocket(
             const std::string& sIp,
@@ -135,7 +134,7 @@ protected:
 
     //! Checks if the given interface is allowed by the white list.
     bool is_interface_allowed(
-            const std::string& iface) const override;
+            const std::string& interface) const override;
 
     /**
      * Method to get a list of interfaces to bind the socket associated to the given locator.

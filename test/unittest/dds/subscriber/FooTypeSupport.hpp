@@ -15,9 +15,9 @@
 #ifndef _TEST_UNITTEST_DDS_SUBSCRIBER_FOOTYPESUPPORT_HPP_
 #define _TEST_UNITTEST_DDS_SUBSCRIBER_FOOTYPESUPPORT_HPP_
 
+#include <fastcdr/Cdr.h>
 
 #include <fastdds/dds/topic/TopicDataType.hpp>
-#include <fastdds/rtps/common/CdrSerialization.hpp>
 
 #include "./FooType.hpp"
 
@@ -39,37 +39,20 @@ public:
 
     bool serialize(
             void* data,
-            eprosima::fastrtps::rtps::SerializedPayload_t* payload) override
-    {
-        return serialize(data, payload, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    bool serialize(
-            void* data,
-            fastrtps::rtps::SerializedPayload_t* payload,
-            DataRepresentationId_t data_representation) override
+            fastrtps::rtps::SerializedPayload_t* payload) override
     {
         FooType* p_type = static_cast<FooType*>(data);
 
         // Object that manages the raw buffer.
         eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(payload->data), payload->max_size);
         // Object that serializes the data.
-        eprosima::fastcdr::Cdr ser(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                data_representation == DataRepresentationId_t::XCDR_DATA_REPRESENTATION ?
-                eprosima::fastcdr::CdrVersion::XCDRv1 : eprosima::fastcdr::CdrVersion::XCDRv2);
+        eprosima::fastcdr::Cdr ser(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
         payload->encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-#if FASTCDR_VERSION_MAJOR > 1
-        ser.set_encoding_flag(
-            data_representation == DataRepresentationId_t::XCDR_DATA_REPRESENTATION ?
-            eprosima::fastcdr::EncodingAlgorithmFlag::PLAIN_CDR  :
-            eprosima::fastcdr::EncodingAlgorithmFlag::PLAIN_CDR2);
-#endif // FASTCDR_VERSION_MAJOR > 1
+        // Serialize encapsulation
+        ser.serialize_encapsulation();
 
         try
         {
-            // Serialize encapsulation
-            ser.serialize_encapsulation();
-
             // Serialize the object.
             p_type->serialize(ser);
         }
@@ -79,11 +62,7 @@ public:
         }
 
         // Get the serialized length
-#if FASTCDR_VERSION_MAJOR == 1
         payload->length = static_cast<uint32_t>(ser.getSerializedDataLength());
-#else
-        payload->length = static_cast<uint32_t>(ser.get_serialized_data_length());
-#endif // FASTCDR_VERSION_MAJOR == 1
         return true;
     }
 
@@ -98,12 +77,7 @@ public:
         eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(payload->data), payload->length);
 
         // Object that deserializes the data.
-        eprosima::fastcdr::Cdr deser(fb
-#if FASTCDR_VERSION_MAJOR == 1
-                , eprosima::fastcdr::Cdr::DEFAULT_ENDIAN
-                , eprosima::fastcdr::Cdr::CdrType::DDS_CDR
-#endif // FASTCDR_VERSION_MAJOR == 1
-                );
+        eprosima::fastcdr::Cdr deser(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
 
         // Deserialize encapsulation.
         deser.read_encapsulation();
@@ -123,14 +97,7 @@ public:
     }
 
     std::function<uint32_t()> getSerializedSizeProvider(
-            void* data) override
-    {
-        return getSerializedSizeProvider(data, eprosima::fastdds::dds::DEFAULT_DATA_REPRESENTATION);
-    }
-
-    std::function<uint32_t()> getSerializedSizeProvider(
-            void* /*data*/,
-            DataRepresentationId_t /*data_representation*/) override
+            void* /*data*/) override
     {
         return [this]
                {
@@ -168,11 +135,7 @@ public:
         {
             MD5 md5;
             md5.init();
-#if FASTCDR_VERSION_MAJOR == 1
             md5.update(key_buf, static_cast<unsigned int>(ser.getSerializedDataLength()));
-#else
-            md5.update(key_buf, static_cast<unsigned int>(ser.get_serialized_data_length()));
-#endif // FASTCDR_VERSION_MAJOR == 1
             md5.finalize();
             for (uint8_t i = 0; i < 16; ++i)
             {
@@ -206,9 +169,6 @@ public:
         return true;
     }
 
-private:
-
-    using TopicDataType::is_plain;
 };
 
 } // namespace dds

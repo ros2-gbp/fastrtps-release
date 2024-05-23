@@ -575,14 +575,8 @@ private:
             type data;
             eprosima::fastcdr::FastBuffer buffer((char*)change->serializedPayload.data,
                     change->serializedPayload.length);
-            eprosima::fastcdr::Cdr cdr(buffer
-#if FASTCDR_VERSION_MAJOR == 1
-                    , eprosima::fastcdr::Cdr::DEFAULT_ENDIAN
-                    , eprosima::fastcdr::Cdr::CdrType::DDS_CDR
-#endif // FASTCDR_VERSION_MAJOR == 1
-                    );
+            eprosima::fastcdr::Cdr cdr(buffer);
 
-            cdr.read_encapsulation();
             cdr >> data;
 
             auto it = std::find(total_msgs_.begin(), total_msgs_.end(), data);

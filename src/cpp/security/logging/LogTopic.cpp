@@ -1,42 +1,34 @@
 #include <security/logging/LogTopic.h>
 
-#include <functional>
-
-#include <utils/thread.hpp>
-#include <utils/threading.hpp>
+#include <fastrtps/publisher/Publisher.h>
+#include <fastrtps/log/Log.h>
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 namespace security {
 
-LogTopic::LogTopic(
-        uint32_t thread_id,
-        const fastdds::rtps::ThreadSettings& thr_config)
+LogTopic::LogTopic()
     : stop_(false)
-    , thread_(
-        create_thread(
-            [this]()
-            {
-                while (true)
-                {
-                    // Put the thread asleep until there is
-                    // something to process
-                    auto p = queue_.wait_pop();
-
-                    if (!p)
+    , thread_([this]() {
+                    for (;;)
                     {
-                        if (stop_)
-                        {
-                            return;
-                        }
-                        continue;
-                    }
+                        // Put the thread asleep until there is
+                        // something to process
+                        auto p = queue_.wait_pop();
 
-                    publish(*p);
-                }
-            },
-            thr_config, "dds.slog.%u", thread_id))
+                        if (!p)
+                        {
+                            if (stop_)
+                            {
+                                return;
+                            }
+                            continue;
+                        }
+
+                        publish(*p);
+                    }
+                })
 {
     //
 }
@@ -76,7 +68,7 @@ bool LogTopic::enable_logging_impl(
     {
         file_stream_.open(options.log_file, std::ios::out | std::ios::app);
 
-        if ((file_stream_.rdstate() & std::ofstream::failbit ) != 0 )
+        if ( (file_stream_.rdstate() & std::ofstream::failbit ) != 0 )
         {
             exception = SecurityException("Error opening file: " + options.log_file);
             return false;

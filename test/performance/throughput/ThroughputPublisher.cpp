@@ -19,10 +19,9 @@
 
 #include "ThroughputPublisher.hpp"
 
-#include <chrono>
-#include <fstream>
 #include <map>
-#include <thread>
+#include <fstream>
+#include <chrono>
 
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
@@ -32,10 +31,10 @@
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastrtps/utils/TimeConversion.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastrtps::rtps;

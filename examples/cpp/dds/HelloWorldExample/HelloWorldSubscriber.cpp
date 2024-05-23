@@ -18,10 +18,6 @@
  */
 
 #include "HelloWorldSubscriber.h"
-
-#include <chrono>
-#include <thread>
-
 #include <fastrtps/attributes/ParticipantAttributes.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>

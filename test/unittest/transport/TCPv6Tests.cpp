@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <limits>
 #include <memory>
 #include <thread>
 
@@ -58,14 +59,6 @@ class TCPv6Tests : public ::testing::Test
 {
 public:
 
-    void SetUp() override
-    {
-#ifdef __APPLE__
-        // TODO: fix IPv6 issues related with zone ID
-        GTEST_SKIP() << "TCPv6 tests are disabled in Mac";
-#endif // ifdef __APPLE__
-    }
-
     TCPv6Tests()
     {
         HELPER_SetDescriptorDefaults();
@@ -82,6 +75,74 @@ public:
     std::unique_ptr<std::thread> senderThread;
     std::unique_ptr<std::thread> receiverThread;
 };
+
+TEST_F(TCPv6Tests, wrong_configuration_values)
+{
+    // Too big sendBufferSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.sendBufferSize = std::numeric_limits<uint32_t>::max();
+        TCPv6Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // Too big receiveBufferSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.receiveBufferSize = std::numeric_limits<uint32_t>::max();
+        TCPv6Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // Too big maxMessageSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.maxMessageSize = std::numeric_limits<uint32_t>::max();
+        TCPv6Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // maxMessageSize bigger than receiveBufferSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.maxMessageSize = 10;
+        wrong_descriptor.receiveBufferSize = 5;
+        TCPv6Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // maxMessageSize bigger than sendBufferSize
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.maxMessageSize = 10;
+        wrong_descriptor.sendBufferSize = 5;
+        TCPv6Transport transportUnderTest(wrong_descriptor);
+        ASSERT_FALSE(transportUnderTest.init());
+        eprosima::fastdds::dds::Log::Flush();
+    }
+
+    // Buffer sizes automatically decrease
+    {
+        auto wrong_descriptor = descriptor;
+        wrong_descriptor.sendBufferSize = static_cast<uint32_t>(std::numeric_limits<int32_t>::max());
+        wrong_descriptor.receiveBufferSize = static_cast<uint32_t>(std::numeric_limits<int32_t>::max());
+        wrong_descriptor.maxMessageSize = 1470;
+        TCPv6Transport transportUnderTest(wrong_descriptor);
+        ASSERT_TRUE(transportUnderTest.init());
+        auto* final_cfg = transportUnderTest.configuration();
+        EXPECT_GE(final_cfg->sendBufferSize, final_cfg->maxMessageSize);
+        // The system could allow for the send buffer to be MAX_INT, so we cannot check it to be strictly lower
+        EXPECT_LE(final_cfg->sendBufferSize, wrong_descriptor.sendBufferSize);
+        EXPECT_GE(final_cfg->receiveBufferSize, final_cfg->maxMessageSize);
+        // The system could allow for the receive buffer to be MAX_INT, so we cannot check it to be strictly lower
+        EXPECT_LE(final_cfg->receiveBufferSize, wrong_descriptor.receiveBufferSize);
+        eprosima::fastdds::dds::Log::Flush();
+    }
+}
 
 TEST_F(TCPv6Tests, conversion_to_ip6_string)
 {
@@ -197,71 +258,23 @@ TEST_F(TCPv6Tests, autofill_port)
     transportUnderTest_autofill.init();
 
     EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports[0] != 0);
-    EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports.size() == 1u);
-}
+    EXPECT_TRUE(transportUnderTest_autofill.configuration()->listening_ports.size() == 1);
 
-static void GetIP6s(
-        std::vector<IPFinder::info_IP>& interfaces)
-{
-    IPFinder::getIPs(&interfaces, false);
-    auto new_end = remove_if(interfaces.begin(),
-                    interfaces.end(),
-                    [](IPFinder::info_IP ip)
-                    {
-                        return ip.type != IPFinder::IP6 && ip.type != IPFinder::IP6_LOCAL;
-                    });
-    interfaces.erase(new_end, interfaces.end());
-    std::for_each(interfaces.begin(), interfaces.end(), [](IPFinder::info_IP& loc)
-            {
-                loc.locator.kind = LOCATOR_KIND_TCPv6;
-            });
-}
+    uint16_t port = 12345;
+    TCPv6TransportDescriptor test_descriptor_multiple_autofill;
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    test_descriptor_multiple_autofill.add_listener_port(port);
+    test_descriptor_multiple_autofill.add_listener_port(0);
+    TCPv6Transport transportUnderTest_multiple_autofill(test_descriptor_multiple_autofill);
+    transportUnderTest_multiple_autofill.init();
 
-TEST_F(TCPv6Tests, check_TCPv6_interface_whitelist_initialization)
-{
-    std::vector<IPFinder::info_IP> interfaces;
-
-    GetIP6s(interfaces);
-
-    // asio::ip::addres_v6 appends the interface name to the IP address, but the locator does not
-    // Create two different vectors to compare them
-    std::vector<std::string> asio_interfaces;
-    std::vector<std::string> locator_interfaces;
-    for (auto& ip : interfaces)
-    {
-        asio_interfaces.push_back(ip.name);
-        locator_interfaces.push_back(IPLocator::toIPv6string(ip.locator));
-    }
-    // Add manually localhost to test adding multiple interfaces
-    asio_interfaces.push_back("::1");
-    locator_interfaces.push_back("::1");
-
-    for (auto& ip : locator_interfaces)
-    {
-        descriptor.interfaceWhiteList.emplace_back(ip);
-    }
-    descriptor.add_listener_port(g_default_port);
-    MockTCPv6Transport transportUnderTest(descriptor);
-    transportUnderTest.init();
-
-    // Check that the transport whitelist and the acceptors map is the same size as the locator_interfaces
-    ASSERT_EQ(transportUnderTest.get_interface_whitelist().size(), descriptor.interfaceWhiteList.size());
-    ASSERT_EQ(transportUnderTest.get_acceptors_map().size(), descriptor.interfaceWhiteList.size());
-
-    // Check that every interface is in the whitelist
-    auto check_whitelist = transportUnderTest.get_interface_whitelist();
-    for (auto& ip : asio_interfaces)
-    {
-        ASSERT_NE(std::find(check_whitelist.begin(), check_whitelist.end(), asio::ip::address_v6::from_string(
-                    ip)), check_whitelist.end());
-    }
-
-    // Check that every interface is in the acceptors map
-    for (const auto& test : transportUnderTest.get_acceptors_map())
-    {
-        ASSERT_NE(std::find(locator_interfaces.begin(), locator_interfaces.end(), IPLocator::toIPv6string(
-                    test.first)), locator_interfaces.end());
-    }
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[0] != 0);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[1] == port);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports[2] != 0);
+    EXPECT_TRUE(
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[0] !=
+        transportUnderTest_multiple_autofill.configuration()->listening_ports[2]);
+    EXPECT_TRUE(transportUnderTest_multiple_autofill.configuration()->listening_ports.size() == 3);
 }
 
 // This test verifies server's channel resources mapping keys uniqueness, where keys are clients locators.
@@ -298,7 +311,7 @@ TEST_F(TCPv6Tests, client_announced_local_port_uniqueness)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    ASSERT_EQ(receiveTransportUnderTest.get_channel_resources().size(), 2u);
+    ASSERT_EQ(receiveTransportUnderTest.get_channel_resources().size(), 2);
 }
 
 #ifndef _WIN32
@@ -307,14 +320,15 @@ TEST_F(TCPv6Tests, client_announced_local_port_uniqueness)
 TEST_F(TCPv6Tests, non_blocking_send)
 {
     uint16_t port = g_default_port;
-    uint32_t msg_size = eprosima::fastdds::rtps::s_minimumSocketBuffer;
+    uint32_t msg_size = 64ul * 1024ul;
     // Create a TCP Server transport
     TCPv6TransportDescriptor senderDescriptor;
     senderDescriptor.add_listener_port(port);
-    senderDescriptor.non_blocking_send = true;
     senderDescriptor.sendBufferSize = msg_size;
     MockTCPv6Transport senderTransportUnderTest(senderDescriptor);
-    senderTransportUnderTest.init();
+    eprosima::fastrtps::rtps::RTPSParticipantAttributes att;
+    att.properties.properties().emplace_back("fastdds.tcp_transport.non_blocking_send", "true");
+    senderTransportUnderTest.init(&att.properties);
 
     // Create a TCP Client socket.
     // The creation of a reception transport for testing this functionality is not
@@ -362,7 +376,7 @@ TEST_F(TCPv6Tests, non_blocking_send)
        as communication lacks most of the discovery messages using a raw socket as participant.
      */
     auto sender_unbound_channel_resources = senderTransportUnderTest.get_unbound_channel_resources();
-    ASSERT_TRUE(sender_unbound_channel_resources.size() == 1u);
+    ASSERT_TRUE(sender_unbound_channel_resources.size() == 1);
     auto sender_channel_resource =
             std::static_pointer_cast<TCPChannelResourceBasic>(sender_unbound_channel_resources[0]);
 
@@ -505,7 +519,7 @@ TEST_F(TCPv6Tests, opening_output_channel_with_same_locator_as_local_listening_p
     // If the remote address is higher than the local one, a CONNECT channel must be created and added to the send_resource_list
     ASSERT_TRUE(transportUnderTest.OpenOutputChannel(send_resource_list, higherOutputChannelLocator));
     ASSERT_TRUE(transportUnderTest.is_output_channel_open_for(higherOutputChannelLocator));
-    ASSERT_EQ(send_resource_list.size(), 2u);
+    ASSERT_EQ(send_resource_list.size(), 2);
 }
 
 // This test verifies that the send resource list is correctly cleaned and the channel resource is removed
@@ -538,7 +552,7 @@ TEST_F(TCPv6Tests, remove_from_send_resource_list)
     IPLocator::createLocator(LOCATOR_KIND_TCPv6, "::1", g_default_port + 2, wrong_output_locator);
     IPLocator::setLogicalPort(wrong_output_locator, 7410);
     wrong_remote_participant_physical_locators.push_back(wrong_output_locator);
-    send_transport_under_test.cleanup_sender_resources(
+    send_transport_under_test.CloseOutputChannel(
         send_resource_list,
         wrong_remote_participant_physical_locators,
         initial_peer_list);
@@ -547,7 +561,7 @@ TEST_F(TCPv6Tests, remove_from_send_resource_list)
     // Using the correct locator should remove the channel resource
     LocatorList_t remote_participant_physical_locators;
     remote_participant_physical_locators.push_back(output_locator_1);
-    send_transport_under_test.cleanup_sender_resources(
+    send_transport_under_test.CloseOutputChannel(
         send_resource_list,
         remote_participant_physical_locators,
         initial_peer_list);
@@ -556,7 +570,7 @@ TEST_F(TCPv6Tests, remove_from_send_resource_list)
     // Using the initial peer locator should not remove the channel resource
     remote_participant_physical_locators.clear();
     remote_participant_physical_locators.push_back(output_locator_2);
-    send_transport_under_test.cleanup_sender_resources(
+    send_transport_under_test.CloseOutputChannel(
         send_resource_list,
         remote_participant_physical_locators,
         initial_peer_list);

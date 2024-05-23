@@ -21,22 +21,20 @@
 
 #include <inttypes.h>
 
-#include <chrono>
+#include <numeric>
 #include <cmath>
 #include <fstream>
-#include <numeric>
-#include <thread>
 
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/log/Colors.hpp>
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/dds/log/Colors.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/subscriber/DataReader.hpp>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 
 
 #define TIME_LIMIT_US 10000

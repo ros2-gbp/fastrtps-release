@@ -344,8 +344,7 @@ private:
             type data;
             eprosima::fastcdr::FastBuffer buffer((char*)change->serializedPayload.data,
                     change->serializedPayload.length);
-            eprosima::fastcdr::Cdr cdr(buffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                    eprosima::fastcdr::CdrVersion::DDS_CDR);
+            eprosima::fastcdr::Cdr cdr(buffer);
             std::string magicword;
             cdr >> magicword;
 

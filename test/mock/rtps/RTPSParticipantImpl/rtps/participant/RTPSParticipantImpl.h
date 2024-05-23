@@ -75,16 +75,6 @@ public:
 
     MOCK_METHOD2(onParticipantDiscovery_mock, void (RTPSParticipant*, const ParticipantDiscoveryInfo&));
 
-    void onParticipantDiscovery(
-            RTPSParticipant* participant,
-            ParticipantDiscoveryInfo&& info,
-            bool& should_be_ignored) override
-    {
-        onParticipantDiscovery_mock(participant, info, should_be_ignored);
-    }
-
-    MOCK_METHOD3(onParticipantDiscovery_mock, void (RTPSParticipant*, const ParticipantDiscoveryInfo&, bool&));
-
 #if HAVE_SECURITY
     void onParticipantAuthentication(
             RTPSParticipant* participant,
@@ -95,6 +85,10 @@ public:
 
     MOCK_METHOD2(onParticipantAuthentication, void (RTPSParticipant*, const ParticipantAuthenticationInfo&));
 #endif // if HAVE_SECURITY
+
+private:
+
+    using RTPSParticipantListener::onParticipantDiscovery;
 };
 
 class RTPSParticipantImpl
@@ -112,10 +106,6 @@ public:
 
     MOCK_CONST_METHOD0(network_factory, const NetworkFactory& ());
 
-    MOCK_METHOD0(is_intraprocess_only, bool());
-
-    MOCK_METHOD0(get_persistence_guid_prefix, GuidPrefix_t());
-
 #if HAVE_SECURITY
     MOCK_CONST_METHOD0(security_attributes, const security::ParticipantSecurityAttributes& ());
 
@@ -131,11 +121,6 @@ public:
 #endif // if HAVE_SECURITY
 
     MOCK_METHOD1(setGuid, void(GUID_t &));
-
-    MOCK_METHOD1(check_type, bool(std::string));
-
-    MOCK_METHOD2(on_entity_discovery,
-            void(const fastrtps::rtps::GUID_t&, const fastdds::dds::ParameterPropertyList_t&));
 
     // *INDENT-OFF* Uncrustify makes a mess with MOCK_METHOD macros
     MOCK_METHOD6(createWriter_mock,

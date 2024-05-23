@@ -17,20 +17,18 @@
  *
  */
 
-#include "SubscriberModule.hpp"
-
-#include <chrono>
-#include <fstream>
-#include <string>
-#include <thread>
-
 #include <asio.hpp>
 
+#include "SubscriberModule.hpp"
+
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/subscriber/DataReader.hpp>
-#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
+#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
+#include <fastdds/dds/subscriber/DataReader.hpp>
+
+#include <fstream>
+#include <string>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastrtps::rtps;
@@ -154,7 +152,7 @@ bool SubscriberModule::run_for(
         std::unique_lock<std::mutex> lock(mutex_);
         returned_value = cv_.wait_for(lock, timeout, [&]
                         {
-                            if (succeed_on_timeout_ && (std::chrono::steady_clock::now() - t0) > timeout)
+                            if (succeeed_on_timeout_ && (std::chrono::steady_clock::now() - t0) > timeout)
                             {
                                 return true;
                             }
@@ -262,11 +260,6 @@ void SubscriberModule::on_subscription_matched(
 void SubscriberModule::on_data_available(
         DataReader* reader)
 {
-    if (die_on_data_received_)
-    {
-        std::abort();
-    }
-
     EPROSIMA_LOG_INFO(SUBSCRIBER_MODULE, "Subscriber on_data_available from :" << participant_->guid());
 
     if (zero_copy_)

@@ -14,7 +14,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <thread>
 #include <utility>
 
 #ifdef ANDROID
@@ -177,11 +176,6 @@ bool SharedMemTransport::is_local_locator(
     return true;
 }
 
-bool SharedMemTransport::is_localhost_allowed() const
-{
-    return true;
-}
-
 void SharedMemTransport::delete_input_channel(
         SharedMemChannelResource* channel)
 {
@@ -245,10 +239,8 @@ bool SharedMemTransport::DoInputLocatorsMatch(
 }
 
 bool SharedMemTransport::init(
-        const fastrtps::rtps::PropertyPolicy*,
-        const uint32_t& max_msg_size_no_frag)
+        const fastrtps::rtps::PropertyPolicy*)
 {
-    (void) max_msg_size_no_frag;
     // TODO(Adolfo): Calculate this value from UDP sockets buffers size.
     static constexpr uint32_t shm_default_segment_size = 512 * 1024;
 
@@ -293,7 +285,7 @@ bool SharedMemTransport::init(
             auto packets_file_consumer = std::unique_ptr<SHMPacketFileConsumer>(
                 new SHMPacketFileConsumer(configuration_.rtps_dump_file()));
 
-            packet_logger_ = std::make_shared<PacketsLog<SHMPacketFileConsumer>>(0, configuration_.dump_thread());
+            packet_logger_ = std::make_shared<PacketsLog<SHMPacketFileConsumer>>();
             packet_logger_->RegisterConsumer(std::move(packets_file_consumer));
         }
     }
@@ -344,10 +336,7 @@ SharedMemChannelResource* SharedMemTransport::CreateInputChannelResource(
             open_mode)->create_listener(),
         locator,
         receiver,
-        configuration_.rtps_dump_file(),
-        configuration_.dump_thread(),
-        true,
-        configuration_.get_thread_config_for_port(locator.port));
+        configuration_.rtps_dump_file());
 }
 
 bool SharedMemTransport::OpenOutputChannel(
@@ -403,9 +392,7 @@ Locator SharedMemTransport::RemoteToMainLocal(
 
 bool SharedMemTransport::transform_remote_locator(
         const Locator& remote_locator,
-        Locator& result_locator,
-        bool,
-        bool) const
+        Locator& result_locator) const
 {
     if (IsLocatorSupported(remote_locator))
     {

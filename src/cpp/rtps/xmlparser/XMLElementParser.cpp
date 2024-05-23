@@ -12,176 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-
-#include <algorithm>
-#include <cassert>
-#include <cstdint>
-#include <cstdio>
 #include <cstring>
 #include <regex>
-#include <set>
 #include <string>
 #include <unordered_map>
 
 #include <tinyxml2.h>
 
-#include <fastdds/dds/log/Log.hpp>
-#include <fastrtps/utils/IPLocator.h>
-#include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLParserCommon.h>
+#include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <fastrtps/utils/IPLocator.h>
+#include <fastdds/dds/log/Log.hpp>
 
-#include <rtps/xmlparser/XMLParserUtils.hpp>
-#include <utils/SystemInfo.hpp>
 #include <utils/string_utilities.hpp>
-#include <fastrtps/utils/UnitsParser.hpp>
 
-namespace eprosima {
-namespace fastdds {
-namespace xml {
-namespace detail {
-
-static std::string process_environment(
-        const std::string& input)
-{
-    /* From [IEEE Std 1003.1]:(https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html)
-     * Environment variable names used ... consist solely of uppercase letters, digits, and the '_' (underscore)
-     * from the characters defined in Portable Character Set and do not begin with a digit.
-     */
-    std::regex expression("\\$\\{([A-Z_][A-Z0-9_]*)\\}");
-
-    // Algorithm inspired by https://stackoverflow.com/a/37516316/559350
-
-    // This will hold the accumulated substitution result
-    std::string ret_val{};
-
-    // Iterators to first and last character of the input string
-    auto first = input.cbegin();
-    auto last = input.cend();
-
-    // Position of last match in the input string
-    std::smatch::difference_type last_match_position = 0;
-
-    // Iterator to the character after the last match in the input string
-    auto last_match_end = first;
-
-    // Functor called to process each match
-    auto match_cb = [&](const std::smatch& match)
-            {
-                // Compute substitution value
-                std::string var_name = match[1];
-                std::string value = "";
-                if (var_name == "_")
-                {
-                    // Silently ignore ${_} since it might expose sensitive information (full path to executable).
-                    EPROSIMA_LOG_WARNING(XMLPARSER, "Ignoring environment variable ${_}");
-                }
-                else if (ReturnCode_t::RETCODE_OK != SystemInfo::get_env(var_name, value))
-                {
-                    EPROSIMA_LOG_ERROR(XMLPARSER, "Could not find a value for environment variable " << var_name);
-                }
-
-                // Compute number of non-matching characters between this match and the last one
-                auto this_match_position = match.position();
-                auto diff = this_match_position - last_match_position;
-
-                // Append non-matching characters to return value
-                auto this_match_start = last_match_end;
-                std::advance(this_match_start, diff);
-                ret_val.append(last_match_end, this_match_start);
-
-                // Append substitution value to return value
-                ret_val.append(value);
-
-                // Prepare for next iteration
-                auto match_length = match.length();
-                last_match_position = this_match_position + match_length;
-                last_match_end = this_match_start;
-                std::advance(last_match_end, match_length);
-            };
-
-    // Substitute all matches
-    std::sregex_iterator begin(first, last, expression);
-    std::sregex_iterator end;
-    std::for_each(begin, end, match_cb);
-
-    // Append characters after last match
-    ret_val.append(last_match_end, last);
-
-    return ret_val;
-}
-
-std::string get_element_text(
-        tinyxml2::XMLElement* element)
-{
-    std::string ret_val{};
-
-    assert(nullptr != element);
-    const char* text = element->GetText();
-    if (nullptr != text)
-    {
-        ret_val = process_environment(text);
-    }
-
-    return ret_val;
-}
-
-}  // namespace detail
-}  // namespace xml
-}  // namespace fastdds
-}  // namespace eprosima
-
-
-namespace eprosima {
-namespace fastrtps {
-namespace xmlparser {
-
+using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
-using namespace eprosima::fastdds::xml::detail;
-
-static XMLP_ret parseXMLOctetVector(
-        tinyxml2::XMLElement* elem,
-        std::vector<octet>& octet_vector,
-        bool allow_empty)
-{
-    std::string text = get_element_text(elem);
-    if (text.empty() && allow_empty)
-    {
-        return XMLP_ret::XML_OK;
-    }
-
-    std::istringstream ss(text);
-    ss >> std::hex;
-
-    while (!ss.eof())
-    {
-        uint16_t o = 0;
-        ss >> o;
-
-        if (!ss || std::numeric_limits<octet>::max() < o)
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Expected an octet value on line " << elem->GetLineNum());
-            return XMLP_ret::XML_ERROR;
-        }
-
-        // Add octet in vector.
-        octet_vector.push_back(static_cast<octet>(o));
-
-        if (!ss.eof())
-        {
-            char c = 0;
-            ss >> c;
-
-            if (!ss || '.' != c)
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER, "Expected a '.' separator on line " << elem->GetLineNum());
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-    }
-
-    return XMLP_ret::XML_OK;
-}
+using namespace eprosima::fastrtps::xmlparser;
 
 XMLP_ret XMLParser::getXMLParticipantAllocationAttributes(
         tinyxml2::XMLElement* elem,
@@ -439,18 +287,18 @@ XMLP_ret XMLParser::getXMLDiscoverySettings(
                     </xs:restriction>
                 </xs:simpleType>
              */
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << _EDP << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-            else if (strcmp(text.c_str(), SIMPLE) == 0)
+            else if (strcmp(text, SIMPLE) == 0)
             {
                 settings.use_SIMPLE_EndpointDiscoveryProtocol = true;
                 settings.use_STATIC_EndpointDiscoveryProtocol = false;
             }
-            else if (strcmp(text.c_str(), STATIC) == 0)
+            else if (strcmp(text, STATIC) == 0)
             {
                 settings.use_SIMPLE_EndpointDiscoveryProtocol = false;
                 settings.use_STATIC_EndpointDiscoveryProtocol = true;
@@ -567,51 +415,6 @@ XMLP_ret XMLParser::getXMLDiscoverySettings(
 
 }
 
-XMLP_ret XMLParser::getXMLTypeLookupSettings(
-        tinyxml2::XMLElement* elem,
-        rtps::TypeLookupSettings& settings,
-        uint8_t ident)
-{
-    /*
-       <xs:complexType name="typelookupSettingsType">
-        <xs:all minOccurs="0">
-          <xs:element name="use_client" type="boolType" minOccurs="0"/>
-          <xs:element name="use_server" type="boolType" minOccurs="0"/>
-        </xs:all>
-       </xs:complexType>
-     */
-
-    tinyxml2::XMLElement* p_aux0 = nullptr;
-    const char* name = nullptr;
-    for (p_aux0 = elem->FirstChildElement(); p_aux0 != NULL; p_aux0 = p_aux0->NextSiblingElement())
-    {
-        name = p_aux0->Name();
-        if (strcmp(name, TYPELOOKUP_USE_SERVER) == 0)
-        {
-            //
-            if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &settings.use_server, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, TYPELOOKUP_USE_CLIENT) == 0)
-        {
-            //
-            if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &settings.use_client, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'typelookupSettingsType'. Name: " << name);
-            return XMLP_ret::XML_ERROR;
-        }
-    }
-
-    return XMLP_ret::XML_OK;
-}
-
 XMLP_ret XMLParser::getXMLBuiltinAttributes(
         tinyxml2::XMLElement* elem,
         BuiltinAttributes& builtin,
@@ -652,14 +455,6 @@ XMLP_ret XMLParser::getXMLBuiltinAttributes(
         {
             // discovery_config - DiscoverySettings
             if (XMLP_ret::XML_OK != getXMLDiscoverySettings(p_aux0, builtin.discovery_config, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, TYPELOOKUP_CONFIG) == 0)
-        {
-            // typelookup_config - boolType
-            if (XMLP_ret::XML_OK != getXMLTypeLookupSettings(p_aux0, builtin.typelookup_config, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
@@ -918,8 +713,8 @@ XMLP_ret XMLParser::getXMLTransports(
 
     while (nullptr != p_aux0)
     {
-        std::string text = get_element_text(p_aux0);
-        if (text.empty())
+        const char* text = p_aux0->GetText();
+        if (nullptr == text)
         {
             EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << TRANSPORT_ID << "' without content");
             return XMLP_ret::XML_ERROR;
@@ -1019,16 +814,21 @@ XMLP_ret XMLParser::getXMLTopicAttributes(
                     </xs:restriction>
                 </xs:simpleType>
              */
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-
-            if (!get_element_enum_value(text.c_str(), topic.topicKind,
-                    _NO_KEY, TopicKind_t::NO_KEY,
-                    _WITH_KEY, TopicKind_t::WITH_KEY))
+            if (strcmp(text, _NO_KEY) == 0)
+            {
+                topic.topicKind = TopicKind_t::NO_KEY;
+            }
+            else if (strcmp(text, _WITH_KEY) == 0)
+            {
+                topic.topicKind = TopicKind_t::WITH_KEY;
+            }
+            else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
@@ -1037,8 +837,8 @@ XMLP_ret XMLParser::getXMLTopicAttributes(
         else if (strcmp(name, NAME) == 0)
         {
             // name - stringType
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text;
+            if (nullptr == (text = p_aux0->GetText()))
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "<" << p_aux0->Value() << "> getXMLString XML_ERROR!");
                 return XMLP_ret::XML_ERROR;
@@ -1048,8 +848,8 @@ XMLP_ret XMLParser::getXMLTopicAttributes(
         else if (strcmp(name, DATA_TYPE) == 0)
         {
             // dataType - stringType
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text;
+            if (nullptr == (text = p_aux0->GetText()))
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "<" << p_aux0->Value() << "> getXMLString XML_ERROR!");
                 return XMLP_ret::XML_ERROR;
@@ -1259,16 +1059,21 @@ XMLP_ret XMLParser::getXMLHistoryQosPolicy(
                     </xs:restriction>
                 </xs:simpleType>
              */
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-
-            if (!get_element_enum_value(text.c_str(), historyQos.kind,
-                    KEEP_LAST, HistoryQosPolicyKind::KEEP_LAST_HISTORY_QOS,
-                    KEEP_ALL, HistoryQosPolicyKind::KEEP_ALL_HISTORY_QOS))
+            if (strcmp(text, KEEP_LAST) == 0)
+            {
+                historyQos.kind = HistoryQosPolicyKind::KEEP_LAST_HISTORY_QOS;
+            }
+            else if (strcmp(text, KEEP_ALL) == 0)
+            {
+                historyQos.kind = HistoryQosPolicyKind::KEEP_ALL_HISTORY_QOS;
+            }
+            else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
@@ -1666,19 +1471,30 @@ XMLP_ret XMLParser::getXMLDurabilityQos(
                     </xs:restriction>
                 </xs:simpleType>
              */
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
             bKindDefined = true;
-
-            if (!get_element_enum_value(text.c_str(), durability.kind,
-                    _VOLATILE, DurabilityQosPolicyKind::VOLATILE_DURABILITY_QOS,
-                    _TRANSIENT_LOCAL, DurabilityQosPolicyKind::TRANSIENT_LOCAL_DURABILITY_QOS,
-                    _TRANSIENT, DurabilityQosPolicyKind::TRANSIENT_DURABILITY_QOS,
-                    _PERSISTENT, DurabilityQosPolicyKind::PERSISTENT_DURABILITY_QOS))
+            if (strcmp(text, _VOLATILE) == 0)
+            {
+                durability.kind = DurabilityQosPolicyKind::VOLATILE_DURABILITY_QOS;
+            }
+            else if (strcmp(text, _TRANSIENT_LOCAL) == 0)
+            {
+                durability.kind = DurabilityQosPolicyKind::TRANSIENT_LOCAL_DURABILITY_QOS;
+            }
+            else if (strcmp(text, _TRANSIENT) == 0)
+            {
+                durability.kind = DurabilityQosPolicyKind::TRANSIENT_DURABILITY_QOS;
+            }
+            else if (strcmp(text, _PERSISTENT) == 0)
+            {
+                durability.kind = DurabilityQosPolicyKind::PERSISTENT_DURABILITY_QOS;
+            }
+            else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
@@ -1743,17 +1559,17 @@ XMLP_ret XMLParser::getXMLDurabilityQos(
             //        </xs:restriction>
             //    </xs:simpleType>
             //
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << HISTORY_KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-            if (strcmp(text.c_str(), KEEP_LAST) == 0)
+            if (strcmp(text, KEEP_LAST) == 0)
             {
                 durabilityService.history_kind = HistoryQosPolicyKind::KEEP_LAST_HISTORY_QOS;
             }
-            else if (strcmp(text.c_str(), KEEP_ALL) == 0)
+            else if (strcmp(text, KEEP_ALL) == 0)
             {
                 durabilityService.history_kind = HistoryQosPolicyKind::KEEP_ALL_HISTORY_QOS;
             }
@@ -1921,17 +1737,25 @@ XMLP_ret XMLParser::getXMLLivelinessQos(
                     </xs:restriction>
                 </xs:simpleType>
              */
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-
-            if (!get_element_enum_value(text.c_str(), liveliness.kind,
-                    AUTOMATIC, LivelinessQosPolicyKind::AUTOMATIC_LIVELINESS_QOS,
-                    MANUAL_BY_PARTICIPANT, LivelinessQosPolicyKind::MANUAL_BY_PARTICIPANT_LIVELINESS_QOS,
-                    MANUAL_BY_TOPIC, LivelinessQosPolicyKind::MANUAL_BY_TOPIC_LIVELINESS_QOS))
+            if (strcmp(text, AUTOMATIC) == 0)
+            {
+                liveliness.kind = LivelinessQosPolicyKind::AUTOMATIC_LIVELINESS_QOS;
+            }
+            else if (strcmp(text, MANUAL_BY_PARTICIPANT) == 0)
+            {
+                liveliness.kind = LivelinessQosPolicyKind::MANUAL_BY_PARTICIPANT_LIVELINESS_QOS;
+            }
+            else if (strcmp(text, MANUAL_BY_TOPIC) == 0)
+            {
+                liveliness.kind = LivelinessQosPolicyKind::MANUAL_BY_TOPIC_LIVELINESS_QOS;
+            }
+            else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
@@ -1993,16 +1817,21 @@ XMLP_ret XMLParser::getXMLReliabilityQos(
                     </xs:restriction>
                 </xs:simpleType>
              */
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-
-            if (!get_element_enum_value(text.c_str(), reliability.kind,
-                    _BEST_EFFORT, ReliabilityQosPolicyKind::BEST_EFFORT_RELIABILITY_QOS,
-                    _RELIABLE, ReliabilityQosPolicyKind::RELIABLE_RELIABILITY_QOS))
+            if (strcmp(text, _BEST_EFFORT) == 0)
+            {
+                reliability.kind = ReliabilityQosPolicyKind::BEST_EFFORT_RELIABILITY_QOS;
+            }
+            else if (strcmp(text, _RELIABLE) == 0)
+            {
+                reliability.kind = ReliabilityQosPolicyKind::RELIABLE_RELIABILITY_QOS;
+            }
+            else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
@@ -2119,25 +1948,10 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
     /*
         <xs:complexType name="dataSharingQosPolicyType">
             <xs:all>
-                <xs:element name="kind" minOccurs="1" maxOccurs="1">
-                    <xs:simpleType>
-                        <xs:restriction base="xs:string">
-                            <xs:enumeration value="AUTOMATIC"/>
-                            <xs:enumeration value="ON"/>
-                            <xs:enumeration value="OFF"/>
-                        </xs:restriction>
-                    </xs:simpleType>
-                </xs:element>
-                <xs:element name="shared_dir" type="string" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="domain_ids" minOccurs="0" maxOccurs="1">
-                    <xs:complexType>
-                        <xs:sequence>
-                            <xs:element name="domainId" type="domainIDType" minOccurs="0" maxOccurs="unbounded"/>
-                        </xs:sequence>
-                    </xs:complexType>
-                </xs:element>
-                <xs:element name="max_domains" type="uint32" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="data_sharing_listener_thread" type="threadSettingsType" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="kind" type="datasharingQosKindType" minOccurs="1"/>
+                <xs:element name="shared_dir" type="stringType" minOccurs="0"/>
+                <xs:element name="domain_ids" type="domainIdVectorType" minOccurs="0"/>
+                <xs:element name="max_domains" type="uint32Type" minOccurs="0"/>
             </xs:all>
         </xs:complexType>
      */
@@ -2163,18 +1977,25 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
                     </xs:restriction>
                 </xs:simpleType>
              */
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-
-            if (!get_element_enum_value(text.c_str(), kind,
-                    ON, DataSharingKind::ON,
-                    OFF, DataSharingKind::OFF,
-                    AUTOMATIC, DataSharingKind::AUTO,
-                    AUTO, DataSharingKind::AUTO))
+            if (strcmp(text, ON) == 0)
+            {
+                kind = DataSharingKind::ON;
+            }
+            else if (strcmp(text, OFF) == 0)
+            {
+                kind = DataSharingKind::OFF;
+            }
+            else if (strcmp(text, AUTOMATIC) == 0)
+            {
+                kind = DataSharingKind::AUTO;
+            }
+            else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
@@ -2238,14 +2059,6 @@ XMLP_ret XMLParser::getXMLDataSharingQos(
             {
                 // Not even one
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << DOMAIN_IDS << "' without content");
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, DATA_SHARING_LISTENER_THREAD) == 0)
-        {
-            // data_sharing_listener_thread
-            if (XMLP_ret::XML_OK != getXMLThreadSettings(*p_aux0, data_sharing.data_sharing_listener_thread()))
-            {
                 return XMLP_ret::XML_ERROR;
             }
         }
@@ -2368,16 +2181,21 @@ XMLP_ret XMLParser::getXMLOwnershipQos(
             //    </xs:simpleType>
 
             bKindDefined = true;
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-
-            if (!get_element_enum_value(text.c_str(), ownership.kind,
-                    SHARED, OwnershipQosPolicyKind::SHARED_OWNERSHIP_QOS,
-                    EXCLUSIVE, OwnershipQosPolicyKind::EXCLUSIVE_OWNERSHIP_QOS))
+            if (strcmp(text, SHARED) == 0)
+            {
+                ownership.kind = OwnershipQosPolicyKind::SHARED_OWNERSHIP_QOS;
+            }
+            else if (strcmp(text, EXCLUSIVE) == 0)
+            {
+                ownership.kind = OwnershipQosPolicyKind::EXCLUSIVE_OWNERSHIP_QOS;
+            }
+            else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' with bad content");
                 return XMLP_ret::XML_ERROR;
@@ -2396,7 +2214,8 @@ XMLP_ret XMLParser::getXMLOwnershipQos(
         return XMLP_ret::XML_ERROR;
     }
 
-    return XMLP_ret::XML_OK;
+    return XMLP_ret::
+                   XML_OK;
 }
 
 XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
@@ -2474,7 +2293,7 @@ XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
             //    </xs:simpleType>
 
             bKindDefined = true;
-            const char* text = get_element_text(p_aux0);
+            const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
@@ -2545,7 +2364,7 @@ XMLP_ret XMLParser::getXMLOwnershipStrengthQos(
             //        </xs:restriction>
             //    </xs:simpleType>
 
-            const char* text = get_element_text(p_aux0);
+            const char* text = p_aux0->GetText();
             if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << ACCESS_SCOPE << "' without content");
@@ -2683,16 +2502,21 @@ XMLP_ret XMLParser::getXMLPublishModeQos(
                 </xs:simpleType>
              */
             bKindDefined = true;
-            std::string text = get_element_text(p_aux0);
-            if (text.empty())
+            const char* text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
                 return XMLP_ret::XML_ERROR;
             }
-
-            if (!get_element_enum_value(text.c_str(), publishMode.kind,
-                    SYNCHRONOUS, PublishModeQosPolicyKind::SYNCHRONOUS_PUBLISH_MODE,
-                    ASYNCHRONOUS, PublishModeQosPolicyKind::ASYNCHRONOUS_PUBLISH_MODE))
+            if (strcmp(text, SYNCHRONOUS) == 0)
+            {
+                publishMode.kind = PublishModeQosPolicyKind::SYNCHRONOUS_PUBLISH_MODE;
+            }
+            else if (strcmp(text, ASYNCHRONOUS) == 0)
+            {
+                publishMode.kind = PublishModeQosPolicyKind::ASYNCHRONOUS_PUBLISH_MODE;
+            }
+            else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' bad content");
                 return XMLP_ret::XML_ERROR;
@@ -2747,9 +2571,9 @@ XMLP_ret XMLParser::getXMLDuration(
     std::regex infinite(DURATION_INFINITY);
     std::regex infinite_sec(DURATION_INFINITE_SEC);
     std::regex infinite_nsec(DURATION_INFINITE_NSEC);
-    std::string text = get_element_text(elem);
+    const char* text = elem->GetText();
 
-    if (!text.empty() && std::regex_match(text, infinite))
+    if (text != nullptr && std::regex_match(text, infinite))
     {
         empty = false;
         duration = c_TimeInfinite;
@@ -2786,8 +2610,8 @@ XMLP_ret XMLParser::getXMLDuration(
                     </xs:union>
                 </xs:simpleType>
              */
-            text = get_element_text(p_aux0);
-            if (text.empty())
+            text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'SECONDS' without content");
                 return XMLP_ret::XML_ERROR;
@@ -2820,8 +2644,8 @@ XMLP_ret XMLParser::getXMLDuration(
                     </xs:union>
                 </xs:simpleType>
              */
-            text = get_element_text(p_aux0);
-            if (text.empty())
+            text = p_aux0->GetText();
+            if (nullptr == text)
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Node 'NANOSECONDS' without content");
                 return XMLP_ret::XML_ERROR;
@@ -3485,18 +3309,29 @@ XMLP_ret XMLParser::getXMLHistoryMemoryPolicy(
             </xs:restriction>
         </xs:simpleType>
      */
-    std::string text = get_element_text(elem);
-    if (text.empty())
+    const char* text = elem->GetText();
+    if (nullptr == text)
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
         return XMLP_ret::XML_ERROR;
     }
-
-    if (!get_element_enum_value(text.c_str(), historyMemoryPolicy,
-            PREALLOCATED, MemoryManagementPolicy::PREALLOCATED_MEMORY_MODE,
-            PREALLOCATED_WITH_REALLOC, MemoryManagementPolicy::PREALLOCATED_WITH_REALLOC_MEMORY_MODE,
-            DYNAMIC, MemoryManagementPolicy::DYNAMIC_RESERVE_MEMORY_MODE,
-            DYNAMIC_REUSABLE, MemoryManagementPolicy::DYNAMIC_REUSABLE_MEMORY_MODE))
+    if (strcmp(text, PREALLOCATED) == 0)
+    {
+        historyMemoryPolicy = MemoryManagementPolicy::PREALLOCATED_MEMORY_MODE;
+    }
+    else if (strcmp(text, PREALLOCATED_WITH_REALLOC) == 0)
+    {
+        historyMemoryPolicy = MemoryManagementPolicy::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+    }
+    else if (strcmp(text, DYNAMIC) == 0)
+    {
+        historyMemoryPolicy = MemoryManagementPolicy::DYNAMIC_RESERVE_MEMORY_MODE;
+    }
+    else if (strcmp(text, DYNAMIC_REUSABLE) == 0)
+    {
+        historyMemoryPolicy = MemoryManagementPolicy::DYNAMIC_REUSABLE_MEMORY_MODE;
+    }
+    else
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' bad content");
         return XMLP_ret::XML_ERROR;
@@ -3623,10 +3458,12 @@ XMLP_ret XMLParser::getXMLPropertiesPolicy(
                     }
                     else if (strcmp(sub_name, VALUE) == 0)
                     {
-                        if (XMLP_ret::XML_OK != parseXMLOctetVector(p_aux2, bin_prop.value(), true))
-                        {
-                            return XMLP_ret::XML_ERROR;
-                        }
+                        // TODO:
+                        // value - stringType
+                        EPROSIMA_LOG_ERROR(XMLPARSER, "Tag '" << p_aux2->Value() << "' do not supported for now");
+                        /*std::string s = "";
+                           if (XMLP_ret::XML_OK != getXMLString(p_aux2, &s, ident + 2)) return XMLP_ret::XML_ERROR;
+                           bin_prop.value(s);*/
                     }
                     else if (strcmp(sub_name, PROPAGATE) == 0)
                     {
@@ -3664,29 +3501,61 @@ XMLP_ret XMLParser::getXMLOctetVector(
     }
 
     tinyxml2::XMLElement* p_aux0 = nullptr;
+    XMLP_ret ret_value = XMLP_ret::XML_OK;
     size_t num_elems = 0;
-    XMLP_ret ret_val = XMLP_ret::XML_OK;
 
     for (p_aux0 = elem->FirstChildElement(); nullptr != p_aux0; p_aux0 = p_aux0->NextSiblingElement())
     {
         if (1 < ++num_elems)
         {
             EPROSIMA_LOG_ERROR(XMLPARSER, "More than one tag on " << p_aux0->GetLineNum());
-            return XMLP_ret::XML_ERROR;
+            ret_value = XMLP_ret::XML_ERROR;
         }
         if (0 == strcmp(p_aux0->Name(), VALUE))
         {
-            ret_val = parseXMLOctetVector(p_aux0, octet_vector, false);
+            std::string text = p_aux0->GetText();
+            std::istringstream ss(text);
+
+            ss >> std::hex;
+
+            while (!ss.eof())
+            {
+                uint16_t o = 0;
+                ss >> o;
+
+                if (!ss || std::numeric_limits<octet>::max() < o)
+                {
+                    EPROSIMA_LOG_ERROR(XMLPARSER, "Expected an octet value on line " << p_aux0->GetLineNum());
+                    ret_value = XMLP_ret::XML_ERROR;
+                    break;
+                }
+
+                // Add octet in vector.
+                octet_vector.push_back(static_cast<octet>(o));
+
+                if (!ss.eof())
+                {
+                    char c = 0;
+                    ss >> c;
+
+                    if (!ss || '.' != c)
+                    {
+                        EPROSIMA_LOG_ERROR(XMLPARSER, "Expected a '.' separator on line " << p_aux0->GetLineNum());
+                        ret_value = XMLP_ret::XML_ERROR;
+                        break;
+                    }
+                }
+            }
         }
         else
         {
             EPROSIMA_LOG_ERROR(XMLPARSER,
                     "Invalid tag with name of " << p_aux0->Name() << " on line " << p_aux0->GetLineNum());
-            return XMLP_ret::XML_ERROR;
+            ret_value = XMLP_ret::XML_ERROR;
         }
     }
 
-    return ret_val;
+    return ret_value;
 }
 
 XMLP_ret XMLParser::getXMLInt(
@@ -3699,9 +3568,7 @@ XMLP_ret XMLParser::getXMLInt(
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty() || !tinyxml2::XMLUtil::ToInt(text.c_str(), in))
+    else if (tinyxml2::XMLError::XML_SUCCESS != elem->QueryIntText(in))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLInt XML_ERROR!");
         return XMLP_ret::XML_ERROR;
@@ -3719,9 +3586,7 @@ XMLP_ret XMLParser::getXMLUint(
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty() || !tinyxml2::XMLUtil::ToUnsigned(text.c_str(), ui))
+    else if (tinyxml2::XMLError::XML_SUCCESS != elem->QueryUnsignedText(ui))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
@@ -3740,64 +3605,13 @@ XMLP_ret XMLParser::getXMLUint(
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty() || !tinyxml2::XMLUtil::ToUnsigned(text.c_str(), &ui) || ui >= 65536)
+    else if (tinyxml2::XMLError::XML_SUCCESS != elem->QueryUnsignedText(&ui) ||
+            ui >= 65536)
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
     *ui16 = static_cast<uint16_t>(ui);
-    return XMLP_ret::XML_OK;
-}
-
-XMLP_ret XMLParser::getXMLUint(
-        tinyxml2::XMLElement* elem,
-        uint64_t* ui64,
-        uint8_t /*ident*/)
-{
-    unsigned long int ui = 0u;
-    if (nullptr == elem || nullptr == ui64)
-    {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
-        return XMLP_ret::XML_ERROR;
-    }
-
-    auto to_uint64 = [](const char* str, unsigned long int* value) -> bool
-            {
-                // Look for a '-' sign
-                bool ret = false;
-                const char minus = '-';
-                const char* minus_result = str;
-                if (nullptr == std::strchr(minus_result, minus))
-                {
-                    // Minus not found
-                    ret = true;
-                }
-
-                if (ret)
-                {
-                    ret = false;
-#ifdef _WIN32
-                    if (sscanf_s(str, "%lu", value) == 1)
-#else
-                    if (sscanf(str, "%lu", value) == 1)
-#endif // ifdef _WIN32
-                    {
-                        // Number found
-                        ret = true;
-                    }
-                }
-                return ret;
-            };
-
-    std::string text = get_element_text(elem);
-    if (text.empty() || !to_uint64(text.c_str(), &ui))
-    {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLUint XML_ERROR!");
-        return XMLP_ret::XML_ERROR;
-    }
-    *ui64 = static_cast<uint64_t>(ui);
     return XMLP_ret::XML_OK;
 }
 
@@ -3811,9 +3625,7 @@ XMLP_ret XMLParser::getXMLBool(
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty() || !tinyxml2::XMLUtil::ToBool(text.c_str(), b))
+    else if (tinyxml2::XMLError::XML_SUCCESS != elem->QueryBoolText(b))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLBool XML_ERROR!");
         return XMLP_ret::XML_ERROR;
@@ -3834,23 +3646,31 @@ XMLP_ret XMLParser::getXMLEnum(
     //    </xs:restriction>
     //</xs:simpleType>
 
+    const char* text = nullptr;
+
     if (nullptr == elem || nullptr == e)
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty())
+    else if (nullptr == (text = elem->GetText()))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    if (!get_element_enum_value(text.c_str(), *e,
-            OFF, IntraprocessDeliveryType::INTRAPROCESS_OFF,
-            USER_DATA_ONLY, IntraprocessDeliveryType::INTRAPROCESS_USER_DATA_ONLY,
-            FULL, IntraprocessDeliveryType::INTRAPROCESS_FULL))
+    else if (strcmp(text, OFF) == 0)
+    {
+        *e = IntraprocessDeliveryType::INTRAPROCESS_OFF;
+    }
+    else if (strcmp(text, USER_DATA_ONLY) == 0)
+    {
+        *e = IntraprocessDeliveryType::INTRAPROCESS_USER_DATA_ONLY;
+    }
+    else if (strcmp(text, FULL) == 0)
+    {
+        *e = IntraprocessDeliveryType::INTRAPROCESS_FULL;
+    }
+    else
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << INTRAPROCESS_DELIVERY << "' with bad content");
         return XMLP_ret::XML_ERROR;
@@ -3877,27 +3697,43 @@ XMLP_ret XMLParser::getXMLEnum(
         </xs:simpleType>
      */
 
+    const char* text = nullptr;
 
     if (nullptr == elem || nullptr == e)
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty())
+    else if (nullptr == (text = elem->GetText()))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    if (!get_element_enum_value(text.c_str(), *e,
-            NONE, DiscoveryProtocol_t::NONE,
-            SIMPLE, DiscoveryProtocol_t::SIMPLE,
-            CLIENT, DiscoveryProtocol_t::CLIENT,
-            SERVER, DiscoveryProtocol_t::SERVER,
-            BACKUP, DiscoveryProtocol_t::BACKUP,
-            SUPER_CLIENT, DiscoveryProtocol_t::SUPER_CLIENT))
+    else if (strcmp(text, NONE) == 0)
+    {
+        *e = DiscoveryProtocol_t::NONE;
+    }
+    else if (strcmp(text, SIMPLE) == 0)
+    {
+        *e = DiscoveryProtocol_t::SIMPLE;
+    }
+    else if (strcmp(text, CLIENT) == 0)
+    {
+        *e = DiscoveryProtocol_t::CLIENT;
+    }
+    else if (strcmp(text, SERVER) == 0)
+    {
+        *e = DiscoveryProtocol_t::SERVER;
+    }
+    else if (strcmp(text, BACKUP) == 0)
+    {
+        *e = DiscoveryProtocol_t::BACKUP;
+    }
+    else if (strcmp(text, SUPER_CLIENT) == 0)
+    {
+        *e = DiscoveryProtocol_t::SUPER_CLIENT;
+    }
+    else
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << RTPS_PDP_TYPE << "' with bad content");
         return XMLP_ret::XML_ERROR;
@@ -3919,14 +3755,14 @@ XMLP_ret XMLParser::getXMLEnum(
         </xs:simpleType>
      */
 
+    const char* text = nullptr;
+
     if (nullptr == elem || nullptr == e)
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty())
+    else if (nullptr == (text = elem->GetText()))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLEnum XML_ERROR!");
         return XMLP_ret::XML_ERROR;
@@ -3943,7 +3779,7 @@ XMLP_ret XMLParser::getXMLEnum(
 
     // Lets parse the flags, we assume the flags argument has been already flushed
     std::regex flags("FILTER_DIFFERENT_HOST|FILTER_DIFFERENT_PROCESS|FILTER_SAME_PROCESS");
-    std::cregex_iterator it(text.c_str(), text.c_str() + strlen(text.c_str()), flags);
+    std::cregex_iterator it(text, text + strlen(text), flags);
     uint32_t newflags = *e;
 
     while (it != std::cregex_iterator())
@@ -4077,14 +3913,14 @@ XMLP_ret XMLParser::getXMLString(
         std::string* s,
         uint8_t /*ident*/)
 {
+    const char* text = nullptr;
+
     if (nullptr == elem || nullptr == s)
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLUint XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty())
+    else if (nullptr == (text = elem->GetText()))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLString XML_ERROR!");
         return XMLP_ret::XML_ERROR;
@@ -4098,14 +3934,14 @@ XMLP_ret XMLParser::getXMLguidPrefix(
         GuidPrefix_t& prefix,
         uint8_t /*ident*/)
 {
+    const char* text = nullptr;
+
     if (nullptr == elem )
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "nullptr when getXMLguidPrefix XML_ERROR!");
         return XMLP_ret::XML_ERROR;
     }
-
-    std::string text = get_element_text(elem);
-    if (text.empty())
+    else if (nullptr == (text = elem->GetText()))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "<" << elem->Value() << "> getXMLguidPrefix XML_ERROR!");
         return XMLP_ret::XML_ERROR;
@@ -4114,65 +3950,6 @@ XMLP_ret XMLParser::getXMLguidPrefix(
     std::istringstream is(text);
     return (is >> prefix ? XMLP_ret::XML_OK : XMLP_ret::XML_ERROR);
 
-}
-
-XMLP_ret XMLParser::getXMLDomainParticipantFactoryQos(
-        tinyxml2::XMLElement& elem,
-        fastdds::dds::DomainParticipantFactoryQos& qos)
-{
-    /*
-        <xs:complexType name="domainParticipantFactoryQosPoliciesType">
-            <xs:all>
-                <xs:element name="entity_factory" type="entityFactoryQosPolicyType" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="shm_watchdog_thread" type="threadSettingsType" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="file_watch_threads" type="threadSettingsType" minOccurs="0" maxOccurs="1"/>
-            </xs:all>
-        </xs:complexType>
-     */
-
-    std::set<std::string> tags_present;
-
-    for (tinyxml2::XMLElement* element = elem.FirstChildElement(); element != nullptr;
-            element = element->NextSiblingElement())
-    {
-        const char* name = element->Name();
-        if (tags_present.count(name) != 0)
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER,
-                    "Duplicated element found in 'domainParticipantFactoryQosPoliciesType'. Name: " << name);
-            return XMLP_ret::XML_ERROR;
-        }
-        tags_present.emplace(name);
-
-        if (strcmp(name, ENTITY_FACTORY) == 0)
-        {
-            if (XMLP_ret::XML_OK != getXMLEntityFactoryQos(*element, qos.entity_factory()))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, SHM_WATCHDOG_THREAD) == 0)
-        {
-            if (XMLP_ret::XML_OK != getXMLThreadSettings(*element, qos.shm_watchdog_thread()))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else if (strcmp(name, FILE_WATCH_THREADS) == 0)
-        {
-            if (XMLP_ret::XML_OK != getXMLThreadSettings(*element, qos.file_watch_threads()))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER,
-                    "Invalid element found into 'domainParticipantFactoryQosPoliciesType'. Name: " << name);
-            return XMLP_ret::XML_ERROR;
-        }
-    }
-    return XMLP_ret::XML_OK;
 }
 
 XMLP_ret XMLParser::getXMLPublisherAttributes(
@@ -4514,376 +4291,34 @@ XMLP_ret XMLParser::getXMLSubscriberAttributes(
     return XMLP_ret::XML_OK;
 }
 
-XMLP_ret XMLParser::getXMLThreadSettings(
-        tinyxml2::XMLElement& elem,
-        fastdds::rtps::ThreadSettings& thread_setting)
-{
-    /*
-        <xs:complexType name="threadSettingsType">
-            <xs:all>
-                <xs:element name="scheduling_policy" type="int32" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="priority" type="int32" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="affinity" type="uint32" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="stack_size" type="int32" minOccurs="0" maxOccurs="1"/>
-            </xs:all>
-        </xs:complexType>
-     */
-    uint32_t port = 0;
-    return getXMLThreadSettingsWithPort(elem, thread_setting,
-                   port) != XMLP_ret::XML_ERROR ? XMLP_ret::XML_OK : XMLP_ret::XML_ERROR;
-}
-
-XMLP_ret XMLParser::getXMLThreadSettingsWithPort(
-        tinyxml2::XMLElement& elem,
-        fastdds::rtps::ThreadSettings& thread_setting,
-        uint32_t& port)
-{
-    /*
-        <xs:complexType name="threadSettingsWithPortType">
-            <xs:complexContent>
-                <xs:extension base="threadSettingsType">
-                    <xs:attribute name="port" type="uint32" use="optional"/>
-                </xs:extension>
-            </xs:complexContent>
-        </xs:complexType>
-     */
-
-    /*
-     * The are 4 allowed elements, all their min occurrences are 0, and their max are 1.
-     * In case port is not present, return NOK instead of ERROR
-     */
-    XMLP_ret ret = XMLP_ret::XML_OK;
-    bool port_found = false;
-    for (const tinyxml2::XMLAttribute* attrib = elem.FirstAttribute(); attrib != nullptr; attrib = attrib->Next())
-    {
-        if (strcmp(attrib->Name(), PORT) == 0)
-        {
-            try
-            {
-                std::string temp = attrib->Value();
-                temp.erase(std::remove_if(temp.begin(), temp.end(), [](unsigned char c)
-                        {
-                            return std::isspace(c);
-                        }), temp.end());
-                if (attrib->Value()[0] == '-')
-                {
-                    throw std::invalid_argument("Negative value detected");
-                }
-                port = static_cast<uint32_t>(std::stoul(attrib->Value()));
-                port_found = true;
-            }
-            catch (std::invalid_argument& except)
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Found wrong value " << attrib->Value() << " for port attribute. " <<
-                        except.what());
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-            catch (const std::out_of_range& except)
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Value of the port attribute " << attrib->Value() << " out of range. " <<
-                        except.what());
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Found wrong attribute " << attrib->Name() << " in 'thread_settings");
-            ret = XMLP_ret::XML_ERROR;
-            break;
-        }
-    }
-
-    // Set ret to NOK if port attribute was not present
-    if (ret == XMLP_ret::XML_OK && !port_found)
-    {
-        ret = XMLP_ret::XML_NOK;
-    }
-
-    const uint8_t ident = 1;
-    std::set<std::string> tags_present;
-
-    for (tinyxml2::XMLElement* current_elem = elem.FirstChildElement();
-            current_elem != nullptr && ret != XMLP_ret::XML_ERROR;
-            current_elem = current_elem->NextSiblingElement())
-    {
-        const char* name = current_elem->Name();
-        if (tags_present.count(name) != 0)
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'thread_settings'. Tag: " << name);
-            ret = XMLP_ret::XML_ERROR;
-            break;
-        }
-        tags_present.emplace(name);
-
-        if (strcmp(current_elem->Name(), SCHEDULING_POLICY) == 0)
-        {
-            // scheduling_policy - int32Type
-            if (XMLP_ret::XML_OK != getXMLInt(current_elem, &thread_setting.scheduling_policy, ident) ||
-                    thread_setting.scheduling_policy < -1)
-            {
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else if (strcmp(current_elem->Name(), PRIORITY) == 0)
-        {
-            // priority - int32Type
-            if (XMLP_ret::XML_OK != getXMLInt(current_elem, &thread_setting.priority, ident))
-            {
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else if (strcmp(current_elem->Name(), AFFINITY) == 0)
-        {
-            // affinity - uint64Type
-            if (XMLP_ret::XML_OK != getXMLUint(current_elem, &thread_setting.affinity, ident))
-            {
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else if (strcmp(current_elem->Name(), STACK_SIZE) == 0)
-        {
-            // stack_size - int32Type
-            if (XMLP_ret::XML_OK != getXMLInt(current_elem, &thread_setting.stack_size, ident) ||
-                    thread_setting.stack_size < -1)
-            {
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Found incorrect tag '" << current_elem->Name() << "'");
-            ret = XMLP_ret::XML_ERROR;
-            break;
-        }
-    }
-    return ret;
-}
-
-XMLP_ret XMLParser::getXMLEntityFactoryQos(
-        tinyxml2::XMLElement& elem,
-        fastdds::dds::EntityFactoryQosPolicy& entity_factory)
-{
-    /*
-        <xs:complexType name="entityFactoryQosPolicyType">
-            <xs:all>
-                <xs:element name="autoenable_created_entities" type="boolean" minOccurs="0" maxOccurs="1"/>
-            </xs:all>
-        </xs:complexType>
-     */
-
-    /*
-     * The only allowed element is autoenable_created_entities, its min occurrences is 0, and its max is 1.
-     */
-    const uint8_t ident = 1;
-    std::set<std::string> tags_present;
-
-    for (tinyxml2::XMLElement* current_elem = elem.FirstChildElement(); current_elem != nullptr;
-            current_elem = current_elem->NextSiblingElement())
-    {
-        const char* name = current_elem->Name();
-        if (tags_present.count(name) != 0)
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'entityFactoryQosPolicyType'. Tag: " << name);
-            return XMLP_ret::XML_ERROR;
-        }
-        tags_present.emplace(name);
-
-        if (strcmp(current_elem->Name(), AUTOENABLE_CREATED_ENTITIES) == 0)
-        {
-            // autoenable_created_entities - boolean
-            if (XMLP_ret::XML_OK != getXMLBool(current_elem, &entity_factory.autoenable_created_entities, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Found incorrect tag '" << current_elem->Name() << "'");
-            return XMLP_ret::XML_ERROR;
-        }
-    }
-    return XMLP_ret::XML_OK;
-}
-
 XMLP_ret XMLParser::getXMLBuiltinTransports(
         tinyxml2::XMLElement* elem,
         eprosima::fastdds::rtps::BuiltinTransports* bt,
-        eprosima::fastdds::rtps::BuiltinTransportsOptions* bt_opts,
         uint8_t /*ident*/)
 {
     /*
-        <xs:simpleType name="builtinTransportKind">
+        <xs:simpleType name="builtinTransports">
             <xs:restriction base="xs:string">
-                <xs:enumeration value="NONE" />
-                <xs:enumeration value="DEFAULT" />
-                <xs:enumeration value="DEFAULTv6" />
-                <xs:enumeration value="SHM" />
-                <xs:enumeration value="UDPv4" />
-                <xs:enumeration value="UDPv6" />
-                <xs:enumeration value="LARGE_DATA" />
-                <xs:enumeration value="LARGE_DATAv6" />
+                <xs:enumeration value="NONE"/>
+                <xs:enumeration value="DEFAULT"/>
+                <xs:enumeration value="DEFAULTv6"/>
+                <xs:enumeration value="SHM"/>
+                <xs:enumeration value="UDPv4"/>
+                <xs:enumeration value="UDPv6"/>
+                <xs:enumeration value="LARGE_DATA"/>
+                <xs:enumeration value="LARGE_DATAv6"/>
             </xs:restriction>
         </xs:simpleType>
-
-        <xs:complexType name="builtinTransportsType">
-            <xs:simpleContent>
-                <xs:extension base="builtinTransportKind">
-                    <xs:attribute name="max_msg_size" type="string" use="optional"/>
-                    <xs:attribute name="sockets_size" type="string" use="optional"/>
-                    <xs:attribute name="non_blocking" type="bool" use="optional"/>
-                    <xs:attribute name="tcp_negotiation_timeout" type="uint32" use="optional"/>
-                </xs:extension>
-            </xs:simpleContent>
-        </xs:complexType>
      */
 
-    XMLP_ret ret = XMLP_ret::XML_OK;
-    for (const tinyxml2::XMLAttribute* attrib = elem->FirstAttribute(); attrib != nullptr; attrib = attrib->Next())
-    {
-        if (strcmp(attrib->Name(), MAX_MSG_SIZE_LARGE_DATA) == 0)
-        {
-            // max_msg_size - stringType
-            try
-            {
-                std::string temp = attrib->Value();
-                temp.erase(std::remove_if(temp.begin(), temp.end(), [](unsigned char c)
-                        {
-                            return std::isspace(c);
-                        }), temp.end());
-                if (attrib->Value()[0] == '-')
-                {
-                    throw std::invalid_argument("Negative value detected.");
-                }
-                std::regex msg_size_regex(R"((\d+)(\w*))");
-                std::smatch mr;
-                if (std::regex_search(temp, mr, msg_size_regex, std::regex_constants::match_not_null))
-                {
-                    std::string value = mr[1];
-                    std::string unit = mr[2].str();
-                    bt_opts->maxMessageSize = eprosima::fastdds::dds::utils::parse_value_and_units(value, unit);
-                }
-            }
-            catch (std::invalid_argument& except)
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Found wrong value " << attrib->Value() << " for max_msg_size attribute. " <<
-                        except.what());
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else if (strcmp(attrib->Name(), SOCKETS_SIZE_LARGE_DATA) == 0)
-        {
-            // sockets_size - stringType
-            try
-            {
-                std::string temp = attrib->Value();
-                temp.erase(std::remove_if(temp.begin(), temp.end(), [](unsigned char c)
-                        {
-                            return std::isspace(c);
-                        }), temp.end());
-                if (attrib->Value()[0] == '-')
-                {
-                    throw std::invalid_argument("Negative value detected.");
-                }
-                std::regex sockets_size_regex(R"((\d+)(\w*))");
-                std::smatch mr;
-                if (std::regex_search(temp, mr, sockets_size_regex, std::regex_constants::match_not_null))
-                {
-                    std::string value = mr[1];
-                    std::string unit = mr[2].str();
-                    bt_opts->sockets_buffer_size = eprosima::fastdds::dds::utils::parse_value_and_units(value, unit);
-                }
-            }
-            catch (std::invalid_argument& except)
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Found wrong value " << attrib->Value() << " for sockets_size attribute. " <<
-                        except.what());
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else if (strcmp(attrib->Name(), NON_BLOCKING_LARGE_DATA) == 0)
-        {
-            // non_blocking - stringType
-            try
-            {
-                std::string temp = attrib->Value();
-                temp.erase(std::remove_if(temp.begin(), temp.end(), [](unsigned char c)
-                        {
-                            return std::isspace(c);
-                        }), temp.end());
-                if (temp != "true" && temp != "false")
-                {
-                    throw std::invalid_argument("Only \"true\" or \"false\" values allowed.");
-                }
-                bt_opts->non_blocking_send = temp == "true" ? true : false;
-            }
-            catch (std::invalid_argument& except)
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Found wrong value " << attrib->Value() << " for non_blocking attribute. " <<
-                        except.what());
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else if (strcmp(attrib->Name(), TCP_NEGOTIATION_TIMEOUT) == 0)
-        {
-            // tcp_negotiation_timeout - stringType
-            try
-            {
-                std::string temp = attrib->Value();
-                temp.erase(std::remove_if(temp.begin(), temp.end(), [](unsigned char c)
-                        {
-                            return std::isspace(c);
-                        }), temp.end());
-                if (attrib->Value()[0] == '-')
-                {
-                    throw std::invalid_argument("Negative value detected.");
-                }
-                uint64_t value = std::stoull(temp);
-                if (value > std::numeric_limits<std::uint32_t>::max())
-                {
-                    throw std::out_of_range("Value for timeout out of range. Max uint32_t.");
-                }
-                bt_opts->tcp_negotiation_timeout = static_cast<uint32_t>(std::stoul(temp));
-            }
-            catch (std::exception& except)
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Found wrong value " << attrib->Value() << " for tcp_negotiation_timeout attribute. " <<
-                        except.what());
-                ret = XMLP_ret::XML_ERROR;
-                break;
-            }
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Found wrong attribute " << attrib->Name() << " in 'builtin_transports");
-            ret = XMLP_ret::XML_ERROR;
-            break;
-        }
-    }
-
-    std::string mode = get_element_text(elem);
-
-    if (mode.empty())
+    const char* text = elem->GetText();
+    if (nullptr == text)
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' without content");
         return XMLP_ret::XML_ERROR;
     }
 
-    if (!get_element_enum_value(mode.c_str(), *bt,
+    if (!get_element_enum_value(text, *bt,
             NONE, eprosima::fastdds::rtps::BuiltinTransports::NONE,
             DEFAULT_C, eprosima::fastdds::rtps::BuiltinTransports::DEFAULT,
             DEFAULTv6, eprosima::fastdds::rtps::BuiltinTransports::DEFAULTv6,
@@ -4894,12 +4329,8 @@ XMLP_ret XMLParser::getXMLBuiltinTransports(
             LARGE_DATAv6, eprosima::fastdds::rtps::BuiltinTransports::LARGE_DATAv6))
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "Node '" << KIND << "' bad content");
-        ret = XMLP_ret::XML_ERROR;
+        return XMLP_ret::XML_ERROR;
     }
 
-    return ret;
+    return XMLP_ret::XML_OK;
 }
-
-}  // namespace xmlparser
-}  // namespace fastrtps
-}  // namespace eprosima

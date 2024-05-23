@@ -26,9 +26,7 @@
 #include <fastrtps/utils/IPLocator.h>
 
 #include <rtps/network/ReceiverResource.h>
-#include <rtps/network/utils/netmask_filter.hpp>
-
-#include <utils/SystemInfo.hpp>
+#include <rtps/transport/asio_helpers.hpp>
 
 using namespace std;
 using namespace asio;
@@ -41,16 +39,11 @@ using IPFinder = fastrtps::rtps::IPFinder;
 using IPLocator = fastrtps::rtps::IPLocator;
 using Log = fastdds::dds::Log;
 
-static bool get_ipv4s(
+static void get_ipv4s(
         std::vector<IPFinder::info_IP>& locNames,
-        bool return_loopback,
-        bool force_lookup)
+        bool return_loopback = false)
 {
-    if (!SystemInfo::get_ips(locNames, return_loopback, force_lookup))
-    {
-        return false;
-    }
-
+    IPFinder::getIPs(&locNames, return_loopback);
     auto new_end = remove_if(locNames.begin(),
                     locNames.end(),
                     [](IPFinder::info_IP ip)
@@ -61,20 +54,14 @@ static bool get_ipv4s(
     std::for_each(locNames.begin(), locNames.end(), [](IPFinder::info_IP& loc)
             {
                 loc.locator.kind = LOCATOR_KIND_UDPv4;
-                loc.masked_locator.kind = LOCATOR_KIND_UDPv4;
             });
-    return true;
 }
 
-static bool get_ipv4s_unique_interfaces(
+static void get_ipv4s_unique_interfaces(
         std::vector<IPFinder::info_IP>& locNames,
-        bool return_loopback,
-        bool force_lookup)
+        bool return_loopback = false)
 {
-    if (!get_ipv4s(locNames, return_loopback, force_lookup))
-    {
-        return false;
-    }
+    get_ipv4s(locNames, return_loopback);
     std::sort(locNames.begin(), locNames.end(),
             [](const IPFinder::info_IP&  a, const IPFinder::info_IP& b) -> bool
             {
@@ -86,7 +73,6 @@ static bool get_ipv4s_unique_interfaces(
                         return a.type != IPFinder::IP4_LOCAL && b.type != IPFinder::IP4_LOCAL && a.dev == b.dev;
                     });
     locNames.erase(new_end, locNames.end());
-    return true;
 }
 
 static asio::ip::address_v4::bytes_type locator_to_native(
@@ -115,109 +101,24 @@ UDPv4Transport::UDPv4Transport(
 {
     mSendBufferSize = descriptor.sendBufferSize;
     mReceiveBufferSize = descriptor.receiveBufferSize;
-
-    // Copy descriptor's netmask filter configuration
-    // NOTE: participant's netmask_filter already taken into account before calling tranport registration
-    netmask_filter_ = descriptor.netmask_filter;
-
-    if (!descriptor.interfaceWhiteList.empty() || !descriptor.interface_allowlist.empty() ||
-            !descriptor.interface_blocklist.empty())
+    if (!descriptor.interfaceWhiteList.empty())
     {
         const auto white_begin = descriptor.interfaceWhiteList.begin();
         const auto white_end = descriptor.interfaceWhiteList.end();
 
-        const auto allow_begin = descriptor.interface_allowlist.begin();
-        const auto allow_end = descriptor.interface_allowlist.end();
-
-        const auto block_begin = descriptor.interface_blocklist.begin();
-        const auto block_end = descriptor.interface_blocklist.end();
-
-        if (!descriptor.interfaceWhiteList.empty())
-        {
-            EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
-                    "Support for interfaceWhiteList will be removed in a future release."
-                    << " Please use interface allowlist/blocklist instead.");
-        }
-
         std::vector<IPFinder::info_IP> local_interfaces;
-        get_ipv4s(local_interfaces, true, false);
+        get_ipv4s(local_interfaces, true);
         for (const IPFinder::info_IP& infoIP : local_interfaces)
         {
-            if (std::find_if(block_begin, block_end, [infoIP](const BlockedNetworkInterface& blocklist_element)
-                    {
-                        return blocklist_element.name == infoIP.dev || blocklist_element.name == infoIP.name;
-                    }) != block_end )
-            {
-                // Before skipping this interface, check if present in whitelist/allowlist and warn the user if found
-                if ((std::find_if(white_begin, white_end, [infoIP](const std::string& whitelist_element)
-                        {
-                            return whitelist_element == infoIP.dev || whitelist_element == infoIP.name;
-                        }) != white_end ) ||
-                        (std::find_if(allow_begin, allow_end,
-                        [infoIP](const AllowedNetworkInterface& allowlist_element)
-                        {
-                            return allowlist_element.name == infoIP.dev || allowlist_element.name == infoIP.name;
-                        }) != allow_end ))
-                {
-                    EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
-                            "Blocked interface " << infoIP.dev << ": " << infoIP.name
-                                                 << " is also present in whitelist/allowlist."
-                                                 << " Blocklist takes precedence over whitelist/allowlist.");
-                }
-                continue;
-            }
-            else if (descriptor.interfaceWhiteList.empty() && descriptor.interface_allowlist.empty())
+            if (std::find(white_begin, white_end, infoIP.name) != white_end)
             {
                 interface_whitelist_.emplace_back(ip::address_v4::from_string(infoIP.name));
-                allowed_interfaces_.emplace_back(infoIP.dev, infoIP.name, infoIP.masked_locator,
-                        descriptor.netmask_filter);
-            }
-            else if (!descriptor.interface_allowlist.empty())
-            {
-                auto allow_it = std::find_if(
-                    allow_begin,
-                    allow_end,
-                    [&infoIP](const AllowedNetworkInterface& allowlist_element)
-                    {
-                        return allowlist_element.name == infoIP.dev || allowlist_element.name == infoIP.name;
-                    });
-                if (allow_it != allow_end)
-                {
-                    NetmaskFilterKind netmask_filter = allow_it->netmask_filter;
-                    if (network::netmask_filter::validate_and_transform(netmask_filter,
-                            descriptor.netmask_filter))
-                    {
-                        interface_whitelist_.emplace_back(ip::address_v4::from_string(infoIP.name));
-                        allowed_interfaces_.emplace_back(infoIP.dev, infoIP.name, infoIP.masked_locator,
-                                netmask_filter);
-                    }
-                    else
-                    {
-                        EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
-                                "Ignoring allowed interface " << infoIP.dev << ": " << infoIP.name
-                                                              << " as its netmask filter configuration (" << netmask_filter << ") is incompatible"
-                                                              << " with descriptor's (" << descriptor.netmask_filter <<
-                                ").");
-                    }
-                }
-            }
-            else if (!descriptor.interfaceWhiteList.empty())
-            {
-                if (std::find_if(white_begin, white_end, [infoIP](const std::string& whitelist_element)
-                        {
-                            return whitelist_element == infoIP.dev || whitelist_element == infoIP.name;
-                        }) != white_end )
-                {
-                    interface_whitelist_.emplace_back(ip::address_v4::from_string(infoIP.name));
-                    allowed_interfaces_.emplace_back(infoIP.dev, infoIP.name, infoIP.masked_locator,
-                            descriptor.netmask_filter);
-                }
             }
         }
 
         if (interface_whitelist_.empty())
         {
-            EPROSIMA_LOG_ERROR(TRANSPORT_UDPV4, "All whitelist interfaces were filtered out");
+            EPROSIMA_LOG_ERROR(TRANSPORT, "All whitelist interfaces were filtered out");
             interface_whitelist_.emplace_back(ip::address_v4::from_string("192.0.2.0"));
         }
     }
@@ -372,12 +273,11 @@ asio::ip::udp UDPv4Transport::generate_protocol() const
     return ip::udp::v4();
 }
 
-bool UDPv4Transport::get_ips(
+void UDPv4Transport::get_ips(
         std::vector<IPFinder::info_IP>& locNames,
-        bool return_loopback,
-        bool force_lookup) const
+        bool return_loopback)
 {
-    return get_ipv4s(locNames, return_loopback, force_lookup);
+    get_ipv4s(locNames, return_loopback);
 }
 
 const std::string& UDPv4Transport::localhost_name()
@@ -395,7 +295,20 @@ eProsimaUDPSocket UDPv4Transport::OpenAndBindInputSocket(
     getSocketPtr(socket)->open(generate_protocol());
     if (mReceiveBufferSize != 0)
     {
-        getSocketPtr(socket)->set_option(socket_base::receive_buffer_size(mReceiveBufferSize));
+        uint32_t configured_value = 0;
+        uint32_t minimum_value = configuration()->maxMessageSize;
+        if (!asio_helpers::try_setting_buffer_size<socket_base::receive_buffer_size>(
+                    socket, mReceiveBufferSize, minimum_value, configured_value))
+        {
+            EPROSIMA_LOG_ERROR(TRANSPORT_UDPV4,
+                    "Couldn't set receive buffer size to minimum value: " << minimum_value);
+        }
+        else if (mReceiveBufferSize != configured_value)
+        {
+            EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
+                    "Receive buffer size could not be set to the desired value. "
+                    << "Using " << configured_value << " instead of " << mReceiveBufferSize);
+        }
     }
 
     if (is_multicast)
@@ -451,7 +364,7 @@ bool UDPv4Transport::OpenInputChannel(
             auto& channelResources = mInputSockets.at(IPLocator::getPhysicalPort(locator));
             for (UDPChannelResource* channelResource : channelResources)
             {
-                if (channelResource->iface() == locatorAddressStr)
+                if (channelResource->interface() == locatorAddressStr)
                 {
                     found = true;
                     break;
@@ -478,9 +391,9 @@ bool UDPv4Transport::OpenInputChannel(
                 catch (asio::system_error const& e)
                 {
                     (void)e;
-                    EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4, "UDPTransport Error binding " << locatorAddressStr << " at port: (" << IPLocator::getPhysicalPort(
+                    EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, "UDPTransport Error binding " << locatorAddressStr << " at port: (" << IPLocator::getPhysicalPort(
                                 locator) << ")"
-                                                                                        << " with msg: " << e.what());
+                                                                                     << " with msg: " << e.what());
                 }
             }
         }
@@ -492,10 +405,10 @@ bool UDPv4Transport::OpenInputChannel(
             auto& channelResources = mInputSockets.at(IPLocator::getPhysicalPort(locator));
             for (UDPChannelResource* channelResource : channelResources)
             {
-                if (channelResource->iface() == s_IPv4AddressAny)
+                if (channelResource->interface() == s_IPv4AddressAny)
                 {
                     std::vector<IPFinder::info_IP> locNames;
-                    get_ipv4s_unique_interfaces(locNames, true, false);
+                    get_ipv4s_unique_interfaces(locNames, true);
                     for (const auto& infoIP : locNames)
                     {
                         auto ip = asio::ip::address_v4::from_string(infoIP.name);
@@ -506,14 +419,14 @@ bool UDPv4Transport::OpenInputChannel(
                         catch (std::system_error& ex)
                         {
                             (void)ex;
-                            EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
+                            EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
                                     "Error joining multicast group on " << ip << ": " << ex.what());
                         }
                     }
                 }
                 else
                 {
-                    auto ip = asio::ip::address_v4::from_string(channelResource->iface());
+                    auto ip = asio::ip::address_v4::from_string(channelResource->interface());
                     try
                     {
                         channelResource->socket()->set_option(ip::multicast::join_group(locatorAddress, ip));
@@ -521,7 +434,7 @@ bool UDPv4Transport::OpenInputChannel(
                     catch (std::system_error& ex)
                     {
                         (void)ex;
-                        EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
+                        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
                                 "Error joining multicast group on " << ip << ": " << ex.what());
                     }
                 }
@@ -551,9 +464,9 @@ std::vector<std::string> UDPv4Transport::get_binding_interfaces_list()
 }
 
 bool UDPv4Transport::is_interface_allowed(
-        const std::string& iface) const
+        const std::string& interface) const
 {
-    return is_interface_allowed(asio::ip::address_v4::from_string(iface));
+    return is_interface_allowed(asio::ip::address_v4::from_string(interface));
 }
 
 bool UDPv4Transport::is_interface_allowed(
@@ -599,7 +512,7 @@ LocatorList UDPv4Transport::NormalizeLocator(
     if (IPLocator::isAny(locator))
     {
         std::vector<IPFinder::info_IP> locNames;
-        get_ipv4s(locNames, false, false);
+        get_ipv4s(locNames);
         for (const auto& infoIP : locNames)
         {
             auto ip = asio::ip::address_v4::from_string(infoIP.name);
@@ -635,13 +548,6 @@ bool UDPv4Transport::is_local_locator(
         return true;
     }
 
-    std::vector<IPFinder::info_IP> currentInterfaces;
-    if (!get_ips(currentInterfaces, false, false))
-    {
-        EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
-                "Could not retrieve IPs information to check if locator " << locator << " is local.");
-        return false;
-    }
     for (const IPFinder::info_IP& localInterface : currentInterfaces)
     {
         if (IPLocator::compareAddress(locator, localInterface.locator))
@@ -679,11 +585,10 @@ void UDPv4Transport::update_network_interfaces()
     {
         for (UDPChannelResource* channelResource : channelResources.second)
         {
-            if (channelResource->iface() == s_IPv4AddressAny)
+            if (channelResource->interface() == s_IPv4AddressAny)
             {
-                // WARNING: SystemInfo::update_interfaces() should have been called prior to this point
                 std::vector<IPFinder::info_IP> locNames;
-                get_ipv4s_unique_interfaces(locNames, true, false);
+                get_ipv4s_unique_interfaces(locNames, true);
                 for (const auto& infoIP : locNames)
                 {
                     auto ip = asio::ip::address_v4::from_string(infoIP.name);
@@ -695,14 +600,14 @@ void UDPv4Transport::update_network_interfaces()
                     catch (std::system_error& ex)
                     {
                         (void)ex;
-                        EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
+                        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
                                 "Error joining multicast group on " << ip << ": " << ex.what());
                     }
                 }
             }
             else
             {
-                auto ip = asio::ip::address_v4::from_string(channelResource->iface());
+                auto ip = asio::ip::address_v4::from_string(channelResource->interface());
                 try
                 {
                     channelResource->socket()->set_option(ip::multicast::join_group(
@@ -711,8 +616,7 @@ void UDPv4Transport::update_network_interfaces()
                 catch (std::system_error& ex)
                 {
                     (void)ex;
-                    EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
-                            "Error joining multicast group on " << ip << ": " << ex.what());
+                    EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
                 }
             }
         }

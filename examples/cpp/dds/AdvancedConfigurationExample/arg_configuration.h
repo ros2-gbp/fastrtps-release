@@ -175,9 +175,7 @@ enum optionIndex
     TTL,
     PARTITIONS,
     OWNERSHIP_STRENGTH,
-    OWNERSHIP,
-    DATA_SIZE,
-    PROFILE,
+    OWNERSHIP
 };
 
 const option::Descriptor usage[] = {
@@ -187,14 +185,12 @@ const option::Descriptor usage[] = {
 
     { UNKNOWN_OPT, 0, "", "",                Arg::None,      "\nPublisher options:"},
     { TOPIC, 0, "t", "topic",                  Arg::String,
-      "  -t <topic_name> \t--topic=<topic_name>  \tTopic name (Default: AdvancedConfigurationTopic)." },
+      "  -t <topic_name> \t--topic=<topic_name>  \tTopic name (Default: HelloWorldTopic)." },
     { DOMAIN_ID, 0, "d", "domain",                Arg::NumericRange<0, 230>,
       "  -d <id> \t--domain=<id>  \tDDS domain ID (Default: 0)." },
     { WAIT, 0, "w", "wait",                 Arg::NumericRange<>,
       "  -w <num> \t--wait=<num> \tNumber of matched subscribers required to publish"
       " (Default: 0 => does not wait)." },
-    { DATA_SIZE, 0, "m", "msg-size",         Arg::String,
-      "  -m <num> \t--msg-size=<num>\tSize in bytes of the data to send (Default 10)."},
     { SAMPLES, 0, "s", "samples",              Arg::NumericRange<>,
       "  -s <num> \t--samples=<num>  \tNumber of samples to send (Default: 0 => infinite samples)." },
     { INTERVAL, 0, "i", "interval",            Arg::NumericRange<>,
@@ -212,7 +208,7 @@ const option::Descriptor usage[] = {
 
     { UNKNOWN_OPT, 0, "", "",                Arg::None,      "\nSubscriber options:"},
     { TOPIC, 0, "t", "topic",                  Arg::String,
-      "  -t <topic_name> \t--topic=<topic_name>  \tTopic name (Default: AdvancedConfigurationTopic)." },
+      "  -t <topic_name> \t--topic=<topic_name>  \tTopic name (Default: HelloWorldTopic)." },
     { DOMAIN_ID, 0, "d", "domain",                Arg::NumericRange<0, 230>,
       "  -d <id> \t--domain=<id>  \tDDS domain ID (Default: 0)." },
     { SAMPLES, 0, "s", "samples",              Arg::NumericRange<>,
@@ -233,8 +229,6 @@ const option::Descriptor usage[] = {
       "  -p <str> \t--partitions=<str> \tPartitions to match separated by ';'."
       " Single or double quotes required with multiple partitions."
       " With empty string ('') no partitions used. (Default: '')." },
-    { PROFILE, 0, "x", "xml-profile",         Arg::String,
-      "  -x <str> \t--xml-profile <str>\tProfile name to configure DomainParticipant."},
 
     { UNKNOWN_OPT, 0, "", "",                Arg::None,      "\nDiscovery options:"},
     { TTL, 0, "", "ttl",         Arg::NumericRange<1, 255>,

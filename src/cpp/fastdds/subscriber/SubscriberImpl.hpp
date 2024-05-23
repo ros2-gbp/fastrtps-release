@@ -21,19 +21,16 @@
 #define _FASTDDS_SUBSCRIBERIMPL_HPP_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <map>
-#include <mutex>
+#include <fastrtps/attributes/SubscriberAttributes.h>
 
-#include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastdds/dds/subscriber/DataReaderListener.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
-#include <fastdds/dds/topic/qos/TopicQos.hpp>
-#include <fastrtps/attributes/SubscriberAttributes.h>
+#include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastrtps/types/TypesBase.h>
 
-#include <statistics/rtps/monitor-service/interfaces/IStatusQueryable.hpp>
-
+#include <mutex>
+#include <map>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -153,9 +150,11 @@ public:
             const std::string& profile_name,
             DataReaderQos& qos) const;
 
-    ReturnCode_t static copy_from_topic_qos(
-            DataReaderQos& reader_qos,
-            const TopicQos& topic_qos);
+    /* TODO
+       bool copy_from_topic_qos(
+            ReaderQos& reader_qos,
+            const fastrtps::TopicAttributes& topic_qos) const;
+     */
 
     const DomainParticipant* get_participant() const;
 
@@ -227,12 +226,6 @@ public:
     ReturnCode_t delete_contained_entities();
 
     bool can_be_deleted() const;
-
-#ifdef FASTDDS_STATISTICS
-    bool get_monitoring_status(
-            statistics::MonitorServiceData& status,
-            const fastrtps::rtps::GUID_t& entity_guid);
-#endif //FASTDDS_STATISTICS
 
 protected:
 

@@ -17,23 +17,21 @@
  *
  */
 
+#include <fastdds/rtps/writer/RTPSWriter.h>
+
 #include <mutex>
-
-#include <rtps/history/BasicPayloadPool.hpp>
-#include <rtps/history/CacheChangePool.h>
-
-#include <rtps/DataSharing/DataSharingNotifier.hpp>
-#include <rtps/DataSharing/WriterPool.hpp>
-
-#include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <fastdds/dds/log/Log.hpp>
 
-#include <fastdds/rtps/writer/RTPSWriter.h>
-
+#include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastdds/rtps/history/WriterHistory.h>
-
 #include <fastdds/rtps/messages/RTPSMessageCreator.h>
+
+#include <rtps/DataSharing/DataSharingNotifier.hpp>
+#include <rtps/DataSharing/WriterPool.hpp>
+#include <rtps/history/BasicPayloadPool.hpp>
+#include <rtps/history/CacheChangePool.h>
+#include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <statistics/rtps/StatisticsBase.hpp>
 #include <statistics/rtps/messages/RTPSStatisticsMessages.hpp>
@@ -109,6 +107,22 @@ void RTPSWriter::init(
         const std::shared_ptr<IChangePool>& change_pool,
         const WriterAttributes& att)
 {
+    {
+        const std::string* max_size_property =
+                PropertyPolicyHelper::find_property(att.endpoint.properties, "fastdds.max_message_size");
+        if (max_size_property != nullptr)
+        {
+            try
+            {
+                max_output_message_size_ = std::stoul(*max_size_property);
+            }
+            catch (const std::exception& e)
+            {
+                EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error parsing max_message_size property: " << e.what());
+            }
+        }
+    }
+
     payload_pool_ = payload_pool;
     change_pool_ = change_pool;
     fixed_payload_size_ = 0;
@@ -152,7 +166,7 @@ void RTPSWriter::deinit()
         std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
         for (auto it = mp_history->changesBegin(); it != mp_history->changesEnd(); ++it)
         {
-            flow_controller_->remove_change(*it, std::chrono::steady_clock::now() + std::chrono::hours(24));
+            flow_controller_->remove_change(*it);
         }
 
         for (auto it = mp_history->changesBegin(); it != mp_history->changesEnd(); ++it)
@@ -198,7 +212,6 @@ CacheChange_t* RTPSWriter::new_change(
     reserved_change->writer_info.previous = nullptr;
     reserved_change->writer_info.next = nullptr;
     reserved_change->writer_info.num_sent_submessages = 0;
-    reserved_change->vendor_id = c_VendorId_eProsima;
     return reserved_change;
 }
 
@@ -226,7 +239,6 @@ CacheChange_t* RTPSWriter::new_change(
     reserved_change->writer_info.previous = nullptr;
     reserved_change->writer_info.next = nullptr;
     reserved_change->writer_info.num_sent_submessages = 0;
-    reserved_change->vendor_id = c_VendorId_eProsima;
     return reserved_change;
 }
 
@@ -308,6 +320,10 @@ uint32_t RTPSWriter::getMaxDataSize()
     uint32_t flow_max = flow_controller_->get_max_payload();
     uint32_t part_max = mp_RTPSParticipant->getMaxMessageSize();
     uint32_t max_size = flow_max > part_max ? part_max : flow_max;
+    if (max_output_message_size_ < max_size)
+    {
+        max_size = max_output_message_size_;
+    }
 
     max_size =  calculateMaxDataSize(max_size);
     return max_size &= ~3;

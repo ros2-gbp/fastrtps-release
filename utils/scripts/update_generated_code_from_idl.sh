@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 files_to_exclude=(
     './include/fastrtps/types/*'
@@ -6,10 +6,6 @@ files_to_exclude=(
 
 files_needing_typeobject=(
     './examples/cpp/dds/ContentFilteredTopicExample/HelloWorld.idl'
-    './test/blackbox/types/HelloWorld.idl'
-    './test/blackbox/types/TestIncludeRegression3361.idl'
-    './test/blackbox/types/TestRegression3361.idl'
-    './test/unittest/dds/topic/DDSSQLFilter/data_types/ContentFilterTestType.idl'
     './test/unittest/dynamic_types/idl/Basic.idl'
     './test/unittest/dynamic_types/idl/new_features_4_2.idl'
     './test/unittest/dynamic_types/idl/Test.idl'
@@ -23,18 +19,15 @@ files_needing_case_sensitive=(
     )
 
 files_needing_output_dir=(
-    './include/fastdds/statistics/types.idl|../../../src/cpp/statistics/types|../../../test/blackbox/types/statistics'
-    './include/fastdds/statistics/monitorservice_types.idl|../../../src/cpp/statistics/types'
+    './include/fastdds/statistics/types.idl|../../../src/cpp/statistics/types'
     )
 
-red='\E[1;31m'
+
 yellow='\E[1;33m'
 textreset='\E[1;0m'
 
-current_dir=$(git rev-parse --show-toplevel)
-
-if [[ ! "$(pwd -P)" -ef "$current_dir" ]]; then
-    echo -e "${red}This script must be executed in the repository root directory.${textreset}"
+if [[ $(ls update_generated_code_from_idl.sh 2>/dev/null | wc -l) != 1 ]]; then
+    echo "Please, execute this script from its directory"
     exit -1
 fi
 
@@ -42,6 +35,8 @@ if [[ -z "$(which fastddsgen)" ]]; then
     echo "Cannot find fastddsgen. Please, include it in PATH environment variable"
     exit -1
 fi
+
+cd ../..
 
 readarray -d '' idl_files < <(find . -iname \*.idl -print0)
 
@@ -68,23 +63,17 @@ for idl_file in "${idl_files[@]}"; do
     # Detect if needs case sensitive.
     [[ ${files_needing_case_sensitive[*]} =~ $idl_file ]] && cs_arg='-cs' || cs_arg=''
 
-    # Detect if needs output directories.
-    not_processed=true
+    # Detect if needs output directory.
+    od_arg=""
     for od_entry in ${files_needing_output_dir[@]}; do
         if [[ $od_entry = $idl_file\|* ]]; then
-            not_processed=false;
             od_entry_split=(${od_entry//\|/ })
-            for od_entry_split_element in ${od_entry_split[@]:1}; do
-                od_arg="-d ${od_entry_split_element}"
-                fastddsgen -cdr both -replace $to_arg $cs_arg $od_arg "$file_from_gen"
-            done
+            od_arg="-d ${od_entry_split[1]}"
             break
         fi
     done
 
-    if $not_processed ; then
-        fastddsgen -cdr both -replace $to_arg $cs_arg "$file_from_gen"
-    fi
+    fastddsgen -replace $to_arg $cs_arg $od_arg "$file_from_gen"
 
     if [[ $? != 0 ]]; then
         ret_value=-1
@@ -92,5 +81,7 @@ for idl_file in "${idl_files[@]}"; do
 
     cd -
 done
+
+cd utils/scripts
 
 exit $ret_value

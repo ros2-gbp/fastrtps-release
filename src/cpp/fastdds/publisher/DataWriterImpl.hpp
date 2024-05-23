@@ -453,11 +453,6 @@ protected:
                 const fastrtps::rtps::GUID_t& reader_guid,
                 const fastrtps::rtps::ReaderProxyData* reader_info) override;
 
-#ifdef FASTDDS_STATISTICS
-        void notify_status_observer(
-                const uint32_t& status_id);
-#endif //FASTDDS_STATISTICS
-
         DataWriterImpl* data_writer_;
 
     private:
@@ -508,8 +503,6 @@ protected:
     fastrtps::rtps::GUID_t guid_;
 
     std::unique_ptr<ReaderFilterCollection> reader_filters_;
-
-    DataRepresentationId_t data_representation_ {DEFAULT_DATA_REPRESENTATION};
 
     ReturnCode_t check_write_preconditions(
             void* data,
@@ -733,11 +726,6 @@ protected:
     bool is_relevant(
             const fastrtps::rtps::CacheChange_t& change,
             const fastrtps::rtps::GUID_t& reader_guid) const override;
-
-private:
-
-    DataWriterQos get_datawriter_qos_from_settings(
-            const DataWriterQos& qos);
 
 };
 

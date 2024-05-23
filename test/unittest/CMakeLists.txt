@@ -14,7 +14,6 @@
 
 add_compile_definitions(FASTRTPS_NO_LIB)
 
-add_subdirectory(rtps/attributes)
 add_subdirectory(rtps/common)
 add_subdirectory(rtps/DataSharing)
 add_subdirectory(rtps/builtin)

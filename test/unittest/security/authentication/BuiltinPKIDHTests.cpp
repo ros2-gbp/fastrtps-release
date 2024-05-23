@@ -682,15 +682,12 @@ int main(
 {
     testing::InitGoogleTest(&argc, argv);
 
-    if (!::testing::GTEST_FLAG(list_tests))
-    {
-        certs_path = std::getenv("CERTS_PATH");
+    certs_path = std::getenv("CERTS_PATH");
 
-        if (certs_path == nullptr)
-        {
-            std::cout << "Cannot get enviroment variable CERTS_PATH" << std::endl;
-            exit(-1);
-        }
+    if (certs_path == nullptr)
+    {
+        std::cout << "Cannot get enviroment variable CERTS_PATH" << std::endl;
+        exit(-1);
     }
 
     return RUN_ALL_TESTS();

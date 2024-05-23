@@ -32,6 +32,7 @@ set(sqlite3_source_files
 
 set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
     ${DDSSQLFILTER_SOURCES}
+
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/AnnotationDescriptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/AnnotationParameterValue.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/BuiltinAnnotationsTypeObject.cpp
@@ -54,22 +55,21 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypeObjectHashId.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/dynamic-types/TypesBase.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/builtin/common/RPCHeadersImpl.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/builtin/typelookup/common/TypeLookupTypes.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/builtin/typelookup/TypeLookupManager.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/builtin/typelookup/TypeLookupReplyListener.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/builtin/typelookup/TypeLookupRequestListener.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/builtin/typelookup/common/TypeLookupTypes.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/Entity.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/Condition.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/ConditionNotifier.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/StatusCondition.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/StatusConditionImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/WaitSetImpl.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/Entity.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/policy/ParameterList.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/policy/QosPolicyUtils.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/domain/DomainParticipant.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/domain/DomainParticipantFactory.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/domain/DomainParticipantImpl.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/domain/qos/DomainParticipantFactoryQos.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/domain/qos/DomainParticipantQos.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/FileConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
@@ -85,34 +85,36 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/publisher/qos/WriterQos.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/DataReader.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/DataReaderImpl.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/ReadCondition.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/Subscriber.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/SubscriberImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/history/DataReaderHistory.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/qos/DataReaderQos.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/qos/ReaderQos.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/qos/SubscriberQos.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/ReadCondition.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/Subscriber.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/SubscriberImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/ContentFilteredTopic.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/ContentFilteredTopicImpl.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/qos/TopicQos.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/Topic.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/TopicDataType.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/TopicImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/TopicProxyFactory.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/TypeSupport.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/qos/TopicQos.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/utils/QosConverters.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastrtps_deprecated/subscriber/SubscriberHistory.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/DataSharing/DataSharingListener.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/DataSharing/DataSharingNotification.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/DataSharing/DataSharingPayloadPool.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/RTPSDomain.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/RTPSParticipantAttributes.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/ThreadSettings.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/BuiltinProtocols.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/data/ParticipantProxyData.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/data/ReaderProxyData.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/data/WriterProxyData.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/database/backup/SharedBackupFunctions.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/database/DiscoveryDataBase.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/database/DiscoveryParticipantInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/database/DiscoveryParticipantsAckStatus.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/database/DiscoverySharedInfo.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/database/backup/SharedBackupFunctions.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/endpoint/EDP.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/endpoint/EDPClient.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/endpoint/EDPServer.cpp
@@ -132,12 +134,7 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/timedevent/DServerEvent.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/liveliness/WLP.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/liveliness/WLPListener.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/GuidPrefix_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/DataSharing/DataSharingListener.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/DataSharing/DataSharingNotification.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/DataSharing/DataSharingPayloadPool.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/FlowControllerConsts.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/FlowControllerFactory.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
@@ -152,11 +149,10 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/messages/RTPSMessageCreator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/messages/RTPSMessageGroup.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/messages/SendBuffersManager.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/ExternalLocatorsProcessor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/ReceiverResource.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/external_locators.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/RTPSParticipantAttributes.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/participant/RTPSParticipant.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/participant/RTPSParticipantImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/persistence/PersistenceFactory.cpp
@@ -169,15 +165,7 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/ResourceEvent.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEvent.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEventImpl.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/RTPSDomain.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/PortBasedTransportDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/RTCPMessageManager.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/TCPControlMessage.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPAcceptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPAcceptorBasic.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPChannelResource.cpp
@@ -185,17 +173,19 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPTransportInterface.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPv4Transport.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPv6Transport.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TransportInterface.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPChannelResource.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPTransportInterface.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPv6Transport.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/RTCPMessageManager.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/TCPControlMessage.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/LivelinessManager.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/LocatorSelectorSender.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/PersistentWriter.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/RTPSWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/ReaderLocator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/ReaderProxy.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/RTPSWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/StatefulPersistentWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/StatefulWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/writer/StatelessPersistentWriter.cpp
@@ -208,12 +198,11 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/xmlparser/XMLProfileManager.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/string_convert.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/StringMatching.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/UnitsParser.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/string_convert.cpp
     )
 
     if(SQLITE3_SUPPORT)
@@ -231,16 +220,10 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/fastdds/publisher/qos/DataWriterQos.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/fastdds/subscriber/qos/DataReaderQos.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/rtps/StatisticsBase.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/statistics/rtps/monitor-service/MonitorService.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/statistics/rtps/monitor-service/MonitorServiceListener.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/rtps/reader/StatisticsReaderImpl.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/rtps/writer/StatisticsWriterImpl.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/types.cxx
-            ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/typesv1.cxx
             ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/typesPubSubTypes.cxx
-            ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/monitorservice_typesPubSubTypes.cxx
-            ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/monitorservice_types.cxx
-            ${PROJECT_SOURCE_DIR}/src/cpp/statistics/types/monitorservice_typesv1.cxx
             )
 
         list(APPEND DATAWRITERTESTS_SOURCE ${statistics_sources})
@@ -277,7 +260,6 @@ set(DATAWRITERTESTS_SOURCE DataWriterTests.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/security/artifact_providers/Pkcs11Provider.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/security/authentication/PKIDH.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/security/accesscontrol/Permissions.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/security/accesscontrol/DistinguishedName.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/security/cryptography/AESGCMGMAC.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/security/cryptography/AESGCMGMAC_KeyExchange.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/security/cryptography/AESGCMGMAC_KeyFactory.cpp
@@ -331,13 +313,10 @@ endif()
 
 add_executable(PublisherTests ${PUBLISHERTESTS_SOURCE})
 target_compile_definitions(PublisherTests PRIVATE
-    BOOST_ASIO_STANDALONE
-    ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(PublisherTests PRIVATE
-    ${Asio_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
     ${PROJECT_SOURCE_DIR}/thirdparty/taocpp-pegtl
@@ -348,7 +327,7 @@ target_link_libraries(PublisherTests fastrtps fastcdr foonathan_memory
 if(QNX)
     target_link_libraries(PublisherTests socket)
 endif()
-gtest_discover_tests(PublisherTests)
+add_gtest(PublisherTests SOURCES ${PUBLISHERTESTS_SOURCE})
 
 add_executable(DataWriterTests ${DATAWRITERTESTS_SOURCE})
 target_compile_definitions(DataWriterTests PRIVATE
@@ -394,5 +373,11 @@ if(MSVC OR MSVC_IDE)
         iphlpapi Shlwapi
         )
 endif()
-gtest_discover_tests(DataWriterTests
-    PROPERTIES ENVIRONMENT "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs")
+add_gtest(DataWriterTests
+    SOURCES ${DATAWRITERTESTS_SOURCE}
+    ENVIRONMENTS "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs")
+
+if(ANDROID)
+    set_property(TARGET PublisherTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET DataWriterTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

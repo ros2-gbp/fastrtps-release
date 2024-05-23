@@ -15,22 +15,20 @@
 #ifndef _FASTDDS_UDP_TRANSPORT_INTERFACE_H_
 #define _FASTDDS_UDP_TRANSPORT_INTERFACE_H_
 
-#include <map>
-#include <memory>
-#include <mutex>
-#include <vector>
-
 #include <asio.hpp>
+#include <thread>
 
-#include <fastdds/rtps/common/LocatorWithMask.hpp>
-#include <fastdds/rtps/transport/network/AllowedNetworkInterface.hpp>
-#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
 #include <fastdds/rtps/transport/TransportInterface.h>
 #include <fastdds/rtps/transport/UDPTransportDescriptor.h>
 #include <fastrtps/utils/IPFinder.h>
 
 #include <rtps/transport/UDPChannelResource.h>
 #include <statistics/rtps/messages/OutputTrafficManager.hpp>
+
+#include <vector>
+#include <memory>
+#include <map>
+#include <mutex>
 
 namespace eprosima {
 namespace fastdds {
@@ -39,8 +37,6 @@ namespace rtps {
 class UDPTransportInterface : public TransportInterface
 {
     friend class UDPSenderResource;
-
-    using TransportInterface::transform_remote_locator;
 
 public:
 
@@ -64,8 +60,7 @@ public:
     virtual const UDPTransportDescriptor* configuration() const = 0;
 
     bool init(
-            const fastrtps::rtps::PropertyPolicy* properties = nullptr,
-            const uint32_t& max_msg_size_no_frag = 0) override;
+            const fastrtps::rtps::PropertyPolicy* properties = nullptr) override;
 
     //! Checks whether there are open and bound sockets for the given port.
     bool IsInputChannelOpen(
@@ -92,20 +87,16 @@ public:
      * Transforms a remote locator into a locator optimized for local communications.
      *
      * If the remote locator corresponds to one of the local interfaces, it is converted
-     * to the corresponding local address if allowed by both local and remote transports.
+     * to the corresponding local address.
      *
      * @param [in]  remote_locator Locator to be converted.
      * @param [out] result_locator Converted locator.
-     * @param [in]  allowed_remote_localhost Whether localhost is allowed (and hence used) in the remote transport.
-     * @param [in]  allowed_local_localhost Whether localhost is allowed locally (by this or other transport).
      *
      * @return false if the input locator is not supported/allowed by this transport, true otherwise.
      */
     bool transform_remote_locator(
             const Locator& remote_locator,
-            Locator& result_locator,
-            bool allowed_remote_localhost,
-            bool allowed_local_localhost) const override;
+            Locator& result_locator) const override;
 
     /**
      * Blocking Send through the specified channel. In both modes, using a localLocator of 0.0.0.0 will
@@ -176,16 +167,13 @@ public:
 
     void update_network_interfaces() override;
 
-    bool is_localhost_allowed() const override;
-
-    NetmaskFilterInfo netmask_filter_info() const override;
-
 protected:
 
     friend class UDPChannelResource;
 
     // For UDPv6, the notion of channel corresponds to a port + direction tuple.
     asio::io_service io_service_;
+    std::vector<fastrtps::rtps::IPFinder::info_IP> currentInterfaces;
 
     mutable std::recursive_mutex mInputMapMutex;
     std::map<uint16_t, std::vector<UDPChannelResource*>> mInputSockets;
@@ -196,9 +184,6 @@ protected:
 
     //! First time open output channel flag: open the first socket with the ip::multicast::enable_loopback
     bool first_time_open_output_channel_;
-
-    NetmaskFilterKind netmask_filter_;
-    std::vector<AllowedNetworkInterface> allowed_interfaces_;
 
     UDPTransportInterface(
             int32_t transport_kind);
@@ -230,10 +215,9 @@ protected:
             const Locator& loc,
             uint16_t port) = 0;
     virtual asio::ip::udp generate_protocol() const = 0;
-    virtual bool get_ips(
+    virtual void get_ips(
             std::vector<fastrtps::rtps::IPFinder::info_IP>& locNames,
-            bool return_loopback,
-            bool force_lookup) const = 0;
+            bool return_loopback = false) = 0;
     virtual const std::string& localhost_name() = 0;
 
     //! Checks if the interfaces white list is empty.
@@ -241,7 +225,7 @@ protected:
 
     //! Checks if the given interface is allowed by the white list.
     virtual bool is_interface_allowed(
-            const std::string& iface) const = 0;
+            const std::string& interface) const = 0;
 
     /**
      * Method to get a list of interfaces to bind the socket associated to the given locator.
@@ -267,10 +251,6 @@ protected:
     eProsimaUDPSocket OpenAndBindUnicastOutputSocket(
             const asio::ip::udp::endpoint& endpoint,
             uint16_t& port);
-    eProsimaUDPSocket OpenAndBindUnicastOutputSocket(
-            const asio::ip::udp::endpoint& endpoint,
-            uint16_t& port,
-            const LocatorWithMask& locator);
 
     virtual void set_receive_buffer_size(
             uint32_t size) = 0;
@@ -305,6 +285,7 @@ protected:
             bool return_loopback = false);
 
     std::atomic_bool rescan_interfaces_ = {true};
+
 };
 
 } // namespace rtps

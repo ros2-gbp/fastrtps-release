@@ -1,4 +1,5 @@
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastrtps/Domain.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
 
 #include "fuzz_utils.h"
 
@@ -22,7 +23,21 @@ extern "C" int LLVMFuzzerTestOneInput(
         return EXIT_FAILURE;
     }
 
-    fastdds::dds::DomainParticipantFactory::get_instance()->load_XML_profiles_string(reinterpret_cast<const char*>(data), size);
+    const char* filename = buf_to_file(data, size);
+
+    if (filename == NULL)
+    {
+        return EXIT_FAILURE;
+    }
+
+    // TODO change this to a func. taking buf + len (or C string)
+    // to avoid using `buf_to_file`
+    xmlparser::XMLProfileManager::loadXMLFile(filename);
+
+    if (delete_file(filename) != 0)
+    {
+        return EXIT_FAILURE;
+    }
 
     return 0;
 }

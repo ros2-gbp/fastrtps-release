@@ -106,8 +106,17 @@ DataReader* Subscriber::create_datareader(
         TopicDescription* topic,
         const DataReaderQos& reader_qos,
         DataReaderListener* listener,
-        const StatusMask& mask,
-        std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool)
+        const StatusMask& mask)
+{
+    return impl_->create_datareader(topic, reader_qos, listener, mask, nullptr);
+}
+
+DataReader* Subscriber::create_datareader_with_payload_pool(
+        TopicDescription* topic,
+        const DataReaderQos& reader_qos,
+        std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool,
+        DataReaderListener* listener,
+        const StatusMask& mask)
 {
     return impl_->create_datareader(topic, reader_qos, listener, mask, payload_pool);
 }
@@ -116,8 +125,17 @@ DataReader* Subscriber::create_datareader_with_profile(
         TopicDescription* topic,
         const std::string& profile_name,
         DataReaderListener* listener,
-        const StatusMask& mask,
-        std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool)
+        const StatusMask& mask)
+{
+    return impl_->create_datareader_with_profile(topic, profile_name, listener, mask, nullptr);
+}
+
+DataReader* Subscriber::create_datareader_with_profile_with_payload_pool(
+        TopicDescription* topic,
+        const std::string& profile_name,
+        std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool,
+        DataReaderListener* listener,
+        const StatusMask& mask)
 {
     return impl_->create_datareader_with_profile(topic, profile_name, listener, mask, payload_pool);
 }
@@ -221,7 +239,12 @@ ReturnCode_t Subscriber::copy_from_topic_qos(
         DataReaderQos& reader_qos,
         const TopicQos& topic_qos)
 {
-    return SubscriberImpl::copy_from_topic_qos(reader_qos, topic_qos);
+    static_cast<void> (reader_qos);
+    static_cast<void> (topic_qos);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
+    /*
+       return impl_->copy_from_topic_qos(reader_qos, topic_qos);
+     */
 }
 
 const DomainParticipant* Subscriber::get_participant() const

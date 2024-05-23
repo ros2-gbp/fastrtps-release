@@ -42,8 +42,6 @@ set(${PROJECT_NAME}_source_files
     fastdds/log/StdoutConsumer.cpp
     fastdds/log/FileConsumer.cpp
 
-    rtps/common/GuidPrefix_t.cpp
-    rtps/common/LocatorWithMask.cpp
     rtps/common/Time_t.cpp
     rtps/resources/ResourceEvent.cpp
     rtps/resources/TimedEvent.cpp
@@ -77,11 +75,9 @@ set(${PROJECT_NAME}_source_files
     rtps/messages/submessages/DataMsg.hpp
     rtps/messages/submessages/GapMsg.hpp
     rtps/messages/submessages/HeartbeatMsg.hpp
+    rtps/network/ExternalLocatorsProcessor.cpp
     rtps/network/NetworkFactory.cpp
     rtps/network/ReceiverResource.cpp
-    rtps/network/utils/external_locators.cpp
-    rtps/network/utils/netmask_filter.cpp
-    rtps/network/utils/network.cpp
     rtps/attributes/RTPSParticipantAttributes.cpp
     rtps/participant/RTPSParticipant.cpp
     rtps/participant/RTPSParticipantImpl.cpp
@@ -104,7 +100,6 @@ set(${PROJECT_NAME}_source_files
     fastdds/topic/TopicImpl.cpp
     fastdds/topic/TopicProxyFactory.cpp
     fastdds/topic/TypeSupport.cpp
-    fastdds/topic/TopicDataType.cpp
     fastdds/topic/qos/TopicQos.cpp
     fastdds/publisher/qos/DataWriterQos.cpp
     fastdds/subscriber/qos/DataReaderQos.cpp
@@ -128,28 +123,23 @@ set(${PROJECT_NAME}_source_files
     fastdds/builtin/typelookup/TypeLookupManager.cpp
     fastdds/builtin/typelookup/TypeLookupRequestListener.cpp
     fastdds/builtin/typelookup/TypeLookupReplyListener.cpp
-    rtps/transport/TransportInterface.cpp
-    rtps/transport/ChainingTransport.cpp
     rtps/transport/ChannelResource.cpp
-    rtps/transport/network/NetmaskFilterKind.cpp
-    rtps/transport/network/NetworkInterface.cpp
-    rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    rtps/transport/PortBasedTransportDescriptor.cpp
-    rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
-    rtps/transport/tcp/RTCPMessageManager.cpp
-    rtps/transport/tcp/TCPControlMessage.cpp
-    rtps/transport/TCPAcceptor.cpp
-    rtps/transport/TCPAcceptorBasic.cpp
+    rtps/transport/UDPChannelResource.cpp
     rtps/transport/TCPChannelResource.cpp
     rtps/transport/TCPChannelResourceBasic.cpp
+    rtps/transport/TCPAcceptor.cpp
+    rtps/transport/TCPAcceptorBasic.cpp
+    rtps/transport/UDPv4Transport.cpp
     rtps/transport/TCPTransportInterface.cpp
+    rtps/transport/UDPTransportInterface.cpp
+    rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
     rtps/transport/TCPv4Transport.cpp
+    rtps/transport/UDPv6Transport.cpp
     rtps/transport/TCPv6Transport.cpp
     rtps/transport/test_UDPv4Transport.cpp
-    rtps/transport/UDPChannelResource.cpp
-    rtps/transport/UDPTransportInterface.cpp
-    rtps/transport/UDPv4Transport.cpp
-    rtps/transport/UDPv6Transport.cpp
+    rtps/transport/tcp/TCPControlMessage.cpp
+    rtps/transport/tcp/RTCPMessageManager.cpp
+    rtps/transport/ChainingTransport.cpp
 
     dynamic-types/AnnotationDescriptor.cpp
     dynamic-types/AnnotationParameterValue.cpp
@@ -209,7 +199,6 @@ set(${PROJECT_NAME}_source_files
     rtps/flowcontrol/FlowControllerFactory.cpp
     rtps/exceptions/Exception.cpp
     rtps/attributes/PropertyPolicy.cpp
-    rtps/attributes/ThreadSettings.cpp
     rtps/common/Token.cpp
     rtps/xmlparser/XMLParserCommon.cpp
     rtps/xmlparser/XMLElementParser.cpp
@@ -246,7 +235,6 @@ set(${PROJECT_NAME}_source_files
     utils/SystemInfo.cpp
     utils/TimedConditionVariable.cpp
     utils/string_convert.cpp
-    utils/UnitsParser.cpp
 
     dds/core/types.cpp
     dds/core/Exception.cpp
@@ -269,17 +257,11 @@ if (FASTDDS_STATISTICS)
     set(statistics_sources
         statistics/fastdds/domain/DomainParticipantImpl.cpp
         statistics/fastdds/domain/DomainParticipantStatisticsListener.cpp
-        statistics/rtps/monitor-service/MonitorService.cpp
-        statistics/rtps/monitor-service/MonitorServiceListener.cpp
-        statistics/rtps/reader/StatisticsReaderImpl.cpp
         statistics/rtps/StatisticsBase.cpp
+        statistics/rtps/reader/StatisticsReaderImpl.cpp
         statistics/rtps/writer/StatisticsWriterImpl.cpp
         statistics/types/typesPubSubTypes.cxx
         statistics/types/types.cxx
-        statistics/types/typesv1.cxx
-        statistics/types/monitorservice_types.cxx
-        statistics/types/monitorservice_typesv1.cxx
-        statistics/types/monitorservice_typesPubSubTypes.cxx
         )
 
     list(APPEND ${PROJECT_NAME}_source_files
@@ -314,7 +296,6 @@ set(${PROJECT_NAME}_security_source_files
     rtps/builtin/discovery/participant/DS/PDPSecurityInitiatorListener.cpp
     security/authentication/PKIDH.cpp
     security/accesscontrol/Permissions.cpp
-    security/accesscontrol/DistinguishedName.cpp
     security/cryptography/AESGCMGMAC.cpp
     security/cryptography/AESGCMGMAC_KeyExchange.cpp
     security/cryptography/AESGCMGMAC_KeyFactory.cpp
@@ -458,15 +439,12 @@ configure_file(${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/config.h.in
 
 #Create library
 add_library(${PROJECT_NAME} ${${PROJECT_NAME}_source_files})
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-    )
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
 option(INTERNAL_DEBUG "Activate developer debug messages" OFF)
 
-target_compile_definitions(${PROJECT_NAME}
-    PRIVATE
+target_compile_definitions(${PROJECT_NAME} PRIVATE
     ${PROJECT_NAME_UPPER}_SOURCE
     BOOST_ASIO_STANDALONE
     ASIO_STANDALONE
@@ -482,10 +460,6 @@ target_compile_definitions(${PROJECT_NAME}
     $<$<NOT:$<BOOL:${IS_THIRDPARTY_BOOST_SUPPORTED}>>:FASTDDS_SHM_TRANSPORT_DISABLED> # Do not compile SHM Transport
     $<$<BOOL:${SHM_TRANSPORT_DEFAULT}>:SHM_TRANSPORT_BUILTIN> # Enable SHM as built-in transport
     $<$<BOOL:${STDOUTERR_LOG_CONSUMER}>:STDOUTERR_LOG_CONSUMER> # Enable StdoutErrConsumer as default LogConsumer
-    INTERFACE
-    $<$<BOOL:${WIN32}>:${PROJECT_NAME_UPPER}_NO_LIB>
-    PUBLIC
-    $<$<STREQUAL:$<TARGET_PROPERTY:${PROJECT_NAME},TYPE>,SHARED_LIBRARY>:${PROJECT_NAME_UPPER}_DYN_LINK>
     )
 
 # Define public headers
@@ -562,24 +536,23 @@ if(MSVC OR MSVC_IDE)
         unset(MANIFEST_FILE_PATH)
     endif()
 
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-        RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-        DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-        )
+    set_target_properties(${PROJECT_NAME} PROPERTIES RELEASE_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+    set_target_properties(${PROJECT_NAME} PROPERTIES RELWITHDEBINFO_POSTFIX -${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+    set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
     get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
     if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
         # Export symbols in DLL library
+        target_compile_definitions(${PROJECT_NAME} PUBLIC ${PROJECT_NAME_UPPER}_DYN_LINK)
         set_target_properties(${PROJECT_NAME} PROPERTIES
-            PDB_NAME_DEBUG ${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+            PDB_NAME_DEBUG "${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
             PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
             )
     else()
         # Rename the library to have a "lib" before.
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME lib${PROJECT_NAME})
         set_target_properties(${PROJECT_NAME} PROPERTIES
-            OUTPUT_NAME lib${PROJECT_NAME}
-            COMPILE_PDB_NAME_DEBUG lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+            COMPILE_PDB_NAME_DEBUG "lib${PROJECT_NAME}d-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
             COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}/symbols"
             )
     endif()
@@ -639,21 +612,23 @@ install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/fastdds/statistics
 
 # Install libraries
 
+# Generate different target names depending on linking
+get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
+if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
+    set(FASTDDS_LINKING dynamic)
+else()
+    set(FASTDDS_LINKING static)
+endif()
+
 install(TARGETS ${PROJECT_NAME} eProsima_atomic
-    EXPORT ${PROJECT_NAME}-targets
+    EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
     COMPONENT libraries
     RUNTIME DESTINATION "${BIN_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
     LIBRARY DESTINATION "${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
     ARCHIVE DESTINATION "${LIB_INSTALL_DIR}${MSVCARCH_DIR_EXTENSION}"
     )
 
-# Generate different target names depending on linking
-get_target_property(TARGET_TYPE ${PROJECT_NAME} TYPE)
-if(TARGET_TYPE STREQUAL "SHARED_LIBRARY")
-    set(FASTDDS_LINKING shared)
-else()
-    set(FASTDDS_LINKING static)
-endif()
+export(TARGETS ${PROJECT_NAME} eProsima_atomic FILE ${PROJECT_BINARY_DIR}/cmake/config/${PROJECT_NAME}-${FASTDDS_LINKING}-targets.cmake)
 
 if(INSTALLER_PLATFORM)
     set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}-${INSTALLER_PLATFORM}/cmake)
@@ -661,9 +636,8 @@ else()
     set(INSTALL_DESTINATION_PATH ${DATA_INSTALL_DIR}/${PROJECT_NAME}/cmake${MSVCARCH_DIR_EXTENSION_EXT})
 endif()
 
-install(EXPORT ${PROJECT_NAME}-targets
+install(EXPORT ${PROJECT_NAME}-${FASTDDS_LINKING}-targets
     DESTINATION ${INSTALL_DESTINATION_PATH}
-    FILE ${PROJECT_NAME}-${FASTDDS_LINKING}-targets.cmake
     COMPONENT cmake
     )
 
@@ -727,11 +701,7 @@ if(LINK_SSL)
             find_package(OpenSSL REQUIRED)\n\
         endfunction()"
         )
-        set(FASTRTPS_INSTALLER_OPT_DEPS "\
-        if (\${type} STREQUAL \"static\")\n\
-            find_fastdds_deployed_openssl()\n\
-        endif()")
-
+        set(FASTRTPS_INSTALLER_OPT_DEPS "find_fastdds_deployed_openssl()")
     elseif(WIN32)
         # windows from sources only requires OpenSSL on static libraries
         set(FASTRTPS_PACKAGE_WIN32_OPT_DEPS "find_package(OpenSSL REQUIRED)")
