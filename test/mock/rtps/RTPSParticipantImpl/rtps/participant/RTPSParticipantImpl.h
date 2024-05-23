@@ -26,6 +26,7 @@
 #include <fastrtps/rtps/reader/RTPSReader.h>
 #include <fastrtps/rtps/resources/ResourceEvent.h>
 #include <fastrtps/rtps/writer/RTPSWriter.h>
+#include <fastdds/rtps/common/LocatorList.hpp>
 
 #if HAVE_SECURITY
 #include <rtps/security/SecurityManager.h>
@@ -84,6 +85,10 @@ public:
 
     MOCK_METHOD2(onParticipantAuthentication, void (RTPSParticipant*, const ParticipantAuthenticationInfo&));
 #endif // if HAVE_SECURITY
+
+private:
+
+    using RTPSParticipantListener::onParticipantDiscovery;
 };
 
 class RTPSParticipantImpl
@@ -311,6 +316,8 @@ public:
     MOCK_METHOD(bool, should_match_local_endpoints, ());
 
     MOCK_METHOD(bool, ignore_participant, (const GuidPrefix_t&));
+
+    MOCK_METHOD(bool, update_removed_participant, (rtps::LocatorList_t&));
 
 private:
 

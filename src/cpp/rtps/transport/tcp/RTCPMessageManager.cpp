@@ -463,11 +463,13 @@ ResponseCode RTCPMessageManager::processBindConnectionRequest(
 
     if (RETCODE_OK == code)
     {
-        // In server side, at this moment, the channel has to be included in the map.
         mTransport->bind_socket(channel);
     }
 
     sendData(channel, BIND_CONNECTION_RESPONSE, transaction_id, &payload, code);
+
+    // Add pending logical ports to the channel
+    mTransport->send_channel_pending_logical_ports(channel);
 
     return RETCODE_OK;
 }
@@ -477,8 +479,11 @@ ResponseCode RTCPMessageManager::processOpenLogicalPortRequest(
         const OpenLogicalPortRequest_t& request,
         const TCPTransactionId& transaction_id)
 {
-    if (!channel->connection_established())
+    // A server can send an OpenLogicalPortRequest to a client before the BindConnectionResponse is processed.
+    if (!channel->connection_established() &&
+            channel->connection_status_ != TCPChannelResource::eConnectionStatus::eWaitingForBindResponse)
     {
+        EPROSIMA_LOG_ERROR(RTCP, "Trying to send [OPEN_LOGICAL_PORT_RESPONSE] without connection established.");
         sendData(channel, CHECK_LOGICAL_PORT_RESPONSE, transaction_id, nullptr, RETCODE_SERVER_ERROR);
     }
     else if (request.logicalPort() == 0 || !mTransport->is_input_port_open(request.logicalPort()))

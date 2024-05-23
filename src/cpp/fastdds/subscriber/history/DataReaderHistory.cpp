@@ -70,17 +70,17 @@ DataReaderHistory::DataReaderHistory(
     , type_(type.get())
     , get_key_object_(nullptr)
 {
-    if (resource_limited_qos_.max_samples == 0)
+    if (resource_limited_qos_.max_samples <= 0)
     {
         resource_limited_qos_.max_samples = std::numeric_limits<int32_t>::max();
     }
 
-    if (resource_limited_qos_.max_instances == 0)
+    if (resource_limited_qos_.max_instances <= 0)
     {
         resource_limited_qos_.max_instances = std::numeric_limits<int32_t>::max();
     }
 
-    if (resource_limited_qos_.max_samples_per_instance == 0)
+    if (resource_limited_qos_.max_samples_per_instance <= 0)
     {
         resource_limited_qos_.max_samples_per_instance = std::numeric_limits<int32_t>::max();
     }
@@ -132,14 +132,14 @@ DataReaderHistory::DataReaderHistory(
         compute_key_for_change_fn_ =
                 [this](CacheChange_t* a_change)
                 {
-                    if (a_change->instanceHandle.isDefined())
-                    {
-                        return true;
-                    }
-
                     if (!a_change->is_fully_assembled())
                     {
                         return false;
+                    }
+
+                    if (a_change->instanceHandle.isDefined())
+                    {
+                        return true;
                     }
 
                     if (type_ != nullptr)
@@ -356,9 +356,21 @@ bool DataReaderHistory::get_first_untaken_info(
     for (auto& it : data_available_instances_)
     {
         auto& instance_changes = it.second->cache_changes;
-        if (!instance_changes.empty())
+        for (auto& instance_change : instance_changes)
         {
-            ReadTakeCommand::generate_info(info, *(it.second), instance_changes.front());
+            WriterProxy* wp = nullptr;
+            bool is_future_change = false;
+
+            if (mp_reader->begin_sample_access_nts(instance_change, wp, is_future_change))
+            {
+                mp_reader->end_sample_access_nts(instance_change, wp, false);
+                if (is_future_change)
+                {
+                    continue;
+                }
+            }
+
+            ReadTakeCommand::generate_info(info, *(it.second), instance_change);
             return true;
         }
     }
@@ -708,25 +720,22 @@ bool DataReaderHistory::completed_change(
         size_t unknown_missing_changes_up_to,
         SampleRejectedStatusKind& rejection_reason)
 {
-    bool ret_value = true;
-    rejection_reason = NOT_REJECTED;
+    bool ret_value = false;
+    rejection_reason = REJECTED_BY_INSTANCES_LIMIT;
 
-    if (!change->instanceHandle.isDefined())
+    if (compute_key_for_change_fn_(change))
     {
-        ret_value = false;
-        if (compute_key_for_change_fn_(change))
+        InstanceCollection::iterator vit;
+        if (find_key(change->instanceHandle, vit))
         {
-            InstanceCollection::iterator vit;
-            if (find_key(change->instanceHandle, vit))
-            {
-                ret_value = !change->instanceHandle.isDefined() ||
-                        complete_fn_(change, *vit->second, unknown_missing_changes_up_to, rejection_reason);
-            }
-            else
-            {
-                rejection_reason = REJECTED_BY_INSTANCES_LIMIT;
-            }
+            ret_value = !change->instanceHandle.isDefined() ||
+                    complete_fn_(change, *vit->second, unknown_missing_changes_up_to, rejection_reason);
         }
+    }
+
+    if (ret_value)
+    {
+        rejection_reason = NOT_REJECTED;
     }
 
     return ret_value;

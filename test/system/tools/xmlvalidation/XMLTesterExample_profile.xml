@@ -51,6 +51,7 @@
                 <calculate_crc>false</calculate_crc>
                 <check_crc>false</check_crc>
                 <enable_tcp_nodelay>false</enable_tcp_nodelay>
+                <tcp_negotiation_timeout>100</tcp_negotiation_timeout>
             </transport_descriptor>
             <!-- UDP sample transport descriptor. Several options are common with TCP -->
             <transport_descriptor>
@@ -855,6 +856,14 @@
                 <bit_value name="flag0" position="0"/>
                 <bit_value name="flag1"/>
             </bitmask>
+        </type>
+
+        <type>
+            <struct name="my_keyed_struct">
+                <member name="first" type="int32"/>
+                <member name="second" type="int64"/>
+                <member name="third" type="int32" key="true"/>
+            </struct>
         </type>
     </types>
 
