@@ -105,6 +105,7 @@ void TCPChannelResourceBasic::disconnect()
 {
     if (eConnecting < change_status(eConnectionStatus::eDisconnected) && alive())
     {
+        std::lock_guard<std::mutex> read_lock(read_mutex_);
         auto socket = socket_;
 
         std::error_code ec;
@@ -151,6 +152,13 @@ size_t TCPChannelResourceBasic::send(
     if (eConnecting < connection_status_)
     {
         std::lock_guard<std::mutex> send_guard(send_mutex_);
+
+        if (parent_->get_non_blocking_send() &&
+                !check_socket_send_buffer(header_size + size, socket_->native_handle()))
+        {
+            return 0;
+        }
+
         if (header_size > 0)
         {
             std::array<asio::const_buffer, 2> buffers;
@@ -174,16 +182,25 @@ asio::ip::tcp::endpoint TCPChannelResourceBasic::remote_endpoint() const
 
 asio::ip::tcp::endpoint TCPChannelResourceBasic::local_endpoint() const
 {
-    std::error_code ec;
+    return socket_->local_endpoint();
+}
+
+asio::ip::tcp::endpoint TCPChannelResourceBasic::remote_endpoint(
+        asio::error_code& ec) const
+{
+    return socket_->remote_endpoint(ec);
+}
+
+asio::ip::tcp::endpoint TCPChannelResourceBasic::local_endpoint(
+        asio::error_code& ec) const
+{
     return socket_->local_endpoint(ec);
 }
 
 void TCPChannelResourceBasic::set_options(
         const TCPTransportDescriptor* options)
 {
-    socket_->set_option(socket_base::receive_buffer_size(options->receiveBufferSize));
-    socket_->set_option(socket_base::send_buffer_size(options->sendBufferSize));
-    socket_->set_option(ip::tcp::no_delay(options->enable_tcp_nodelay));
+    TCPChannelResource::set_socket_options(*socket_, options);
 }
 
 void TCPChannelResourceBasic::cancel()
