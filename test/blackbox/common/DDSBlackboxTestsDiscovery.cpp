@@ -18,6 +18,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -36,9 +37,11 @@
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
+#include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
 #include <fastdds/rtps/transport/test_UDPv4TransportDescriptor.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
 #include <rtps/transport/test_UDPv4Transport.h>
 #include <utils/SystemInfo.hpp>
 
@@ -86,7 +89,7 @@ TEST(DDSDiscovery, IgnoreParticipantFlags)
  *    2. Then, connect the client to the other server and check discovery again.
  *    3. Finally connect the two servers by adding one of them to the others list
  */
-TEST(DDSDiscovery, AddDiscoveryServerToList)
+TEST(DDSDiscovery, AddDiscoveryServerToListUDP)
 {
     using namespace eprosima;
     using namespace eprosima::fastdds::dds;
@@ -175,7 +178,7 @@ TEST(DDSDiscovery, AddDiscoveryServerToList)
     // Update client's servers list
     ASSERT_TRUE(client.update_wire_protocol(client_qos));
 
-    /* Check that the servers only know about the client, and that the client known about both servers */
+    /* Check that the servers only know about the client and that the client knows about both servers */
     server_1.wait_discovery(std::chrono::seconds::zero(), 1, true);
     client.wait_discovery(std::chrono::seconds::zero(), 2, true);
     server_2.wait_discovery(std::chrono::seconds::zero(), 1, true);
@@ -188,6 +191,144 @@ TEST(DDSDiscovery, AddDiscoveryServerToList)
     server_1.wait_discovery(std::chrono::seconds::zero(), 2, true);
     client.wait_discovery(std::chrono::seconds::zero(), 2, true);
     server_2.wait_discovery(std::chrono::seconds::zero(), 2, true);
+}
+
+/**
+ * This test checks that adding servers to the Discovery Server list results in discovering those participants.
+ * It does so by:
+ *    1. Creating two servers and two clients that are only connected to the first server. Discovery is checked
+ *       at this state.
+ *    2. Then, connect client_1 to the second server and check discovery again.
+ *    3. Finally connect the two servers by adding one of them to the others list and check disvoery again.
+ */
+TEST(DDSDiscovery, AddDiscoveryServerToListTCP)
+{
+    using namespace eprosima;
+    using namespace eprosima::fastdds::dds;
+    using namespace eprosima::fastrtps::rtps;
+
+    // TCP default DS port
+    std::string W_UNICAST_PORT_RANDOM_NUMBER_STR = "42100";
+
+    /* Create first server */
+    PubSubParticipant<HelloWorldPubSubType> server_1(0u, 0u, 0u, 0u);
+    // Set participant as server
+    WireProtocolConfigQos server_1_qos;
+    server_1_qos.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::SERVER;
+    // Generate random GUID prefix
+    srand(static_cast<unsigned>(time(nullptr)));
+    GuidPrefix_t server_1_prefix;
+    for (auto i = 0; i < 12; i++)
+    {
+        server_1_prefix.value[i] = eprosima::fastrtps::rtps::octet(rand() % 254);
+    }
+    server_1_qos.prefix = server_1_prefix;
+    // Generate server's listening locator
+    Locator_t locator_server_1;
+    IPLocator::setIPv4(locator_server_1, 127, 0, 0, 1);
+    uint16_t server_1_port = static_cast<uint16_t>(stoi(W_UNICAST_PORT_RANDOM_NUMBER_STR));
+    IPLocator::setPhysicalPort(locator_server_1, server_1_port);
+    locator_server_1.kind = LOCATOR_KIND_TCPv4;
+    // Leave logical port as 0 to use TCP DS default logical port
+    server_1_qos.builtin.metatrafficUnicastLocatorList.push_back(locator_server_1);
+    // Add TCP transport
+    auto descriptor_1 = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    descriptor_1->add_listener_port(server_1_port);
+    // Init server
+    ASSERT_TRUE(server_1.wire_protocol(server_1_qos)
+                    .disable_builtin_transport()
+                    .add_user_transport_to_pparams(descriptor_1)
+                    .init_participant());
+
+    /* Create second server */
+    PubSubParticipant<HelloWorldPubSubType> server_2(0u, 0u, 0u, 0u);
+    // Set participant as server
+    WireProtocolConfigQos server_2_qos;
+    server_2_qos.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::SERVER;
+    // Generate random GUID prefix
+    GuidPrefix_t server_2_prefix = server_1_prefix;
+    server_2_prefix.value[11]++;
+    server_2_qos.prefix = server_2_prefix;
+    // Generate server's listening locator
+    Locator_t locator_server_2;
+    IPLocator::setIPv4(locator_server_2, 127, 0, 0, 1);
+    uint16_t server_2_port = server_1_port + 1;
+    IPLocator::setPhysicalPort(locator_server_2, server_2_port);
+    locator_server_2.kind = LOCATOR_KIND_TCPv4;
+    // Leave logical port as 0 to use TCP DS default logical port
+    server_2_qos.builtin.metatrafficUnicastLocatorList.push_back(locator_server_2);
+    // Add TCP transport
+    auto descriptor_2 = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    descriptor_2->add_listener_port(server_2_port);
+
+    // Init server
+    ASSERT_TRUE(server_2.wire_protocol(server_2_qos)
+                    .disable_builtin_transport()
+                    .add_user_transport_to_pparams(descriptor_2)
+                    .init_participant());
+
+
+    /* Create a client that connects to the first server from the beginning with higher listening_port*/
+    PubSubParticipant<HelloWorldPubSubType> client_1(0u, 0u, 0u, 0u);
+    // Set participant as client
+    WireProtocolConfigQos client_qos_1;
+    client_qos_1.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::CLIENT;
+    // Connect to first server
+    RemoteServerAttributes server_1_att;
+    server_1_att.guidPrefix = server_1_prefix;
+    server_1_att.metatrafficUnicastLocatorList.push_back(Locator_t(locator_server_1));
+    client_qos_1.builtin.discovery_config.m_DiscoveryServers.push_back(server_1_att);
+    auto descriptor_3 = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    uint16_t client_1_port = server_1_port + 10;
+    descriptor_3->add_listener_port(client_1_port);
+    // Init client
+    ASSERT_TRUE(client_1.wire_protocol(client_qos_1)
+                    .disable_builtin_transport()
+                    .add_user_transport_to_pparams(descriptor_3)
+                    .init_participant());
+
+    /* Create a client that connects to the first server from the beginning with lower listening_port*/
+    PubSubParticipant<HelloWorldPubSubType> client_2(0u, 0u, 0u, 0u);
+    // Set participant as client
+    WireProtocolConfigQos client_qos_2;
+    client_qos_2.builtin.discovery_config.discoveryProtocol = DiscoveryProtocol_t::CLIENT;
+    // Connect to first server
+    client_qos_2.builtin.discovery_config.m_DiscoveryServers.push_back(server_1_att);
+    auto descriptor_4 = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    uint16_t client_2_port = server_1_port - 10;
+    descriptor_4->add_listener_port(client_2_port);
+    // Init client
+    ASSERT_TRUE(client_2.wire_protocol(client_qos_2)
+                    .disable_builtin_transport()
+                    .add_user_transport_to_pparams(descriptor_4)
+                    .init_participant());
+
+    server_1.wait_discovery(std::chrono::seconds::zero(), 2, true); // Knows client1 and client2
+    client_1.wait_discovery(std::chrono::seconds::zero(), 1, true); // Knows server1
+    client_2.wait_discovery(std::chrono::seconds::zero(), 1, true); // Knows server1
+    server_2.wait_discovery(std::chrono::seconds::zero(), 0, true); // Knows no one
+
+    /* Add server_2 to client */
+    RemoteServerAttributes server_2_att;
+    server_2_att.guidPrefix = server_2_prefix;
+    server_2_att.metatrafficUnicastLocatorList.push_back(Locator_t(locator_server_2));
+    client_qos_1.builtin.discovery_config.m_DiscoveryServers.push_back(server_2_att);
+    // Update client_1's servers list
+    ASSERT_TRUE(client_1.update_wire_protocol(client_qos_1));
+
+    server_1.wait_discovery(std::chrono::seconds::zero(), 2, true); // Knows client1 and client2
+    client_1.wait_discovery(std::chrono::seconds::zero(), 2, true); // Knows server1 and server2
+    client_2.wait_discovery(std::chrono::seconds::zero(), 1, true); // Knows server1
+    server_2.wait_discovery(std::chrono::seconds::zero(), 1, true); // Knows client1
+
+    /* Add server_2 to server_1 */
+    server_1_qos.builtin.discovery_config.m_DiscoveryServers.push_back(server_2_att);
+    ASSERT_TRUE(server_1.update_wire_protocol(server_1_qos));
+
+    server_1.wait_discovery(std::chrono::seconds::zero(), 3, true); // Knows client1, client2 and server2
+    client_1.wait_discovery(std::chrono::seconds::zero(), 2, true); // Knows server1 and server2
+    client_2.wait_discovery(std::chrono::seconds::zero(), 1, true); // Knows server1
+    server_2.wait_discovery(std::chrono::seconds::zero(), 2, true); // Knows client1 and server1
 }
 
 /**
@@ -438,15 +579,17 @@ TEST(DDSDiscovery, ParticipantProxyPhysicalData)
                 {
                     delete remote_participant_info;
                 }
-                remote_participant_info = new ParticipantDiscoveryInfo(info);
+                remote_participant_info = new ParticipantProxyData(info.info);
                 found_->store(true);
                 cv_->notify_one();
             }
         }
 
-        ParticipantDiscoveryInfo* remote_participant_info;
+        ParticipantProxyData* remote_participant_info;
 
     private:
+
+        using DomainParticipantListener::on_participant_discovery;
 
         std::condition_variable* cv_;
 
@@ -496,7 +639,7 @@ TEST(DDSDiscovery, ParticipantProxyPhysicalData)
         participant_found.store(false);
 
         // Prevent assertion on spurious discovery of a participant from elsewhere
-        if (part_1->guid() == listener.remote_participant_info->info.m_guid)
+        if (part_1->guid() == listener.remote_participant_info->m_guid)
         {
             // Check that all three properties are present in the ParticipantProxyData, and that their value
             // is that of the property in part_1 (the original property value)
@@ -504,13 +647,13 @@ TEST(DDSDiscovery, ParticipantProxyPhysicalData)
             {
                 // Find property in ParticipantProxyData
                 auto received_property = std::find_if(
-                    listener.remote_participant_info->info.m_properties.begin(),
-                    listener.remote_participant_info->info.m_properties.end(),
+                    listener.remote_participant_info->m_properties.begin(),
+                    listener.remote_participant_info->m_properties.end(),
                     [&](const ParameterProperty_t& property)
                     {
                         return property.first() == physical_property_name;
                     });
-                ASSERT_NE(received_property, listener.remote_participant_info->info.m_properties.end());
+                ASSERT_NE(received_property, listener.remote_participant_info->m_properties.end());
 
                 // Find property in first participant
                 auto part_1_property = PropertyPolicyHelper::find_property(
@@ -556,20 +699,20 @@ TEST(DDSDiscovery, ParticipantProxyPhysicalData)
         participant_found.store(false);
 
         // Prevent assertion on spurious discovery of a participant from elsewhere
-        if (part_1->guid() == listener.remote_participant_info->info.m_guid)
+        if (part_1->guid() == listener.remote_participant_info->m_guid)
         {
             // Check that none of the three properties are present in the ParticipantProxyData.
             for (auto physical_property_name : physical_property_names)
             {
                 // Look for property in ParticipantProxyData
                 auto received_property = std::find_if(
-                    listener.remote_participant_info->info.m_properties.begin(),
-                    listener.remote_participant_info->info.m_properties.end(),
+                    listener.remote_participant_info->m_properties.begin(),
+                    listener.remote_participant_info->m_properties.end(),
                     [&](const ParameterProperty_t& property)
                     {
                         return property.first() == physical_property_name;
                     });
-                ASSERT_EQ(received_property, listener.remote_participant_info->info.m_properties.end());
+                ASSERT_EQ(received_property, listener.remote_participant_info->m_properties.end());
             }
             break;
         }
@@ -613,6 +756,9 @@ TEST(DDSDiscovery, DDSDiscoveryDoesNotDropUDPLocator)
             }
         }
 
+    private:
+
+        using DomainParticipantListener::on_participant_discovery;
     };
 
     DomainParticipantFactory* factory = DomainParticipantFactory::get_instance();
@@ -1602,4 +1748,142 @@ TEST(DDSDiscovery, WaitSetMatchedStatus)
 {
     test_DDSDiscovery_WaitSetMatchedStatus(false);
     test_DDSDiscovery_WaitSetMatchedStatus(true);
+}
+
+// Regression test for redmine issue 20409
+TEST(DDSDiscovery, DataracePDP)
+{
+    using namespace eprosima;
+    using namespace eprosima::fastdds::dds;
+    using namespace eprosima::fastdds::rtps;
+
+    class CustomDomainParticipantListener : public DomainParticipantListener
+    {
+    public:
+
+        CustomDomainParticipantListener()
+            : DomainParticipantListener()
+            , discovery_future(discovery_promise.get_future())
+            , destruction_future(destruction_promise.get_future())
+            , undiscovery_future(undiscovery_promise.get_future())
+        {
+        }
+
+        void on_participant_discovery(
+                DomainParticipant* /*participant*/,
+                eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&& info) override
+        {
+            if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
+            {
+                try
+                {
+                    discovery_promise.set_value();
+                }
+                catch (std::future_error&)
+                {
+                    // do nothing
+                }
+                destruction_future.wait();
+            }
+            else if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT ||
+                    info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
+            {
+                try
+                {
+                    undiscovery_promise.set_value();
+                }
+                catch (std::future_error&)
+                {
+                    // do nothing
+                }
+            }
+        }
+
+        std::promise<void> discovery_promise;
+        std::future<void> discovery_future;
+
+        std::promise<void> destruction_promise;
+        std::future<void> destruction_future;
+
+        std::promise<void> undiscovery_promise;
+        std::future<void> undiscovery_future;
+
+    private:
+
+        using DomainParticipantListener::on_participant_discovery;
+    };
+
+    // Disable intraprocess
+    auto settings = fastrtps::xmlparser::XMLProfileManager::library_settings();
+    auto prev_intraprocess_delivery = settings.intraprocess_delivery;
+    settings.intraprocess_delivery = fastrtps::INTRAPROCESS_OFF;
+    fastrtps::xmlparser::XMLProfileManager::library_settings(settings);
+
+    // DDS Domain Id
+    const unsigned int DOMAIN_ID = (uint32_t)GET_PID() % 230;
+
+    // This is a non deterministic test, so we will run it several times to increase probability of data race detection
+    // if it exists.
+    const unsigned int N_ITER = 10;
+    unsigned int iter_idx = 0;
+    while (iter_idx < N_ITER)
+    {
+        iter_idx++;
+
+        DomainParticipantQos qos;
+        qos.transport().use_builtin_transports = false;
+        auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+        qos.transport().user_transports.push_back(udp_transport);
+
+        // Create discoverer participant (the one where a data race on PDP might occur)
+        CustomDomainParticipantListener participant_listener;
+        DomainParticipant* participant = DomainParticipantFactory::get_instance()->create_participant(DOMAIN_ID, qos,
+                        &participant_listener);
+
+        DomainParticipantQos aux_qos;
+        aux_qos.transport().use_builtin_transports = false;
+        auto aux_udp_transport = std::make_shared<test_UDPv4TransportDescriptor>();
+        aux_qos.transport().user_transports.push_back(aux_udp_transport);
+
+        // Create auxiliary participant to be discovered
+        aux_qos.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod = Duration_t(1, 0);
+        aux_qos.wire_protocol().builtin.discovery_config.leaseDuration = Duration_t(1, 10);
+        DomainParticipant* aux_participant = DomainParticipantFactory::get_instance()->create_participant(DOMAIN_ID,
+                        aux_qos);
+
+        // Wait for discovery
+        participant_listener.discovery_future.wait();
+
+        // Shutdown auxiliary participant's network, so it will be removed after lease duration
+        test_UDPv4Transport::test_UDPv4Transport_ShutdownAllNetwork = true;
+        DomainParticipantFactory::get_instance()->delete_participant(aux_participant);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1500)); // Wait for longer than lease duration
+
+        try
+        {
+            // NOTE: at this point, the discoverer participant is stuck in a UDP discovery thread (unicast or multicast).
+            // At the same time, the events thread is stuck at PDP::remove_remote_participant (lease duration expired
+            // and so the discovered participant is removed), trying to acquire the callback mutex taken by the
+            // discovery thread.
+
+            // If we now signal the discovery thread to continue, a data race might occur if the received
+            // ParticipantProxyData, which is further being processed in the discovery thread (assignRemoteEndpoints),
+            // gets deleted/cleared by the events thread at the same time.
+            // Note that a similar situation might arise in other scenarios, such as on the concurrent reception of a
+            // data P and data uP each on a different thread (unicast and multicast), however these are harder to
+            // reproduce in a regression test.
+            participant_listener.destruction_promise.set_value();
+        }
+        catch (std::future_error&)
+        {
+            // do nothing
+        }
+
+        participant_listener.undiscovery_future.wait();
+        DomainParticipantFactory::get_instance()->delete_participant(participant);
+    }
+
+    // Reestablish previous intraprocess configuration
+    settings.intraprocess_delivery = prev_intraprocess_delivery;
+    fastrtps::xmlparser::XMLProfileManager::library_settings(settings);
 }

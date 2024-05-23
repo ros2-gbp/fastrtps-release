@@ -98,6 +98,7 @@ static std::shared_ptr<fastdds::rtps::TCPv4TransportDescriptor> create_tcpv4_tra
     descriptor->check_crc = false;
     descriptor->apply_security = false;
     descriptor->enable_tcp_nodelay = true;
+    descriptor->tcp_negotiation_timeout = 0;
 
     return descriptor;
 }
@@ -114,6 +115,7 @@ static std::shared_ptr<fastdds::rtps::TCPv6TransportDescriptor> create_tcpv6_tra
     descriptor->check_crc = false;
     descriptor->apply_security = false;
     descriptor->enable_tcp_nodelay = true;
+    descriptor->tcp_negotiation_timeout = 0;
 
     return descriptor;
 }
@@ -198,6 +200,7 @@ static void setup_transports_large_data(
 
         auto tcp_transport = create_tcpv4_transport(att);
         att.userTransports.push_back(tcp_transport);
+        att.properties.properties().emplace_back("fastdds.tcp_transport.non_blocking_send", "true");
 
         Locator_t tcp_loc;
         tcp_loc.kind = LOCATOR_KIND_TCPv4;
@@ -234,6 +237,7 @@ static void setup_transports_large_datav6(
 
         auto tcp_transport = create_tcpv6_transport(att);
         att.userTransports.push_back(tcp_transport);
+        att.properties.properties().emplace_back("fastdds.tcp_transport.non_blocking_send", "true");
 
         Locator_t tcp_loc;
         tcp_loc.kind = LOCATOR_KIND_TCPv6;
@@ -251,6 +255,7 @@ static void setup_transports_large_datav6(
     {
         Locator_t pdp_locator;
         pdp_locator.kind = LOCATOR_KIND_UDPv6;
+        IPLocator::setIPv6(pdp_locator, "ff1e::ffff:efff:1");
         att.builtin.metatrafficMulticastLocatorList.push_back(pdp_locator);
     }
 }
