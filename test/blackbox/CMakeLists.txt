@@ -160,7 +160,8 @@ macro(add_blackbox_gtest)
 
         # add filtering statement if required
         if(GTEST_IGNORE)
-            set(gtest_filter "--gtest_filter=${GTEST_IGNORE}")
+            list(JOIN GTEST_IGNORE ":" gtest_filter)
+            string(PREPEND gtest_filter "--gtest_filter=-")
         endif()
 
         add_test(NAME ${test} COMMAND ${command} ${gtest_filter})
@@ -232,16 +233,41 @@ if(NOT LibP11_FOUND)
     if(GTEST_INDIVIDUAL)
         set(pkcs_filter "[Pp][Kk][Cc][Ss]")
     else()
-        set(pkcs_filter "-*pkcs*")
+        set(pkcs_filter "*pkcs*")
     endif() # GTEST_INDIVIDUAL
+    message(STATUS "Ignoring tests: '${pkcs_filter}'")
 endif() # LibP11_FOUND
 
 if(EPROSIMA_TEST_DNS_NOT_SET_UP)
-    set(dns_filter "-Discovery.ServerClientEnvironmentSetUpDNS")
+    if(GTEST_INDIVIDUAL)
+        set(dns_filter "ServerClientEnvironmentSetUpDNS")
+    else()
+        set(dns_filter "*ServerClientEnvironmentSetUpDNS*")
+    endif() # GTEST_INDIVIDUAL
+    message(STATUS "Ignoring tests: '${dns_filter}'")
+endif()
+
+if(SECURITY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/certs/maincacert.pem
+        ${CMAKE_CURRENT_BINARY_DIR}/maincacert.pem COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/certs/mainpubcert.pem
+        ${CMAKE_CURRENT_BINARY_DIR}/mainpubcert.pem COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/certs/mainpubkey.pem
+        ${CMAKE_CURRENT_BINARY_DIR}/mainpubkey.pem COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/certs/governance_helloworld_all_enable.smime
+        ${CMAKE_CURRENT_BINARY_DIR}/governance_helloworld_all_enable.smime COPYONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/test/certs/permissions_helloworld.smime
+        ${CMAKE_CURRENT_BINARY_DIR}/permissions_helloworld.smime COPYONLY)
 endif()
 
 file(GLOB RTPS_BLACKBOXTESTS_TEST_SOURCE "common/RTPSBlackboxTests*.cpp")
 set(RTPS_BLACKBOXTESTS_SOURCE ${RTPS_BLACKBOXTESTS_TEST_SOURCE}
+    types/Data1mb.cxx
+    types/Data1mbPubSubTypes.cxx
+    types/Data64kb.cxx
+    types/Data64kbPubSubTypes.cxx
+    types/FixedSized.cxx
+    types/FixedSizedPubSubTypes.cxx
     types/HelloWorld.cxx
     types/HelloWorldPubSubTypes.cxx
     types/KeyedHelloWorld.cxx
@@ -256,6 +282,8 @@ set(RTPS_BLACKBOXTESTS_SOURCE ${RTPS_BLACKBOXTESTS_TEST_SOURCE}
     types/KeyedData1mbPubSubTypes.cxx
     types/FixedSized.cxx
     types/FixedSizedPubSubTypes.cxx
+    types/UnboundedHelloWorld.cxx
+    types/UnboundedHelloWorldPubSubTypes.cxx
 
     utils/data_generators.cpp
     utils/lambda_functions.cpp
@@ -277,6 +305,12 @@ add_blackbox_gtest(BlackboxTests_RTPS SOURCES ${RTPS_BLACKBOXTESTS_TEST_SOURCE} 
 
 file(GLOB BLACKBOXTESTS_TEST_SOURCE "common/BlackboxTests*.cpp")
 set(BLACKBOXTESTS_SOURCE ${BLACKBOXTESTS_TEST_SOURCE}
+    types/Data1mb.cxx
+    types/Data1mbPubSubTypes.cxx
+    types/Data64kb.cxx
+    types/Data64kbPubSubTypes.cxx
+    types/FixedSized.cxx
+    types/FixedSizedPubSubTypes.cxx
     types/HelloWorld.cxx
     types/HelloWorldPubSubTypes.cxx
     types/HelloWorldTypeObject.cxx
@@ -297,6 +331,9 @@ set(BLACKBOXTESTS_SOURCE ${BLACKBOXTESTS_TEST_SOURCE}
     types/TestRegression3361.cxx
     types/TestRegression3361PubSubTypes.cxx
     types/TestRegression3361TypeObject.cxx
+    types/UnboundedHelloWorld.cxx
+    types/UnboundedHelloWorldPubSubTypes.cxx
+    types/UnboundedHelloWorldv1.cxx
 
     utils/data_generators.cpp
     utils/lambda_functions.cpp
@@ -343,6 +380,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/partitions_profile.xml
     ${CMAKE_CURRENT_BINARY_DIR}/partitions_profile.xml)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/builtin_transports_profile.xml
     ${CMAKE_CURRENT_BINARY_DIR}/builtin_transports_profile.xml)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/auth_handshake_props_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/auth_handshake_props_profile.xml COPYONLY)
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/datagrams" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 if(FASTRTPS_API_TESTS)

@@ -18,12 +18,13 @@
 #include <utility>
 
 #include <fastdds/rtps/common/Guid.h>
+#include <fastdds/rtps/common/LocatorList.hpp>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/transport/TransportDescriptorInterface.h>
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/IPLocator.h>
 
-#include <rtps/transport/UDPv4Transport.h>
+#include <rtps/transport/TCPTransportInterface.h>
 
 using namespace std;
 using namespace eprosima::fastdds::rtps;
@@ -370,30 +371,27 @@ bool NetworkFactory::configureInitialPeerLocator(
 }
 
 bool NetworkFactory::getDefaultUnicastLocators(
-        uint32_t domain_id,
         LocatorList_t& locators,
-        const RTPSParticipantAttributes& m_att) const
+        uint32_t port) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
     {
-        result |= transport->getDefaultUnicastLocators(locators, calculate_well_known_port(domain_id, m_att, false));
+        result |= transport->getDefaultUnicastLocators(locators, port);
     }
     return result;
 }
 
 bool NetworkFactory::fill_default_locator_port(
-        uint32_t domain_id,
         Locator_t& locator,
-        const RTPSParticipantAttributes& m_att,
-        bool is_multicast) const
+        uint32_t port) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
     {
         if (transport->IsLocatorSupported(locator))
         {
-            result |= transport->fillUnicastLocator(locator, calculate_well_known_port(domain_id, m_att, is_multicast));
+            result |= transport->fillUnicastLocator(locator, port);
         }
     }
     return result;
@@ -437,6 +435,24 @@ void NetworkFactory::update_network_interfaces()
     for (auto& transport : mRegisteredTransports)
     {
         transport->update_network_interfaces();
+    }
+}
+
+void NetworkFactory::remove_participant_associated_send_resources(
+        SendResourceList& send_resource_list,
+        const LocatorList_t& remote_participant_locators,
+        const LocatorList_t& participant_initial_peers) const
+{
+    for (auto& transport : mRegisteredTransports)
+    {
+        TCPTransportInterface* tcp_transport = dynamic_cast<TCPTransportInterface*>(transport.get());
+        if (tcp_transport)
+        {
+            tcp_transport->CloseOutputChannel(
+                send_resource_list,
+                remote_participant_locators,
+                participant_initial_peers);
+        }
     }
 }
 
