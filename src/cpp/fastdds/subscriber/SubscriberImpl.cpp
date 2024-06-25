@@ -16,28 +16,27 @@
  * @file SubscriberImpl.cpp
  *
  */
-
-#include <fastdds/subscriber/SubscriberImpl.hpp>
-#include <fastdds/subscriber/DataReaderImpl.hpp>
-#include <fastdds/topic/TopicDescriptionImpl.hpp>
-#include <fastdds/domain/DomainParticipantImpl.hpp>
-
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
-
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/subscriber/SubscriberListener.hpp>
-#include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
-#include <fastdds/utils/QosConverters.hpp>
-
 #include <fastdds/rtps/common/Property.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
-#include <fastdds/dds/log/Log.hpp>
-
 #include <fastrtps/attributes/SubscriberAttributes.h>
-
 #include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include <fastdds/domain/DomainParticipantImpl.hpp>
+#include <fastdds/subscriber/DataReaderImpl.hpp>
+#include <fastdds/subscriber/SubscriberImpl.hpp>
+#include <fastdds/topic/TopicDescriptionImpl.hpp>
+#include <fastdds/utils/QosConverters.hpp>
+#include <rtps/network/utils/netmask_filter.hpp>
+#ifdef FASTDDS_STATISTICS
+#include <statistics/types/monitorservice_types.h>
+#endif //FASTDDS_STATISTICS
 
 namespace eprosima {
 namespace fastdds {
@@ -203,6 +202,24 @@ DataReader* SubscriberImpl::create_datareader(
     if (!DataReaderImpl::check_qos_including_resource_limits(qos, type_support))
     {
         return nullptr;
+    }
+
+    // Check netmask filtering preconditions
+    if (nullptr != rtps_participant_)
+    {
+        std::vector<fastdds::rtps::TransportNetmaskFilterInfo> netmask_filter_info =
+                rtps_participant_->get_netmask_filter_info();
+        std::string error_msg;
+        if (!fastdds::rtps::network::netmask_filter::check_preconditions(netmask_filter_info,
+                qos.endpoint().ignore_non_matching_locators,
+                error_msg) ||
+                !fastdds::rtps::network::netmask_filter::check_preconditions(netmask_filter_info,
+                qos.endpoint().external_unicast_locators, error_msg))
+        {
+            EPROSIMA_LOG_ERROR(SUBSCRIBER,
+                    "Failed to create reader -> " << error_msg);
+            return nullptr;
+        }
     }
 
     topic->get_impl()->reference();
@@ -418,15 +435,24 @@ const ReturnCode_t SubscriberImpl::get_datareader_qos_from_profile(
     return ReturnCode_t::RETCODE_BAD_PARAMETER;
 }
 
-/* TODO
-   bool SubscriberImpl::copy_from_topic_qos(
-        DataReaderQos&,
-        const fastrtps::TopicAttributes&) const
-   {
-    EPROSIMA_LOG_ERROR(PUBLISHER, "Operation not implemented");
-    return false;
-   }
- */
+ReturnCode_t SubscriberImpl::copy_from_topic_qos(
+        DataReaderQos& reader_qos,
+        const TopicQos& topic_qos)
+{
+    TypeConsistencyQos new_value;
+    reader_qos.durability(topic_qos.durability());
+    reader_qos.durability_service(topic_qos.durability_service());
+    reader_qos.deadline(topic_qos.deadline());
+    reader_qos.latency_budget(topic_qos.latency_budget());
+    reader_qos.liveliness(topic_qos.liveliness());
+    reader_qos.reliability(topic_qos.reliability());
+    reader_qos.destination_order(topic_qos.destination_order());
+    reader_qos.history(topic_qos.history());
+    reader_qos.resource_limits(topic_qos.resource_limits());
+    reader_qos.ownership(topic_qos.ownership());
+    reader_qos.type_consistency().representation = topic_qos.representation();
+    return ReturnCode_t::RETCODE_OK;
+}
 
 const DomainParticipant* SubscriberImpl::get_participant() const
 {
@@ -660,6 +686,96 @@ bool SubscriberImpl::can_be_deleted() const
     }
     return true;
 }
+
+#ifdef FASTDDS_STATISTICS
+bool SubscriberImpl::get_monitoring_status(
+        statistics::MonitorServiceData& status,
+        const fastrtps::rtps::GUID_t& entity_guid)
+{
+    bool ret = false;
+    std::vector<DataReader*> readers;
+    if (get_datareaders(readers) == ReturnCode_t::RETCODE_OK)
+    {
+        for (auto& reader : readers)
+        {
+            if (reader->guid() == entity_guid)
+            {
+                switch (status._d())
+                {
+                    case statistics::INCOMPATIBLE_QOS:
+                    {
+                        RequestedIncompatibleQosStatus incompatible_qos_status;
+                        reader->get_requested_incompatible_qos_status(incompatible_qos_status);
+                        status.incompatible_qos_status().total_count(incompatible_qos_status.total_count);
+                        status.incompatible_qos_status().last_policy_id(incompatible_qos_status.last_policy_id);
+                        for (auto& qos : incompatible_qos_status.policies)
+                        {
+                            statistics::QosPolicyCount_s count;
+                            count.count(qos.count);
+                            count.policy_id(qos.policy_id);
+                            status.incompatible_qos_status().policies().push_back(count);
+                        }
+                        ret = true;
+                        break;
+                    }
+                    //! TODO
+                    /*case statistics::INCONSISTENT_TOPIC:
+                       {
+                        reader->get_inconsistent_topic_status();
+                        ret = true;
+                        break;
+                       }*/
+                    case statistics::LIVELINESS_CHANGED:
+                    {
+                        LivelinessChangedStatus liveliness_changed_status;
+                        reader->get_liveliness_changed_status(liveliness_changed_status);
+                        status.liveliness_changed_status().alive_count(liveliness_changed_status.alive_count);
+                        status.liveliness_changed_status().not_alive_count(liveliness_changed_status.not_alive_count);
+                        std::memcpy(
+                            status.liveliness_changed_status().last_publication_handle().data(),
+                            liveliness_changed_status.last_publication_handle.value,
+                            16);
+                        ret = true;
+                        break;
+                    }
+                    case statistics::DEADLINE_MISSED:
+                    {
+                        DeadlineMissedStatus deadline_missed_status;
+                        reader->get_requested_deadline_missed_status(deadline_missed_status);
+                        status.deadline_missed_status().total_count(deadline_missed_status.total_count);
+                        std::memcpy(
+                            status.deadline_missed_status().last_instance_handle().data(),
+                            deadline_missed_status.last_instance_handle.value,
+                            16);
+                        ret = true;
+                        break;
+                    }
+                    case statistics::SAMPLE_LOST:
+                    {
+                        SampleLostStatus sample_lost_status;
+                        reader->get_sample_lost_status(sample_lost_status);
+                        status.sample_lost_status().total_count(sample_lost_status.total_count);
+                        ret = true;
+                        break;
+                    }
+                    default:
+                    {
+                        EPROSIMA_LOG_ERROR(SUBSCRIBER, "Queried status not available for this entity " << status._d());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        EPROSIMA_LOG_ERROR(SUBSCRIBER, "Could not retrieve datareaders");
+    }
+
+    return ret;
+}
+
+#endif //FASTDDS_STATISTICS
 
 } /* namespace dds */
 } /* namespace fastdds */

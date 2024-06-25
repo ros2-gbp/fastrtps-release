@@ -12,25 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <thread>
-#include <mutex>
-
-#include <fastrtps/xmlparser/XMLParser.h>
-#include <fastrtps/xmlparser/XMLTree.h>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastrtps/utils/IPLocator.h>
-#include "../logging/mock/MockConsumer.h"
-#include "wrapper/XMLParserTest.hpp"
-
-#include <tinyxml2.h>
-#include <gtest/gtest.h>
-
+#include <cstdlib>
 #include <fstream>
+#include <mutex>
 #include <sstream>
+#include <stdexcept>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include <gtest/gtest.h>
+#include <tinyxml2.h>
+
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
+#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/xmlparser/XMLParser.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <fastrtps/xmlparser/XMLTree.h>
+
+#include "../common/env_var_utils.hpp"
+#include "../logging/mock/MockConsumer.h"
+#include "rtps/xmlparser/XMLParserUtils.hpp"
+#include "wrapper/XMLParserTest.hpp"
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
+using namespace eprosima::testing;
 
 using eprosima::fastrtps::xmlparser::BaseNode;
 using eprosima::fastrtps::xmlparser::DataNode;
@@ -607,6 +616,8 @@ TEST_F(XMLParserTests, getXMLTransports)
  * 1. Correct parsing of all valid values of BuiltinTransport.
  * 2. Check a wrong definition of <builtinTransports>.
  * 3. Check an empty definition of <builtinTransports>.
+ * 4. Correct parsing arguments of LARGE_DATA.
+ * 4.a-4.d. Check all possible combinations of arguments for LARGE_DATA.
  */
 TEST_F(XMLParserTests, getXMLbuiltinTransports)
 {
@@ -623,7 +634,7 @@ TEST_F(XMLParserTests, getXMLbuiltinTransports)
     constexpr size_t xml_len {500};
     char xml[xml_len];
 
-    // Valid XML
+    // 1. Valid XML with all possible builtin transports
     std::vector<std::string> bt_list;
     bt_list.push_back("NONE");
     bt_list.push_back("DEFAULT");
@@ -642,17 +653,121 @@ TEST_F(XMLParserTests, getXMLbuiltinTransports)
         ASSERT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident));
     }
 
-    // Wrong ID
+    // 2. Wrong Value
     snprintf(xml, xml_len, xml_p, "WrongBuiltinTransport");
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     titleElement = xml_doc.RootElement();
     ASSERT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident));
 
-    // Missing data
+    // 3. Missing data
     snprintf(xml, xml_len, xml_p, "");
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     titleElement = xml_doc.RootElement();
     ASSERT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident));
+
+    // 4. LARGE_DATA with arguments
+    const char* xml_arguments =
+            "\
+            <builtinTransports%s>LARGE_DATA</builtinTransports>\
+            ";
+    eprosima::fastdds::rtps::BuiltinTransportsOptions bt_opts;
+    eprosima::fastdds::rtps::BuiltinTransportsOptions bt_opts_check;
+
+    // 4.a. Only max_msg_size
+    std::string arguments = " max_msg_size=\"50KIB\"";
+    bt_opts_check.maxMessageSize = 50 * 1024;
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
+
+    // 4.b. Only sockets_buffers_size
+    arguments = " sockets_size=\"50KB\"";
+    bt_opts = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check.sockets_buffer_size = 50000;
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
+
+    // 4.c. Only non_blocking_send
+    arguments = " non_blocking=\"true\"";
+    bt_opts = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check.non_blocking_send = true;
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
+
+    // 4.d. Only tcp_negotiation_timeout
+    arguments = " tcp_negotiation_timeout=\"50\"";
+    bt_opts = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check.tcp_negotiation_timeout = 50;
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
+
+    // 4.e. All options
+    arguments = " max_msg_size=\"1MB\" non_blocking=\"true\" sockets_size=\"1MB\" tcp_negotiation_timeout=\"50\"";
+    bt_opts = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check.maxMessageSize = 1000000;
+    bt_opts_check.sockets_buffer_size = 1000000;
+    bt_opts_check.non_blocking_send = true;
+    bt_opts_check.tcp_negotiation_timeout = 50;
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
+
+    // 4.f. Wrong units for argument defaults in LARGE_DATA with default config options
+    arguments = " max_msg_size=\"50TB\"";
+    bt_opts = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
+
+    // 4.g. Exceed maximum value for argument defaults in LARGE_DATA with default config options
+    arguments = " sockets_size=\"5000000000\"";
+    bt_opts = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
+
+    // 4.h. Wrong value for argument defaults in LARGE_DATA with default config options
+    arguments = " non_blocking=\"treu\"";
+    bt_opts = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
+
+    // 4.i. Wrong value for argument defaults in LARGE_DATA with default config options
+    arguments = " tcp_negotiation_timeout=\"5000000000\"";
+    bt_opts = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    bt_opts_check = eprosima::fastdds::rtps::BuiltinTransportsOptions();
+    snprintf(xml, xml_len, xml_arguments, arguments.c_str());
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    ASSERT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLBuiltinTransports_wrapper(titleElement, &bt, ident, &bt_opts));
+    ASSERT_EQ(bt_opts, bt_opts_check);
 
     // Clean up
     xmlparser::XMLProfileManager::DeleteInstance();
@@ -679,7 +794,15 @@ TEST_F(XMLParserTests, getXMLPropertiesPolicy)
         "Property1Value",
         "false",
         "BinProperty1Name",
+        "01.02.CA.FE",
         "false"};
+    const std::vector<std::string> wrong_parameters {
+        "",
+        "",
+        "",
+        "",
+        "ZZ",
+        ""};
     std::vector<std::string> parameters(valid_parameters);
 
     // Template xml
@@ -696,7 +819,7 @@ TEST_F(XMLParserTests, getXMLPropertiesPolicy)
                 <binary_properties>\
                     <property>\
                         <name>%s</name>\
-                        <value></value>\
+                        <value>%s</value>\
                         <propagate>%s</propagate>\
                     </property>\
                 </binary_properties>\
@@ -710,7 +833,8 @@ TEST_F(XMLParserTests, getXMLPropertiesPolicy)
             valid_parameters[1].c_str(),
             valid_parameters[2].c_str(),
             valid_parameters[3].c_str(),
-            valid_parameters[4].c_str());
+            valid_parameters[4].c_str(),
+            valid_parameters[5].c_str());
 
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     titleElement = xml_doc.RootElement();
@@ -719,21 +843,21 @@ TEST_F(XMLParserTests, getXMLPropertiesPolicy)
     EXPECT_EQ(property_policy.properties()[0].value(), valid_parameters[1]);
     EXPECT_EQ(property_policy.properties()[0].propagate(), false);
     EXPECT_EQ(property_policy.binary_properties()[0].name(), valid_parameters[3]);
-    // TODO check when binary property values are suported
-    // EXPECT_EQ(property_policy.binary_properties()[0].name(), valid_parameters[4]);
+    EXPECT_EQ(property_policy.binary_properties()[0].value(), std::vector<uint8_t>({0x01, 0x02, 0xCA, 0xFE}));
     EXPECT_EQ(property_policy.binary_properties()[0].propagate(), false);
 
-    for (int i = 0; i < 5; i++)
+    for (size_t i = 0; i < valid_parameters.size(); i++)
     {
         parameters = valid_parameters;
-        parameters[i] = "";
+        parameters[i] = wrong_parameters[i];
 
         snprintf(xml, xml_len, xml_p,
                 parameters[0].c_str(),
                 parameters[1].c_str(),
                 parameters[2].c_str(),
                 parameters[3].c_str(),
-                parameters[4].c_str());
+                parameters[4].c_str(),
+                parameters[5].c_str());
         ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
         titleElement = xml_doc.RootElement();
         EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::propertiesPolicy_wrapper(titleElement, property_policy, ident));
@@ -904,27 +1028,22 @@ TEST_F(XMLParserTests, getXMLPortParameters_NegativeClauses)
             parameters.assign (7, "1");
             parameters[i] = "";
             xml =
-                    "\
-                    <port>\
-                        <portBase>" + parameters[0] + "</portBase>\
-                        <domainIDGain>" + parameters[1] + "</domainIDGain>\
-                        <participantIDGain>" + parameters[2] +
-                    "</participantIDGain>\
-                        <offsetd0>" + parameters[3] + "</offsetd0>\
-                        <offsetd1>" + parameters[4] + "</offsetd1>\
-                        <offsetd2>" + parameters[5] + "</offsetd2>\
-                        <offsetd3>" + parameters[6] + "</offsetd3>\
-                    </port>\
-                    ";
+                    "<port>"
+                    "    <portBase>" + parameters[0] + "</portBase>"
+                    "    <domainIDGain>" + parameters[1] + "</domainIDGain>"
+                    "    <participantIDGain>" + parameters[2] + "</participantIDGain>"
+                    "    <offsetd0>" + parameters[3] + "</offsetd0>"
+                    "    <offsetd1>" + parameters[4] + "</offsetd1>"
+                    "    <offsetd2>" + parameters[5] + "</offsetd2>"
+                    "    <offsetd3>" + parameters[6] + "</offsetd3>"
+                    "</port>";
         }
         else
         {
             xml =
-                    "\
-                    <port>\
-                        <bad_element></bad_element>\
-                    </port>\
-                    ";
+                    "<port>"
+                    "    <bad_element></bad_element>"
+                    "</port>";
         }
 
         ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml.c_str()));
@@ -1327,6 +1446,7 @@ TEST_F(XMLParserTests, getXMLUint_NegativeClauses)
     uint8_t ident = 1;
     unsigned int ui;
     uint16_t ui16;
+    uint64_t ui64;
     tinyxml2::XMLDocument xml_doc;
     tinyxml2::XMLElement* titleElement;
 
@@ -1341,6 +1461,12 @@ TEST_F(XMLParserTests, getXMLUint_NegativeClauses)
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse("<field>not_an_uint</field>"));
     titleElement = xml_doc.RootElement();
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLUint_wrapper(titleElement, &ui16, ident));
+
+    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLUint_wrapper(nullptr, &ui64, ident));
+
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse("<field>not_an_uint</field>"));
+    titleElement = xml_doc.RootElement();
+    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLUint_wrapper(titleElement, &ui64, ident));
 }
 
 /*
@@ -1884,6 +2010,7 @@ TEST_F(XMLParserTests, getXMLDurabilityQosKind)
  *      <writerPayloadSize>
  *      <mutation_tries>
  *      <avoid_builtin_multicast>
+ *      <typelookup_config>
  * 2. Check invalid element
  */
 TEST_F(XMLParserTests, getXMLBuiltinAttributes_NegativeClauses)
@@ -1924,7 +2051,8 @@ TEST_F(XMLParserTests, getXMLBuiltinAttributes_NegativeClauses)
         "readerPayloadSize",
         "writerPayloadSize",
         "mutation_tries",
-        "avoid_builtin_multicast"
+        "avoid_builtin_multicast",
+        "typelookup_config"
     };
 
     for (std::string tag : field_vec)
@@ -1941,6 +2069,122 @@ TEST_F(XMLParserTests, getXMLBuiltinAttributes_NegativeClauses)
     ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
     titleElement = xml_doc.RootElement();
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::getXMLBuiltinAttributes_wrapper(titleElement, builtin, ident));
+}
+
+/*
+ * This test checks parsing of flow_controller_descriptor_list elements.
+ */
+TEST_F(XMLParserTests, getXMLFlowControllerDescriptorList)
+{
+    uint8_t ident = 1;
+
+    /*
+     * Aux mapping for FlowControllerSchedulerPolicy
+     */
+
+    auto scheduler_policy_map = std::map<std::string, eprosima::fastdds::rtps::FlowControllerSchedulerPolicy>
+    {
+        {"FIFO", eprosima::fastdds::rtps::FlowControllerSchedulerPolicy::FIFO},
+        {"ROUND_ROBIN", eprosima::fastdds::rtps::FlowControllerSchedulerPolicy::ROUND_ROBIN},
+        {"HIGH_PRIORITY", eprosima::fastdds::rtps::FlowControllerSchedulerPolicy::HIGH_PRIORITY},
+        {"PRIORITY_WITH_RESERVATION", eprosima::fastdds::rtps::FlowControllerSchedulerPolicy::PRIORITY_WITH_RESERVATION}
+    };
+
+    /* Define the test cases */
+    std::vector<std::pair<std::vector<std::string>, XMLP_ret>> test_cases =
+    {
+        /*
+         * name, scheduler, max_bytes_per_period, period_ms,
+         * sender_thread_scheduling_policy, sender_thread_priority,
+         * sender_thread_affinity, sender_thread_stack_size, extra_xml_tag
+         */
+        {{"test_flow_controller", "FIFO", "120", "50", \
+            "12", "12", "12", "12", "" }, XMLP_ret::XML_OK},
+        {{"test_flow_controller", "ROUND_ROBIN", "2500", "100", \
+            "15", "12", "12", "12", "" }, XMLP_ret::XML_OK},
+        {{"test_flow_controller", "HIGH_PRIORITY", "2500", "100", \
+            "15", "12", "12", "12", "" }, XMLP_ret::XML_OK},
+        {{"test_flow_controller", "PRIORITY_WITH_RESERVATION", "2500", "100", \
+            "15", "12", "12", "12", "" }, XMLP_ret::XML_OK},
+        {{"test_flow_controller", "INVALID", "120", "50", \
+            "12", "12", "12", "12", "" }, XMLP_ret::XML_ERROR},   // Invalid scheduler
+        {{"test_flow_controller", "HIGH_PRIORITY", "120", "-10", \
+            "12", "12", "12", "12", "" }, XMLP_ret::XML_ERROR},   // negative period_ms
+        {{"test_flow_controller", "HIGH_PRIORITY", "120", "50", \
+            "12", "12", "12", "12", "<bad_element></bad_element>" }, XMLP_ret::XML_ERROR},   // Invalid tag
+        {{"", "HIGH_PRIORITY", "120", "50", \
+            "12", "12", "12", "12", "" }, XMLP_ret::XML_ERROR},   // empty name
+        {{"test_flow_controller", "HIGH_PRIORITY", "120", "50", \
+            "12", "12", "12", "12", "<name>another_name</name>" }, XMLP_ret::XML_ERROR},   // duplicated name tag
+        {{"test_flow_controller", "HIGH_PRIORITY", "120", "50", \
+            "12", "12", "12", "12", "<scheduler>FIFO</scheduler>" }, XMLP_ret::XML_ERROR},   // duplicated scheduler tag
+        {{"test_flow_controller", "HIGH_PRIORITY", "120", "50", \
+            "12", "12", "12", "12", "<max_bytes_per_period>96</max_bytes_per_period>" }, XMLP_ret::XML_ERROR},   // duplicated max_bytes_per_period tag
+        {{"test_flow_controller", "HIGH_PRIORITY", "120", "50", \
+            "12", "12", "12", "12", "<period_ms>96</period_ms>" }, XMLP_ret::XML_ERROR},   // duplicated period_ms tag
+        {{"test_flow_controller", "HIGH_PRIORITY", "120", "50", \
+            "12", "12", "12", "12", "<sender_thread><scheduling_policy>12</scheduling_policy></sender_thread>" },
+            XMLP_ret::XML_ERROR}, // duplicated sender_thread tag
+        {{"", "HIGH_PRIORITY", "120", "50", \
+            "12345", "12", "12", "a", "" }, XMLP_ret::XML_ERROR},   // invalid thread settings
+    };
+
+    /* Run the tests */
+    for (auto test_case : test_cases)
+    {
+        std::vector<std::string>& params = test_case.first;
+        XMLP_ret& expectation = test_case.second;
+
+        using namespace eprosima::fastdds::rtps;
+        XMLParserTest::FlowControllerDescriptorList flow_controller_descriptor_list;
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* titleElement;
+
+        // Create XML snippet
+        std::string xml =
+                "<flow_controller_descriptor_list>"
+                "   <flow_controller_descriptor>"
+                "       <name>" + params[0] + "</name>"
+                "       <scheduler>" + params[1] + "</scheduler>"
+                "       <max_bytes_per_period>" + params[2] + "</max_bytes_per_period>"
+                "       <period_ms>" + params[3] + "</period_ms>"
+                "       <sender_thread>"
+                "           <scheduling_policy>" + params[4] + "</scheduling_policy>"
+                "           <priority>" + params[5] + "</priority>"
+                "           <affinity>" + params[6] + "</affinity>"
+                "           <stack_size>" + params[7] + "</stack_size>"
+                "       </sender_thread>"
+                + params[8] +
+                "   </flow_controller_descriptor>"
+                "</flow_controller_descriptor_list>";
+
+        // Parse the XML snippet
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml.c_str())) << xml;
+
+        // Extract FlowControllersDescriptors
+        titleElement = xml_doc.RootElement();
+        ASSERT_EQ(expectation,
+                XMLParserTest::getXMLFlowControllerDescriptorList_wrapper(titleElement, flow_controller_descriptor_list,
+                ident));
+
+        // Validate in the OK cases
+        if (expectation == XMLP_ret::XML_OK)
+        {
+            ASSERT_EQ(flow_controller_descriptor_list.at(0)->name, params[0]);
+            ASSERT_EQ(flow_controller_descriptor_list.at(0)->scheduler, scheduler_policy_map[params[1]]);
+            ASSERT_EQ(flow_controller_descriptor_list.at(0)->max_bytes_per_period,
+                    static_cast<int32_t>(std::stoi(params[2])));
+            ASSERT_EQ(flow_controller_descriptor_list.at(0)->period_ms, static_cast<uint64_t>(std::stoi(params[3])));
+            ASSERT_EQ(flow_controller_descriptor_list.at(0)->sender_thread.scheduling_policy,
+                    static_cast<int32_t>(std::stoi(params[4])));
+            ASSERT_EQ(flow_controller_descriptor_list.at(0)->sender_thread.priority,
+                    static_cast<int32_t>(std::stoi(params[5])));
+            ASSERT_EQ(flow_controller_descriptor_list.at(0)->sender_thread.affinity,
+                    static_cast<uint64_t>(std::stoi(params[6])));
+            ASSERT_EQ(flow_controller_descriptor_list.at(0)->sender_thread.stack_size,
+                    static_cast<int32_t>(std::stoi(params[7])));
+        }
+    }
 }
 
 /*
@@ -1998,6 +2242,62 @@ TEST_F(XMLParserTests, getXMLThroughputController_NegativeClauses)
     titleElement = xml_doc.RootElement();
     EXPECT_EQ(XMLP_ret::XML_ERROR,
             XMLParserTest::getXMLThroughputController_wrapper(titleElement, throughputController, ident));
+}
+
+/*
+ * This test checks the negative cases in the xml child element of <flow_controller_descriptor_list>
+ * 1. Check an invalid tag of:
+ *      <flow_controller_descriptor>
+ * 2. Check invalid element
+ */
+TEST_F(XMLParserTests, getXMLFlowControllerDescriptorList_NegativeClauses)
+{
+    uint8_t ident = 1;
+    XMLParserTest::FlowControllerDescriptorList flow_controller_descriptor_list;
+    tinyxml2::XMLDocument xml_doc;
+    tinyxml2::XMLElement* titleElement;
+
+    // Parametrized XML
+    const char* xml_p =
+            "\
+            <flow_controller_descriptor_list>\
+                %s\
+            </flow_controller_descriptor_list>\
+            ";
+    constexpr size_t xml_len {1000};
+    char xml[xml_len];
+    const char* field_p =
+            "\
+            <%s>\
+                <bad_element> </bad_element>\
+            </%s>\
+            ";
+    constexpr size_t field_len {500};
+    char field[field_len];
+
+    std::vector<std::string> field_vec =
+    {
+        "flow_controller_descriptor"
+    };
+
+    for (std::string tag : field_vec)
+    {
+        snprintf(field, field_len, field_p, tag.c_str(), tag.c_str());
+        snprintf(xml, xml_len, xml_p, field);
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+        titleElement = xml_doc.RootElement();
+        EXPECT_EQ(XMLP_ret::XML_ERROR,
+                XMLParserTest::getXMLFlowControllerDescriptorList_wrapper(titleElement, flow_controller_descriptor_list,
+                ident));
+    }
+
+    // Invalid element
+    snprintf(xml, xml_len, xml_p, "<bad_element> </bad_element>");
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    EXPECT_EQ(XMLP_ret::XML_ERROR,
+            XMLParserTest::getXMLFlowControllerDescriptorList_wrapper(titleElement, flow_controller_descriptor_list,
+            ident));
 }
 
 /*
@@ -3872,5 +4172,492 @@ TEST_F(XMLParserTests, getXMLOwnershipStrengthQos)
         titleElement = xml_doc.RootElement();
         EXPECT_EQ(XMLP_ret::XML_ERROR,
                 XMLParserTest::propertiesPolicy_wrapper(titleElement, ownership_strength_policy, ident));
+    }
+}
+
+/*
+ * This test checks the positive cases of configuration through XML of the TypeLookupService.
+ * 1. Check that the XML return code is correct for the TypeLookup configuration settings.
+ * 2. Check that the flags are corretly set.
+ */
+TEST_F(XMLParserTests, getXMLTypeLookupSettings)
+{
+    uint8_t ident = 1;
+    TypeLookupSettings settings;
+    tinyxml2::XMLDocument xml_doc;
+    tinyxml2::XMLElement* titleElement;
+
+    // XML snippet
+    const char* xml =
+            "\
+            <typelookup_config>\
+                <use_server>true</use_server>\
+                <use_client>false</use_client>\
+            </typelookup_config>\
+            ";
+
+    // Load the xml
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    // Check that the XML return code is correct for the TypeLookup settings
+    titleElement = xml_doc.RootElement();
+    EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLTypeLookupSettings_wrapper(titleElement, settings, ident));
+    EXPECT_TRUE(settings.use_server);
+    EXPECT_FALSE(settings.use_client);
+
+    // XML snippet
+    xml =
+            "\
+            <typelookup_config>\
+                <use_server>false</use_server>\
+                <use_client>true</use_client>\
+            </typelookup_config>\
+            ";
+
+    // Load the xml
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    // Check that the XML return code is correct for the TypeLookup settings
+    EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::getXMLTypeLookupSettings_wrapper(titleElement, settings, ident));
+    EXPECT_FALSE(settings.use_server);
+    EXPECT_TRUE(settings.use_client);
+}
+
+/*
+ * This test checks the negative cases in the <typelookup_config> xml element.
+ * 1. Check an invalid tag of:
+ *      <use_client>
+ *      <use_server>
+ * 2. Check invalid element.
+ */
+TEST_F(XMLParserTests, getXMLTypeLookupSettings_NegativeClauses)
+{
+    uint8_t ident = 1;
+    TypeLookupSettings settings;
+    tinyxml2::XMLDocument xml_doc;
+    tinyxml2::XMLElement* titleElement;
+
+    // Parametrized XML
+    const char* xml_p =
+            "\
+            <typelookup_config>\
+                %s\
+            </typelookup_config>\
+            ";
+    constexpr size_t xml_len {1000};
+    char xml[xml_len];
+
+    const char* field_p =
+            "\
+            <%s>\
+                <bad_element> </bad_element>\
+            </%s>\
+            ";
+    constexpr size_t field_len {500};
+    char field[field_len];
+
+    std::vector<std::string> field_vec =
+    {
+        "use_client",
+        "use_server",
+    };
+
+    for (std::string tag : field_vec)
+    {
+        snprintf(field, field_len, field_p, tag.c_str(), tag.c_str());
+        snprintf(xml, xml_len, xml_p, field);
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+        titleElement = xml_doc.RootElement();
+        EXPECT_EQ(XMLP_ret::XML_ERROR,
+                XMLParserTest::getXMLTypeLookupSettings_wrapper(titleElement, settings, ident));
+    }
+
+    // Invalid element
+    snprintf(xml, xml_len, xml_p, "<bad_element> </bad_element>");
+    ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
+    titleElement = xml_doc.RootElement();
+    EXPECT_EQ(XMLP_ret::XML_ERROR,
+            XMLParserTest::getXMLTypeLookupSettings_wrapper(titleElement, settings, ident));
+}
+
+TEST_F(XMLParserTests, get_element_text)
+{
+    using namespace eprosima::fastdds::xml::detail;
+
+    // 1. Empty content
+    {
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* xml_element;
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse("<elem></elem>"));
+        xml_element = xml_doc.RootElement();
+
+        std::string result;
+        EXPECT_EQ(get_element_text(xml_element), "");
+        EXPECT_FALSE(get_element_text(xml_element, result));
+    }
+
+    // 2. Plain content
+    {
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* xml_element;
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse("<elem>Content</elem>"));
+        xml_element = xml_doc.RootElement();
+
+        std::string result;
+        EXPECT_EQ(get_element_text(xml_element), "Content");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "Content");
+    }
+}
+
+TEST_F(XMLParserTests, env_var_substitution)
+{
+    using namespace eprosima::fastdds::xml::detail;
+
+    const char* const env_var_1 = "XML_PARSER_TESTS_ENV_VAR_1";
+    const char* const env_var_2 = "XML_PARSER_TESTS_ENV_VAR_2";
+
+    // 1. Empty var
+    {
+        clear_environment_variable(env_var_1);
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* xml_element;
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse("<elem>${XML_PARSER_TESTS_ENV_VAR_1}</elem>"));
+        xml_element = xml_doc.RootElement();
+
+        std::string result;
+        EXPECT_EQ(get_element_text(xml_element), "");
+        EXPECT_FALSE(get_element_text(xml_element, result));
+    }
+
+    // 2. Single environment var only
+    {
+        set_environment_variable(env_var_1, "Content");
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* xml_element;
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse("<elem>${XML_PARSER_TESTS_ENV_VAR_1}</elem>"));
+        xml_element = xml_doc.RootElement();
+
+        std::string result;
+        EXPECT_EQ(get_element_text(xml_element), "Content");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "Content");
+    }
+
+    // 3. Text plus env var
+    {
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* xml_element;
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse("<elem>Has ${XML_PARSER_TESTS_ENV_VAR_1}</elem>"));
+        xml_element = xml_doc.RootElement();
+
+        std::string result;
+        EXPECT_EQ(get_element_text(xml_element), "Has Content");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "Has Content");
+    }
+
+    // 4. Text plus empty env var
+    {
+        clear_environment_variable(env_var_1);
+
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* xml_element;
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse("<elem>Empty ${XML_PARSER_TESTS_ENV_VAR_1}</elem>"));
+        xml_element = xml_doc.RootElement();
+
+        std::string result;
+        EXPECT_EQ(get_element_text(xml_element), "Empty ");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "Empty ");
+    }
+
+    // 5. Mixing vars
+    {
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* xml_element;
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS,
+                xml_doc.Parse("<elem>${XML_PARSER_TESTS_ENV_VAR_1}${XML_PARSER_TESTS_ENV_VAR_2}</elem>"));
+        xml_element = xml_doc.RootElement();
+
+        // 5.1. Both empty
+        clear_environment_variable(env_var_1);
+        clear_environment_variable(env_var_2);
+
+        std::string result;
+        EXPECT_EQ(get_element_text(xml_element), "");
+        EXPECT_FALSE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "");
+
+        // 5.2. First with data
+        set_environment_variable(env_var_1, "Content-1");
+        clear_environment_variable(env_var_2);
+
+        EXPECT_EQ(get_element_text(xml_element), "Content-1");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "Content-1");
+
+        // 5.3. Second with data
+        clear_environment_variable(env_var_1);
+        set_environment_variable(env_var_2, "Content-2");
+
+        EXPECT_EQ(get_element_text(xml_element), "Content-2");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "Content-2");
+
+        // 5.4. Both with data
+        set_environment_variable(env_var_1, "Content-1");
+        set_environment_variable(env_var_2, "Content-2");
+
+        EXPECT_EQ(get_element_text(xml_element), "Content-1Content-2");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "Content-1Content-2");
+    }
+
+    // 6. Mixing text and vars
+    {
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* xml_element;
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS,
+                xml_doc.Parse("<elem>A mix of ${XML_PARSER_TESTS_ENV_VAR_1} & ${XML_PARSER_TESTS_ENV_VAR_2}!</elem>"));
+        xml_element = xml_doc.RootElement();
+
+        // 5.1. Both empty
+        clear_environment_variable(env_var_1);
+        clear_environment_variable(env_var_2);
+
+        std::string result;
+        EXPECT_EQ(get_element_text(xml_element), "A mix of  & !");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "A mix of  & !");
+
+        // 6.2. First with data
+        set_environment_variable(env_var_1, "Content-1");
+        clear_environment_variable(env_var_2);
+
+        EXPECT_EQ(get_element_text(xml_element), "A mix of Content-1 & !");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "A mix of Content-1 & !");
+
+        // 6.3. Second with data
+        clear_environment_variable(env_var_1);
+        set_environment_variable(env_var_2, "Content-2");
+
+        EXPECT_EQ(get_element_text(xml_element), "A mix of  & Content-2!");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "A mix of  & Content-2!");
+
+        // 6.4. Both with data
+        set_environment_variable(env_var_1, "Content-1");
+        set_environment_variable(env_var_2, "Content-2");
+
+        EXPECT_EQ(get_element_text(xml_element), "A mix of Content-1 & Content-2!");
+        EXPECT_TRUE(get_element_text(xml_element, result));
+        EXPECT_EQ(result, "A mix of Content-1 & Content-2!");
+    }
+
+    // Cleanup environment variables used in this test
+    clear_environment_variable(env_var_1);
+    clear_environment_variable(env_var_2);
+}
+
+/*
+ * This test checks parsing of thread_settings elements.
+ */
+TEST_F(XMLParserTests, getXMLThreadSettings)
+{
+    /* Define the test cases */
+    std::vector<std::pair<std::vector<std::string>, XMLP_ret>> test_cases =
+    {
+        {{"12", "12", "12", "12", ""}, XMLP_ret::XML_OK},
+        {{"-1", "12", "12", "12", ""}, XMLP_ret::XML_OK},
+        {{"12", "-1", "12", "12", ""}, XMLP_ret::XML_OK},
+        {{"12", "12", "12", "-1", ""}, XMLP_ret::XML_OK},
+        {{"-2", "12", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "-2", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "12", "-2", ""}, XMLP_ret::XML_ERROR},
+        {{"a", "12", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12", "a", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "a", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "12", "a", ""}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "12", "12", "<scheduling_policy>12</scheduling_policy>"}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "12", "12", "<priority>12</priority>"}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "12", "12", "<affinity>12</affinity>"}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "12", "12", "<stack_size>12</stack_size>"}, XMLP_ret::XML_ERROR},
+        {{"12", "12", "12", "12", "<wrong_tag>12</wrong_tag>"}, XMLP_ret::XML_ERROR},
+    };
+
+    /* Run the tests */
+    for (auto test_case : test_cases)
+    {
+        std::vector<std::string>& params = test_case.first;
+        XMLP_ret& expectation = test_case.second;
+
+        using namespace eprosima::fastdds::rtps;
+        ThreadSettings thread_settings;
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* titleElement;
+
+        // Create XML snippet
+        std::string xml =
+                "<thread_settings>"
+                "    <scheduling_policy>" + params[0] + "</scheduling_policy>"
+                "    <priority>" + params[1] + "</priority>"
+                "    <affinity>" + params[2] + "</affinity>"
+                "    <stack_size>" + params[3] + "</stack_size>"
+                + params[4] +
+                "</thread_settings>";
+
+        // Parse the XML snippet
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml.c_str())) << xml;
+
+        // Extract ThreadSetting
+        titleElement = xml_doc.RootElement();
+        ASSERT_EQ(expectation, XMLParserTest::getXMLThreadSettings_wrapper(titleElement, thread_settings));
+
+        // Validate in the OK cases
+        if (expectation == XMLP_ret::XML_OK)
+        {
+            ASSERT_EQ(thread_settings.scheduling_policy, static_cast<int32_t>(std::stoi(params[0])));
+            ASSERT_EQ(thread_settings.priority, static_cast<int32_t>(std::stoi(params[1])));
+            ASSERT_EQ(thread_settings.affinity, static_cast<uint64_t>(std::stoi(params[2])));
+            ASSERT_EQ(thread_settings.stack_size, static_cast<int32_t>(std::stoi(params[3])));
+        }
+    }
+}
+
+/*
+ * This test checks parsing of thread_settings with port elements.
+ */
+TEST_F(XMLParserTests, getXMLThreadSettingsWithPort)
+{
+    /* Define the test cases */
+    std::vector<std::pair<std::vector<std::string>, XMLP_ret>> test_cases =
+    {
+        {{"12345", "", "12", "12", "12", "12", ""}, XMLP_ret::XML_OK},
+        {{"12345", "", "-1", "12", "12", "12", ""}, XMLP_ret::XML_OK},
+        {{"12345", "", "12", "-1", "12", "12", ""}, XMLP_ret::XML_OK},
+        {{"12345", "", "12", "12", "12", "-1", ""}, XMLP_ret::XML_OK},
+        {{"12345", "", "-2", "12", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"-1", "", "12", "12", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"a", "", "12", "12", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"a", "wrong_attr=\"12\"", "12", "12", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12345", "", "12", "12", "12", "-2", ""}, XMLP_ret::XML_ERROR},
+        {{"12345", "", "a", "12", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12345", "", "12", "a", "12", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12345", "", "12", "12", "a", "12", ""}, XMLP_ret::XML_ERROR},
+        {{"12345", "", "12", "12", "12", "a", ""}, XMLP_ret::XML_ERROR},
+        {{"12345", "", "12", "12", "12", "12", "<stack_size>12</stack_size>"}, XMLP_ret::XML_ERROR},
+        {{"12345", "", "12", "12", "12", "12", "<wrong_tag>12</wrong_tag>"}, XMLP_ret::XML_ERROR},
+    };
+
+    /* Run the tests */
+    for (auto test_case : test_cases)
+    {
+        std::vector<std::string>& params = test_case.first;
+        XMLP_ret& expectation = test_case.second;
+
+        using namespace eprosima::fastdds::rtps;
+        ThreadSettings thread_settings;
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* titleElement;
+
+        // Create XML snippet
+        std::string xml =
+                "<thread_settings port=\"" + params[0] + "\" " + params[1] + ">"
+                "    <scheduling_policy>" + params[2] + "</scheduling_policy>"
+                "    <priority>" + params[3] + "</priority>"
+                "    <affinity>" + params[4] + "</affinity>"
+                "    <stack_size>" + params[5] + "</stack_size>"
+                + params[6] +
+                "</thread_settings>";
+
+        // Parse the XML snippet
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml.c_str())) << xml;
+
+        // Extract ThreadSetting
+        titleElement = xml_doc.RootElement();
+        uint32_t port;
+        ASSERT_EQ(expectation,
+                XMLParserTest::getXMLThreadSettingsWithPort_wrapper(titleElement, thread_settings, port));
+
+        // Validate in the OK cases
+        if (expectation == XMLP_ret::XML_OK)
+        {
+            ASSERT_EQ(port, static_cast<uint32_t>(std::stoi(params[0])));
+            ASSERT_EQ(thread_settings.scheduling_policy, static_cast<int32_t>(std::stoi(params[2])));
+            ASSERT_EQ(thread_settings.priority, static_cast<int32_t>(std::stoi(params[3])));
+            ASSERT_EQ(thread_settings.affinity, static_cast<uint32_t>(std::stoi(params[4])));
+            ASSERT_EQ(thread_settings.stack_size, static_cast<int32_t>(std::stoi(params[5])));
+        }
+    }
+}
+
+/*
+ * This test checks parsing of entity factory qos elements.
+ */
+TEST_F(XMLParserTests, getXMLEntityFactoryQos)
+{
+    /* Define the test cases */
+    std::vector<std::pair<std::vector<std::string>, XMLP_ret>> test_cases =
+    {
+        {{"true", ""}, XMLP_ret::XML_OK},
+        {{"false", ""}, XMLP_ret::XML_OK},
+        {{"0", ""}, XMLP_ret::XML_OK},
+        {{"1", ""}, XMLP_ret::XML_OK},
+        {{"20", ""}, XMLP_ret::XML_OK},
+        {{"wrong_value", ""}, XMLP_ret::XML_ERROR}
+    };
+
+    /* Run the tests */
+    for (auto test_case : test_cases)
+    {
+        std::vector<std::string>& params = test_case.first;
+        XMLP_ret& expectation = test_case.second;
+
+        using namespace eprosima::fastdds::dds;
+        EntityFactoryQosPolicy entity_factory_qos;
+        tinyxml2::XMLDocument xml_doc;
+        tinyxml2::XMLElement* titleElement;
+
+        // Create XML snippet
+        std::string xml =
+                "<entity_factory>"
+                "    <autoenable_created_entities>" + params[0] + "</autoenable_created_entities>"
+                + params[1] +
+                "</entity_factory>";
+
+        std::cout << xml << std::endl;
+
+        // Parse the XML snippet
+        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml.c_str()));
+
+        // Extract ThreadSetting
+        titleElement = xml_doc.RootElement();
+        ASSERT_EQ(expectation, XMLParserTest::getXMLEntityFactoryQos_wrapper(titleElement, entity_factory_qos));
+
+        // Validate in the OK cases
+        if (expectation == XMLP_ret::XML_OK)
+        {
+            bool expected_value;
+            if (params[0] == "true")
+            {
+                expected_value = true;
+            }
+            else if (params[0] == "false")
+            {
+                expected_value = false;
+            }
+            else
+            {
+                try
+                {
+                    expected_value = static_cast<bool>(std::stoi(params[0]));
+                }
+                catch (std::invalid_argument&)
+                {
+                    expected_value = false;
+                }
+            }
+            ASSERT_EQ(entity_factory_qos.autoenable_created_entities, expected_value);
+        }
     }
 }

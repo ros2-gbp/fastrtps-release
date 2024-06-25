@@ -166,7 +166,7 @@ void RTPSWriter::deinit()
         std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
         for (auto it = mp_history->changesBegin(); it != mp_history->changesEnd(); ++it)
         {
-            flow_controller_->remove_change(*it);
+            flow_controller_->remove_change(*it, std::chrono::steady_clock::now() + std::chrono::hours(24));
         }
 
         for (auto it = mp_history->changesBegin(); it != mp_history->changesEnd(); ++it)
@@ -212,6 +212,7 @@ CacheChange_t* RTPSWriter::new_change(
     reserved_change->writer_info.previous = nullptr;
     reserved_change->writer_info.next = nullptr;
     reserved_change->writer_info.num_sent_submessages = 0;
+    reserved_change->vendor_id = c_VendorId_eProsima;
     return reserved_change;
 }
 
@@ -239,6 +240,7 @@ CacheChange_t* RTPSWriter::new_change(
     reserved_change->writer_info.previous = nullptr;
     reserved_change->writer_info.next = nullptr;
     reserved_change->writer_info.num_sent_submessages = 0;
+    reserved_change->vendor_id = c_VendorId_eProsima;
     return reserved_change;
 }
 

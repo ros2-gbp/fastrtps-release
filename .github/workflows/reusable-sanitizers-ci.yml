@@ -52,12 +52,7 @@ defaults:
 
 jobs:
   asan_fastdds_build:
-    if: ${{ (
-          !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
-          !contains(github.event.pull_request.labels.*.name, 'no-test') &&
-          !contains(github.event.pull_request.labels.*.name, 'conflicts') &&
-          (inputs.run_asan_fastdds == true)
-        ) }}
+    if: ${{ inputs.run_asan_fastdds == true }}
     runs-on: ubuntu-22.04
     steps:
       - name: Add ci-pending label if PR
@@ -77,7 +72,7 @@ jobs:
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
@@ -94,6 +89,9 @@ jobs:
 
       - name: Setup CCache
         uses: eProsima/eProsima-CI/external/setup-ccache-action@v0
+        if: ${{ !always() }}
+        with:
+          api_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch Fast DDS dependencies
         uses: eProsima/eProsima-CI/multiplatform/vcs_import@v0
@@ -112,13 +110,13 @@ jobs:
       - name: Show .meta file
         id: show_meta
         run: |
-          cat ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan_colcon.meta
+          cat ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan.meta
 
       - name: Colcon build
         continue-on-error: false
         uses: eProsima/eProsima-CI/multiplatform/colcon_build@v0
         with:
-          colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan_colcon.meta
+          colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan.meta
           colcon_build_args: ${{ inputs.colcon_build_args }}
           cmake_args: ${{ inputs.cmake_args }}
           cmake_args_default: ''
@@ -145,7 +143,7 @@ jobs:
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
@@ -174,26 +172,29 @@ jobs:
 
       - name: Setup CCache
         uses: eProsima/eProsima-CI/external/setup-ccache-action@v0
+        if: ${{ !always() }}
+        with:
+          api_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show .meta file
         id: show_meta
         run: |
-          cat ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan_colcon.meta
+          cat ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan.meta
 
       - name: Colcon build
         continue-on-error: false
         uses: eProsima/eProsima-CI/multiplatform/colcon_build@v0
         with:
-          colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan_colcon.meta
+          colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan.meta
           colcon_build_args: ${{ inputs.colcon_build_args }}
           cmake_args: ${{ inputs.cmake_args }}
-          cmake_args_default: -DEPROSIMA_BUILD_TESTS=ON -DGTEST_INDIVIDUAL=ON -DRTPS_API_TESTS=ON -DFASTRTPS_API_TESTS=ON -DFASTDDS_PIM_API_TESTS=ON -DPERFORMANCE_TESTS=ON
+          cmake_args_default: -DEPROSIMA_BUILD_TESTS=ON -DRTPS_API_TESTS=ON -DFASTRTPS_API_TESTS=ON -DFASTDDS_PIM_API_TESTS=ON -DPERFORMANCE_TESTS=ON
           cmake_build_type: 'Debug'
           workspace: ${{ github.workspace }}
           workspace_dependencies: ''
 
       - name: Colcon test
-        if: ${{ inputs.run_asan_fastdds }}
+        if: ${{ inputs.run_asan_fastdds == true }}
         id: test
         continue-on-error: true
         uses: eProsima/eProsima-CI/multiplatform/colcon_test@v0
@@ -208,7 +209,7 @@ jobs:
           test_report_artifact: ${{ format('test_report_{0}_{1}', inputs.label, github.job) }}
 
       - name: Report sanitizer errors
-        if: ${{ inputs.run_asan_fastdds }}
+        if: ${{ inputs.run_asan_fastdds == true }}
         run: |
           bash src/fastrtps/.github/workflows/utils/specific_errors_filter.sh \
             "==ERROR:" \
@@ -222,12 +223,7 @@ jobs:
             --sanitizer asan
 
   asan_discovery_server_test:
-    if: ${{ (
-          !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
-          !contains(github.event.pull_request.labels.*.name, 'no-test') &&
-          !contains(github.event.pull_request.labels.*.name, 'conflicts') &&
-          (inputs.run_asan_discovery_server == true)
-        ) }}
+    if: ${{ inputs.run_asan_discovery_server == true }}
     needs: asan_fastdds_build
     runs-on: ubuntu-22.04
     steps:
@@ -240,7 +236,7 @@ jobs:
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
@@ -257,6 +253,9 @@ jobs:
 
       - name: Setup CCache
         uses: eProsima/eProsima-CI/external/setup-ccache-action@v0
+        if: ${{ !always() }}
+        with:
+          api_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get Discovery Server branch
         id: get_discovery_server_branch
@@ -275,13 +274,13 @@ jobs:
       - name: Show .meta file
         id: show_meta
         run: |
-          cat ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan_colcon.meta
+          cat ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan.meta
 
       - name: Colcon build
         continue-on-error: false
         uses: eProsima/eProsima-CI/multiplatform/colcon_build@v0
         with:
-          colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan_colcon.meta
+          colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan.meta
           colcon_build_args: ${{ inputs.colcon_build_args }}
           cmake_args: ${{ inputs.cmake_args }}
           cmake_args_default: ''
@@ -290,7 +289,7 @@ jobs:
           workspace_dependencies: ''
 
       - name: Colcon test
-        if: ${{ inputs.run_asan_fastdds }}
+        if: ${{ inputs.run_asan_fastdds == true }}
         id: test
         continue-on-error: true
         uses: eProsima/eProsima-CI/multiplatform/colcon_test@v0
@@ -305,7 +304,7 @@ jobs:
           test_report_artifact: ${{ format('test_report_{0}_{1}', inputs.label, github.job) }}
 
       - name: Report sanitizer errors
-        if: ${{ inputs.run_asan_discovery_server }}
+        if: ${{ inputs.run_asan_discovery_server == true }}
         run: |
           bash src/fastrtps/.github/workflows/utils/specific_errors_filter.sh \
             "==ERROR:" \
@@ -319,12 +318,7 @@ jobs:
             --sanitizer=asan
 
   tsan_fastdds_test:
-    if: ${{ (
-          !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
-          !contains(github.event.pull_request.labels.*.name, 'no-test') &&
-          !contains(github.event.pull_request.labels.*.name, 'conflicts') &&
-          (inputs.run_tsan_fastdds == true)
-        ) }}
+    if: ${{ inputs.run_tsan_fastdds == true }}
     runs-on: ubuntu-22.04
     env:
       TSAN_OPTIONS: second_deadlock_stack=1 history_size=7 memory_limit_mb=5000
@@ -350,7 +344,7 @@ jobs:
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
@@ -367,6 +361,9 @@ jobs:
 
       - name: Setup CCache
         uses: eProsima/eProsima-CI/external/setup-ccache-action@v0
+        if: ${{ !always() }}
+        with:
+          api_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch Fast DDS dependencies
         uses: eProsima/eProsima-CI/multiplatform/vcs_import@v0
@@ -390,20 +387,20 @@ jobs:
       - name: Fetch Fast DDS CI dependencies
         uses: eProsima/eProsima-CI/multiplatform/vcs_import@v0
         with:
-          vcs_repos_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/ci.repos
+          vcs_repos_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/fastdds_test.repos
           destination_workspace: src
           skip_existing: 'true'
 
       - name: Show .meta file
         id: show_meta
         run: |
-          cat ${{ github.workspace }}/src/fastrtps/.github/workflows/config/tsan_colcon.meta
+          cat ${{ github.workspace }}/src/fastrtps/.github/workflows/config/tsan.meta
 
       - name: Colcon build
         continue-on-error: false
         uses: eProsima/eProsima-CI/multiplatform/colcon_build@v0
         with:
-          colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/tsan_colcon.meta
+          colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/tsan.meta
           colcon_build_args: ${{ inputs.colcon_build_args }}
           cmake_args: ${{ inputs.cmake_args }}
           cmake_args_default: ''
@@ -412,7 +409,7 @@ jobs:
           workspace_dependencies: ''
 
       - name: Colcon test
-        if: ${{ inputs.run_asan_fastdds }}
+        if: ${{ inputs.run_asan_fastdds == true }}
         id: test
         continue-on-error: true
         uses: eProsima/eProsima-CI/multiplatform/colcon_test@v0

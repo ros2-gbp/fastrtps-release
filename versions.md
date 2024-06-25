@@ -1,36 +1,57 @@
 Forthcoming
 -----------
 
-Version 2.10.4
+* Added new `flow_controller_descriptor_list` XML configuration.
+
+Version 2.14.0
 --------------
 
-* Added `non_blocking_send` to TCP Transport.
 * Added authentication handshake properties.
-* Added `max_message_size` property to configure maximum output message size.
+* Added methods OpenOutputChannels and CloseOutputChannels to TransportInterface with LocatorSelectorEntry argument.
+* Added `netmask_filter`, `allowlist` and `blocklist` transport configuration options.
+* Added extra configuration options for the builitin transports.
+* Limit the amount of listening ports for TCP servers to 1.
 
-Version 2.10.3
+Version 2.13.0
 --------------
 
+* Added monitor service feature.
+* Enable configuration of thread setting for all threads.
 * Added the possibility to define a listening port equal to 0 in TCP Transport
 * Added support for TCP to Fast DDS CLI and environment variable
-* Enable Discovery Server example through TCP
-* Added configuration of builtin transports through DomainParticipantQos, environment
-  variable and XML.
+* Enable Discovery Server example through TCP.
+* Define a discovery server' super client by environment variable.
+* Added the possibility to define interfaces in the whitelist by interface name.
+* Added configuration of builtin transports through DomainParticipantQos, environment variable and XML.
+* Enable support for DataRepresentationQos to select the CDR encoding.
 
-Version 2.10.2
+Version 2.12.0
 --------------
 
-* Shared memory improvements.
-* Data-sharing improvements.
-* Improve performance of intraprocess plus data-sharing.
 * Added participant property to configure SHM transport metatraffic behavior.
   No metatraffic over SHM transport by default.
-* Added Participant ignore local endpoints feature.
-* `DomainParticipantListener::on_participant_discovery` changed behavior (fix ABI break in 2.10.0).
-* Improve content filter expression parameters checks and verbosity.
-* Support new endpoint QoS XML tags.
-* Allow participant profiles with no rtps tag.
+* Exposed custom payload pool on DDS endpoints declaration
+* Processing environment variables on XML text
+* Upgrade to support Fast CDR v2.0.0.
+  Default encoding is XCDRv1 to maintain interoperability with previous Fast-DDS versions.
+  Some concerns:
+    - Data type source code generated with Fast DDS-Gen v2 should be regenerated using Fast DDS-Gen v3.
+    - **API break**. Changed a `MEMBER_INVALID` identifier from a `#define` to a `constexpr`.
+      Although this is not a new major version, using a `#define` is a bad conduct which was decided to be changed.
+      Note that new `constexpr` is inside namespace `eprosima::fastrtps::types`.
 
+Version 2.11.0
+--------------
+
+* Added Participant ignore local endpoints feature.
+* Remove `FASTDDS_STATIC` CMake option.
+  Please, use `BUILD_SHARED_LIBS=OFF` instead.
+* Fixed exported symbols on ContentFilteredTopic (ABI break)
+* Deprecated the DDS:Crypto:AES-GCM-GMAC plugin configuration through the DomainParticipant PropertyPolicyQos (security vulnerability).
+* `DomainParticipantListener::on_participant_discovery` changed behavior (fix API break in 2.10.0).
+* Included XML schema for static discovery profile configuration.
+* Extend DynamicDataHelper API providing `print` overload with `std::ostream` parameter (API extension in Dynamic Types).
+* TypeLookup Service configuration through XML.
 
 Version 2.10.1
 --------------

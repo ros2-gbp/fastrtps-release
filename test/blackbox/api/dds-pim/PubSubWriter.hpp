@@ -34,6 +34,7 @@
 #include <Windows.h>
 #endif // _MSC_VER
 
+#include <fastdds/dds/common/InstanceHandle.hpp>
 #include <fastdds/dds/core/condition/GuardCondition.hpp>
 #include <fastdds/dds/core/condition/StatusCondition.hpp>
 #include <fastdds/dds/core/condition/WaitSet.hpp>
@@ -48,14 +49,16 @@
 #include <fastdds/dds/publisher/qos/DataWriterQos.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
 #include <fastdds/rtps/flowcontrol/FlowControllerSchedulerPolicy.hpp>
+#include <fastdds/rtps/transport/TCPv4TransportDescriptor.h>
+#include <fastdds/rtps/transport/TCPv6TransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPTransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastdds/rtps/transport/UDPv6TransportDescriptor.h>
-#include <fastdds/rtps/transport/TCPv4TransportDescriptor.h>
-#include <fastdds/rtps/transport/TCPv6TransportDescriptor.h>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/xmlparser/XMLParser.h>
 #include <fastrtps/xmlparser/XMLTree.h>
+
+#include "PubSubTypeTraits.hpp"
 
 using DomainParticipantFactory = eprosima::fastdds::dds::DomainParticipantFactory;
 using eprosima::fastrtps::rtps::IPLocator;
@@ -63,7 +66,7 @@ using eprosima::fastdds::rtps::UDPTransportDescriptor;
 using eprosima::fastdds::rtps::UDPv4TransportDescriptor;
 using eprosima::fastdds::rtps::UDPv6TransportDescriptor;
 
-template<class TypeSupport>
+template<class TypeSupport, typename TypeTraits = PubSubTypeTraits<TypeSupport>>
 class PubSubWriter
 {
     class ParticipantListener : public eprosima::fastdds::dds::DomainParticipantListener
@@ -278,6 +281,7 @@ public:
 
     typedef TypeSupport type_support;
     typedef typename type_support::type type;
+    typedef typename TypeTraits::DataListType datalist_type;
 
     PubSubWriter(
             const std::string& topic_name)
@@ -384,7 +388,7 @@ public:
         {
             participant_guid_ = participant_->guid();
 
-            type_.reset(new type_support());
+            TypeTraits::build_type_support(type_);
 
             // Register type
             ASSERT_EQ(participant_->register_type(type_), ReturnCode_t::RETCODE_OK);
@@ -492,7 +496,7 @@ public:
     }
 
     void send(
-            std::list<type>& msgs,
+            std::list<datalist_type>& msgs,
             uint32_t milliseconds = 0)
     {
         auto it = msgs.begin();
@@ -501,7 +505,7 @@ public:
         {
             if (datawriter_->write((void*)&(*it)))
             {
-                default_send_print<type>(*it);
+                TypeTraits::print_sent_data(*it);
                 it = msgs.erase(it);
                 if (milliseconds > 0)
                 {
@@ -538,8 +542,16 @@ public:
     bool send_sample(
             type& msg)
     {
-        default_send_print(msg);
+        TypeTraits::print_sent_data(msg);
         return datawriter_->write((void*)&msg);
+    }
+
+    ReturnCode_t send_sample(
+            type& msg,
+            const eprosima::fastdds::dds::InstanceHandle_t& instance_handle)
+    {
+        TypeTraits::print_sent_data(msg);
+        return datawriter_->write((void*)&msg, instance_handle);
     }
 
     void assert_liveliness()
@@ -649,6 +661,35 @@ public:
                 });
 
         std::cout << "Writer removal finished..." << std::endl;
+    }
+
+    bool wait_reader_undiscovery(
+            std::chrono::seconds timeout,
+            unsigned int matched = 0)
+    {
+        bool ret_value = true;
+        std::unique_lock<std::mutex> lock(mutexDiscovery_);
+
+        std::cout << "Writer is waiting removal..." << std::endl;
+
+        if (!cv_.wait_for(lock, timeout, [&]()
+                {
+                    return matched_ <= matched;
+                }))
+        {
+            ret_value = false;
+        }
+
+        if (ret_value)
+        {
+            std::cout << "Writer removal finished successfully..." << std::endl;
+        }
+        else
+        {
+            std::cout << "Writer removal finished unsuccessfully..." << std::endl;
+        }
+
+        return ret_value;
     }
 
     void wait_liveliness_lost(
@@ -930,6 +971,14 @@ public:
         return *this;
     }
 
+    PubSubWriter& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports,
+            const eprosima::fastdds::rtps::BuiltinTransportsOptions& options)
+    {
+        participant_qos_.setup_transports(transports, options);
+        return *this;
+    }
+
     PubSubWriter& setup_large_data_tcp(
             bool v6 = false,
             const uint16_t& port = 0,
@@ -1007,6 +1056,13 @@ public:
     PubSubWriter& disable_builtin_transport()
     {
         participant_qos_.transport().use_builtin_transports = false;
+        return *this;
+    }
+
+    PubSubWriter& set_wire_protocol_qos(
+            const eprosima::fastdds::dds::WireProtocolConfigQos& qos)
+    {
+        participant_qos_.wire_protocol() = qos;
         return *this;
     }
 
@@ -1496,6 +1552,13 @@ public:
         return *this;
     }
 
+    PubSubWriter& set_events_thread_settings(
+            const eprosima::fastdds::rtps::ThreadSettings& settings)
+    {
+        participant_qos_.timed_events_thread(settings);
+        return *this;
+    }
+
     const std::string& topic_name() const
     {
         return topic_name_;
@@ -1643,6 +1706,18 @@ public:
     {
         participant_qos_.wire_protocol().builtin.use_WriterLivelinessProtocol = use_wlp;
         return *this;
+    }
+
+    PubSubWriter& data_representation(
+            const std::vector<eprosima::fastdds::dds::DataRepresentationId_t>& values)
+    {
+        datawriter_qos_.representation().m_value = values;
+        return *this;
+    }
+
+    eprosima::fastdds::dds::TypeSupport get_type_support()
+    {
+        return type_;
     }
 
 protected:

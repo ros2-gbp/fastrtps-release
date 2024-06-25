@@ -172,8 +172,12 @@ typedef struct TCPTransportDescriptor : public SocketTransportDescriptor
     bool calculate_crc;
     bool check_crc;
     bool apply_security;
+    bool non_blocking_send;
 
     TLSConfig tls_config;
+
+    fastdds::rtps::ThreadSettings keep_alive_thread;
+    fastdds::rtps::ThreadSettings accept_thread;
 
     uint32_t tcp_negotiation_timeout;
 

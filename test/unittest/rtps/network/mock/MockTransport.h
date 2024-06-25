@@ -59,7 +59,8 @@ public:
     ~MockTransport();
 
     bool init(
-            const PropertyPolicy* properties = nullptr) override;
+            const PropertyPolicy* properties = nullptr,
+            const uint32_t& max_msg_size_no_frag = 0) override;
 
     //API implementation
     bool IsInputChannelOpen(
@@ -108,6 +109,11 @@ public:
 
     bool is_local_locator(
             const Locator_t&) const override
+    {
+        return false;
+    }
+
+    bool is_localhost_allowed() const override
     {
         return false;
     }
@@ -181,6 +187,15 @@ public:
     bool transform_remote_locator(
             const fastrtps::rtps::Locator_t&,
             fastrtps::rtps::Locator_t&) const override
+    {
+        return true;
+    }
+
+    bool transform_remote_locator(
+            const fastrtps::rtps::Locator_t&,
+            fastrtps::rtps::Locator_t&,
+            bool,
+            bool) const override
     {
         return true;
     }

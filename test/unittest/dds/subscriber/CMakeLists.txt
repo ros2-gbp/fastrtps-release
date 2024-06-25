@@ -17,19 +17,30 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../profiles/test_xml_profile.xml
     COPYONLY)
 
 set(SUBSCRIBERTESTS_SOURCE SubscriberTests.cpp)
-set(DATAREADERTESTS_SOURCE DataReaderTests.cpp)
+set(DATAREADERTESTS_SOURCE
+    DataReaderTests.cpp
+    )
 set(DATAREADERINSTANCETESTS_SOURCE DataReaderInstanceTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     )
 set(DATAREADERHISTORYTESTS_SOURCE DataReaderHistoryTests.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/history/DataReaderHistory.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/topic/TopicDataType.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/history/History.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/history/ReaderHistory.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/subscriber/history/DataReaderHistory.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
 
 if(WIN32)
@@ -55,6 +66,8 @@ endif()
 
 add_executable(SubscriberTests ${SUBSCRIBERTESTS_SOURCE})
 target_compile_definitions(SubscriberTests PRIVATE
+    BOOST_ASIO_STANDALONE
+    ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
@@ -65,7 +78,7 @@ target_include_directories(SubscriberTests PRIVATE
 target_link_libraries(SubscriberTests fastrtps fastcdr foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
-add_gtest(SubscriberTests SOURCES ${SUBSCRIBERTESTS_SOURCE})
+gtest_discover_tests(SubscriberTests)
 
 add_executable(DataReaderTests ${DATAREADERTESTS_SOURCE})
 target_compile_definitions(DataReaderTests PRIVATE
@@ -76,6 +89,7 @@ target_compile_definitions(DataReaderTests PRIVATE
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(DataReaderTests PRIVATE
+    ${Asio_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
     ${Asio_INCLUDE_DIR}
@@ -83,24 +97,29 @@ target_include_directories(DataReaderTests PRIVATE
 target_link_libraries(DataReaderTests fastrtps fastcdr foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
-add_gtest(DataReaderTests SOURCES ${DATAREADERTESTS_SOURCE})
+gtest_discover_tests(DataReaderTests)
 
 add_executable(DataReaderInstanceTests ${DATAREADERINSTANCETESTS_SOURCE})
 target_compile_definitions(DataReaderInstanceTests PRIVATE
+    BOOST_ASIO_STANDALONE
+    ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(DataReaderInstanceTests PRIVATE
+    ${Asio_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
     )
 target_link_libraries(DataReaderInstanceTests foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
-add_gtest(DataReaderInstanceTests SOURCES ${DATAREADERINSTANCETESTS_SOURCE})
+gtest_discover_tests(DataReaderInstanceTests)
 
 add_executable(DataReaderHistoryTests ${DATAREADERHISTORYTESTS_SOURCE})
 target_compile_definitions(DataReaderHistoryTests PRIVATE
+    BOOST_ASIO_STANDALONE
+    ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     $<$<BOOL:${MSVC}>:NOMINMAX> # avoid conflic with std::min & std::max in visual studio
@@ -108,6 +127,7 @@ target_compile_definitions(DataReaderHistoryTests PRIVATE
     $<$<AND:$<BOOL:${MSVC}>,$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},19.29.30140.0>>:_ENABLE_ATOMIC_ALIGNMENT_FIX>
     )
 target_include_directories(DataReaderHistoryTests PRIVATE
+    ${Asio_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/RTPSReader
     ${PROJECT_SOURCE_DIR}/test/mock/rtps/StatelessReader
     ${PROJECT_SOURCE_DIR}/test/mock/dds/Topic
@@ -119,10 +139,4 @@ target_include_directories(DataReaderHistoryTests PRIVATE
 target_link_libraries(DataReaderHistoryTests fastcdr foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
-add_gtest(DataReaderHistoryTests SOURCES ${DATAREADERHISTORYTESTS_SOURCE})
-if(ANDROID)
-    set_property(TARGET SubscriberTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET DataReaderTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET DataReaderHistoryTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET DataReaderInstanceTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()
+gtest_discover_tests(DataReaderHistoryTests)

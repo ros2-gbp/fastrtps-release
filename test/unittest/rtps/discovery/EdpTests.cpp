@@ -399,6 +399,59 @@ TEST_F(EdpTests, CheckPositiveAckCompatibility)
     }
 }
 
+TEST_F(EdpTests, CheckDataRepresentationCompatibility)
+{
+    using DataRepresentationQosVector = std::vector<DataRepresentationId>;
+    std::vector<QosTestingCase<DataRepresentationQosVector>> testing_cases{
+        { {}, {}, fastdds::dds::INVALID_QOS_POLICY_ID},
+        { {}, {DataRepresentationId::XCDR_DATA_REPRESENTATION}, fastdds::dds::INVALID_QOS_POLICY_ID},
+        { {}, {DataRepresentationId::XCDR_DATA_REPRESENTATION, DataRepresentationId::XCDR2_DATA_REPRESENTATION},
+            fastdds::dds::INVALID_QOS_POLICY_ID},
+        { {}, {DataRepresentationId::XCDR2_DATA_REPRESENTATION}, fastdds::dds::DATAREPRESENTATION_QOS_POLICY_ID},
+        { {DataRepresentationId::XCDR_DATA_REPRESENTATION}, {}, fastdds::dds::INVALID_QOS_POLICY_ID},
+        { {DataRepresentationId::XCDR_DATA_REPRESENTATION}, {DataRepresentationId::XCDR_DATA_REPRESENTATION},
+            fastdds::dds::INVALID_QOS_POLICY_ID},
+        { {DataRepresentationId::XCDR_DATA_REPRESENTATION},
+            {DataRepresentationId::XCDR_DATA_REPRESENTATION, DataRepresentationId::XCDR2_DATA_REPRESENTATION},
+            fastdds::dds::INVALID_QOS_POLICY_ID},
+        { {DataRepresentationId::XCDR_DATA_REPRESENTATION}, {DataRepresentationId::XCDR2_DATA_REPRESENTATION},
+            fastdds::dds::DATAREPRESENTATION_QOS_POLICY_ID},
+        { {DataRepresentationId::XCDR2_DATA_REPRESENTATION}, {}, fastdds::dds::DATAREPRESENTATION_QOS_POLICY_ID},
+        { {DataRepresentationId::XCDR2_DATA_REPRESENTATION}, {DataRepresentationId::XCDR_DATA_REPRESENTATION},
+            fastdds::dds::DATAREPRESENTATION_QOS_POLICY_ID},
+        { {DataRepresentationId::XCDR2_DATA_REPRESENTATION},
+            {DataRepresentationId::XCDR_DATA_REPRESENTATION, DataRepresentationId::XCDR2_DATA_REPRESENTATION},
+            fastdds::dds::INVALID_QOS_POLICY_ID},
+        { {DataRepresentationId::XCDR2_DATA_REPRESENTATION}, {DataRepresentationId::XCDR2_DATA_REPRESENTATION},
+            fastdds::dds::INVALID_QOS_POLICY_ID}
+    };
+
+    for (auto testing_case : testing_cases)
+    {
+        wdata->m_qos.representation.m_value = testing_case.offered_qos;
+        rdata->m_qos.representation.m_value = testing_case.requested_qos;
+        check_expectations(testing_case.failed_qos);
+    }
+}
+
+TEST(MatchingFailureMask, matching_failure_mask_overflow)
+{
+    EDP::MatchingFailureMask mask;
+
+    mask.set(EDP::MatchingFailureMask::different_topic);
+    EXPECT_TRUE(mask.test(EDP::MatchingFailureMask::different_topic));
+
+    mask.set(EDP::MatchingFailureMask::inconsistent_topic);
+    EXPECT_TRUE(mask.test(EDP::MatchingFailureMask::inconsistent_topic));
+
+    mask.set(EDP::MatchingFailureMask::incompatible_qos);
+    EXPECT_TRUE(mask.test(EDP::MatchingFailureMask::incompatible_qos));
+
+    mask.set(EDP::MatchingFailureMask::partitions);
+    EXPECT_TRUE(mask.test(EDP::MatchingFailureMask::partitions));
+}
+
+
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima

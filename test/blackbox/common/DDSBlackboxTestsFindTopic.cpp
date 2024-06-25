@@ -98,6 +98,10 @@ class DDSFindTopicTest : public testing::Test
             return false;
         }
 
+    private:
+
+        using TopicDataType::getSerializedSizeProvider;
+        using TopicDataType::serialize;
     };
 
 public:

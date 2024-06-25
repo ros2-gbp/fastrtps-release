@@ -36,7 +36,7 @@
 #include <rtps/DataSharing/WriterPool.hpp>
 #include <rtps/DataSharing/DataSharingNotifier.hpp>
 #include <rtps/history/CacheChangePool.h>
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
+#include <rtps/network/utils/external_locators.hpp>
 #include <rtps/RTPSDomainImpl.hpp>
 
 #include "../flowcontrol/FlowController.hpp"
@@ -360,29 +360,35 @@ bool StatelessWriter::intraprocess_delivery(
 }
 
 bool StatelessWriter::change_removed_by_history(
-        CacheChange_t* change)
+        CacheChange_t* change,
+        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
 {
+    bool ret_value = false;
     std::lock_guard<RecursiveTimedMutex> guard(mp_mutex);
 
-    flow_controller_->remove_change(change);
-
-    // remove from datasharing pool history
-    if (is_datasharing_compatible())
+    if (flow_controller_->remove_change(change, max_blocking_time))
     {
-        auto pool = std::dynamic_pointer_cast<WriterPool>(payload_pool_);
-        assert (pool != nullptr);
 
-        pool->remove_from_shared_history(change);
-        EPROSIMA_LOG_INFO(RTPS_WRITER, "Removing shared cache change with SN " << change->sequenceNumber);
+        // remove from datasharing pool history
+        if (is_datasharing_compatible())
+        {
+            auto pool = std::dynamic_pointer_cast<WriterPool>(payload_pool_);
+            assert (pool != nullptr);
+
+            pool->remove_from_shared_history(change);
+            EPROSIMA_LOG_INFO(RTPS_WRITER, "Removing shared cache change with SN " << change->sequenceNumber);
+        }
+
+        const uint64_t sequence_number = change->sequenceNumber.to64long();
+        if (sequence_number > last_sequence_number_sent_)
+        {
+            unsent_changes_cond_.notify_all();
+        }
+
+        ret_value = true;
     }
 
-    const uint64_t sequence_number = change->sequenceNumber.to64long();
-    if (sequence_number > last_sequence_number_sent_)
-    {
-        unsent_changes_cond_.notify_all();
-    }
-
-    return true;
+    return ret_value;
 }
 
 bool StatelessWriter::has_been_fully_delivered(
@@ -455,7 +461,7 @@ bool StatelessWriter::wait_for_acknowledgement(
 bool StatelessWriter::matched_reader_add(
         const ReaderProxyData& data)
 {
-    using fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators;
+    using fastdds::rtps::network::external_locators::filter_remote_locators;
 
     std::unique_lock<RecursiveTimedMutex> guard(mp_mutex);
     std::unique_lock<LocatorSelectorSender> locator_selector_guard(locator_selector_);
@@ -489,6 +495,16 @@ bool StatelessWriter::matched_reader_add(
             guard.unlock();
             mp_listener->on_reader_discovery(this, ReaderDiscoveryInfo::CHANGED_QOS_READER, data.guid(), &data);
         }
+
+#ifdef FASTDDS_STATISTICS
+        // notify monitor service so that the connectionlist for this entity
+        // could be updated
+        if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+        {
+            mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+        }
+#endif //FASTDDS_STATISTICS
+
         return false;
     }
 
@@ -558,6 +574,16 @@ bool StatelessWriter::matched_reader_add(
         guard.unlock();
         mp_listener->on_reader_discovery(this, ReaderDiscoveryInfo::DISCOVERED_READER, data.guid(), &data);
     }
+
+#ifdef FASTDDS_STATISTICS
+    // notify monitor service so that the connectionlist for this entity
+    // could be updated
+    if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+    {
+        mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+    }
+#endif //FASTDDS_STATISTICS
+
     return true;
 }
 
@@ -644,6 +670,16 @@ bool StatelessWriter::matched_reader_remove(
 
             mp_listener->on_reader_discovery(this, ReaderDiscoveryInfo::REMOVED_READER, reader_guid, nullptr);
         }
+
+#ifdef FASTDDS_STATISTICS
+        // notify monitor service so that the connectionlist for this entity
+        // could be updated
+        if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+        {
+            mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+        }
+#endif //FASTDDS_STATISTICS
+
         return true;
     }
 
@@ -875,6 +911,86 @@ DeliveryRetCode StatelessWriter::deliver_sample_nts(
 
     return ret_code;
 }
+
+#ifdef FASTDDS_STATISTICS
+
+bool StatelessWriter::get_connections(
+        fastdds::statistics::rtps::ConnectionList& connection_list)
+{
+    connection_list.reserve(matched_local_readers_.size() +
+            matched_datasharing_readers_.size() +
+            matched_remote_readers_.size());
+
+    fastdds::statistics::Connection connection;
+
+    {
+        std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
+
+        //! intraprocess
+        for_matched_readers(matched_local_readers_, [&connection, &connection_list](ReaderLocator& reader)
+                {
+                    connection.guid(fastdds::statistics::to_statistics_type(reader.local_reader()->getGuid()));
+                    connection.mode(fastdds::statistics::INTRAPROCESS);
+                    connection_list.push_back(connection);
+
+                    return false;
+                });
+    }
+
+    {
+        std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
+
+        //! datasharing
+        for_matched_readers(matched_datasharing_readers_, [&connection, &connection_list](ReaderLocator& reader)
+                {
+                    connection.guid(fastdds::statistics::to_statistics_type(reader.remote_guid()));
+                    connection.mode(fastdds::statistics::DATA_SHARING);
+                    connection_list.push_back(connection);
+
+                    return false;
+                });
+    }
+
+    {
+        std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
+
+        //! remote
+        for_matched_readers(matched_remote_readers_, [&connection, &connection_list](ReaderLocator& reader)
+                {
+                    //! Announced locators is, for the moment,
+                    //! equal to the used_locators
+                    LocatorSelectorEntry* loc_selector_entry = reader.general_locator_selector_entry();
+
+                    connection.announced_locators().reserve(reader.locators_size());
+                    connection.used_locators().reserve(reader.locators_size());
+
+                    std::vector<fastdds::statistics::detail::Locator_s> statistics_locators;
+                    std::for_each(loc_selector_entry->multicast.begin(), loc_selector_entry->multicast.end(),
+                    [&statistics_locators](const Locator_t& locator)
+                    {
+                        statistics_locators.push_back(fastdds::statistics::to_statistics_type(locator));
+                    });
+
+                    std::for_each(loc_selector_entry->unicast.begin(), loc_selector_entry->unicast.end(),
+                    [&statistics_locators](const Locator_t& locator)
+                    {
+                        statistics_locators.push_back(fastdds::statistics::to_statistics_type(locator));
+                    });
+
+                    connection.guid(fastdds::statistics::to_statistics_type(reader.remote_guid()));
+                    connection.mode(fastdds::statistics::TRANSPORT);
+                    connection.announced_locators(statistics_locators);
+                    connection.used_locators(statistics_locators);
+                    connection_list.push_back(connection);
+
+                    return false;
+                });
+    }
+
+    return true;
+}
+
+#endif // ifdef FASTDDS_STATISTICS
 
 } /* namespace rtps */
 } /* namespace fastrtps */

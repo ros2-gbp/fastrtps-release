@@ -17,24 +17,25 @@
  *
  */
 
-#include <fastdds/rtps/reader/StatelessReader.h>
-#include <fastdds/rtps/history/ReaderHistory.h>
-#include <fastdds/rtps/reader/ReaderListener.h>
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/common/CacheChange.h>
-#include <fastdds/rtps/builtin/BuiltinProtocols.h>
-#include <fastdds/rtps/builtin/liveliness/WLP.h>
-#include <fastdds/rtps/writer/LivelinessManager.h>
-#include <rtps/participant/RTPSParticipantImpl.h>
-#include <rtps/DataSharing/DataSharingListener.hpp>
-#include <rtps/DataSharing/ReaderPool.hpp>
-
-#include "rtps/RTPSDomainImpl.hpp"
-
+#include <cassert>
 #include <mutex>
 #include <thread>
 
-#include <cassert>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/builtin/BuiltinProtocols.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/common/CacheChange.h>
+#include <fastdds/rtps/common/VendorId_t.hpp>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/reader/ReaderListener.h>
+#include <fastdds/rtps/reader/StatelessReader.h>
+#include <fastdds/rtps/writer/LivelinessManager.h>
+
+#include "reader_utils.hpp"
+#include "rtps/RTPSDomainImpl.hpp"
+#include <rtps/DataSharing/DataSharingListener.hpp>
+#include <rtps/DataSharing/ReaderPool.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
 
 #define IDSTRING "(ID:" << std::this_thread::get_id() << ") " <<
 
@@ -118,6 +119,16 @@ bool StatelessReader::matched_writer_add(
                     listener->on_writer_discovery(this, WriterDiscoveryInfo::CHANGED_QOS_WRITER, wdata.guid(),
                             &wdata);
                 }
+
+#ifdef FASTDDS_STATISTICS
+                // notify monitor service so that the connectionlist for this entity
+                // could be updated
+                if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+                {
+                    mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+                }
+#endif //FASTDDS_STATISTICS
+
                 return false;
             }
         }
@@ -196,6 +207,15 @@ bool StatelessReader::matched_writer_add(
         listener->on_writer_discovery(this, WriterDiscoveryInfo::DISCOVERED_WRITER, wdata.guid(), &wdata);
     }
 
+#ifdef FASTDDS_STATISTICS
+    // notify monitor service so that the connectionlist for this entity
+    // could be updated
+    if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+    {
+        mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+    }
+#endif //FASTDDS_STATISTICS
+
     return true;
 }
 
@@ -208,10 +228,21 @@ bool StatelessReader::matched_writer_remove(
         auto wlp = mp_RTPSParticipant->wlp();
         if ( wlp != nullptr)
         {
+            LivelinessData::WriterStatus writer_liveliness_status;
             wlp->sub_liveliness_manager_->remove_writer(
                 writer_guid,
                 liveliness_kind_,
-                liveliness_lease_duration_);
+                liveliness_lease_duration_,
+                writer_liveliness_status);
+
+            if (writer_liveliness_status == LivelinessData::WriterStatus::ALIVE)
+            {
+                wlp->update_liveliness_changed_status(writer_guid, this, -1, 0);
+            }
+            else if (writer_liveliness_status == LivelinessData::WriterStatus::NOT_ALIVE)
+            {
+                wlp->update_liveliness_changed_status(writer_guid, this, 0, -1);
+            }
         }
         else
         {
@@ -248,6 +279,16 @@ bool StatelessReader::matched_writer_remove(
                     guard.unlock();
                     listener->on_writer_discovery(this, WriterDiscoveryInfo::REMOVED_WRITER, writer_guid, nullptr);
                 }
+
+#ifdef FASTDDS_STATISTICS
+                // notify monitor service so that the connectionlist for this entity
+                // could be updated
+                if (nullptr != mp_RTPSParticipant->get_connections_observer() && !m_guid.is_builtin())
+                {
+                    mp_RTPSParticipant->get_connections_observer()->on_local_entity_connections_change(m_guid);
+                }
+#endif //FASTDDS_STATISTICS
+
                 return true;
             }
         }
@@ -473,6 +514,47 @@ void StatelessReader::change_read_by_user(
 
 }
 
+#ifdef FASTDDS_STATISTICS
+
+bool StatelessReader::get_connections(
+        eprosima::fastdds::statistics::rtps::ConnectionList& connection_list)
+{
+    connection_list.reserve(matched_writers_.size());
+
+    std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
+    for (RemoteWriterInfo_t& writer : matched_writers_)
+    {
+        fastdds::statistics::Connection connection;
+        fastdds::statistics::ConnectionMode mode;
+
+        connection.guid(fastdds::statistics::to_statistics_type(writer.guid));
+
+        if (writer.is_datasharing)
+        {
+            mode = fastdds::statistics::DATA_SHARING;
+        }
+        else if (RTPSDomainImpl::should_intraprocess_between(m_guid, writer.guid))
+        {
+            mode = fastdds::statistics::INTRAPROCESS;
+        }
+        else
+        {
+            mode = fastdds::statistics::TRANSPORT;
+
+            //! In the case of a stateless reader
+            //! there is no need to communicate with the writer
+            //! so there are no posible locators.
+        }
+
+        connection.mode(mode);
+        connection_list.push_back(connection);
+    }
+
+    return true;
+}
+
+#endif // ifdef FASTDDS_STATISTICS
+
 bool StatelessReader::processDataMsg(
         CacheChange_t* change)
 {
@@ -507,9 +589,10 @@ bool StatelessReader::processDataMsg(
                 return false;
             }
 
-            if (data_filter_ && !data_filter_->is_relevant(*change, m_guid))
+            if (!fastdds::rtps::change_is_relevant_for_filter(*change, m_guid, data_filter_))
             {
                 update_last_notified(change->writerGUID, change->sequenceNumber);
+                // Change was filtered out, so there isn't anything else to do
                 return true;
             }
 
@@ -722,7 +805,8 @@ bool StatelessReader::processDataFragMsg(
                 {
                     // Temporarilly assign the inline qos while evaluating the data filter
                     change_completed->inline_qos = incomingChange->inline_qos;
-                    bool filtered_out = data_filter_ && !data_filter_->is_relevant(*change_completed, m_guid);
+                    bool filtered_out = !fastdds::rtps::change_is_relevant_for_filter(*change_completed, m_guid,
+                                    data_filter_);
                     change_completed->inline_qos = SerializedPayload_t();
 
                     if (filtered_out)
@@ -757,7 +841,8 @@ bool StatelessReader::processHeartbeatMsg(
         const SequenceNumber_t& /*firstSN*/,
         const SequenceNumber_t& /*lastSN*/,
         bool /*finalFlag*/,
-        bool /*livelinessFlag*/)
+        bool /*livelinessFlag*/,
+        eprosima::fastdds::rtps::VendorId_t /*origin_vendor_id*/)
 {
     return true;
 }
@@ -765,7 +850,8 @@ bool StatelessReader::processHeartbeatMsg(
 bool StatelessReader::processGapMsg(
         const GUID_t& /*writerGUID*/,
         const SequenceNumber_t& /*gapStart*/,
-        const SequenceNumberSet_t& /*gapList*/)
+        const SequenceNumberSet_t& /*gapList*/,
+        eprosima::fastdds::rtps::VendorId_t /*origin_vendor_id*/)
 {
     return true;
 }

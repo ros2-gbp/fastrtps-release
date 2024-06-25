@@ -521,7 +521,6 @@ public:
      */
     bool has_active_entities();
 
-
     /**
      * Returns the most appropriate listener to handle the callback for the given status,
      * or nullptr if there is no appropriate listener.
@@ -663,6 +662,10 @@ protected:
             bool on_guard_;
         };
 
+        using fastrtps::rtps::RTPSParticipantListener::onParticipantDiscovery;
+        using fastrtps::rtps::RTPSParticipantListener::onReaderDiscovery;
+        using fastrtps::rtps::RTPSParticipantListener::onWriterDiscovery;
+
     public:
 
         MyRTPSParticipantListener(
@@ -717,11 +720,6 @@ protected:
         DomainParticipantImpl* participant_;
         int callback_counter_ = 0;
 
-    private:
-
-        using fastrtps::rtps::RTPSParticipantListener::onParticipantDiscovery;
-        using fastrtps::rtps::RTPSParticipantListener::onReaderDiscovery;
-        using fastrtps::rtps::RTPSParticipantListener::onWriterDiscovery;
     }
     rtps_listener_;
 

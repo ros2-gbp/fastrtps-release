@@ -42,6 +42,7 @@
 #include <fastrtps/types/TypesBase.h>
 
 #include "BlackboxTests.hpp"
+#include "../api/dds-pim/CustomPayloadPool.hpp"
 #include "../api/dds-pim/PubSubReader.hpp"
 #include "../api/dds-pim/PubSubWriter.hpp"
 #include "../api/dds-pim/ReqRepAsReliableHelloWorldRequester.hpp"
