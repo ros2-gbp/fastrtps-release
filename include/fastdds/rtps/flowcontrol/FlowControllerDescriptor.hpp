@@ -33,7 +33,7 @@ namespace rtps {
 struct FlowControllerDescriptor
 {
     //! Name of the flow controller.
-    const char* name = FASTDDS_FLOW_CONTROLLER_DEFAULT;
+    const char* name = nullptr;
 
     //! Scheduler policy used by the flow controller.
     //!

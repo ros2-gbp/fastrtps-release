@@ -1095,7 +1095,6 @@ bool WriterProxyData::readFromCDRMessage(
 
     uint32_t qos_size;
     clear();
-    m_qos.data_sharing.off();
     try
     {
         if (ParameterList::readParameterListfromCDRMsg(*msg, param_process, true, qos_size))

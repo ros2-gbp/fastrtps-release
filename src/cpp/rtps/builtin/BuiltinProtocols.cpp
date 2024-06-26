@@ -58,12 +58,9 @@ BuiltinProtocols::BuiltinProtocols()
 BuiltinProtocols::~BuiltinProtocols()
 {
     // Send participant is disposed
-    if (nullptr != mp_PDP)
+    if (mp_PDP != nullptr)
     {
-        // Send participant is disposed
         mp_PDP->announceParticipantState(true, true);
-        // Consider all discovered participants as disposed
-        mp_PDP->disable();
     }
 
     // TODO Auto-generated destructor stub
@@ -202,7 +199,7 @@ bool BuiltinProtocols::addLocalWriter(
 {
     bool ok = true;
 
-    if (nullptr != mp_PDP)
+    if (mp_PDP != nullptr)
     {
         ok = mp_PDP->getEDP()->newLocalWriterProxyData(w, topicAtt, wqos);
 
@@ -217,7 +214,7 @@ bool BuiltinProtocols::addLocalWriter(
         EPROSIMA_LOG_WARNING(RTPS_EDP, "EDP is not used in this Participant, register a Writer is impossible");
     }
 
-    if (nullptr != mp_WLP)
+    if (mp_WLP != nullptr)
     {
         ok &= mp_WLP->add_local_writer(w, wqos);
     }
@@ -237,7 +234,7 @@ bool BuiltinProtocols::addLocalReader(
 {
     bool ok = true;
 
-    if (nullptr != mp_PDP)
+    if (mp_PDP != nullptr)
     {
         ok = mp_PDP->getEDP()->newLocalReaderProxyData(R, topicAtt, rqos, content_filter);
 
@@ -252,7 +249,7 @@ bool BuiltinProtocols::addLocalReader(
         EPROSIMA_LOG_WARNING(RTPS_EDP, "EDP is not used in this Participant, register a Reader is impossible");
     }
 
-    if (nullptr != mp_WLP)
+    if (mp_WLP != nullptr)
     {
         ok &= mp_WLP->add_local_reader(R, rqos);
     }
@@ -266,7 +263,7 @@ bool BuiltinProtocols::updateLocalWriter(
         const WriterQos& wqos)
 {
     bool ok = false;
-    if ((nullptr != mp_PDP) && (nullptr != mp_PDP->getEDP()))
+    if (mp_PDP != nullptr && mp_PDP->getEDP() != nullptr)
     {
         ok = mp_PDP->getEDP()->updatedLocalWriter(W, topicAtt, wqos);
     }
@@ -280,7 +277,7 @@ bool BuiltinProtocols::updateLocalReader(
         const fastdds::rtps::ContentFilterProperty* content_filter)
 {
     bool ok = false;
-    if ((nullptr != mp_PDP) && (nullptr != mp_PDP->getEDP()))
+    if (mp_PDP != nullptr && mp_PDP->getEDP() != nullptr)
     {
         ok = mp_PDP->getEDP()->updatedLocalReader(R, topicAtt, rqos, content_filter);
     }
@@ -291,11 +288,11 @@ bool BuiltinProtocols::removeLocalWriter(
         RTPSWriter* W)
 {
     bool ok = false;
-    if (nullptr != mp_WLP)
+    if (mp_WLP != nullptr)
     {
         ok |= mp_WLP->remove_local_writer(W);
     }
-    if ((nullptr != mp_PDP) && (nullptr != mp_PDP->getEDP()))
+    if (mp_PDP != nullptr && mp_PDP->getEDP() != nullptr)
     {
         ok |= mp_PDP->getEDP()->removeLocalWriter(W);
     }
@@ -306,11 +303,11 @@ bool BuiltinProtocols::removeLocalReader(
         RTPSReader* R)
 {
     bool ok = false;
-    if (nullptr != mp_WLP)
+    if (mp_WLP != nullptr)
     {
         ok |= mp_WLP->remove_local_reader(R);
     }
-    if ((nullptr != mp_PDP) && (nullptr != mp_PDP->getEDP()))
+    if (mp_PDP != nullptr && mp_PDP->getEDP() != nullptr)
     {
         ok |= mp_PDP->getEDP()->removeLocalReader(R);
     }
