@@ -22,6 +22,8 @@
 
 #include <gtest/gtest.h>
 
+#define EXPECT_LONG_DOUBLE_EQ(val1, val2) (val1 == val2)
+
 using namespace eprosima::fastcdr;
 using namespace ::exception;
 
@@ -176,13 +178,6 @@ static void EXPECT_ARRAY_DOUBLE_EQ(
     {
         EXPECT_DOUBLE_EQ(array1[count], array2[count]);
     }
-}
-
-static void EXPECT_LONG_DOUBLE_EQ(
-        const long double val1,
-        const long double val2)
-{
-    EXPECT_TRUE(val1 == val2);
 }
 
 static void EXPECT_ARRAY_LONG_DOUBLE_EQ(
