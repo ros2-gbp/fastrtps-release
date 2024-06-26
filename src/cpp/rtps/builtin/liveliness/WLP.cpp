@@ -712,8 +712,6 @@ bool WLP::remove_local_writer(
 
     EPROSIMA_LOG_INFO(RTPS_LIVELINESS, W->getGuid().entityId << " from Liveliness Protocol");
 
-    LivelinessData::WriterStatus writer_status;
-
     if (W->get_liveliness_kind() == AUTOMATIC_LIVELINESS_QOS)
     {
         auto it = std::find(
@@ -766,8 +764,7 @@ bool WLP::remove_local_writer(
         if (!pub_liveliness_manager_->remove_writer(
                     W->getGuid(),
                     W->get_liveliness_kind(),
-                    W->get_liveliness_lease_duration(),
-                    writer_status))
+                    W->get_liveliness_lease_duration()))
         {
             EPROSIMA_LOG_ERROR(RTPS_LIVELINESS,
                     "Could not remove writer " << W->getGuid() << " from liveliness manager");
@@ -810,8 +807,7 @@ bool WLP::remove_local_writer(
         if (!pub_liveliness_manager_->remove_writer(
                     W->getGuid(),
                     W->get_liveliness_kind(),
-                    W->get_liveliness_lease_duration(),
-                    writer_status))
+                    W->get_liveliness_lease_duration()))
         {
             EPROSIMA_LOG_ERROR(RTPS_LIVELINESS,
                     "Could not remove writer " << W->getGuid() << " from liveliness manager");

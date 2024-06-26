@@ -91,11 +91,11 @@ bool LivelinessManager::add_writer(
 
 bool LivelinessManager::remove_writer(
         GUID_t guid,
-        fastdds::dds::LivelinessQosPolicyKind kind,
-        Duration_t lease_duration,
-        LivelinessData::WriterStatus& writer_status)
+        LivelinessQosPolicyKind kind,
+        Duration_t lease_duration)
 {
     bool removed = false;
+    LivelinessData::WriterStatus status;
 
     {
         // collection guard
@@ -103,9 +103,9 @@ bool LivelinessManager::remove_writer(
         // writers_ elements guard
         std::lock_guard<std::mutex> __(mutex_);
 
-        removed = writers_.remove_if([guid, kind, lease_duration, &writer_status](LivelinessData& writer)
+        removed = writers_.remove_if([guid, kind, lease_duration, &status](LivelinessData& writer)
                         {
-                            writer_status = writer.status;
+                            status = writer.status;
                             return writer.guid == guid &&
                             writer.kind == kind &&
                             writer.lease_duration == lease_duration &&
@@ -116,6 +116,18 @@ bool LivelinessManager::remove_writer(
     if (!removed)
     {
         return false;
+    }
+
+    if (callback_ != nullptr)
+    {
+        if (status == LivelinessData::WriterStatus::ALIVE)
+        {
+            callback_(guid, kind, lease_duration, -1, 0);
+        }
+        else if (status == LivelinessData::WriterStatus::NOT_ALIVE)
+        {
+            callback_(guid, kind, lease_duration, 0, -1);
+        }
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
