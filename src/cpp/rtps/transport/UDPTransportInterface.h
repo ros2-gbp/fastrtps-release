@@ -305,7 +305,6 @@ protected:
             bool return_loopback = false);
 
     std::atomic_bool rescan_interfaces_ = {true};
-
 };
 
 } // namespace rtps
