@@ -1257,7 +1257,6 @@ public:
             uint32_t sockerBufferSize)
     {
         participant_attr_.rtps.listenSocketBufferSize = sockerBufferSize;
-        participant_attr_.rtps.sendSocketBufferSize = sockerBufferSize;
         return *this;
     }
 

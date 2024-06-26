@@ -200,7 +200,9 @@ asio::ip::tcp::endpoint TCPChannelResourceBasic::local_endpoint(
 void TCPChannelResourceBasic::set_options(
         const TCPTransportDescriptor* options)
 {
-    TCPChannelResource::set_socket_options(*socket_, options);
+    socket_->set_option(socket_base::receive_buffer_size(options->receiveBufferSize));
+    socket_->set_option(socket_base::send_buffer_size(options->sendBufferSize));
+    socket_->set_option(ip::tcp::no_delay(options->enable_tcp_nodelay));
 }
 
 void TCPChannelResourceBasic::cancel()

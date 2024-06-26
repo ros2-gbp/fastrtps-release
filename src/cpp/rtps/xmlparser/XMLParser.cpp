@@ -18,11 +18,6 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif // _WIN32
 
 #include <tinyxml2.h>
 
@@ -52,32 +47,7 @@ using namespace eprosima::fastdds::xml::detail;
 XMLP_ret XMLParser::loadDefaultXMLFile(
         up_base_node_t& root)
 {
-    // Use absolute path to ensure that the file is loaded only once
-#ifdef _WIN32
-    char current_directory[MAX_PATH];
-    if (GetCurrentDirectory(MAX_PATH, current_directory) == 0)
-    {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "GetCurrentDirectory failed " << GetLastError());
-    }
-    else
-    {
-        strcat_s(current_directory, MAX_PATH, DEFAULT_FASTRTPS_PROFILES);
-        return loadXML(current_directory, root, true);
-    }
-#else
-    char current_directory[PATH_MAX];
-    if (getcwd(current_directory, PATH_MAX) == NULL)
-    {
-        EPROSIMA_LOG_ERROR(XMLPARSER, "getcwd failed " << std::strerror(errno));
-    }
-    else
-    {
-        strcat(current_directory, "/");
-        strcat(current_directory, DEFAULT_FASTRTPS_PROFILES);
-        return loadXML(current_directory, root, true);
-    }
-#endif // _WIN32
-    return XMLP_ret::XML_ERROR;
+    return loadXML(DEFAULT_FASTRTPS_PROFILES, root);
 }
 
 XMLP_ret XMLParser::parseXML(
@@ -449,7 +419,7 @@ XMLP_ret XMLParser::validateXMLTransportElements(
                 strcmp(name, MAX_INITIAL_PEERS_RANGE) == 0 ||
                 strcmp(name, WHITE_LIST) == 0 ||
                 strcmp(name, NETMASK_FILTER) == 0 ||
-                strcmp(name, NETWORK_INTERFACES) == 0 ||
+                strcmp(name, INTERFACES) == 0 ||
                 strcmp(name, TTL) == 0 ||
                 strcmp(name, NON_BLOCKING_SEND) == 0 ||
                 strcmp(name, UDP_OUTPUT_PORT) == 0 ||
@@ -634,7 +604,7 @@ XMLP_ret XMLParser::parseXMLSocketTransportData(
                     p_aux1 != nullptr; p_aux1 = p_aux1->NextSiblingElement())
             {
                 address = p_aux1->Name();
-                if (strcmp(address, ADDRESS) == 0 || strcmp(address, NETWORK_INTERFACE) == 0)
+                if (strcmp(address, ADDRESS) == 0 || strcmp(address, INTERFACE) == 0)
                 {
                     std::string text = get_element_text(p_aux1);
                     if (!text.empty())
@@ -669,7 +639,7 @@ XMLP_ret XMLParser::parseXMLSocketTransportData(
                 return XMLP_ret::XML_ERROR;
             }
         }
-        else if (strcmp(name, NETWORK_INTERFACES) == 0)
+        else if (strcmp(name, INTERFACES) == 0)
         {
             if (XMLP_ret::XML_OK != parseXMLInterfaces(p_aux0, p_transport))
             {
@@ -2086,14 +2056,6 @@ XMLP_ret XMLParser::loadXML(
         const std::string& filename,
         up_base_node_t& root)
 {
-    return loadXML(filename, root, false);
-}
-
-XMLP_ret XMLParser::loadXML(
-        const std::string& filename,
-        up_base_node_t& root,
-        bool is_default)
-{
     if (filename.empty())
     {
         EPROSIMA_LOG_ERROR(XMLPARSER, "Error loading XML file, filename empty");
@@ -2103,7 +2065,7 @@ XMLP_ret XMLParser::loadXML(
     tinyxml2::XMLDocument xmlDoc;
     if (tinyxml2::XMLError::XML_SUCCESS != xmlDoc.LoadFile(filename.c_str()))
     {
-        if (!is_default)
+        if (filename != std::string(DEFAULT_FASTRTPS_PROFILES))
         {
             EPROSIMA_LOG_ERROR(XMLPARSER, "Error opening '" << filename << "'");
         }
@@ -2245,7 +2207,6 @@ XMLP_ret XMLParser::fillDataNode(
                 <xs:element name="userData" type="octetVectorType" minOccurs="0"/>
                 <xs:element name="participantID" type="int32Type" minOccurs="0"/>
                 <xs:element name="throughputController" type="throughputControllerType" minOccurs="0"/>
-                <xs:element name="flow_controller_descriptors" type="flowControllerDescriptorsType" minOccurs="0"/>
                 <xs:element name="userTransports" type="stringListType" minOccurs="0"/>
                 <xs:element name="useBuiltinTransports" type="boolType" minOccurs="0"/>
                 <xs:element name="propertiesPolicy" type="propertyPolicyType" minOccurs="0"/>
@@ -2454,16 +2415,6 @@ XMLP_ret XMLParser::fillDataNode(
                 return XMLP_ret::XML_ERROR;
             }
             EPROSIMA_LOG_WARNING(XML_PARSER, THROUGHPUT_CONT << " XML tag is deprecated");
-        }
-        else if (strcmp(name, FLOW_CONTROLLER_DESCRIPTOR_LIST) == 0)
-        {
-            // flow_controller_descriptors
-            if (XMLP_ret::XML_OK !=
-                    getXMLFlowControllerDescriptorList(p_aux0,
-                    participant_node.get()->rtps.flow_controllers, ident))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
         }
         else if (strcmp(name, USER_TRANS) == 0)
         {
@@ -2830,13 +2781,6 @@ XMLP_ret XMLParser::fillDataNode(
     replier_node.get()->publisher.topic.topicDataType = replier_node.get()->reply_type;
     replier_node.get()->publisher.topic.topicName = replier_node.get()->reply_topic_name;
 
-    return XMLP_ret::XML_OK;
-}
-
-XMLP_ret XMLParser::clear()
-{
-    std::lock_guard<std::mutex> lock(collections_mtx_);
-    flow_controller_descriptor_names_.clear();
     return XMLP_ret::XML_OK;
 }
 
