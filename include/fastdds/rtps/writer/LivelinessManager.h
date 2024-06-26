@@ -82,17 +82,15 @@ public:
 
     /**
      * @brief Removes a writer
-     * @param [in] guid GUID of the writer
-     * @param [in] kind Liveliness kind
-     * @param [in] lease_duration Liveliness lease duration
-     * @param [out] writer_liveliness_status The liveliness status of the writer
+     * @param guid GUID of the writer
+     * @param kind Liveliness kind
+     * @param lease_duration Liveliness lease duration
      * @return True if the writer was successfully removed
      */
     bool remove_writer(
             GUID_t guid,
-            fastdds::dds::LivelinessQosPolicyKind kind,
-            Duration_t lease_duration,
-            LivelinessData::WriterStatus& writer_liveliness_status);
+            LivelinessQosPolicyKind kind,
+            Duration_t lease_duration);
 
     /**
      * @brief Asserts liveliness of a writer in the set
