@@ -152,28 +152,18 @@ TEST_F(LivelinessManagerTests, WriterCannotBeRemovedTwice)
     GuidPrefix_t guidP;
     guidP.value[0] = 1;
     GUID_t guid(guidP, 0);
-    LivelinessData::WriterStatus writer_status;
 
-    EXPECT_EQ(liveliness_manager.add_writer(guid, fastdds::dds::AUTOMATIC_LIVELINESS_QOS, Duration_t(1)), true);
-    EXPECT_EQ(liveliness_manager.remove_writer(guid, fastdds::dds::AUTOMATIC_LIVELINESS_QOS, Duration_t(1),
-            writer_status), true);
-    EXPECT_EQ(liveliness_manager.remove_writer(guid, fastdds::dds::AUTOMATIC_LIVELINESS_QOS, Duration_t(1),
-            writer_status), false);
+    EXPECT_EQ(liveliness_manager.add_writer(guid, AUTOMATIC_LIVELINESS_QOS, Duration_t(1)), true);
+    EXPECT_EQ(liveliness_manager.remove_writer(guid, AUTOMATIC_LIVELINESS_QOS, Duration_t(1)), true);
+    EXPECT_EQ(liveliness_manager.remove_writer(guid, AUTOMATIC_LIVELINESS_QOS, Duration_t(1)), false);
 
-    EXPECT_EQ(liveliness_manager.add_writer(guid, fastdds::dds::MANUAL_BY_PARTICIPANT_LIVELINESS_QOS, Duration_t(
-                1)), true);
-    EXPECT_EQ(liveliness_manager.remove_writer(guid, fastdds::dds::MANUAL_BY_PARTICIPANT_LIVELINESS_QOS, Duration_t(
-                1), writer_status), true);
-    EXPECT_EQ(liveliness_manager.remove_writer(guid, fastdds::dds::MANUAL_BY_PARTICIPANT_LIVELINESS_QOS, Duration_t(
-                1), writer_status), false);
+    EXPECT_EQ(liveliness_manager.add_writer(guid, MANUAL_BY_PARTICIPANT_LIVELINESS_QOS, Duration_t(1)), true);
+    EXPECT_EQ(liveliness_manager.remove_writer(guid, MANUAL_BY_PARTICIPANT_LIVELINESS_QOS, Duration_t(1)), true);
+    EXPECT_EQ(liveliness_manager.remove_writer(guid, MANUAL_BY_PARTICIPANT_LIVELINESS_QOS, Duration_t(1)), false);
 
-    EXPECT_EQ(liveliness_manager.add_writer(guid, fastdds::dds::MANUAL_BY_TOPIC_LIVELINESS_QOS, Duration_t(1)), true);
-    EXPECT_EQ(liveliness_manager.remove_writer(guid, fastdds::dds::MANUAL_BY_TOPIC_LIVELINESS_QOS, Duration_t(1),
-            writer_status),
-            true);
-    EXPECT_EQ(liveliness_manager.remove_writer(guid, fastdds::dds::MANUAL_BY_TOPIC_LIVELINESS_QOS, Duration_t(1),
-            writer_status),
-            false);
+    EXPECT_EQ(liveliness_manager.add_writer(guid, MANUAL_BY_TOPIC_LIVELINESS_QOS, Duration_t(1)), true);
+    EXPECT_EQ(liveliness_manager.remove_writer(guid, MANUAL_BY_TOPIC_LIVELINESS_QOS, Duration_t(1)), true);
+    EXPECT_EQ(liveliness_manager.remove_writer(guid, MANUAL_BY_TOPIC_LIVELINESS_QOS, Duration_t(1)), false);
 }
 
 //! Tests that the assert_liveliness() method that takes liveliness kind as argument sets the alive state and time
@@ -489,14 +479,12 @@ TEST_F(LivelinessManagerTests, TimerOwnerRemoved)
 
     GuidPrefix_t guidP;
     guidP.value[0] = 1;
-    LivelinessData::WriterStatus writer_status;
 
     liveliness_manager.add_writer(GUID_t(guidP, 1), AUTOMATIC_LIVELINESS_QOS, Duration_t(0.5));
     liveliness_manager.add_writer(GUID_t(guidP, 2), AUTOMATIC_LIVELINESS_QOS, Duration_t(1));
 
-    liveliness_manager.assert_liveliness(GUID_t(guidP, 1), fastdds::dds::AUTOMATIC_LIVELINESS_QOS, Duration_t(0.5));
-    liveliness_manager.remove_writer(GUID_t(guidP, 1), fastdds::dds::AUTOMATIC_LIVELINESS_QOS, Duration_t(
-                0.5), writer_status);
+    liveliness_manager.assert_liveliness(GUID_t(guidP, 1), AUTOMATIC_LIVELINESS_QOS, Duration_t(0.5));
+    liveliness_manager.remove_writer(GUID_t(guidP, 1), AUTOMATIC_LIVELINESS_QOS, Duration_t(0.5));
 
     wait_liveliness_lost(1u);
     EXPECT_EQ(writer_losing_liveliness, GUID_t(guidP, 2));
