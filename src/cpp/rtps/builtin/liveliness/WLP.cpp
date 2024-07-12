@@ -712,6 +712,8 @@ bool WLP::remove_local_writer(
 
     EPROSIMA_LOG_INFO(RTPS_LIVELINESS, W->getGuid().entityId << " from Liveliness Protocol");
 
+    LivelinessData::WriterStatus writer_status;
+
     if (W->get_liveliness_kind() == AUTOMATIC_LIVELINESS_QOS)
     {
         auto it = std::find(
@@ -764,7 +766,8 @@ bool WLP::remove_local_writer(
         if (!pub_liveliness_manager_->remove_writer(
                     W->getGuid(),
                     W->get_liveliness_kind(),
-                    W->get_liveliness_lease_duration()))
+                    W->get_liveliness_lease_duration(),
+                    writer_status))
         {
             EPROSIMA_LOG_ERROR(RTPS_LIVELINESS,
                     "Could not remove writer " << W->getGuid() << " from liveliness manager");
@@ -807,7 +810,8 @@ bool WLP::remove_local_writer(
         if (!pub_liveliness_manager_->remove_writer(
                     W->getGuid(),
                     W->get_liveliness_kind(),
-                    W->get_liveliness_lease_duration()))
+                    W->get_liveliness_lease_duration(),
+                    writer_status))
         {
             EPROSIMA_LOG_ERROR(RTPS_LIVELINESS,
                     "Could not remove writer " << W->getGuid() << " from liveliness manager");
@@ -856,10 +860,11 @@ bool WLP::remove_local_reader(
 
 bool WLP::automatic_liveliness_assertion()
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_builtinProtocols->mp_PDP->getMutex());
+    std::unique_lock<std::recursive_mutex> lock(*mp_builtinProtocols->mp_PDP->getMutex());
 
     if (0 < automatic_writers_.size())
     {
+        lock.unlock();
         return send_liveliness_message(automatic_instance_handle_);
     }
 
