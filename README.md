@@ -28,7 +28,7 @@
     <a href="https://eprosima-fast-rtps.readthedocs.io"><img alt="Documentation badge" src="https://img.shields.io/readthedocs/eprosima-fast-rtps.svg"/></a>
     <br>
     <a href=""><img alt="Status" src="https://nexus.lab.fiware.org/static/badges/statuses/incubating.svg"/></a>
-    <a href="http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux"><img alt="Linux ci" src="http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux/lastCompletedBuild/badge/icon?subject=%20%20%20Linux%20CI%20"/></a>
+    <a href="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-ubuntu-ci.yml"><img alt="Fast DDS Ubuntu CI (nightly)" src="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-ubuntu-ci.yml/badge.svg"/></a>
     <a href="http://jenkins.eprosima.com:8080/view/Nightly/job/nightly_fastdds_sec_master_linux_aarch64/"><img alt="Linux arm64 ci" src="http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux_aarch64/lastCompletedBuild/badge/icon?subject=%20%20%20Linux-aarch64%20CI%20"/></a>
     <a href="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-windows-ci.yml"><img alt="Windows ci" src="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-windows-ci.yml/badge.svg"/></a>
     <a href="http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac"><img alt="Mac ci" src="http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac/lastCompletedBuild/badge/icon?subject=%20%20%20%20%20%20%20Mac%20CI%20"/></a>
@@ -69,11 +69,6 @@ We are curious to get to know your use case!
 ## Supported platforms
 
 More information about the official support can be found [here](https://github.com/eProsima/Fast-DDS/blob/master/PLATFORM_SUPPORT.md#platform-support)
-
-* Linux [![Linux ci](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux/lastCompletedBuild/badge/icon?subject=%20%20%20Linux%20CI%20)](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux)
-* Linux-aarch64 [![Linux arm64 ci](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux_aarch64/lastCompletedBuild/badge/icon?subject=%20%20%20Linux-aarch64%20CI%20)](http://jenkins.eprosima.com:8080/view/Nightly/job/nightly_fastdds_sec_master_linux_aarch64/)
-* Windows [![Windows ci](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_windows/label=windows-secure,platform=x64,toolset=v142/lastCompletedBuild/badge/icon?subject=%20%20%20%20Windows%20CI%20)](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_windows/label=windows-secure,platform=x64,toolset=v142)
-* Mac [![Mac ci](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac/lastCompletedBuild/badge/icon?subject=%20%20%20%20%20%20%20Mac%20CI%20)](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac)
 
 ## Installation Guide
 You can get either a binary distribution of *eprosima Fast DDS* or compile the library yourself from source.
