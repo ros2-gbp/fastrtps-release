@@ -18,26 +18,28 @@
  */
 
 #include <fastdds/rtps/reader/StatefulReader.h>
-#include <fastdds/rtps/reader/ReaderListener.h>
-#include <fastdds/rtps/history/ReaderHistory.h>
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/messages/RTPSMessageCreator.h>
-#include <rtps/participant/RTPSParticipantImpl.h>
-#include <rtps/reader/WriterProxy.h>
-#include <fastrtps/utils/TimeConversion.h>
-#include <rtps/history/HistoryAttributesExtension.hpp>
-#include <rtps/DataSharing/DataSharingListener.hpp>
-#include <rtps/DataSharing/ReaderPool.hpp>
-#include <fastdds/rtps/builtin/BuiltinProtocols.h>
-#include <fastdds/rtps/builtin/liveliness/WLP.h>
-#include <fastdds/rtps/writer/LivelinessManager.h>
 
-#include "rtps/RTPSDomainImpl.hpp"
-
+#include <cassert>
 #include <mutex>
 #include <thread>
 
-#include <cassert>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/builtin/BuiltinProtocols.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/common/VendorId_t.hpp>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/messages/RTPSMessageCreator.h>
+#include <fastdds/rtps/reader/ReaderListener.h>
+#include <fastdds/rtps/writer/LivelinessManager.h>
+#include <fastrtps/utils/TimeConversion.h>
+
+#include "reader_utils.hpp"
+#include <rtps/DataSharing/DataSharingListener.hpp>
+#include <rtps/DataSharing/ReaderPool.hpp>
+#include <rtps/history/HistoryAttributesExtension.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/reader/WriterProxy.h>
+#include <rtps/RTPSDomainImpl.hpp>
 
 #define IDSTRING "(ID:" << std::this_thread::get_id() << ") " <<
 
@@ -352,28 +354,11 @@ bool StatefulReader::matched_writer_remove(
         const GUID_t& writer_guid,
         bool removed_by_lease)
 {
-
-    if (is_alive_ && liveliness_lease_duration_ < c_TimeInfinite)
-    {
-        auto wlp = this->mp_RTPSParticipant->wlp();
-        if ( wlp != nullptr)
-        {
-            wlp->sub_liveliness_manager_->remove_writer(
-                writer_guid,
-                liveliness_kind_,
-                liveliness_lease_duration_);
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(RTPS_LIVELINESS,
-                    "Finite liveliness lease duration but WLP not enabled, cannot remove writer");
-        }
-    }
-
-    std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
     WriterProxy* wproxy = nullptr;
     if (is_alive_)
     {
+        std::unique_lock<RecursiveTimedMutex> lock(mp_mutex);
+
         //Remove cachechanges belonging to the unmatched writer
         mp_history->writer_unmatched(writer_guid, get_last_notified(writer_guid));
 
@@ -425,7 +410,36 @@ bool StatefulReader::matched_writer_remove(
         }
     }
 
-    return (wproxy != nullptr);
+    bool ret_val = (wproxy != nullptr);
+    if (ret_val && liveliness_lease_duration_ < c_TimeInfinite)
+    {
+        auto wlp = this->mp_RTPSParticipant->wlp();
+        if ( wlp != nullptr)
+        {
+            LivelinessData::WriterStatus writer_liveliness_status;
+            wlp->sub_liveliness_manager_->remove_writer(
+                writer_guid,
+                liveliness_kind_,
+                liveliness_lease_duration_,
+                writer_liveliness_status);
+
+            if (writer_liveliness_status == LivelinessData::WriterStatus::ALIVE)
+            {
+                wlp->update_liveliness_changed_status(writer_guid, this, -1, 0);
+            }
+            else if (writer_liveliness_status == LivelinessData::WriterStatus::NOT_ALIVE)
+            {
+                wlp->update_liveliness_changed_status(writer_guid, this, 0, -1);
+            }
+        }
+        else
+        {
+            EPROSIMA_LOG_ERROR(RTPS_LIVELINESS,
+                    "Finite liveliness lease duration but WLP not enabled, cannot remove writer");
+        }
+    }
+
+    return ret_val;
 }
 
 bool StatefulReader::matched_writer_is_matched(
@@ -554,7 +568,7 @@ bool StatefulReader::processDataMsg(
                 return false;
             }
 
-            if (data_filter_ && !data_filter_->is_relevant(*change, m_guid))
+            if (!fastdds::rtps::change_is_relevant_for_filter(*change, m_guid, data_filter_))
             {
                 if (pWP)
                 {
@@ -562,6 +576,7 @@ bool StatefulReader::processDataMsg(
                     NotifyChanges(pWP);
                     send_ack_if_datasharing(this, mp_history, pWP, change->sequenceNumber);
                 }
+                // Change was filtered out, so there isn't anything else to do
                 return true;
             }
 
@@ -737,7 +752,8 @@ bool StatefulReader::processDataFragMsg(
 
                     // Temporarilly assign the inline qos while evaluating the data filter
                     work_change->inline_qos = incomingChange->inline_qos;
-                    bool filtered_out = data_filter_ && !data_filter_->is_relevant(*work_change, m_guid);
+                    bool filtered_out =
+                            !fastdds::rtps::change_is_relevant_for_filter(*work_change, m_guid, data_filter_);
                     work_change->inline_qos = SerializedPayload_t();
 
                     if (filtered_out)
