@@ -47,7 +47,12 @@ namespace rtps {
 MessageReceiver::MessageReceiver(
         RTPSParticipantImpl* participant,
         uint32_t rec_buffer_size)
-    : participant_(participant)
+    : mtx_()
+    , associated_writers_()
+    , associated_readers_()
+#if !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
+    , participant_(participant)
+#endif // if !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
     , source_version_(c_ProtocolVersion)
     , source_vendor_id_(c_VendorId_Unknown)
     , source_guid_prefix_(c_GuidPrefix_Unknown)
@@ -60,6 +65,7 @@ MessageReceiver::MessageReceiver(
     , crypto_payload_(participant->is_secure() ? rec_buffer_size : 0)
 #endif // if HAVE_SECURITY
 {
+    static_cast<void>(participant);
     (void)rec_buffer_size;
     EPROSIMA_LOG_INFO(RTPS_MSG_IN, "Created with CDRMessage of size: " << rec_buffer_size);
 
