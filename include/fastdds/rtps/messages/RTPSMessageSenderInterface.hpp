@@ -22,11 +22,10 @@
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <chrono>
-#include <vector>
-
-#include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/messages/CDRMessage.h>
+#include <fastdds/rtps/common/Guid.h>
+
+#include <vector>
 
 namespace eprosima {
 namespace fastrtps {

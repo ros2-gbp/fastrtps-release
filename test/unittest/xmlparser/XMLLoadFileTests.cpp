@@ -22,7 +22,6 @@
 #endif // ifdef _WIN32
 
 #include <gtest/gtest.h>
-#include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
 #include <fastrtps/xmlparser/XMLParserCommon.h>
 #include "../logging/mock/MockConsumer.h"

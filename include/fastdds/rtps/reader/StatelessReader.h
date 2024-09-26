@@ -22,12 +22,11 @@
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <map>
-#include <mutex>
-
-#include <fastdds/rtps/common/VendorId_t.hpp>
 #include <fastdds/rtps/reader/RTPSReader.h>
 #include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
+
+#include <mutex>
+#include <map>
 
 namespace eprosima {
 namespace fastrtps {
@@ -144,14 +143,12 @@ public:
             const SequenceNumber_t& firstSN,
             const SequenceNumber_t& lastSN,
             bool finalFlag,
-            bool livelinessFlag,
-            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown) override;
+            bool livelinessFlag) override;
 
     bool processGapMsg(
             const GUID_t& writerGUID,
             const SequenceNumber_t& gapStart,
-            const SequenceNumberSet_t& gapList,
-            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown) override;
+            const SequenceNumberSet_t& gapList) override;
 
     /**
      * This method is called when a new change is received. This method calls the received_change of the History
@@ -252,11 +249,6 @@ public:
             CacheChange_t* change,
             WriterProxy* writer,
             bool mark_as_read = true) override;
-
-#ifdef FASTDDS_STATISTICS
-    bool get_connections(
-            fastdds::statistics::rtps::ConnectionList& connection_list) override;
-#endif // ifdef FASTDDS_STATISTICS
 
 private:
 

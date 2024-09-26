@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <sstream>
-
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/common/CdrSerialization.hpp>
-#include <fastrtps/types/AnnotationDescriptor.h>
-#include <fastrtps/types/BuiltinAnnotationsTypeObject.h>
+#include <fastrtps/types/TypeObjectFactory.h>
+#include <fastrtps/types/TypeDescriptor.h>
+#include <fastrtps/types/MemberDescriptor.h>
 #include <fastrtps/types/DynamicTypeBuilderFactory.h>
 #include <fastrtps/types/DynamicTypeBuilder.h>
 #include <fastrtps/types/DynamicTypeBuilderPtr.h>
 #include <fastrtps/types/DynamicType.h>
 #include <fastrtps/types/DynamicTypeMember.h>
-#include <fastrtps/types/MemberDescriptor.h>
-#include <fastrtps/types/TypeDescriptor.h>
 #include <fastrtps/types/TypeNamesGenerator.h>
-#include <fastrtps/types/TypeObjectFactory.h>
+#include <fastrtps/types/BuiltinAnnotationsTypeObject.h>
+#include <fastrtps/types/AnnotationDescriptor.h>
 #include <fastrtps/utils/md5.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <atomic>
+#include <sstream>
 
 namespace eprosima {
 namespace fastrtps {
@@ -44,30 +43,62 @@ public:
 
 };
 
+enum class TypeObjectFactoryInstanceState
+{
+    NOT_CREATED = 0,  // Instance has not been created
+    CREATING = 1,     // Instance is being created
+    CREATED = 2,      // Instance has been created
+    DESTROYING = 3    // Instance is being destroyed
+};
+
+static std::atomic<TypeObjectFactoryInstanceState> g_instance_state{TypeObjectFactoryInstanceState::NOT_CREATED};
 static TypeObjectFactoryReleaser s_releaser;
 static TypeObjectFactory* g_instance = nullptr;
+
 TypeObjectFactory* TypeObjectFactory::get_instance()
 {
-    if (g_instance == nullptr)
+    TypeObjectFactoryInstanceState expected_state = TypeObjectFactoryInstanceState::NOT_CREATED;
+
+    // Wait until the instance is either created or destroyed
+    while (!g_instance_state.compare_exchange_weak(expected_state, TypeObjectFactoryInstanceState::CREATING))
     {
-        g_instance = new TypeObjectFactory();
-        g_instance->create_builtin_annotations();
+        // If it is already created, return it
+        if (expected_state == TypeObjectFactoryInstanceState::CREATED)
+        {
+            return g_instance;
+        }
+
+        // Prepare for retry
+        expected_state = TypeObjectFactoryInstanceState::NOT_CREATED;
     }
-    return g_instance;
+
+    auto instance = new TypeObjectFactory();
+    g_instance = instance;
+    g_instance_state.store(TypeObjectFactoryInstanceState::CREATED);
+
+    return instance;
 }
 
 ReturnCode_t TypeObjectFactory::delete_instance()
 {
-    if (g_instance != nullptr)
+    TypeObjectFactoryInstanceState expected_state = TypeObjectFactoryInstanceState::CREATED;
+    if (g_instance_state.compare_exchange_strong(expected_state, TypeObjectFactoryInstanceState::DESTROYING))
     {
         delete g_instance;
         g_instance = nullptr;
+        g_instance_state.store(TypeObjectFactoryInstanceState::NOT_CREATED);
         return ReturnCode_t::RETCODE_OK;
     }
     return ReturnCode_t::RETCODE_ERROR;
 }
 
 TypeObjectFactory::TypeObjectFactory()
+{
+    create_basic_identifiers();
+    create_builtin_annotations();
+}
+
+void TypeObjectFactory::create_basic_identifiers()
 {
     std::unique_lock<std::recursive_mutex> scoped(m_MutexIdentifiers);
     // Generate basic TypeIdentifiers
@@ -198,7 +229,7 @@ TypeObjectFactory::~TypeObjectFactory()
 
 void TypeObjectFactory::create_builtin_annotations()
 {
-    register_builtin_annotations_types(g_instance);
+    register_builtin_annotations_types(this);
 }
 
 void TypeObjectFactory::nullify_all_entries(
@@ -314,10 +345,8 @@ void TypeObjectFactory::fill_minimal_information(
     }
     else
     {
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         info->minimal().typeid_with_size().typeobject_serialized_size(
-            static_cast<uint32_t>(calculator.calculate_serialized_size(*obj, current_alignment)));
+            static_cast<uint32_t>(TypeObject::getCdrSerializedSize(*obj)));
     }
 
     switch (ident->_d())
@@ -584,10 +613,8 @@ void TypeObjectFactory::fill_complete_information(
     }
     else
     {
-        eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastcdr::CdrVersion::XCDRv1);
-        size_t current_alignment {0};
         info->complete().typeid_with_size().typeobject_serialized_size(
-            static_cast<uint32_t>(calculator.calculate_serialized_size(*obj, current_alignment)));
+            static_cast<uint32_t>(TypeObject::getCdrSerializedSize(*obj)));
     }
 
     switch (ident->_d())

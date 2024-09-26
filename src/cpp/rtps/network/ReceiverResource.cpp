@@ -15,7 +15,6 @@
 #include <rtps/network/ReceiverResource.h>
 
 #include <cassert>
-#include <thread>
 
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/messages/MessageReceiver.h>

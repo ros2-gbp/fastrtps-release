@@ -154,7 +154,7 @@ bool DataWriterHistory::prepare_change(
         }
         else if (history_qos_.kind == KEEP_LAST_HISTORY_QOS)
         {
-            ret = this->remove_min_change(max_blocking_time);
+            ret = this->remove_min_change();
         }
 
         // Notify if change has been removed unacknowledged
@@ -353,33 +353,16 @@ bool DataWriterHistory::removeMinChange()
 bool DataWriterHistory::remove_change_pub(
         CacheChange_t* change)
 {
-    return DataWriterHistory::remove_change_pub(change, std::chrono::steady_clock::now() + std::chrono::hours(24));
-}
-
-bool DataWriterHistory::remove_change_pub(
-        CacheChange_t* change,
-        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
-{
     if (mp_writer == nullptr || mp_mutex == nullptr)
     {
         EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a Writer with this History before using it");
         return false;
     }
 
-#if HAVE_STRICT_REALTIME
-    std::unique_lock<RecursiveTimedMutex> lock(*this->mp_mutex, std::defer_lock);
-    if (!lock.try_lock_until(max_blocking_time))
-    {
-        EPROSIMA_LOG_ERROR(PUBLISHER, "Cannot lock the DataWriterHistory mutex");
-        return false;
-    }
-#else
     std::lock_guard<RecursiveTimedMutex> guard(*this->mp_mutex);
-#endif // if HAVE_STRICT_REALTIME
-
     if (topic_att_.getTopicKind() == NO_KEY)
     {
-        if (remove_change(change, max_blocking_time))
+        if (remove_change(change))
         {
             m_isHistoryFull = false;
             return true;
@@ -400,7 +383,7 @@ bool DataWriterHistory::remove_change_pub(
         {
             if (((*chit)->sequenceNumber == change->sequenceNumber) && ((*chit)->writerGUID == change->writerGUID))
             {
-                if (remove_change(change, max_blocking_time))
+                if (remove_change(change))
                 {
                     vit->second.cache_changes.erase(chit);
                     m_isHistoryFull = false;
@@ -416,14 +399,7 @@ bool DataWriterHistory::remove_change_pub(
 bool DataWriterHistory::remove_change_g(
         CacheChange_t* a_change)
 {
-    return remove_change_pub(a_change, std::chrono::steady_clock::now() + std::chrono::hours(24));
-}
-
-bool DataWriterHistory::remove_change_g(
-        CacheChange_t* a_change,
-        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
-{
-    return remove_change_pub(a_change, max_blocking_time);
+    return remove_change_pub(a_change);
 }
 
 bool DataWriterHistory::remove_instance_changes(

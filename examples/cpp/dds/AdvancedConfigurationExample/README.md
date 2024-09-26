@@ -3,8 +3,6 @@
 This example extends the configuration options of a trivial HelloWorld by letting the user specify properties of
 entities such as durability, reliability or specify the transport protocol to be used, among other possibilities. This
 could be useful, for example, to quickly test whether two endpoints are compatible and hence would match.
-Additionally, the message type includes a data sequence which size can be set by the user, allowing to send large data between endpoints.
-Note: Due to the nature of the data type (not bounded), this example will not use data sharing.
 
 ## Execution instructions
 
@@ -26,14 +24,12 @@ General options:
 
 Publisher options:
   -t <topic_name> --topic=<topic_name>
-                    Topic name (Default: AdvancedConfigurationTopic).
+                    Topic name (Default: HelloWorldTopic).
   -d <id>         --domain=<id>
                     DDS domain ID (Default: 0).
   -w <num>        --wait=<num>
                     Number of matched subscribers required to publish (Default:
                     0 => does not wait).
-  -m <num>        --msg-size=<num>
-                    Size in bytes of the data to send (Default 10).
   -s <num>        --samples=<num>
                     Number of samples to send (Default: 0 => infinite samples).
   -i <num>        --interval=<num>
@@ -54,7 +50,7 @@ Publisher options:
 
 Subscriber options:
   -t <topic_name> --topic=<topic_name>
-                    Topic name (Default: AdvancedConfigurationTopic).
+                    Topic name (Default: HelloWorldTopic).
   -d <id>         --domain=<id>
                     DDS domain ID (Default: 0).
   -s <num>        --samples=<num>
@@ -79,8 +75,6 @@ QoS options:
                     Partitions to match separated by ';'. Single or double
                     quotes required with multiple partitions. With empty string
                     ('') no partitions used. (Default: '').
-  -x <str>        --xml-profile <str>
-                    Profile name to configure DomainParticipant.
 
 Discovery options:
                   --ttl
@@ -88,17 +82,4 @@ Discovery options:
                     for IPv6. If not set, uses Fast-DDS default (1 hop).
                     Increase it to avoid discovery issues on scenarios with
                     several routers. Maximum: 255.
-```
-
-### XML Configuration
-
-Using argument `--xml-profile <profile_name>` will configure the internal DomainParticipant using the profile name loaded from an XML file.
-To load XML files check [Fast DDS documentation](https://fast-dds.docs.eprosima.com/en/latest/fastdds/xml_configuration/xml_configuration.html).
-Loading example XML configuration [file](shm_off.xml) and calling this example with `--xml-profile no_shm_participant_profile` will disable Shared Memory Transport for the internal DomainParticipant created.
-
-This code presents how to run a publisher with this example without Shared Memory:
-
-```sh
-# From AdvancedConfigurationExample installation dir
-FASTRTPS_DEFAULT_PROFILES_FILE=shm_off.xml ./AdvancedConfigurationExample publisher --xml-profile no_shm_participant_profile
 ```

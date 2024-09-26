@@ -48,62 +48,15 @@ public:
 
     bool transform_remote_locator(
             const Locator_t& remote_locator,
-            Locator_t& result_locator,
-            const NetworkConfigSet_t&) const
+            Locator_t& result_locator) const
     {
         result_locator = remote_locator;
-        return true;
-    }
-
-    bool transform_remote_locator(
-            const Locator_t& remote_locator,
-            Locator_t& result_locator,
-            const NetworkConfigSet_t&,
-            bool) const
-    {
-        result_locator = remote_locator;
-        return true;
-    }
-
-    bool is_locator_supported(
-            const Locator_t&) const
-    {
-        return true;
-    }
-
-    bool is_locator_allowed(
-            const Locator_t&) const
-    {
-        return true;
-    }
-
-    bool is_locator_remote_or_allowed(
-            const Locator_t&) const
-    {
-        return true;
-    }
-
-    bool is_locator_remote_or_allowed(
-            const Locator_t&,
-            bool) const
-    {
         return true;
     }
 
     uint32_t get_min_send_buffer_size()
     {
         return 65536;
-    }
-
-    bool is_local_locator(
-            const Locator_t&) const
-    {
-        return true;
-    }
-
-    std::vector<fastdds::rtps::TransportNetmaskFilterInfo> netmask_filter_info() const
-    {
-        return {};
     }
 
 };

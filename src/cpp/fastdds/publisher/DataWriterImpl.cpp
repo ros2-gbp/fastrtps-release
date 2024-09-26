@@ -16,43 +16,44 @@
  * DataWriterImpl.cpp
  *
  */
+#include <fastrtps/config.h>
+
 #include <fastdds/publisher/DataWriterImpl.hpp>
 
 #include <functional>
 #include <iostream>
 
-#include <fastdds/core/condition/StatusConditionImpl.hpp>
-#include <fastdds/core/policy/ParameterSerializer.hpp>
-#include <fastdds/core/policy/QosPolicyUtils.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/log/Log.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
 #include <fastdds/dds/publisher/PublisherListener.hpp>
-#include <fastdds/dds/topic/TypeSupport.hpp>
-#include <fastdds/domain/DomainParticipantImpl.hpp>
-#include <fastdds/publisher/filtering/DataWriterFilteredChangePool.hpp>
-#include <fastdds/publisher/PublisherImpl.hpp>
+
+#include <fastdds/rtps/RTPSDomain.h>
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/resources/ResourceEvent.h>
 #include <fastdds/rtps/resources/TimedEvent.h>
-#include <fastdds/rtps/RTPSDomain.h>
 #include <fastdds/rtps/writer/RTPSWriter.h>
 #include <fastdds/rtps/writer/StatefulWriter.h>
+
+#include <fastdds/publisher/PublisherImpl.hpp>
 #include <fastrtps/attributes/TopicAttributes.h>
-#include <fastrtps/config.h>
 #include <fastrtps/utils/TimeConversion.h>
+
+#include <fastdds/core/condition/StatusConditionImpl.hpp>
+#include <fastdds/core/policy/ParameterSerializer.hpp>
+#include <fastdds/core/policy/QosPolicyUtils.hpp>
+
+#include <fastdds/domain/DomainParticipantImpl.hpp>
+#include <fastdds/publisher/filtering/DataWriterFilteredChangePool.hpp>
 
 #include <rtps/DataSharing/DataSharingPayloadPool.hpp>
 #include <rtps/history/CacheChangePool.h>
 #include <rtps/history/TopicPayloadPoolRegistry.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
 #include <rtps/RTPSDomainImpl.hpp>
-#ifdef FASTDDS_STATISTICS
-#include <statistics/fastdds/domain/DomainParticipantImpl.hpp>
-#include <statistics/types/monitorservice_types.h>
-#endif //FASTDDS_STATISTICS
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -150,7 +151,7 @@ DataWriterImpl::DataWriterImpl(
     : publisher_(p)
     , type_(type)
     , topic_(topic)
-    , qos_(get_datawriter_qos_from_settings(qos))
+    , qos_(&qos == &DATAWRITER_QOS_DEFAULT ? publisher_->get_default_datawriter_qos() : qos)
     , listener_(listen)
     , history_(get_topic_attributes(qos_, *topic_, type_), type_->m_typeSize, qos_.endpoint().history_memory_policy,
             [this](
@@ -192,7 +193,7 @@ DataWriterImpl::DataWriterImpl(
     : publisher_(p)
     , type_(type)
     , topic_(topic)
-    , qos_(get_datawriter_qos_from_settings(qos))
+    , qos_(&qos == &DATAWRITER_QOS_DEFAULT ? publisher_->get_default_datawriter_qos() : qos)
     , listener_(listen)
     , history_(get_topic_attributes(qos_, *topic_, type_), type_->m_typeSize, qos_.endpoint().history_memory_policy,
             [this](
@@ -209,27 +210,6 @@ DataWriterImpl::DataWriterImpl(
     , lifespan_duration_us_(qos_.lifespan().duration.to_ns() * 1e-3)
 {
     guid_ = { publisher_->get_participant_impl()->guid().guidPrefix, entity_id};
-}
-
-DataWriterQos DataWriterImpl::get_datawriter_qos_from_settings(
-        const DataWriterQos& qos)
-{
-    DataWriterQos return_qos;
-    if (&DATAWRITER_QOS_DEFAULT == &qos)
-    {
-        return_qos = publisher_->get_default_datawriter_qos();
-    }
-    else if (&DATAWRITER_QOS_USE_TOPIC_QOS == &qos)
-    {
-        return_qos = publisher_->get_default_datawriter_qos();
-        publisher_->copy_from_topic_qos(return_qos, topic_->get_qos());
-    }
-    else
-    {
-        return_qos = qos;
-    }
-
-    return return_qos;
 }
 
 ReturnCode_t DataWriterImpl::enable()
@@ -325,11 +305,6 @@ ReturnCode_t DataWriterImpl::enable()
     {
         reader_filters_.reset(new ReaderFilterCollection(qos_.writer_resource_limits().reader_filters_allocation));
     }
-
-    // Set Datawriter's DataRepresentationId taking into account the QoS.
-    data_representation_ = qos_.representation().m_value.empty()
-            || XCDR_DATA_REPRESENTATION == qos_.representation().m_value.at(0)
-                    ? XCDR_DATA_REPRESENTATION : XCDR2_DATA_REPRESENTATION;
 
     auto change_pool = get_change_pool();
     if (!change_pool)
@@ -479,12 +454,8 @@ ReturnCode_t DataWriterImpl::loan_sample(
         void*& sample,
         LoanInitializationKind initialization)
 {
-    // Block lowlevel writer
-    auto max_blocking_time = steady_clock::now() +
-            microseconds(::TimeConv::Time_t2MicroSecondsInt64(qos_.reliability().max_blocking_time));
-
     // Type should be plain and have space for the representation header
-    if (!type_->is_plain(data_representation_) || SerializedPayload_t::representation_header_size > type_->m_typeSize)
+    if (!type_->is_plain() || SerializedPayload_t::representation_header_size > type_->m_typeSize)
     {
         return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
     }
@@ -495,16 +466,7 @@ ReturnCode_t DataWriterImpl::loan_sample(
         return ReturnCode_t::RETCODE_NOT_ENABLED;
     }
 
-#if HAVE_STRICT_REALTIME
-    std::unique_lock<RecursiveTimedMutex> lock(writer_->getMutex(), std::defer_lock);
-    if (!lock.try_lock_until(max_blocking_time))
-    {
-        return ReturnCode_t::RETCODE_TIMEOUT;
-    }
-#else
-    static_cast<void>(max_blocking_time);
     std::lock_guard<RecursiveTimedMutex> lock(writer_->getMutex());
-#endif // if HAVE_STRICT_REALTIME
 
     // Get one payload from the pool
     PayloadInfo_t payload;
@@ -570,7 +532,7 @@ ReturnCode_t DataWriterImpl::discard_loan(
         void*& sample)
 {
     // Type should be plain and have space for the representation header
-    if (!type_->is_plain(data_representation_) || SerializedPayload_t::representation_header_size > type_->m_typeSize)
+    if (!type_->is_plain() || SerializedPayload_t::representation_header_size > type_->m_typeSize)
     {
         return ReturnCode_t::RETCODE_ILLEGAL_OPERATION;
     }
@@ -983,7 +945,7 @@ ReturnCode_t DataWriterImpl::perform_create_new_change(
             return ReturnCode_t::RETCODE_OUT_OF_RESOURCES;
         }
 
-        if ((ALIVE == change_kind) && !type_->serialize(data, &payload.payload, data_representation_))
+        if ((ALIVE == change_kind) && !type_->serialize(data, &payload.payload))
         {
             EPROSIMA_LOG_WARNING(DATA_WRITER, "Data serialization returned false");
             return_payload_to_pool(payload);
@@ -1279,11 +1241,6 @@ void DataWriterImpl::InnerDataWriterListener::on_offered_incompatible_qos(
             listener->on_offered_incompatible_qos(data_writer_->user_datawriter_, callback_status);
         }
     }
-
-#ifdef FASTDDS_STATISTICS
-    notify_status_observer(statistics::INCOMPATIBLE_QOS);
-#endif //FASTDDS_STATISTICS
-
     data_writer_->user_datawriter_->get_statuscondition().get_impl()->set_status(notify_status, true);
 }
 
@@ -1318,11 +1275,6 @@ void DataWriterImpl::InnerDataWriterListener::on_liveliness_lost(
             listener->on_liveliness_lost(data_writer_->user_datawriter_, callback_status);
         }
     }
-
-#ifdef FASTDDS_STATISTICS
-    notify_status_observer(statistics::LIVELINESS_LOST);
-#endif //FASTDDS_STATISTICS
-
     data_writer_->user_datawriter_->get_statuscondition().get_impl()->set_status(notify_status, true);
 }
 
@@ -1349,23 +1301,6 @@ void DataWriterImpl::InnerDataWriterListener::on_reader_discovery(
         }
     }
 }
-
-#ifdef FASTDDS_STATISTICS
-void DataWriterImpl::InnerDataWriterListener::notify_status_observer(
-        const uint32_t& status_id)
-{
-    DomainParticipantImpl* pp_impl = data_writer_->publisher_->get_participant_impl();
-    auto statistics_pp_impl = static_cast<eprosima::fastdds::statistics::dds::DomainParticipantImpl*>(pp_impl);
-    if (nullptr != statistics_pp_impl->get_status_observer())
-    {
-        if (!statistics_pp_impl->get_status_observer()->on_local_entity_status_change(data_writer_->guid(), status_id))
-        {
-            EPROSIMA_LOG_ERROR(DATA_WRITER, "Could not set entity status");
-        }
-    }
-}
-
-#endif //FASTDDS_STATISTICS
 
 ReturnCode_t DataWriterImpl::wait_for_acknowledgments(
         const Duration_t& max_wait)
@@ -1490,11 +1425,6 @@ bool DataWriterImpl::deadline_missed()
         listener->on_offered_deadline_missed(user_datawriter_, deadline_missed_status_);
         deadline_missed_status_.total_count_change = 0;
     }
-
-#ifdef FASTDDS_STATISTICS
-    writer_listener_.notify_status_observer(statistics::DEADLINE_MISSED);
-#endif //FASTDDS_STATISTICS
-
     user_datawriter_->get_statuscondition().get_impl()->set_status(notify_status, true);
 
     if (!history_.set_next_deadline(
@@ -2033,7 +1963,7 @@ std::shared_ptr<IPayloadPool> DataWriterImpl::get_payload_pool()
         // When the user requested PREALLOCATED_WITH_REALLOC, but we know the type cannot
         // grow, we translate the policy into bare PREALLOCATED
         if (PREALLOCATED_WITH_REALLOC_MEMORY_MODE == history_.m_att.memoryPolicy &&
-                (type_->is_bounded() || type_->is_plain(data_representation_)))
+                (type_->is_bounded() || type_->is_plain()))
         {
             history_.m_att.memoryPolicy = PREALLOCATED_MEMORY_MODE;
         }
@@ -2058,7 +1988,7 @@ std::shared_ptr<IPayloadPool> DataWriterImpl::get_payload_pool()
         }
 
         // Prepare loans collection for plain types only
-        if (type_->is_plain(data_representation_))
+        if (type_->is_plain())
         {
             loans_.reset(new LoanCollection(config));
         }

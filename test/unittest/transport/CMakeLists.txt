@@ -67,33 +67,22 @@ endif()
 set(UDPV4TESTS_SOURCE
     UDPv4Tests.cpp
     mock/MockReceiverResource.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/ThreadSettings.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/GuidPrefix_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/PortBasedTransportDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TransportInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPChannelResource.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPTransportInterface.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPTransportInterface.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPChannelResource.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
     ${TCPTransportInterface_SOURCE}
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     )
 
 set(UDPV6TESTS_SOURCE
@@ -104,29 +93,18 @@ set(UDPV6TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/ThreadSettings.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/GuidPrefix_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/PortBasedTransportDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TransportInterface.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPChannelResource.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPTransportInterface.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/UDPv6Transport.cpp
+    ${TCPTransportInterface_SOURCE}
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
-    ${TCPTransportInterface_SOURCE}
     )
 
 set(TCPV4TESTS_SOURCE
@@ -139,38 +117,28 @@ set(TCPV4TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/ThreadSettings.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/GuidPrefix_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/messages/RTPSMessageCreator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/ResourceEvent.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEvent.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEventImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/PortBasedTransportDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/RTCPMessageManager.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/TCPControlMessage.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPAcceptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPAcceptorBasic.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPChannelResource.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPChannelResourceBasic.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPTransportInterface.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPv4Transport.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TransportInterface.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/RTCPMessageManager.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/TCPControlMessage.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/System.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
     )
 
 if(TLS_FOUND)
@@ -190,38 +158,28 @@ set(TCPV6TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/ThreadSettings.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/GuidPrefix_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/messages/RTPSMessageCreator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/ResourceEvent.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEvent.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/resources/TimedEventImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/PortBasedTransportDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/RTCPMessageManager.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/TCPControlMessage.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPAcceptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPAcceptorBasic.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPChannelResource.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPChannelResourceBasic.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPTransportInterface.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TCPv6Transport.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TransportInterface.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/RTCPMessageManager.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/tcp/TCPControlMessage.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/System.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/TimedConditionVariable.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
     )
 
 if(TLS_FOUND)
@@ -240,27 +198,17 @@ set(SHAREDMEMTESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/PropertyPolicy.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/ThreadSettings.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/GuidPrefix_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/flowcontrol/ThroughputControllerDescriptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/NetworkFactory.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/PortBasedTransportDescriptor.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/shared_mem/SharedMemTransport.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/shared_mem/SharedMemTransportDescriptor.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/TransportInterface.cpp
+    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/ChannelResource.cpp
+    ${TCPTransportInterface_SOURCE}
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp
-    ${TCPTransportInterface_SOURCE}
     )
 
 if(ANDROID)
@@ -285,9 +233,6 @@ endif()
 
 include_directories(mock/)
 
-##########################
-# UDPv4 tests
-##########################
 add_executable(UDPv4Tests ${UDPV4TESTS_SOURCE})
 target_compile_definitions(UDPv4Tests PRIVATE
     BOOST_ASIO_STANDALONE
@@ -314,17 +259,12 @@ endif()
 if(MSVC OR MSVC_IDE)
     target_link_libraries(UDPv4Tests ${PRIVACY} iphlpapi Shlwapi )
 endif()
-gtest_discover_tests(UDPv4Tests)
+add_gtest(UDPv4Tests SOURCES ${UDPV4TESTS_SOURCE})
+set(TRANSPORT_XFAIL_LIST XFAIL_UDP4)
 
-##########################
-# IPv6 tests
-##########################
 option(DISABLE_UDPV6_TESTS "Disable UDPv6 tests because fails in some systems" OFF)
 
 if(NOT DISABLE_UDPV6_TESTS)
-    ##########################
-    # UDPv6 tests
-    ##########################
     add_executable(UDPv6Tests ${UDPV6TESTS_SOURCE})
     target_compile_definitions(UDPv6Tests PRIVATE
         BOOST_ASIO_STANDALONE
@@ -350,11 +290,9 @@ if(NOT DISABLE_UDPV6_TESTS)
     if(MSVC OR MSVC_IDE)
         target_link_libraries(UDPv6Tests ${PRIVACY} iphlpapi Shlwapi )
     endif()
-    gtest_discover_tests(UDPv6Tests)
+    add_gtest(UDPv6Tests SOURCES ${UDPV6TESTS_SOURCE})
+    set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_UDP6)
 
-    ##########################
-    # TCPv6 tests
-    ##########################
     add_executable(TCPv6Tests ${TCPV6TESTS_SOURCE})
     target_compile_definitions(TCPv6Tests PRIVATE
         BOOST_ASIO_STANDALONE
@@ -372,10 +310,7 @@ if(NOT DISABLE_UDPV6_TESTS)
         ${PROJECT_SOURCE_DIR}/src/cpp
         $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
         )
-    target_link_libraries(TCPv6Tests
-        fastcdr
-        GTest::gtest
-        ${MOCKS}
+    target_link_libraries(TCPv6Tests GTest::gtest ${MOCKS}
         $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>)
     if(QNX)
         target_link_libraries(TCPv6Tests socket)
@@ -385,12 +320,10 @@ if(NOT DISABLE_UDPV6_TESTS)
     else()
         target_link_libraries(TCPv6Tests ${PRIVACY} fastcdr)
     endif()
-    gtest_discover_tests(TCPv6Tests)
+    add_gtest(TCPv6Tests SOURCES ${TCPV6TESTS_SOURCE})
+    set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TCP6)
 endif()
 
-##########################
-# TCPv4 tests
-##########################
 add_executable(TCPv4Tests ${TCPV4TESTS_SOURCE})
 target_compile_definitions(TCPv4Tests PRIVATE
     BOOST_ASIO_STANDALONE
@@ -408,10 +341,7 @@ target_include_directories(TCPv4Tests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp
     $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>
     )
-target_link_libraries(TCPv4Tests
-    fastcdr
-    GTest::gtest
-    ${MOCKS}
+target_link_libraries(TCPv4Tests GTest::gtest ${MOCKS}
     $<$<BOOL:${TLS_FOUND}>:OpenSSL::SSL$<SEMICOLON>OpenSSL::Crypto>)
 if(QNX)
     target_link_libraries(TCPv4Tests socket)
@@ -421,11 +351,9 @@ if(MSVC OR MSVC_IDE)
 else()
     target_link_libraries(TCPv4Tests ${PRIVACY} fastcdr)
 endif()
-gtest_discover_tests(TCPv4Tests)
+add_gtest(TCPv4Tests SOURCES ${TCPV4TESTS_SOURCE})
+set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_TCP4)
 
-##########################
-# SHM tests
-##########################
 if(IS_THIRDPARTY_BOOST_OK)
     add_executable(SharedMemTests ${SHAREDMEMTESTS_SOURCE})
 
@@ -463,39 +391,19 @@ if(IS_THIRDPARTY_BOOST_OK)
     else()
         target_link_libraries(SharedMemTests ${PRIVACY} )
     endif()
-    gtest_discover_tests(SharedMemTests)
+    add_gtest(SharedMemTests SOURCES ${SHAREDMEMTESTS_SOURCE})
+    set(TRANSPORT_XFAIL_LIST ${TRANSPORT_XFAIL_LIST} XFAIL_SHM)
 endif()
 
-# Add 'xfail' label to flaky tests
-set_property(DIRECTORY APPEND PROPERTY
-    TEST_INCLUDE_FILES ${CMAKE_CURRENT_LIST_DIR}/xfail_tests.cmake
-    )
+foreach(TRANSPORT_XFAIL_TEST ${TRANSPORT_XFAIL_LIST})
+    add_xfail_label(${CMAKE_CURRENT_SOURCE_DIR}/${TRANSPORT_XFAIL_TEST}.list)
+endforeach()
 
-#####################################
-# PortBasedTransportDescriptor tests
-#####################################
-set(PORTBASED_TRANSPORTDESCRIPTOR_TESTS_SOURCES
-    PortBasedTransportDescriptorTests.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/attributes/ThreadSettings.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/PortBasedTransportDescriptor.cpp)
-
-set(PORTBASED_TRANSPORTDESCRIPTOR_TESTS_TARGET PortBasedTransportDescriptorTests)
-
-add_executable(${PORTBASED_TRANSPORTDESCRIPTOR_TESTS_TARGET}
-    ${PORTBASED_TRANSPORTDESCRIPTOR_TESTS_SOURCES})
-
-target_compile_definitions(${PORTBASED_TRANSPORTDESCRIPTOR_TESTS_TARGET}
-    PRIVATE
-    $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-    $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG>)
-
-target_include_directories(${PORTBASED_TRANSPORTDESCRIPTOR_TESTS_TARGET}
-    PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_BINARY_DIR}/include)
-
-target_link_libraries(${PORTBASED_TRANSPORTDESCRIPTOR_TESTS_TARGET}
-    GTest::gtest
-    ${MOCKS})
-
-gtest_discover_tests(${PORTBASED_TRANSPORTDESCRIPTOR_TESTS_TARGET})
+if(ANDROID)
+    set_property(TARGET UDPv4Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET UDPv6Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET TCPv4Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET TCPv6Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET SharedMemTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET test_UDPv4Tests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

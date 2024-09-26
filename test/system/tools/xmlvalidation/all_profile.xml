@@ -292,11 +292,6 @@
                     <writerPayloadSize>512</writerPayloadSize>
 
                     <mutation_tries>55</mutation_tries>
-
-                    <typelookup_config>
-                        <use_client>true</use_client>
-                        <use_server>true</use_server>
-                    </typelookup_config>
                 </builtin>
 
                 <port>
@@ -893,7 +888,6 @@
                 <calculate_crc>false</calculate_crc>
                 <check_crc>false</check_crc>
                 <enable_tcp_nodelay>false</enable_tcp_nodelay>
-                <non_blocking_send>false</non_blocking_send>
                 <tcp_negotiation_timeout>100</tcp_negotiation_timeout>
             </transport_descriptor>
 
@@ -1011,13 +1005,6 @@
                 <value>true</value>
             </property>
         </consumer>
-
-        <thread_settings>
-            <scheduling_policy>-1</scheduling_policy>
-            <priority>0</priority>
-            <affinity>0</affinity>
-            <stack_size>-1</stack_size>
-        </thread_settings>
     </log>
 
     <types>

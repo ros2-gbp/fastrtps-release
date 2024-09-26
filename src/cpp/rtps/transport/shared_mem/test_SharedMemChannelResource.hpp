@@ -33,14 +33,11 @@ public:
             TransportReceiverInterface* receiver,
             uint32_t big_buffer_size,
             uint32_t* big_buffer_size_count)
-        : SharedMemChannelResource(
-            listener, locator, receiver,
-            std::string(), ThreadSettings{},
-            false, ThreadSettings{})
+        : SharedMemChannelResource(listener, locator, receiver, std::string(), false)
         , big_buffer_size_(big_buffer_size)
         , big_buffer_size_count_(big_buffer_size_count)
     {
-        init_thread(locator, ThreadSettings{});
+        init_thread(locator);
     }
 
     virtual ~test_SharedMemChannelResource() override

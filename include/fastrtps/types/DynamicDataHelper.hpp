@@ -29,41 +29,20 @@ namespace types {
 class DynamicDataHelper
 {
 public:
-
     RTPS_DllAPI static void print(
             const DynamicData_ptr& data);
 
-    RTPS_DllAPI static std::ostream& print(
-            std::ostream& output,
-            const DynamicData_ptr& data);
-
     RTPS_DllAPI static void print(
-            const DynamicData* data);
-
-    RTPS_DllAPI static std::ostream& print(
-            std::ostream& output,
             const DynamicData* data);
 
 protected:
-
     static void print_basic_element(
             DynamicData* data,
             MemberId id,
             TypeKind kind);
 
-    static void print_basic_element(
-            DynamicData* data,
-            MemberId id,
-            TypeKind kind,
-            std::ostream& output);
-
     static void print_collection(
             DynamicData* data,
-            const std::string& tabs = "");
-
-    static void print_collection(
-            DynamicData* data,
-            std::ostream& output,
             const std::string& tabs = "");
 
     static void fill_array_positions(
@@ -84,17 +63,8 @@ protected:
     static void print_basic_collection(
             DynamicData* data);
 
-    static void print_basic_collection(
-            DynamicData* data,
-            std::ostream& output);
-
     static void print_complex_collection(
             DynamicData* data,
-            const std::string& tabs = "");
-
-    static void print_complex_collection(
-            DynamicData* data,
-            std::ostream& output,
             const std::string& tabs = "");
 
     static void print_complex_element(
@@ -102,20 +72,8 @@ protected:
             MemberId id,
             const std::string& tabs = "");
 
-    static void print_complex_element(
-            DynamicData* data,
-            MemberId id,
-            std::ostream& output,
-            const std::string& tabs = "");
-
     static void print_member(
             DynamicData* data,
-            const DynamicTypeMember* type,
-            const std::string& tabs = "");
-
-    static void print_member(
-            DynamicData* data,
-            std::ostream& output,
             const DynamicTypeMember* type,
             const std::string& tabs = "");
 };

@@ -18,7 +18,6 @@
 
 #include "SendBuffersManager.hpp"
 #include "../participant/RTPSParticipantImpl.h"
-#include <fastdds/rtps/messages/RTPSMessageGroup.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -35,7 +34,7 @@ SendBuffersManager::SendBuffersManager(
 void SendBuffersManager::init(
         const RTPSParticipantImpl* participant)
 {
-    std::lock_guard<TimedMutex> guard(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
 
     if (n_created_ < pool_.capacity())
     {
@@ -75,18 +74,9 @@ void SendBuffersManager::init(
 }
 
 std::unique_ptr<RTPSMessageGroup_t> SendBuffersManager::get_buffer(
-        const RTPSParticipantImpl* participant,
-        const std::chrono::steady_clock::time_point& max_blocking_time)
+        const RTPSParticipantImpl* participant)
 {
-#if HAVE_STRICT_REALTIME
-    std::unique_lock<TimedMutex> lock(mutex_, std::defer_lock);
-    if (!lock.try_lock_until(max_blocking_time))
-    {
-        throw RTPSMessageGroup::timeout();
-    }
-#else
-    std::unique_lock<TimedMutex> lock(mutex_);
-#endif // if HAVE_STRICT_REALTIME
+    std::unique_lock<std::mutex> lock(mutex_);
 
     std::unique_ptr<RTPSMessageGroup_t> ret_val;
 
@@ -99,10 +89,7 @@ std::unique_ptr<RTPSMessageGroup_t> SendBuffersManager::get_buffer(
         else
         {
             EPROSIMA_LOG_INFO(RTPS_PARTICIPANT, "Waiting for send buffer");
-            if (std::cv_status::timeout == available_cv_.wait_until(lock, max_blocking_time))
-            {
-                throw RTPSMessageGroup::timeout();
-            }
+            available_cv_.wait(lock);
         }
     }
 
@@ -115,7 +102,7 @@ std::unique_ptr<RTPSMessageGroup_t> SendBuffersManager::get_buffer(
 void SendBuffersManager::return_buffer(
         std::unique_ptr <RTPSMessageGroup_t>&& buffer)
 {
-    std::lock_guard<TimedMutex> guard(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     pool_.push_back(std::move(buffer));
     available_cv_.notify_one();
 }

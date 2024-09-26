@@ -154,16 +154,8 @@ void set_qos_from_attributes(
     qos.transport().use_builtin_transports = attr.useBuiltinTransports;
     qos.transport().send_socket_buffer_size = attr.sendSocketBufferSize;
     qos.transport().listen_socket_buffer_size = attr.listenSocketBufferSize;
-    qos.transport().max_msg_size_no_frag = attr.max_msg_size_no_frag;
-    qos.transport().netmask_filter = attr.netmaskFilter;
     qos.name() = attr.getName();
     qos.flow_controllers() = attr.flow_controllers;
-    qos.builtin_controllers_sender_thread() = attr.builtin_controllers_sender_thread;
-    qos.timed_events_thread() = attr.timed_events_thread;
-    qos.discovery_server_thread() = attr.discovery_server_thread;
-#if HAVE_SECURITY
-    qos.security_log_thread() = attr.security_log_thread;
-#endif // if HAVE_SECURITY
 
     // Merge attributes and qos properties
     for (auto property : attr.properties.properties())
@@ -202,16 +194,8 @@ void set_attributes_from_qos(
     attr.useBuiltinTransports = qos.transport().use_builtin_transports;
     attr.sendSocketBufferSize = qos.transport().send_socket_buffer_size;
     attr.listenSocketBufferSize = qos.transport().listen_socket_buffer_size;
-    attr.max_msg_size_no_frag = qos.transport().max_msg_size_no_frag;
-    attr.netmaskFilter = qos.transport().netmask_filter;
     attr.userData = qos.user_data().data_vec();
     attr.flow_controllers = qos.flow_controllers();
-    attr.builtin_controllers_sender_thread = qos.builtin_controllers_sender_thread();
-    attr.timed_events_thread = qos.timed_events_thread();
-    attr.discovery_server_thread = qos.discovery_server_thread();
-#if HAVE_SECURITY
-    attr.security_log_thread = qos.security_log_thread();
-#endif // if HAVE_SECURITY
 }
 
 void set_qos_from_attributes(

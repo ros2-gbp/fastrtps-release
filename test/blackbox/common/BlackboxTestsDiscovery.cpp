@@ -12,30 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-#include <atomic>
-#include <thread>
-
+#include <gtest/gtest.h>
 #ifndef _WIN32
 #include <stdlib.h>
 #endif // _WIN32
 
-#include <gtest/gtest.h>
+#include <thread>
 
-#include <fastdds/dds/domain/DomainParticipant.hpp>
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/domain/DomainParticipantListener.hpp>
-#include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/common/CDRMessage_t.h>
-#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
-
 #include <rtps/transport/test_UDPv4Transport.h>
 #include <utils/SystemInfo.hpp>
 
 #include "BlackboxTests.hpp"
-#include "DatagramInjectionTransport.hpp"
 #include "PubSubReader.hpp"
 #include "PubSubWriter.hpp"
 #include "PubSubWriterReader.hpp"
@@ -2077,135 +2067,4 @@ TEST(Discovery, MulticastInitialPeer)
     // Wait for discovery (times out before the fix).
     writer.wait_discovery();
     reader.wait_discovery();
-}
-
-//! Regression test for redmine issue 17162
-TEST(Discovery, MultipleXMLProfileLoad)
-{
-    // These test may fail because one of the participants disappear before the other has found it.
-    // Thus, use condition variable so threads only finish once the discovery has taken place.
-    std::condition_variable cv;
-    std::mutex cv_mtx;
-    std::atomic<int> n_discoveries(0);
-
-    auto participant_creation_reader = [&]()
-            {
-                PubSubReader<HelloWorldPubSubType> participant(TEST_TOPIC_NAME);
-                participant.init();
-                participant.wait_discovery();
-
-                // Notify discovery has happen
-                {
-                    std::unique_lock<std::mutex> lock(cv_mtx);
-                    n_discoveries++;
-                }
-                cv.notify_all();
-
-                std::unique_lock<std::mutex> lock(cv_mtx);
-                cv.wait(
-                    lock,
-                    [&]()
-                    {
-                        return n_discoveries >= 2;
-                    }
-                    );
-            };
-
-    auto participant_creation_writer = [&]()
-            {
-                PubSubWriter<HelloWorldPubSubType> participant(TEST_TOPIC_NAME);
-                participant.init();
-                participant.wait_discovery();
-
-                // Notify discovery has happen
-                {
-                    std::unique_lock<std::mutex> lock(cv_mtx);
-                    n_discoveries++;
-                }
-                cv.notify_all();
-
-                std::unique_lock<std::mutex> lock(cv_mtx);
-                cv.wait(
-                    lock,
-                    [&]()
-                    {
-                        return n_discoveries >= 2;
-                    }
-                    );
-            };
-
-    // Start thread creating second participant
-    std::thread thr_reader(participant_creation_reader);
-    std::thread thr_writer(participant_creation_writer);
-
-    thr_reader.join();
-    thr_writer.join();
-}
-
-//! Regression test for redmine issue 20641
-TEST(Discovery, discovery_cyclone_participant_with_custom_pid)
-{
-    using namespace eprosima::fastdds::dds;
-    using namespace eprosima::fastrtps::rtps;
-
-    /* Custom participant listener to count number of discovered participants */
-    class DiscoveryListener : public DomainParticipantListener
-    {
-    public:
-
-        void on_participant_discovery(
-                DomainParticipant*,
-                ParticipantDiscoveryInfo&& info) override
-        {
-            if (ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT == info.status)
-            {
-                discovered_participants_++;
-            }
-            else if (ParticipantDiscoveryInfo::REMOVED_PARTICIPANT == info.status)
-            {
-                discovered_participants_--;
-            }
-        }
-
-        uint8_t discovered_participants() const
-        {
-            return discovered_participants_;
-        }
-
-    private:
-
-        using DomainParticipantListener::on_participant_discovery;
-
-        std::atomic<uint8_t> discovered_participants_{0};
-    };
-
-    /* Create a datagram injection transport */
-    using eprosima::fastdds::rtps::DatagramInjectionTransportDescriptor;
-    using eprosima::fastdds::rtps::DatagramInjectionTransport;
-    auto low_level_transport = std::make_shared<UDPv4TransportDescriptor>();
-    auto transport = std::make_shared<DatagramInjectionTransportDescriptor>(low_level_transport);
-
-    /* Disable builtin transport and add custom one */
-    DomainParticipantQos participant_qos = PARTICIPANT_QOS_DEFAULT;
-    participant_qos.transport().use_builtin_transports = false;
-    participant_qos.transport().user_transports.clear();
-    participant_qos.transport().user_transports.push_back(transport);
-
-    /* Create participant with custom transport and listener */
-    DiscoveryListener listener;
-    uint32_t domain_id = static_cast<uint32_t>(GET_PID()) % 230;
-    DomainParticipantFactory* factory = DomainParticipantFactory::get_instance();
-    DomainParticipant* participant = factory->create_participant(domain_id, participant_qos, &listener);
-    ASSERT_NE(nullptr, participant);
-
-    /* Inject a Cyclone DDS Data(p) with a custom PID that we also use */
-    auto receivers = transport->get_receivers();
-    ASSERT_FALSE(receivers.empty());
-    DatagramInjectionTransport::deliver_datagram_from_file(receivers, "datagrams/20641.bin");
-
-    /* Assert that the participant is discovered */
-    ASSERT_EQ(listener.discovered_participants(), 1u);
-
-    /* Clean up */
-    factory->delete_participant(participant);
 }

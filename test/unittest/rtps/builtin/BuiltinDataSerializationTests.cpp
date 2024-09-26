@@ -12,25 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
-
+#include "fastdds/rtps/messages/CDRMessage.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <fastdds/core/policy/ParameterList.hpp>
-#include <fastdds/core/policy/ParameterSerializer.hpp>
-#include <fastdds/dds/core/policy/QosPolicies.hpp>
-#include <fastdds/rtps/common/CacheChange.h>
-#include <fastdds/rtps/common/Guid.h>
-#include <fastdds/rtps/common/SequenceNumber.h>
-#include <fastdds/rtps/common/Types.h>
-#include <fastdds/rtps/common/VendorId_t.hpp>
-#include <fastdds/rtps/messages/CDRMessage.h>
-#include <fastrtps/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
 
+#include <fastdds/core/policy/ParameterSerializer.hpp>
 #include <rtps/network/NetworkFactory.h>
 
 namespace eprosima {
@@ -97,7 +87,7 @@ void assert_is_empty_content_filter(
     ASSERT_EQ("", filter_property.related_topic_name.to_string());
     ASSERT_EQ("", filter_property.filter_class_name.to_string());
     ASSERT_EQ("", filter_property.filter_expression);
-    ASSERT_EQ(0u, filter_property.expression_parameters.size());
+    ASSERT_EQ(0, filter_property.expression_parameters.size());
 }
 
 TEST(BuiltinDataSerializationTests, ok_with_defaults)
@@ -117,7 +107,7 @@ TEST(BuiltinDataSerializationTests, ok_with_defaults)
 
         // Perform deserialization
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
         // EXPECT_EQ(in, out);
     }
 
@@ -136,7 +126,7 @@ TEST(BuiltinDataSerializationTests, ok_with_defaults)
 
         // Perform deserialization
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
     }
 }
 
@@ -154,7 +144,7 @@ TEST(BuiltinDataSerializationTests, msg_without_datasharing)
         msg.length = msg.max_size;
 
         ReaderProxyData out(max_unicast_locators, max_multicast_locators);
-        out.readFromCDRMessage(&msg, network, false, true);
+        out.readFromCDRMessage(&msg, network, true);
         ASSERT_EQ(out.m_qos.data_sharing.kind(), OFF);
     }
 
@@ -171,7 +161,7 @@ TEST(BuiltinDataSerializationTests, msg_without_datasharing)
         msg.length = msg.max_size;
 
         ReaderProxyData out(max_unicast_locators, max_multicast_locators);
-        out.readFromCDRMessage(&msg, network, false, true);
+        out.readFromCDRMessage(&msg, network, true);
         ASSERT_EQ(out.m_qos.data_sharing.kind(), OFF);
     }
 }
@@ -194,7 +184,7 @@ TEST(BuiltinDataSerializationTests, msg_with_datasharing)
         msg.length = msg.max_size;
 
         ReaderProxyData out(max_unicast_locators, max_multicast_locators);
-        out.readFromCDRMessage(&msg, network, false, true);
+        out.readFromCDRMessage(&msg, network, true);
         ASSERT_EQ(out.m_qos.data_sharing.kind(), ON);
     }
 
@@ -214,10 +204,11 @@ TEST(BuiltinDataSerializationTests, msg_with_datasharing)
         msg.length = msg.max_size;
 
         ReaderProxyData out(max_unicast_locators, max_multicast_locators);
-        out.readFromCDRMessage(&msg, network, false, true);
+        out.readFromCDRMessage(&msg, network, true);
         ASSERT_EQ(out.m_qos.data_sharing.kind(), ON);
     }
 }
+
 
 // Regression test for redmine issue #10547
 TEST(BuiltinDataSerializationTests, ignore_unsupported_type_info)
@@ -268,7 +259,7 @@ TEST(BuiltinDataSerializationTests, ignore_unsupported_type_info)
         msg.length = msg.max_size;
 
         WriterProxyData out(max_unicast_locators, max_multicast_locators);
-        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, true)));
+        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false)));
     }
 
     // DATA(r)
@@ -320,7 +311,7 @@ TEST(BuiltinDataSerializationTests, ignore_unsupported_type_info)
         msg.length = msg.max_size;
 
         ReaderProxyData out(max_unicast_locators, max_multicast_locators);
-        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, true)));
+        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false)));
     }
 }
 
@@ -435,7 +426,7 @@ TEST(BuiltinDataSerializationTests, ignore_unsupported_type_object)
         msg.length = msg.max_size;
 
         WriterProxyData out(max_unicast_locators, max_multicast_locators);
-        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, true)));
+        EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false)));
     }
 }
 
@@ -513,453 +504,7 @@ TEST(BuiltinDataSerializationTests, property_list_with_binary_properties)
     msg.length = msg.max_size;
 
     ParticipantProxyData out(RTPSParticipantAllocationAttributes{});
-    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, true, network, false, true)));
-}
-
-// Regression test for redmine tickets 20306 and 20307
-TEST(BuiltinDataSerializationTests, other_vendor_parameter_list_with_custom_pids)
-{
-    /* Convenient functions to group code */
-    auto participant_read = [](octet* buffer, uint32_t buffer_length, ParticipantProxyData& out) -> void
-            {
-                CDRMessage_t msg(0);
-                msg.init(buffer, buffer_length);
-                msg.length = msg.max_size;
-
-                EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, true, network, false, false,
-                        fastdds::rtps::VendorId_t({2, 0}))));
-            };
-
-    auto writer_read = [](octet* buffer, uint32_t buffer_length, WriterProxyData& out) -> void
-            {
-                CDRMessage_t msg(0);
-                msg.init(buffer, buffer_length);
-                msg.length = msg.max_size;
-
-                EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, false,
-                        fastdds::rtps::VendorId_t({2, 0}))));
-            };
-
-    auto reader_read = [](octet* buffer, uint32_t buffer_length, ReaderProxyData& out) -> void
-            {
-                CDRMessage_t msg(0);
-                msg.init(buffer, buffer_length);
-                msg.length = msg.max_size;
-
-                EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, false,
-                        fastdds::rtps::VendorId_t({2, 0}))));
-            };
-
-    auto update_cache_change =
-            [](CacheChange_t& change, octet* buffer, uint32_t buffer_length, uint32_t qos_size) -> void
-            {
-                CDRMessage_t msg(0);
-                msg.init(buffer, buffer_length);
-                msg.length = msg.max_size;
-
-                EXPECT_TRUE(fastdds::dds::ParameterList::updateCacheChangeFromInlineQos(change, &msg, qos_size));
-            };
-
-    /* Custom PID tests */
-
-    // PID_PERSISTENCE_GUID
-    {
-        octet data_buffer[] =
-        {
-            // Encapsulation
-            0x00, 0x03, 0x00, 0x00,
-            // PID_PERSISTENCE_GUID
-            0x02, 0x80, 8, 0,
-            1, 2, 3, 4, 5, 6, 7, 8,
-            // PID_SENTINEL
-            0x01, 0, 0, 0
-        };
-
-        uint32_t buffer_length = static_cast<uint32_t>(sizeof(data_buffer));
-
-        // ParticipantProxyData check
-        ParticipantProxyData participant_pdata(RTPSParticipantAllocationAttributes{});
-        participant_pdata.set_persistence_guid(c_Guid_Unknown);
-        participant_read(data_buffer, buffer_length, participant_pdata);
-        ASSERT_EQ(participant_pdata.get_persistence_guid(), c_Guid_Unknown);
-
-        // WriterProxyData check
-        WriterProxyData writer_pdata(max_unicast_locators, max_multicast_locators);
-        writer_pdata.persistence_guid(c_Guid_Unknown);
-        writer_read(data_buffer, buffer_length, writer_pdata);
-        ASSERT_EQ(writer_pdata.persistence_guid(), c_Guid_Unknown);
-
-        // ReaderProxyData check
-        ReaderProxyData reader_pdata(max_unicast_locators, max_multicast_locators);
-        reader_read(data_buffer, buffer_length, reader_pdata);
-
-        // CacheChange_t check
-        CacheChange_t change;
-        update_cache_change(change, data_buffer, buffer_length, 0);
-    }
-
-    // PID_CUSTOM_RELATED_SAMPLE_IDENTITY
-    {
-        octet data_buffer[] =
-        {
-            // Encapsulation
-            0x00, 0x03, 0x00, 0x00,
-            // PID_CUSTOM_RELATED_SAMPLE_IDENTITY
-            0x0f, 0x80, 8, 0,
-            1, 2, 3, 4, 5, 6, 7, 8,
-            // PID_SENTINEL
-            0x01, 0, 0, 0
-        };
-
-        uint32_t buffer_length = static_cast<uint32_t>(sizeof(data_buffer));
-
-        // ParticipantProxyData check
-        ParticipantProxyData participant_pdata(RTPSParticipantAllocationAttributes{});
-        participant_read(data_buffer, buffer_length, participant_pdata);
-
-        // WriterProxyData check
-        WriterProxyData writer_pdata(max_unicast_locators, max_multicast_locators);
-        writer_read(data_buffer, buffer_length, writer_pdata);
-
-        // ReaderProxyData check
-        ReaderProxyData reader_pdata(max_unicast_locators, max_multicast_locators);
-        reader_read(data_buffer, buffer_length, reader_pdata);
-
-        // CacheChange_t check
-        CacheChange_t change;
-        GuidPrefix_t prefix;
-        prefix.value[0] = 1;
-        change.write_params.related_sample_identity().writer_guid(GUID_t(prefix, 1));
-        change.write_params.sample_identity().sequence_number() = {2, 0};
-        update_cache_change(change, data_buffer, buffer_length, 0);
-        ASSERT_EQ(change.write_params.related_sample_identity().writer_guid(), GUID_t(prefix, 1));
-        ASSERT_EQ(change.write_params.sample_identity().sequence_number(), SequenceNumber_t(2, 0));
-    }
-
-    // PID_DISABLE_POSITIVE_ACKS
-    {
-        octet data_buffer[] =
-        {
-            // Encapsulation
-            0x00, 0x03, 0x00, 0x00,
-            // PID_DISABLE_POSITIVE_ACKS
-            0x05, 0x80, 8, 0,
-            1, 2, 3, 4, 5, 6, 7, 8,
-            // PID_SENTINEL
-            0x01, 0, 0, 0
-        };
-
-        uint32_t buffer_length = static_cast<uint32_t>(sizeof(data_buffer));
-
-        // ParticipantProxyData check
-        ParticipantProxyData participant_pdata(RTPSParticipantAllocationAttributes{});
-        participant_read(data_buffer, buffer_length, participant_pdata);
-
-        // WriterProxyData check
-        WriterProxyData writer_pdata(max_unicast_locators, max_multicast_locators);
-        writer_pdata.m_qos.m_disablePositiveACKs.enabled = false;
-        writer_read(data_buffer, buffer_length, writer_pdata);
-        ASSERT_EQ(writer_pdata.m_qos.m_disablePositiveACKs.enabled, false);
-
-        // ReaderProxyData check
-        ReaderProxyData reader_pdata(max_unicast_locators, max_multicast_locators);
-        reader_pdata.m_qos.m_disablePositiveACKs.enabled = false;
-        reader_read(data_buffer, buffer_length, reader_pdata);
-        ASSERT_EQ(reader_pdata.m_qos.m_disablePositiveACKs.enabled, false);
-
-        // CacheChange_t check
-        CacheChange_t change;
-        update_cache_change(change, data_buffer, buffer_length, 0);
-    }
-
-    // PID_DATASHARING
-    {
-        octet data_buffer[] =
-        {
-            // Encapsulation
-            0x00, 0x03, 0x00, 0x00,
-            // PID_DATASHARING
-            0x06, 0x80, 8, 0,
-            1, 2, 3, 4, 5, 6, 7, 8,
-            // PID_SENTINEL
-            0x01, 0, 0, 0
-        };
-
-        uint32_t buffer_length = static_cast<uint32_t>(sizeof(data_buffer));
-
-        // ParticipantProxyData check
-        ParticipantProxyData participant_pdata(RTPSParticipantAllocationAttributes{});
-        participant_read(data_buffer, buffer_length, participant_pdata);
-
-        // WriterProxyData check
-        WriterProxyData writer_pdata(max_unicast_locators, max_multicast_locators);
-        writer_pdata.m_qos.data_sharing.off();
-        writer_pdata.m_qos.data_sharing.set_max_domains(0);
-        writer_read(data_buffer, buffer_length, writer_pdata);
-        ASSERT_EQ(writer_pdata.m_qos.data_sharing.kind(), OFF);
-
-        // ReaderProxyData check
-        ReaderProxyData reader_pdata(max_unicast_locators, max_multicast_locators);
-        reader_pdata.m_qos.data_sharing.off();
-        reader_pdata.m_qos.data_sharing.set_max_domains(0);
-        reader_pdata.m_qos.m_disablePositiveACKs.enabled = false;
-        reader_read(data_buffer, buffer_length, reader_pdata);
-        ASSERT_EQ(reader_pdata.m_qos.data_sharing.kind(), OFF);
-
-        // CacheChange_t check
-        CacheChange_t change;
-        update_cache_change(change, data_buffer, buffer_length, 0);
-    }
-
-    // PID_NETWORK_CONFIGURATION_SET
-    {
-        octet data_buffer[] =
-        {
-            // Encapsulation
-            0x00, 0x03, 0x00, 0x00,
-            // PID_NETWORK_CONFIGURATION_SET
-            0x07, 0x80, 8, 0,
-            1, 2, 3, 4, 5, 6, 7, 8,
-            // PID_SENTINEL
-            0x01, 0, 0, 0
-        };
-
-        uint32_t buffer_length = static_cast<uint32_t>(sizeof(data_buffer));
-
-        // ParticipantProxyData check
-        ParticipantProxyData participant_pdata(RTPSParticipantAllocationAttributes{});
-        participant_pdata.m_networkConfiguration = 0;
-        participant_read(data_buffer, buffer_length, participant_pdata);
-        ASSERT_EQ(participant_pdata.m_networkConfiguration, 0u);
-
-        // WriterProxyData check
-        WriterProxyData writer_pdata(max_unicast_locators, max_multicast_locators);
-        writer_pdata.networkConfiguration(0);
-        writer_read(data_buffer, buffer_length, writer_pdata);
-        ASSERT_EQ(writer_pdata.networkConfiguration(), 0u);
-
-        // ReaderProxyData check
-        ReaderProxyData reader_pdata(max_unicast_locators, max_multicast_locators);
-        reader_pdata.networkConfiguration(0);
-        reader_read(data_buffer, buffer_length, reader_pdata);
-        ASSERT_EQ(reader_pdata.networkConfiguration(), 0u);
-
-        // CacheChange_t check
-        CacheChange_t change;
-        update_cache_change(change, data_buffer, buffer_length, 0);
-    }
-}
-
-// Check interoperability of compatible custom PIDs when vendor ID is RTI Connext
-TEST(BuiltinDataSerializationTests, rti_parameter_list_with_custom_pids)
-{
-    /* Convenient functions to group code */
-    auto participant_read = [](octet* buffer, uint32_t buffer_length, ParticipantProxyData& out) -> void
-            {
-                CDRMessage_t msg(0);
-                msg.init(buffer, buffer_length);
-                msg.length = msg.max_size;
-
-                EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, true, network, false, false,
-                        fastdds::rtps::c_VendorId_rti_connext)));
-            };
-
-    auto writer_read = [](octet* buffer, uint32_t buffer_length, WriterProxyData& out) -> void
-            {
-                CDRMessage_t msg(0);
-                msg.init(buffer, buffer_length);
-                msg.length = msg.max_size;
-
-                EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, false,
-                        fastdds::rtps::c_VendorId_rti_connext)));
-            };
-
-    auto reader_read = [](octet* buffer, uint32_t buffer_length, ReaderProxyData& out) -> void
-            {
-                CDRMessage_t msg(0);
-                msg.init(buffer, buffer_length);
-                msg.length = msg.max_size;
-
-                EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, false,
-                        fastdds::rtps::c_VendorId_rti_connext)));
-            };
-
-    auto update_cache_change =
-            [](CacheChange_t& change, octet* buffer, uint32_t buffer_length, uint32_t qos_size) -> void
-            {
-                CDRMessage_t msg(0);
-                msg.init(buffer, buffer_length);
-                msg.length = msg.max_size;
-
-                EXPECT_TRUE(fastdds::dds::ParameterList::updateCacheChangeFromInlineQos(change, &msg, qos_size));
-            };
-
-    /* Custom PID tests */
-
-    // PID_PERSISTENCE_GUID
-    {
-        octet data_buffer[] =
-        {
-            // Encapsulation
-            0x00, 0x03, 0x00, 0x00,
-            // PID_PERSISTENCE_GUID
-            0x02, 0x80, 16, 0,
-            0x52, 0x54, 0x49, 0x5F, 0x47, 0x55, 0x49, 0x44, 0x5F, 0x54, 0x45, 0x53, 0x54, 0x50, 0x49, 0x44,
-            // PID_SENTINEL
-            0x01, 0, 0, 0
-        };
-
-        uint32_t buffer_length = static_cast<uint32_t>(sizeof(data_buffer));
-
-        // Define guid for checking the read data
-        GuidPrefix_t prefix;
-        prefix.value[0] = 0x52;
-        prefix.value[1] = 0x54;
-        prefix.value[2] = 0x49;
-        prefix.value[3] = 0x5F;
-        prefix.value[4] = 0x47;
-        prefix.value[5] = 0x55;
-        prefix.value[6] = 0x49;
-        prefix.value[7] = 0x44;
-        prefix.value[8] = 0x5F;
-        prefix.value[9] = 0x54;
-        prefix.value[10] = 0x45;
-        prefix.value[11] = 0x53;
-
-        EntityId_t entity_id;
-        entity_id.value[0] = 0x54;
-        entity_id.value[1] = 0x50;
-        entity_id.value[2] = 0x49;
-        entity_id.value[3] = 0x44;
-
-        GUID_t guid(prefix, entity_id);
-
-        // ParticipantProxyData check
-        ParticipantProxyData participant_pdata(RTPSParticipantAllocationAttributes{});
-        participant_pdata.set_persistence_guid(c_Guid_Unknown);
-        participant_read(data_buffer, buffer_length, participant_pdata);
-
-        ASSERT_EQ(participant_pdata.get_persistence_guid(), c_Guid_Unknown);
-
-        // WriterProxyData check
-        WriterProxyData writer_pdata(max_unicast_locators, max_multicast_locators);
-        writer_pdata.persistence_guid(c_Guid_Unknown);
-        writer_read(data_buffer, buffer_length, writer_pdata);
-        ASSERT_EQ(writer_pdata.persistence_guid(), guid);
-
-        // ReaderProxyData check
-        ReaderProxyData reader_pdata(max_unicast_locators, max_multicast_locators);
-        reader_read(data_buffer, buffer_length, reader_pdata);
-
-        // CacheChange_t check
-        CacheChange_t change;
-        update_cache_change(change, data_buffer, buffer_length, 0);
-    }
-
-    // PID_CUSTOM_RELATED_SAMPLE_IDENTITY
-    {
-        octet data_buffer[] =
-        {
-            // Encapsulation
-            0x00, 0x03, 0x00, 0x00,
-            // PID_CUSTOM_RELATED_SAMPLE_IDENTITY
-            0x0f, 0x80, 24, 0,
-            // Writer guid
-            0x52, 0x54, 0x49, 0x5F, 0x47, 0x55, 0x49, 0x44, 0x5F, 0x54, 0x45, 0x53, 0x54, 0x50, 0x49, 0x44,
-            // Sequence number high
-            0x00, 0x00, 0x00, 0x00,
-            // Sequence number low
-            0x05, 0x00, 0x00, 0x00,
-            // PID_SENTINEL
-            0x01, 0, 0, 0
-        };
-
-        uint32_t buffer_length = static_cast<uint32_t>(sizeof(data_buffer));
-
-        // Define sample identity for checking the read data
-        GuidPrefix_t prefix;
-        prefix.value[0] = 0x52;
-        prefix.value[1] = 0x54;
-        prefix.value[2] = 0x49;
-        prefix.value[3] = 0x5F;
-        prefix.value[4] = 0x47;
-        prefix.value[5] = 0x55;
-        prefix.value[6] = 0x49;
-        prefix.value[7] = 0x44;
-        prefix.value[8] = 0x5F;
-        prefix.value[9] = 0x54;
-        prefix.value[10] = 0x45;
-        prefix.value[11] = 0x53;
-
-        EntityId_t entity_id;
-        entity_id.value[0] = 0x54;
-        entity_id.value[1] = 0x50;
-        entity_id.value[2] = 0x49;
-        entity_id.value[3] = 0x44;
-
-        GUID_t guid(prefix, entity_id);
-
-        SequenceNumber_t sn = {0, 5};
-
-        // ParticipantProxyData check
-        ParticipantProxyData participant_pdata(RTPSParticipantAllocationAttributes{});
-        participant_read(data_buffer, buffer_length, participant_pdata);
-
-        // WriterProxyData check
-        WriterProxyData writer_pdata(max_unicast_locators, max_multicast_locators);
-        writer_read(data_buffer, buffer_length, writer_pdata);
-
-        // ReaderProxyData check
-        ReaderProxyData reader_pdata(max_unicast_locators, max_multicast_locators);
-        reader_read(data_buffer, buffer_length, reader_pdata);
-
-        // CacheChange_t check
-        CacheChange_t change;
-        change.vendor_id = fastdds::rtps::c_VendorId_rti_connext;
-        GuidPrefix_t init_prefix;
-        prefix.value[0] = 1;
-        change.write_params.sample_identity().writer_guid(GUID_t(init_prefix, 1));
-        change.write_params.sample_identity().sequence_number() = {2, 0};
-        update_cache_change(change, data_buffer, buffer_length, 0);
-        ASSERT_EQ(change.write_params.sample_identity().writer_guid(), guid);
-        ASSERT_EQ(change.write_params.sample_identity().sequence_number(), sn);
-    }
-
-    // PID_DISABLE_POSITIVE_ACKS
-    {
-        octet data_buffer[] =
-        {
-            // Encapsulation
-            0x00, 0x03, 0x00, 0x00,
-            // PID_DISABLE_POSITIVE_ACKS
-            0x05, 0x80, 4, 0,
-            1, 0, 0, 0,
-            // PID_SENTINEL
-            0x01, 0, 0, 0
-        };
-
-        uint32_t buffer_length = static_cast<uint32_t>(sizeof(data_buffer));
-
-        // ParticipantProxyData check
-        ParticipantProxyData participant_pdata(RTPSParticipantAllocationAttributes{});
-        participant_read(data_buffer, buffer_length, participant_pdata);
-
-        // WriterProxyData check
-        WriterProxyData writer_pdata(max_unicast_locators, max_multicast_locators);
-        writer_pdata.m_qos.m_disablePositiveACKs.enabled = false;
-        writer_read(data_buffer, buffer_length, writer_pdata);
-        ASSERT_EQ(writer_pdata.m_qos.m_disablePositiveACKs.enabled, true);
-
-        // ReaderProxyData check
-        ReaderProxyData reader_pdata(max_unicast_locators, max_multicast_locators);
-        reader_pdata.m_qos.m_disablePositiveACKs.enabled = false;
-        reader_read(data_buffer, buffer_length, reader_pdata);
-        ASSERT_EQ(reader_pdata.m_qos.m_disablePositiveACKs.enabled, true);
-
-        // CacheChange_t check
-        CacheChange_t change;
-        update_cache_change(change, data_buffer, buffer_length, 0);
-    }
+    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, true, network, false)));
 }
 
 /*!
@@ -990,7 +535,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_without_parameters)
 
     // Perform deserialization
     msg.pos = 0;
-    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
     ASSERT_EQ(in.content_filter().content_filtered_topic_name, out.content_filter().content_filtered_topic_name);
     ASSERT_EQ(in.content_filter().related_topic_name, out.content_filter().related_topic_name);
@@ -1031,7 +576,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_with_parameters)
 
     // Perform deserialization
     msg.pos = 0;
-    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
     ASSERT_EQ(in.content_filter().content_filtered_topic_name, out.content_filter().content_filtered_topic_name);
     ASSERT_EQ(in.content_filter().related_topic_name, out.content_filter().related_topic_name);
@@ -1123,7 +668,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_topic_name_deser
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -1172,7 +717,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_topic_name_deser
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -1257,7 +802,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_related_topic_na
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -1306,7 +851,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_related_topic_na
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -1340,7 +885,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_empty_filter_class)
 
     // Perform deserialization
     msg.pos = 0;
-    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
     assert_is_empty_content_filter(out.content_filter());
 }
@@ -1395,7 +940,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_filter_class_des
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -1444,7 +989,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_filter_class_des
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -1478,7 +1023,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_empty_filter_expressio
 
     // Perform deserialization
     msg.pos = 0;
-    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+    EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
     assert_is_empty_content_filter(out.content_filter());
 }
@@ -1533,7 +1078,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_wrong_filter_expressio
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
         assert_is_empty_content_filter(out.content_filter());
     }
@@ -1720,7 +1265,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_interoperability)
     msg.length = msg.max_size;
 
     ReaderProxyData out(max_unicast_locators, max_multicast_locators);
-    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false, true)));
+    EXPECT_NO_THROW(EXPECT_TRUE(out.readFromCDRMessage(&msg, network, false)));
 
     ASSERT_EQ("ContentFilter_0", out.content_filter().content_filtered_topic_name.to_string());
     ASSERT_EQ("Square", out.content_filter().related_topic_name.to_string());
@@ -1789,7 +1334,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_max_parameter_check)
         EXPECT_TRUE(fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(&msg));
 
         msg.pos = 0;
-        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true, true));
+        EXPECT_TRUE(out.readFromCDRMessage(&msg, network, true));
 
         ASSERT_EQ(100, out.content_filter().expression_parameters.size());
 
@@ -1833,7 +1378,7 @@ TEST(BuiltinDataSerializationTests, contentfilterproperty_max_parameter_check)
 
         msg_fault.pos = 0;
         // Deserialization of messages with more than 100 parameters should fail
-        ASSERT_FALSE(out.readFromCDRMessage(&msg_fault, network, true, true));
+        ASSERT_FALSE(out.readFromCDRMessage(&msg_fault, network, true));
     }
 }
 

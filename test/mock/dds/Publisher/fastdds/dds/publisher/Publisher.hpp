@@ -145,11 +145,6 @@ public:
         return impl_->delete_contained_entities();
     }
 
-    PublisherImpl* get_impl()
-    {
-        return impl_;
-    }
-
 protected:
 
     PublisherImpl* impl_;

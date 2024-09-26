@@ -12,37 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <fastrtps/xmlparser/XMLParser.h>
+#include <fastrtps/xmlparser/XMLTree.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <fastrtps/transport/UDPv4TransportDescriptor.h>
+#include <fastrtps/transport/UDPv6TransportDescriptor.h>
+#include <fastrtps/transport/TCPv4TransportDescriptor.h>
+#include <fastrtps/transport/TCPv6TransportDescriptor.h>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/dds/log/OStreamConsumer.hpp>
+#include <fastdds/dds/log/FileConsumer.hpp>
+#include <fastdds/dds/log/StdoutConsumer.hpp>
+#include <fastdds/dds/log/StdoutErrConsumer.hpp>
+#include "../logging/mock/MockConsumer.h"
 #include "XMLParserTests.hpp"
+#include "wrapper/XMLParserTest.hpp"
+
+#include <tinyxml2.h>
+#include <gtest/gtest.h>
 
 #include <fstream>
 #include <sstream>
-
-#include <fastdds/dds/log/FileConsumer.hpp>
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/dds/log/OStreamConsumer.hpp>
-#include <fastdds/dds/log/StdoutConsumer.hpp>
-#include <fastdds/dds/log/StdoutErrConsumer.hpp>
-#include <fastdds/rtps/attributes/ThreadSettings.hpp>
-#include <fastdds/rtps/transport/network/AllowedNetworkInterface.hpp>
-#include <fastdds/rtps/transport/network/BlockedNetworkInterface.hpp>
-#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
-#include <fastdds/rtps/transport/PortBasedTransportDescriptor.hpp>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-#include <fastrtps/transport/TCPv4TransportDescriptor.h>
-#include <fastrtps/transport/TCPv6TransportDescriptor.h>
-#include <fastrtps/transport/UDPv4TransportDescriptor.h>
-#include <fastrtps/transport/UDPv6TransportDescriptor.h>
-#include <fastrtps/utils/IPLocator.h>
-#include <fastrtps/xmlparser/XMLParser.h>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastrtps/xmlparser/XMLTree.h>
-
-#include <tinyxml2.h>
-
-#include <gtest/gtest.h>
-
-#include "../logging/mock/MockConsumer.h"
-#include "wrapper/XMLParserTest.hpp"
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
@@ -73,10 +66,6 @@ TEST_F(XMLParserTests, regressions)
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/19851_profile_bin.xml", root));
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/simple_participant_profiles_nok.xml", root));
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParser::loadXML("regressions/simple_participant_profiles_ok.xml", root));
-    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/20186_profile_bin.xml", root));
-    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/20187_profile_bin.xml", root));
-    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/20608_profile_bin.xml", root));
-    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/20610_profile_bin.xml", root));
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/20732_profile_bin.xml", root));
 }
 
@@ -524,8 +513,6 @@ TEST_F(XMLParserTests, Data)
     EXPECT_EQ(builtin.readerPayloadSize, 1000u);
     EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
-    EXPECT_TRUE(builtin.typelookup_config.use_client);
-    EXPECT_TRUE(builtin.typelookup_config.use_server);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
     EXPECT_EQ(port.participantIDGain, 56);
@@ -622,8 +609,6 @@ TEST_F(XMLParserTests, DataDeprecated)
     EXPECT_EQ(builtin.readerPayloadSize, 1000u);
     EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
-    EXPECT_TRUE(builtin.typelookup_config.use_client);
-    EXPECT_TRUE(builtin.typelookup_config.use_server);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
     EXPECT_EQ(port.participantIDGain, 56);
@@ -720,8 +705,6 @@ TEST_F(XMLParserTests, DataBuffer)
     EXPECT_EQ(builtin.readerPayloadSize, 1000u);
     EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
-    EXPECT_TRUE(builtin.typelookup_config.use_client);
-    EXPECT_TRUE(builtin.typelookup_config.use_server);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
     EXPECT_EQ(port.participantIDGain, 56);
@@ -818,8 +801,6 @@ TEST_F(XMLParserTests, DataBufferDeprecated)
     EXPECT_EQ(builtin.readerPayloadSize, 1000u);
     EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
-    EXPECT_TRUE(builtin.typelookup_config.use_client);
-    EXPECT_TRUE(builtin.typelookup_config.use_server);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
     EXPECT_EQ(port.participantIDGain, 56);
@@ -875,20 +856,12 @@ TEST_F(XMLParserTests, loadXMLProfiles)
 /*
  * This test checks the return of the parseXMLTransportData method  and the storage of the values in the XMLProfileManager
  * xml is parsed
- * 1. Check the correct parsing of a UDP transport descriptor for both v4 and v6
- * 2. Check the correct parsing of a TCP transport descriptor for both v4 and v6
+ * 1. Check the correct parsing of a UDP transport descriptor for birth v4 and v6
+ * 2. Check the correct parsing of a TCP transport descriptor for birth v4 and v6
  * 3. Check the correct parsing of a SHM transport descriptor
  */
 TEST_F(XMLParserTests, parseXMLTransportData)
 {
-    using namespace eprosima::fastdds::rtps;
-
-    ThreadSettings modified_thread_settings;
-    modified_thread_settings.scheduling_policy = 12;
-    modified_thread_settings.priority = 12;
-    modified_thread_settings.affinity = 12;
-    modified_thread_settings.stack_size = 12;
-
     // Test UDPv4 and UDPv6
     {
         tinyxml2::XMLDocument xml_doc;
@@ -908,19 +881,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     <interfaceWhiteList>\
                         <address>192.168.1.41</address>\
                         <address>127.0.0.1</address>\
-                        <interface>wlp0s20f3</interface>\
-                        <interface>lo</interface>\
                     </interfaceWhiteList>\
-                    <netmask_filter>ON</netmask_filter>\
-                    <interfaces>\
-                        <allowlist>\
-                            <interface name=\"wlp59s0\" netmask_filter=\"ON\"/>\
-                            <interface name=\"127.0.0.1\" netmask_filter=\"AUTO\"/>\
-                        </allowlist>\
-                        <blocklist>\
-                            <interface name=\"docker0\"/>\
-                        </blocklist>\
-                    </interfaces>\
                     <wan_addr>80.80.55.44</wan_addr>\
                     <output_port>5101</output_port>\
                     <keep_alive_frequency_ms>5000</keep_alive_frequency_ms>\
@@ -940,29 +901,9 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     <port_queue_capacity>512</port_queue_capacity>\
                     <healthy_check_timeout_ms>1000</healthy_check_timeout_ms>\
                     <rtps_dump_file>rtsp_messages.log</rtps_dump_file>\
-                    <default_reception_threads>\
-                        <scheduling_policy>12</scheduling_policy>\
-                        <priority>12</priority>\
-                        <affinity>12</affinity>\
-                        <stack_size>12</stack_size>\
-                    </default_reception_threads>\
-                    <reception_threads>\
-                        <reception_thread port=\"12345\">\
-                            <scheduling_policy>12</scheduling_policy>\
-                            <priority>12</priority>\
-                            <affinity>12</affinity>\
-                            <stack_size>12</stack_size>\
-                        </reception_thread>\
-                        <reception_thread port=\"12346\">\
-                            <scheduling_policy>12</scheduling_policy>\
-                            <priority>12</priority>\
-                            <affinity>12</affinity>\
-                            <stack_size>12</stack_size>\
-                        </reception_thread>\
-                    </reception_threads>\
                 </transport_descriptor>\
                 ";
-        constexpr size_t xml_len {3500};
+        constexpr size_t xml_len {2000};
         char xml[xml_len];
 
         // UDPv4
@@ -981,16 +922,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pUDPv4Desc->max_initial_peers_range(), 100u);
         EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[0], "192.168.1.41");
         EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[1], "127.0.0.1");
-        EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[2], "wlp0s20f3");
-        EXPECT_EQ(pUDPv4Desc->interfaceWhiteList[3], "lo");
-        EXPECT_EQ(pUDPv4Desc->netmask_filter, NetmaskFilterKind::ON);
-        EXPECT_EQ(pUDPv4Desc->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
-        EXPECT_EQ(pUDPv4Desc->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
-        EXPECT_EQ(pUDPv4Desc->interface_blocklist[0], BlockedNetworkInterface("docker0"));
         EXPECT_EQ(pUDPv4Desc->m_output_udp_socket, 5101u);
-        EXPECT_EQ(pUDPv4Desc->default_reception_threads(), modified_thread_settings);
-        EXPECT_EQ(pUDPv4Desc->get_thread_config_for_port(12345), modified_thread_settings);
-        EXPECT_EQ(pUDPv4Desc->get_thread_config_for_port(12346), modified_thread_settings);
 
         xmlparser::XMLProfileManager::DeleteInstance();
 
@@ -1010,16 +942,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pUDPv6Desc->max_initial_peers_range(), 100u);
         EXPECT_EQ(pUDPv6Desc->interfaceWhiteList[0], "192.168.1.41");
         EXPECT_EQ(pUDPv6Desc->interfaceWhiteList[1], "127.0.0.1");
-        EXPECT_EQ(pUDPv6Desc->interfaceWhiteList[2], "wlp0s20f3");
-        EXPECT_EQ(pUDPv6Desc->interfaceWhiteList[3], "lo");
-        EXPECT_EQ(pUDPv6Desc->netmask_filter, NetmaskFilterKind::ON);
-        EXPECT_EQ(pUDPv6Desc->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
-        EXPECT_EQ(pUDPv6Desc->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
-        EXPECT_EQ(pUDPv6Desc->interface_blocklist[0], BlockedNetworkInterface("docker0"));
         EXPECT_EQ(pUDPv6Desc->m_output_udp_socket, 5101u);
-        EXPECT_EQ(pUDPv6Desc->default_reception_threads(), modified_thread_settings);
-        EXPECT_EQ(pUDPv6Desc->get_thread_config_for_port(12345), modified_thread_settings);
-        EXPECT_EQ(pUDPv6Desc->get_thread_config_for_port(12346), modified_thread_settings);
         xmlparser::XMLProfileManager::DeleteInstance();
     }
 
@@ -1040,18 +963,8 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     <maxInitialPeersRange>100</maxInitialPeersRange>\
                     <interfaceWhiteList>\
                         <address>192.168.1.41</address>\
-                        <interface>lo</interface>\
+                        <address>127.0.0.1</address>\
                     </interfaceWhiteList>\
-                    <netmask_filter>ON</netmask_filter>\
-                    <interfaces>\
-                        <allowlist>\
-                            <interface name=\"wlp59s0\" netmask_filter=\"ON\"/>\
-                            <interface name=\"127.0.0.1\" netmask_filter=\"AUTO\"/>\
-                        </allowlist>\
-                        <blocklist>\
-                            <interface name=\"docker0\"/>\
-                        </blocklist>\
-                    </interfaces>\
                     <wan_addr>80.80.55.44</wan_addr>\
                     <keep_alive_frequency_ms>5000</keep_alive_frequency_ms>\
                     <keep_alive_timeout_ms>25000</keep_alive_timeout_ms>\
@@ -1065,44 +978,11 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     <calculate_crc>false</calculate_crc>\
                     <check_crc>false</check_crc>\
                     <enable_tcp_nodelay>false</enable_tcp_nodelay>\
-                    <non_blocking_send>true</non_blocking_send>\
                     <tcp_negotiation_timeout>100</tcp_negotiation_timeout>\
                     <tls><!-- TLS Section --></tls>\
-                    <keep_alive_thread>\
-                        <scheduling_policy>12</scheduling_policy>\
-                        <priority>12</priority>\
-                        <affinity>12</affinity>\
-                        <stack_size>12</stack_size>\
-                    </keep_alive_thread>\
-                    <accept_thread>\
-                        <scheduling_policy>12</scheduling_policy>\
-                        <priority>12</priority>\
-                        <affinity>12</affinity>\
-                        <stack_size>12</stack_size>\
-                    </accept_thread>\
-                    <default_reception_threads>\
-                        <scheduling_policy>12</scheduling_policy>\
-                        <priority>12</priority>\
-                        <affinity>12</affinity>\
-                        <stack_size>12</stack_size>\
-                    </default_reception_threads>\
-                    <reception_threads>\
-                        <reception_thread port=\"12345\">\
-                            <scheduling_policy>12</scheduling_policy>\
-                            <priority>12</priority>\
-                            <affinity>12</affinity>\
-                            <stack_size>12</stack_size>\
-                        </reception_thread>\
-                        <reception_thread port=\"12346\">\
-                            <scheduling_policy>12</scheduling_policy>\
-                            <priority>12</priority>\
-                            <affinity>12</affinity>\
-                            <stack_size>12</stack_size>\
-                        </reception_thread>\
-                    </reception_threads>\
                 </transport_descriptor>\
                 ";
-        constexpr size_t xml_len {4000};
+        constexpr size_t xml_len {2000};
         char xml[xml_len];
 
         // TCPv4
@@ -1119,11 +999,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pTCPv4Desc->max_message_size(), 16384u);
         EXPECT_EQ(pTCPv4Desc->max_initial_peers_range(), 100u);
         EXPECT_EQ(pTCPv4Desc->interfaceWhiteList[0], "192.168.1.41");
-        EXPECT_EQ(pTCPv4Desc->interfaceWhiteList[1], "lo");
-        EXPECT_EQ(pTCPv4Desc->netmask_filter, NetmaskFilterKind::ON);
-        EXPECT_EQ(pTCPv4Desc->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
-        EXPECT_EQ(pTCPv4Desc->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
-        EXPECT_EQ(pTCPv4Desc->interface_blocklist[0], BlockedNetworkInterface("docker0"));
+        EXPECT_EQ(pTCPv4Desc->interfaceWhiteList[1], "127.0.0.1");
         EXPECT_EQ(pTCPv4Desc->wan_addr[0], (octet)80);
         EXPECT_EQ(pTCPv4Desc->wan_addr[1], (octet)80);
         EXPECT_EQ(pTCPv4Desc->wan_addr[2], (octet)55);
@@ -1136,13 +1012,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pTCPv4Desc->logical_port_increment, 2u);
         EXPECT_EQ(pTCPv4Desc->listening_ports[0], 5100u);
         EXPECT_EQ(pTCPv4Desc->listening_ports[1], 5200u);
-        EXPECT_EQ(pTCPv4Desc->keep_alive_thread, modified_thread_settings);
-        EXPECT_EQ(pTCPv4Desc->non_blocking_send, true);
-        EXPECT_EQ(pTCPv4Desc->accept_thread, modified_thread_settings);
         EXPECT_EQ(pTCPv4Desc->tcp_negotiation_timeout, 100u);
-        EXPECT_EQ(pTCPv4Desc->default_reception_threads(), modified_thread_settings);
-        EXPECT_EQ(pTCPv4Desc->get_thread_config_for_port(12345), modified_thread_settings);
-        EXPECT_EQ(pTCPv4Desc->get_thread_config_for_port(12346), modified_thread_settings);
         xmlparser::XMLProfileManager::DeleteInstance();
 
         // TCPv6
@@ -1159,11 +1029,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pTCPv6Desc->max_message_size(), 16384u);
         EXPECT_EQ(pTCPv6Desc->max_initial_peers_range(), 100u);
         EXPECT_EQ(pTCPv6Desc->interfaceWhiteList[0], "192.168.1.41");
-        EXPECT_EQ(pTCPv6Desc->interfaceWhiteList[1], "lo");
-        EXPECT_EQ(pTCPv6Desc->netmask_filter, NetmaskFilterKind::ON);
-        EXPECT_EQ(pTCPv6Desc->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
-        EXPECT_EQ(pTCPv6Desc->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
-        EXPECT_EQ(pTCPv6Desc->interface_blocklist[0], BlockedNetworkInterface("docker0"));
+        EXPECT_EQ(pTCPv6Desc->interfaceWhiteList[1], "127.0.0.1");
         EXPECT_EQ(pTCPv6Desc->keep_alive_frequency_ms, 5000u);
         EXPECT_EQ(pTCPv6Desc->keep_alive_timeout_ms, 25000u);
         EXPECT_EQ(pTCPv6Desc->max_logical_port, 9000u);
@@ -1172,13 +1038,7 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pTCPv6Desc->logical_port_increment, 2u);
         EXPECT_EQ(pTCPv6Desc->listening_ports[0], 5100u);
         EXPECT_EQ(pTCPv6Desc->listening_ports[1], 5200u);
-        EXPECT_EQ(pTCPv6Desc->keep_alive_thread, modified_thread_settings);
-        EXPECT_EQ(pTCPv6Desc->non_blocking_send, true);
-        EXPECT_EQ(pTCPv6Desc->accept_thread, modified_thread_settings);
         EXPECT_EQ(pTCPv6Desc->tcp_negotiation_timeout, 100u);
-        EXPECT_EQ(pTCPv6Desc->default_reception_threads(), modified_thread_settings);
-        EXPECT_EQ(pTCPv6Desc->get_thread_config_for_port(12345), modified_thread_settings);
-        EXPECT_EQ(pTCPv6Desc->get_thread_config_for_port(12346), modified_thread_settings);
         xmlparser::XMLProfileManager::DeleteInstance();
     }
 
@@ -1198,40 +1058,14 @@ TEST_F(XMLParserTests, parseXMLTransportData)
                     <rtps_dump_file>rtsp_messages.log</rtps_dump_file>\
                     <maxMessageSize>16384</maxMessageSize>\
                     <maxInitialPeersRange>100</maxInitialPeersRange>\
-                    <default_reception_threads>\
-                        <scheduling_policy>12</scheduling_policy>\
-                        <priority>12</priority>\
-                        <affinity>12</affinity>\
-                        <stack_size>12</stack_size>\
-                    </default_reception_threads>\
-                    <reception_threads>\
-                        <reception_thread port=\"12345\">\
-                            <scheduling_policy>12</scheduling_policy>\
-                            <priority>12</priority>\
-                            <affinity>12</affinity>\
-                            <stack_size>12</stack_size>\
-                        </reception_thread>\
-                        <reception_thread port=\"12346\">\
-                            <scheduling_policy>12</scheduling_policy>\
-                            <priority>12</priority>\
-                            <affinity>12</affinity>\
-                            <stack_size>12</stack_size>\
-                        </reception_thread>\
-                    </reception_threads>\
-                    <dump_thread>\
-                        <scheduling_policy>12</scheduling_policy>\
-                        <priority>12</priority>\
-                        <affinity>12</affinity>\
-                        <stack_size>12</stack_size>\
-                    </dump_thread>\
                 </transport_descriptor>\
                 ";
 
         ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS, xml_doc.Parse(xml));
         titleElement = xml_doc.RootElement();
         EXPECT_EQ(XMLP_ret::XML_OK, XMLParserTest::parseXMLTransportData_wrapper(titleElement));
-        std::shared_ptr<SharedMemTransportDescriptor> pSHMDesc =
-                std::dynamic_pointer_cast<SharedMemTransportDescriptor>(
+        std::shared_ptr<eprosima::fastdds::rtps::SharedMemTransportDescriptor> pSHMDesc =
+                std::dynamic_pointer_cast<eprosima::fastdds::rtps::SharedMemTransportDescriptor>(
             xmlparser::XMLProfileManager::getTransportById("TransportId1"));
         EXPECT_EQ(pSHMDesc->segment_size(), 262144u);
         EXPECT_EQ(pSHMDesc->port_queue_capacity(), 512u);
@@ -1239,15 +1073,10 @@ TEST_F(XMLParserTests, parseXMLTransportData)
         EXPECT_EQ(pSHMDesc->rtps_dump_file(), "rtsp_messages.log");
         EXPECT_EQ(pSHMDesc->max_message_size(), 16384u);
         EXPECT_EQ(pSHMDesc->max_initial_peers_range(), 100u);
-        EXPECT_EQ(pSHMDesc->default_reception_threads(), modified_thread_settings);
-        EXPECT_EQ(pSHMDesc->get_thread_config_for_port(12345), modified_thread_settings);
-        EXPECT_EQ(pSHMDesc->get_thread_config_for_port(12346), modified_thread_settings);
-        EXPECT_EQ(pSHMDesc->dump_thread(), modified_thread_settings);
 
         xmlparser::XMLProfileManager::DeleteInstance();
     }
 }
-
 
 /*
  * This test checks the return of the negative cases of th parseXMLTransportData method.
@@ -1273,11 +1102,7 @@ TEST_F(XMLParserTests, parseXMLTransportData_NegativeClauses)
         "TTL",
         "non_blocking_send",
         "interfaceWhiteList",
-        "netmask_filter",
-        "interfaces",
         "output_port",
-        "default_reception_threads",
-        "reception_threads",
         "bad_element"
     };
 
@@ -1288,9 +1113,9 @@ TEST_F(XMLParserTests, parseXMLTransportData_NegativeClauses)
         "sendBufferSize",
         "receiveBufferSize",
         "TTL",
+        "non_blocking_send",
         "interfaceWhiteList",
-        "netmask_filter",
-        "interfaces",
+        "output_port",
         "keep_alive_frequency_ms",
         "keep_alive_timeout_ms",
         "max_logical_port",
@@ -1299,13 +1124,8 @@ TEST_F(XMLParserTests, parseXMLTransportData_NegativeClauses)
         "calculate_crc",
         "check_crc",
         "enable_tcp_nodelay",
-        "non_blocking_send",
         "tls",
-        "keep_alive_thread",
-        "accept_thread",
         "tcp_negotiation_timeout",
-        "default_reception_threads",
-        "reception_threads",
         "bad_element"
     };
 
@@ -1317,9 +1137,6 @@ TEST_F(XMLParserTests, parseXMLTransportData_NegativeClauses)
         "port_queue_capacity",
         "healthy_check_timeout_ms",
         "rtps_dump_file",
-        "default_reception_threads",
-        "reception_threads",
-        "dump_thread",
         "bad_element"
     };
 
@@ -1747,7 +1564,7 @@ TEST_F(XMLParserTests, parseXMLConsumerNegativeClauses)
 
 /*
  * This test checks the return of the parseLogConfig method.
- * 1. Check a consumer with a wrong class
+ * 1. Check a consummer with a wrong class
  * 2. Check the use_default tag without TRUE and TRUE
  * 3. Check a wrong tag
  */
@@ -3066,146 +2883,6 @@ TEST_F(XMLParserTests, parseXMLTopicDataNegativeClauses)
 
     // Check that an XML_ERROR is triggered when the xml element is nullptr.
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParserTest::parseXMLTopicData_wrapper(nullptr, *topic_node));
-}
-
-/*
- * This test checks the behaviour of the parseXMLReceptionThreads function.
- */
-TEST_F(XMLParserTests, parseXMLReceptionThreads)
-{
-    using namespace eprosima::fastdds::rtps;
-
-    struct TestCase
-    {
-        std::string title;
-        std::string xml;
-        xmlparser::XMLP_ret result;
-        PortBasedTransportDescriptor::ReceptionThreadsConfigMap threads_config;
-    };
-
-    ThreadSettings modified_thread_settings;
-    modified_thread_settings.scheduling_policy = 12;
-    modified_thread_settings.priority = 12;
-    modified_thread_settings.affinity = 12;
-    modified_thread_settings.stack_size = 12;
-
-
-    std::vector<TestCase> test_cases =
-    {
-        {
-            "reception_threads_empty",
-            "<reception_threads></reception_threads>",
-            xmlparser::XMLP_ret::XML_OK,
-            {}
-        },
-        {
-            "reception_threads_ok",
-            R"(
-                <reception_threads>
-                    <reception_thread port="12345">
-                        <scheduling_policy>12</scheduling_policy>
-                        <priority>12</priority>
-                        <affinity>12</affinity>
-                        <stack_size>12</stack_size>
-                    </reception_thread>
-                    <reception_thread port="12346">
-                        <scheduling_policy>12</scheduling_policy>
-                        <priority>12</priority>
-                        <affinity>12</affinity>
-                        <stack_size>12</stack_size>
-                    </reception_thread>
-                </reception_threads>)",
-            xmlparser::XMLP_ret::XML_OK,
-            {
-                {12345, {modified_thread_settings}},
-                {12346, {modified_thread_settings}}
-            }
-        },
-        {
-            "reception_threads_duplicated",
-            R"(
-                <reception_threads>
-                    <reception_thread port="12345">
-                        <scheduling_policy>12</scheduling_policy>
-                        <priority>12</priority>
-                        <affinity>12</affinity>
-                        <stack_size>12</stack_size>
-                    </reception_thread>
-                    <reception_thread port="12345">
-                        <scheduling_policy>12</scheduling_policy>
-                        <priority>12</priority>
-                        <affinity>12</affinity>
-                        <stack_size>12</stack_size>
-                    </reception_thread>
-                </reception_threads>)",
-            xmlparser::XMLP_ret::XML_ERROR,
-            {}
-        },
-        {
-            "reception_threads_wrong_tags",
-            R"(
-                <reception_threads>
-                    <wrong_tag port="12345">
-                        <scheduling_policy>12</scheduling_policy>
-                        <priority>12</priority>
-                        <affinity>12</affinity>
-                        <stack_size>12</stack_size>
-                    </wrong_tag>
-                </reception_threads>)",
-            xmlparser::XMLP_ret::XML_ERROR,
-            {}
-        },
-        {
-            "reception_threads_wrong_attribute",
-            R"(
-                <reception_threads>
-                    <reception_thread wrong_attribute="12345">
-                        <scheduling_policy>12</scheduling_policy>
-                        <priority>12</priority>
-                        <affinity>12</affinity>
-                        <stack_size>12</stack_size>
-                    </reception_thread>
-                </reception_threads>)",
-            xmlparser::XMLP_ret::XML_ERROR,
-            {}
-        },
-        {
-            "reception_threads_no_attribute",
-            R"(
-                <reception_threads>
-                    <reception_thread>
-                        <scheduling_policy>12</scheduling_policy>
-                        <priority>12</priority>
-                        <affinity>12</affinity>
-                        <stack_size>12</stack_size>
-                    </reception_thread>
-                </reception_threads>)",
-            xmlparser::XMLP_ret::XML_ERROR,
-            {}
-        },
-    };
-
-    for (auto test_case : test_cases)
-    {
-        tinyxml2::XMLDocument xml_doc;
-        std::unique_ptr<BaseNode> root;
-        tinyxml2::XMLElement* titleElement;
-        PortBasedTransportDescriptor::ReceptionThreadsConfigMap reception_threads;
-
-        ASSERT_EQ(tinyxml2::XMLError::XML_SUCCESS,
-                xml_doc.Parse(test_case.xml.c_str())) << "test_case = [" << test_case.title << "]";
-
-        titleElement = xml_doc.RootElement();
-        EXPECT_EQ(test_case.result, XMLParserTest::parseXMLReceptionThreads_wrapper(*titleElement, reception_threads));
-
-        if (test_case.result == xmlparser::XMLP_ret::XML_OK)
-        {
-            for (auto entry : test_case.threads_config)
-            {
-                EXPECT_EQ(entry.second, reception_threads[entry.first]);
-            }
-        }
-    }
 }
 
 int main(

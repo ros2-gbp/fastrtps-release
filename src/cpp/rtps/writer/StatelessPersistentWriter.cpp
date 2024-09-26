@@ -86,11 +86,10 @@ void StatelessPersistentWriter::unsent_change_added_to_history(
 }
 
 bool StatelessPersistentWriter::change_removed_by_history(
-        CacheChange_t* change,
-        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
+        CacheChange_t* change)
 {
     remove_persistent_change(change);
-    return StatelessWriter::change_removed_by_history(change, max_blocking_time);
+    return StatelessWriter::change_removed_by_history(change);
 }
 
 } // namespace rtps

@@ -20,8 +20,8 @@
 
 #include <cassert>
 #include <chrono>
-#include <mutex>
 #include <thread>
+#include <mutex>
 
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/attributes/HistoryAttributes.h>
@@ -74,13 +74,25 @@ inline bool usleep_bool()
 }
 
 SecurityManager::SecurityManager(
-        RTPSParticipantImpl* participant,
-        ISecurityPluginFactory& plugin_factory)
+        RTPSParticipantImpl* participant)
     : participant_stateless_message_listener_(*this)
     , participant_volatile_message_secure_listener_(*this)
     , participant_(participant)
-    , factory_(plugin_factory)
+    , participant_stateless_message_writer_(nullptr)
+    , participant_stateless_message_writer_history_(nullptr)
+    , participant_stateless_message_reader_(nullptr)
+    , participant_stateless_message_reader_history_(nullptr)
+    , participant_volatile_message_secure_writer_(nullptr)
+    , participant_volatile_message_secure_writer_history_(nullptr)
+    , participant_volatile_message_secure_reader_(nullptr)
+    , participant_volatile_message_secure_reader_history_(nullptr)
+    , logging_plugin_(nullptr)
+    , authentication_plugin_(nullptr)
+    , access_plugin_(nullptr)
+    , crypto_plugin_(nullptr)
     , domain_id_(0)
+    , local_identity_handle_(nullptr)
+    , local_permissions_handle_(nullptr)
     , auth_last_sequence_number_(1)
     , crypto_last_sequence_number_(1)
     , temp_reader_proxies_({
@@ -179,20 +191,6 @@ bool SecurityManager::init(
                 EPROSIMA_LOG_INFO(SECURITY, "Could not create logging plugin. Security logging will be disabled.");
             }
         }
-
-        const auto log_info_message = [this](const char* msg)
-                {
-                    if (logging_plugin_)
-                    {
-                        SecurityException logging_exception;
-                        logging_plugin_->log(LoggingLevel::INFORMATIONAL_LEVEL, msg, "SecurityManager,init",
-                                logging_exception);
-                    }
-                    else
-                    {
-                        EPROSIMA_LOG_INFO(SECURITY, msg);
-                    }
-                };
 
         authentication_plugin_ = factory_.create_authentication_plugin(participant_properties);
 
@@ -296,14 +294,20 @@ bool SecurityManager::init(
                             local_permissions_handle_ = nullptr;
                         }
                     }
-                    else
-                    {
-                        log_info_message(exception.what());
-                    }
                 }
-                else
+
+                if (access_plugin_ == nullptr)
                 {
-                    log_info_message("Access control plugin not configured");
+                    // Read participant properties.
+                    const std::string* property_value = PropertyPolicyHelper::find_property(participant_properties,
+                                    "rtps.participant.rtps_protection_kind");
+                    if (property_value != nullptr && property_value->compare("ENCRYPT") == 0)
+                    {
+                        attributes.is_rtps_protected = true;
+                        attributes.plugin_participant_attributes |=
+                                PLUGIN_PARTICIPANT_SECURITY_ATTRIBUTES_FLAG_IS_VALID |
+                                PLUGIN_PARTICIPANT_SECURITY_ATTRIBUTES_FLAG_IS_RTPS_ENCRYPTED;
+                    }
                 }
 
                 if (access_plugin_ == nullptr || local_permissions_handle_ != nullptr)
@@ -326,19 +330,22 @@ bool SecurityManager::init(
                         {
                             assert(!local_participant_crypto_handle_->nil());
                         }
-                        else
-                        {
-                            log_info_message(exception.what());
-                        }
                     }
                     else
                     {
-                        log_info_message(exception.what());
+                        if (logging_plugin_)
+                        {
+                            SecurityException logging_exception;
+                            logging_plugin_->log(LoggingLevel::INFORMATIONAL_LEVEL,
+                                    "Cryptography plugin not configured",
+                                    "SecurityManager,init",
+                                    logging_exception);
+                        }
+                        else
+                        {
+                            EPROSIMA_LOG_INFO(SECURITY, "Cryptography plugin not configured.");
+                        }
                     }
-                }
-                else
-                {
-                    log_info_message("Cryptography plugin not configured");
                 }
 
                 if ((access_plugin_ == nullptr || local_permissions_handle_ != nullptr) &&
@@ -347,29 +354,24 @@ bool SecurityManager::init(
                     // Should be activated here, to enable encription buffer on created entities
                     throw true;
                 }
-                else
-                {
-                    if (access_plugin_ != nullptr && local_permissions_handle_ == nullptr)
-                    {
-                        EPROSIMA_LOG_ERROR(SECURITY, "Participant is not allowed with its own permissions file.");
-                    }
-
-                    if (crypto_plugin_ != nullptr && local_participant_crypto_handle_ == nullptr)
-                    {
-                        EPROSIMA_LOG_ERROR(SECURITY, "Participant cryptography could not be configured.");
-                    }
-                }
             }
 
-            // NOTE: This makes Participant creation fails, in some occasions without any info of what happened.
-            // However, it has been decided to leave it this way.
-            // For future developers struggling with security debugging issues, remember that the exception variable
-            // at this point has relevant information.
             throw false;
         }
         else
         {
-            log_info_message("Authentication plugin not configured. Security will be disabled");
+            if (logging_plugin_)
+            {
+                SecurityException logging_exception;
+                logging_plugin_->log(LoggingLevel::INFORMATIONAL_LEVEL,
+                        "Authentication plugin not configured. Security will be disable",
+                        "SecurityManager,init",
+                        logging_exception);
+            }
+            else
+            {
+                EPROSIMA_LOG_INFO(SECURITY, "Authentication plugin not configured. Security will be disable");
+            }
         }
     }
     catch (const SecurityException& e)
@@ -2520,6 +2522,32 @@ bool SecurityManager::get_datawriter_sec_attributes(
             returned_value = false;
         }
     }
+    else
+    {
+        // Get properties.
+        const std::string* property_value = PropertyPolicyHelper::find_property(writer_properties,
+                        "rtps.endpoint.submessage_protection_kind");
+
+        if (property_value != nullptr && property_value->compare("ENCRYPT") == 0)
+        {
+            security_attributes.is_submessage_protected = true;
+            security_attributes.plugin_endpoint_attributes |=
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID |
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
+        }
+
+        property_value = PropertyPolicyHelper::find_property(writer_properties,
+                        "rtps.endpoint.payload_protection_kind");
+
+        if (property_value != nullptr && property_value->compare("ENCRYPT") == 0)
+        {
+            security_attributes.is_payload_protected = true;
+            security_attributes.is_key_protected = true;
+            security_attributes.plugin_endpoint_attributes |=
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID |
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_PAYLOAD_ENCRYPTED;
+        }
+    }
 
     return returned_value;
 }
@@ -2700,6 +2728,32 @@ bool SecurityManager::get_datareader_sec_attributes(
         {
             EPROSIMA_LOG_ERROR(SECURITY, "Error. No topic_name." << std::endl);
             returned_value = false;
+        }
+    }
+    else
+    {
+        // Get properties.
+        const std::string* property_value = PropertyPolicyHelper::find_property(reader_properties,
+                        "rtps.endpoint.submessage_protection_kind");
+
+        if (property_value != nullptr && property_value->compare("ENCRYPT") == 0)
+        {
+            security_attributes.is_submessage_protected = true;
+            security_attributes.plugin_endpoint_attributes |=
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID |
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_SUBMESSAGE_ENCRYPTED;
+        }
+
+        property_value = PropertyPolicyHelper::find_property(reader_properties,
+                        "rtps.endpoint.payload_protection_kind");
+
+        if (property_value != nullptr && property_value->compare("ENCRYPT") == 0)
+        {
+            security_attributes.is_payload_protected = true;
+            security_attributes.is_key_protected = true;
+            security_attributes.plugin_endpoint_attributes |=
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_VALID |
+                    PLUGIN_ENDPOINT_SECURITY_ATTRIBUTES_FLAG_IS_PAYLOAD_ENCRYPTED;
         }
     }
 

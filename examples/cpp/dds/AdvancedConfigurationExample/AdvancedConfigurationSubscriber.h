@@ -28,7 +28,7 @@
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/subscriber/DataReaderListener.hpp>
 
-#include "AdvancedConfigurationPubSubTypes.h"
+#include "HelloWorldPubSubTypes.h"
 #include "types.hpp"
 
 /**
@@ -53,8 +53,7 @@ public:
             bool transient,
             int hops,
             const std::string& partitions,
-            bool use_ownership,
-            const std::string& profile);
+            bool use_ownership);
 
     //! RUN the subscriber until number samples are received
     void run(
@@ -111,7 +110,7 @@ private:
 
     private:
 
-        AdvancedConfiguration hello_;
+        HelloWorld hello_;
 
         //! Number of DataWriters matched to the associated DataReader
         int matched_;

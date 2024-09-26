@@ -17,13 +17,12 @@
  *
  */
 
-#include <cassert>
-#include <limits>
-#include <thread>
-
 #include <fastdds/rtps/common/EntityId_t.hpp>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/messages/MessageReceiver.h>
+
+#include <cassert>
+#include <limits>
 
 #include <fastdds/core/policy/ParameterList.hpp>
 #include <fastdds/dds/log/Log.hpp>
@@ -48,7 +47,12 @@ namespace rtps {
 MessageReceiver::MessageReceiver(
         RTPSParticipantImpl* participant,
         uint32_t rec_buffer_size)
-    : participant_(participant)
+    : mtx_()
+    , associated_writers_()
+    , associated_readers_()
+#if !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
+    , participant_(participant)
+#endif // if !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
     , source_version_(c_ProtocolVersion)
     , source_vendor_id_(c_VendorId_Unknown)
     , source_guid_prefix_(c_GuidPrefix_Unknown)
@@ -61,6 +65,7 @@ MessageReceiver::MessageReceiver(
     , crypto_payload_(participant->is_secure() ? rec_buffer_size : 0)
 #endif // if HAVE_SECURITY
 {
+    static_cast<void>(participant);
     (void)rec_buffer_size;
     EPROSIMA_LOG_INFO(RTPS_MSG_IN, "Created with CDRMessage of size: " << rec_buffer_size);
 
@@ -812,9 +817,6 @@ bool MessageReceiver::proc_Submsg_Data(
         return false;
     }
 
-    // Get the vendor id
-    ch.vendor_id = source_vendor_id_;
-
     //Jump ahead if more parameters are before inlineQos (not in this version, maybe if further minor versions.)
     if (octetsToInlineQos > RTPSMESSAGE_OCTETSTOINLINEQOS_DATASUBMSG)
     {
@@ -991,9 +993,6 @@ bool MessageReceiver::proc_Submsg_DataFrag(
         return false;
     }
 
-    // Get the vendor id
-    ch.vendor_id = source_vendor_id_;
-
     // READ FRAGMENT NUMBER
     uint32_t fragmentStartingNum;
     valid &= CDRMessage::readUInt32(msg, &fragmentStartingNum);
@@ -1163,7 +1162,7 @@ bool MessageReceiver::proc_Submsg_Heartbeat(
 
     //Look for the correct reader and writers:
     findAllReaders(readerGUID.entityId,
-            [was_decoded, &writerGUID, &HBCount, &firstSN, &lastSN, finalFlag, livelinessFlag, this](RTPSReader* reader)
+            [was_decoded, &writerGUID, &HBCount, &firstSN, &lastSN, finalFlag, livelinessFlag](RTPSReader* reader)
             {
                 // Only used when HAVE_SECURITY is defined
                 static_cast<void>(was_decoded);
@@ -1171,8 +1170,7 @@ bool MessageReceiver::proc_Submsg_Heartbeat(
                 if (was_decoded || !reader->getAttributes().security_attributes().is_submessage_protected)
 #endif  // HAVE_SECURITY
                 {
-                    reader->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag,
-                    source_vendor_id_);
+                    reader->processHeartbeatMsg(writerGUID, HBCount, firstSN, lastSN, finalFlag, livelinessFlag);
                 }
             });
 
@@ -1223,7 +1221,7 @@ bool MessageReceiver::proc_Submsg_Acknack(
 #endif  // HAVE_SECURITY
         {
             bool result;
-            if (it->process_acknack(writerGUID, readerGUID, Ackcount, SNSet, finalFlag, result, source_vendor_id_))
+            if (it->process_acknack(writerGUID, readerGUID, Ackcount, SNSet, finalFlag, result))
             {
                 if (!result)
                 {
@@ -1271,7 +1269,7 @@ bool MessageReceiver::proc_Submsg_Gap(
     }
 
     findAllReaders(readerGUID.entityId,
-            [was_decoded, &writerGUID, &gapStart, &gapList, this](RTPSReader* reader)
+            [was_decoded, &writerGUID, &gapStart, &gapList](RTPSReader* reader)
             {
                 // Only used when HAVE_SECURITY is defined
                 static_cast<void>(was_decoded);
@@ -1279,7 +1277,7 @@ bool MessageReceiver::proc_Submsg_Gap(
                 if (was_decoded || !reader->getAttributes().security_attributes().is_submessage_protected)
 #endif  // HAVE_SECURITY
                 {
-                    reader->processGapMsg(writerGUID, gapStart, gapList, source_vendor_id_);
+                    reader->processGapMsg(writerGUID, gapStart, gapList);
                 }
             });
 
@@ -1423,7 +1421,7 @@ bool MessageReceiver::proc_Submsg_NackFrag(
 #endif  // HAVE_SECURITY
         {
             bool result;
-            if (it->process_nack_frag(writerGUID, readerGUID, Ackcount, writerSN, fnState, result, source_vendor_id_))
+            if (it->process_nack_frag(writerGUID, readerGUID, Ackcount, writerSN, fnState, result))
             {
                 if (!result)
                 {

@@ -229,17 +229,11 @@ public:
             eprosima::fastrtps::rtps::CacheChange_t* ch = writer_->new_change(*it, eprosima::fastrtps::rtps::ALIVE);
 
             eprosima::fastcdr::FastBuffer buffer((char*)ch->serializedPayload.data, ch->serializedPayload.max_size);
-            eprosima::fastcdr::Cdr cdr(buffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                    eprosima::fastdds::rtps::DEFAULT_XCDR_VERSION);
+            eprosima::fastcdr::Cdr cdr(buffer);
 
-            cdr.serialize_encapsulation();
             cdr << *it;
 
-#if FASTCDR_VERSION_MAJOR == 1
             ch->serializedPayload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
-#else
-            ch->serializedPayload.length = static_cast<uint32_t>(cdr.get_serialized_data_length());
-#endif // FASTCDR_VERSION_MAJOR == 1
             if (ch->serializedPayload.length > 65000u)
             {
                 ch->setFragmentSize(65000u);
@@ -256,17 +250,11 @@ public:
         eprosima::fastrtps::rtps::CacheChange_t* ch = writer_->new_change(msg, eprosima::fastrtps::rtps::ALIVE);
 
         eprosima::fastcdr::FastBuffer buffer((char*)ch->serializedPayload.data, ch->serializedPayload.max_size);
-        eprosima::fastcdr::Cdr cdr(buffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                eprosima::fastdds::rtps::DEFAULT_XCDR_VERSION);
+        eprosima::fastcdr::Cdr cdr(buffer);
 
-        cdr.serialize_encapsulation();
         cdr << msg;
 
-#if FASTCDR_VERSION_MAJOR == 1
         ch->serializedPayload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
-#else
-        ch->serializedPayload.length = static_cast<uint32_t>(cdr.get_serialized_data_length());
-#endif // FASTCDR_VERSION_MAJOR == 1
         if (ch->serializedPayload.length > 65000u)
         {
             ch->setFragmentSize(65000u);
