@@ -46,7 +46,7 @@ HelloWorldPublisher::HelloWorldPublisher()
     , publisher_(nullptr)
     , topic_(nullptr)
     , writer_(nullptr)
-    , type_(new HelloWorldPubSubType())
+    , type_(new AdvancedConfigurationPubSubType())
 {
 }
 
@@ -72,69 +72,81 @@ bool HelloWorldPublisher::init(
         int hops,
         const std::string& partitions,
         bool use_ownership,
-        unsigned int ownership_strength /* = 0 */)
+        unsigned int ownership_strength,
+        int data_size,
+        const std::string& profile)
 {
+
     hello_.index(0);
     memcpy(hello_.message().data(), "HelloWorld ", strlen("HelloWorld") + 1);
+    hello_.data(std::vector<uint8_t>(data_size, 0xAA));
 
     DomainParticipantQos pqos;
     pqos.name("Participant_pub");
     listener_.set_num_wait_matched(num_wait_matched);
 
-    // TRANSPORT CONFIG
-    // If it is set, not use default and set the transport
-    if (transport != DEFAULT || hops > 0 )
+    if (profile.empty())
     {
-        pqos.transport().use_builtin_transports = false;
-
-        switch ( transport )
+        // TRANSPORT CONFIG
+        // If it is set, not use default and set the transport
+        if (transport != DEFAULT || hops > 0 )
         {
-            case SHM:
-            {
-                auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
-                pqos.transport().user_transports.push_back(shm_transport);
-            }
-            break;
-            case UDPv4:
-            {
-                auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-                pqos.transport().user_transports.push_back(udp_transport);
-            }
-            break;
-            case UDPv6:
-            {
-                auto udp_transport = std::make_shared<UDPv6TransportDescriptor>();
-                pqos.transport().user_transports.push_back(udp_transport);
-            }
-            break;
-            case DEFAULT:
-            default:
-            {
-                // mimick default transport selection
-                auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-                pqos.transport().user_transports.push_back(udp_transport);
-#ifdef SHM_TRANSPORT_BUILTIN
-                auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
-                pqos.transport().user_transports.push_back(shm_transport);
-#endif // SHM_TRANSPORT_BUILTIN
-            }
-        }
+            pqos.transport().use_builtin_transports = false;
 
-        if ( hops > 0 )
-        {
-            for (auto& transportDescriptor : pqos.transport().user_transports)
+            switch ( transport )
             {
-                SocketTransportDescriptor* pT = dynamic_cast<SocketTransportDescriptor*>(transportDescriptor.get());
-                if (pT)
+                case SHM:
                 {
-                    pT->TTL = (uint8_t)std::min(hops, 255);
+                    auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
+                    pqos.transport().user_transports.push_back(shm_transport);
+                }
+                break;
+                case UDPv4:
+                {
+                    auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+                    pqos.transport().user_transports.push_back(udp_transport);
+                }
+                break;
+                case UDPv6:
+                {
+                    auto udp_transport = std::make_shared<UDPv6TransportDescriptor>();
+                    pqos.transport().user_transports.push_back(udp_transport);
+                }
+                break;
+                case DEFAULT:
+                default:
+                {
+                    // mimick default transport selection
+                    auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+                    pqos.transport().user_transports.push_back(udp_transport);
+#ifdef SHM_TRANSPORT_BUILTIN
+                    auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
+                    pqos.transport().user_transports.push_back(shm_transport);
+#endif // SHM_TRANSPORT_BUILTIN
+                }
+            }
+
+            if ( hops > 0 )
+            {
+                for (auto& transportDescriptor : pqos.transport().user_transports)
+                {
+                    SocketTransportDescriptor* pT = dynamic_cast<SocketTransportDescriptor*>(transportDescriptor.get());
+                    if (pT)
+                    {
+                        pT->TTL = (uint8_t)std::min(hops, 255);
+                    }
                 }
             }
         }
-    }
 
-    // CREATE THE PARTICIPANT
-    participant_ = DomainParticipantFactory::get_instance()->create_participant(domain, pqos);
+        // CREATE THE PARTICIPANT
+        participant_ = DomainParticipantFactory::get_instance()->create_participant(domain, pqos);
+    }
+    else
+    {
+        // Create participant from xml profile
+        participant_ = DomainParticipantFactory::get_instance()->create_participant_with_profile(profile);
+    }
 
     if (participant_ == nullptr)
     {
@@ -167,7 +179,7 @@ bool HelloWorldPublisher::init(
     }
 
     // CREATE THE TOPIC
-    topic_ = participant_->create_topic(topic_name, "HelloWorld", TOPIC_QOS_DEFAULT);
+    topic_ = participant_->create_topic(topic_name, type_.get_type_name(), TOPIC_QOS_DEFAULT);
 
     if (topic_ == nullptr)
     {
@@ -316,8 +328,9 @@ void HelloWorldPublisher::runThread(
         if (listener_.enough_matched())
         {
             publish();
-            std::cout << "Message: " << hello_.message().data() << " with index: " << hello_.index()
-                      << " SENT" << std::endl;
+            std::cout << "Sample sent: " << hello_.message().data() << "  " << hello_.index() <<
+                "  (" << static_cast<int>(hello_.data().size()) << " Bytes)"
+                      << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
         }
         else

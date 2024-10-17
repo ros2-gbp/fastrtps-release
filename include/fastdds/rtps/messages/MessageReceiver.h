@@ -24,6 +24,7 @@
 #include <unordered_map>
 
 #include <fastdds/rtps/common/all_common.h>
+#include <fastdds/rtps/common/VendorId_t.hpp>
 #include <fastrtps/utils/shared_mutex.hpp>
 
 namespace eprosima {
@@ -77,14 +78,11 @@ private:
     std::vector<RTPSWriter*> associated_writers_;
     std::unordered_map<EntityId_t, std::vector<RTPSReader*>> associated_readers_;
 
-#if !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
-    //!Pointer to the RTPSParticipantImpl
     RTPSParticipantImpl* participant_;
-#endif // if !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
     //!Protocol version of the message
     ProtocolVersion_t source_version_;
     //!VendorID that created the message
-    VendorId_t source_vendor_id_;
+    fastdds::rtps::VendorId_t source_vendor_id_;
     //!GuidPrefix of the entity that created the message
     GuidPrefix_t source_guid_prefix_;
     //!GuidPrefix of the entity that receives the message. GuidPrefix of the RTPSParticipant.

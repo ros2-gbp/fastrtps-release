@@ -24,26 +24,30 @@
 #include <unistd.h>
 #endif // _WIN32
 
-#include <fastrtps/xmlparser/XMLParserCommon.h>
-#include <fastrtps/xmlparser/XMLTree.h>
-
-#include <fastrtps/transport/UDPv4TransportDescriptor.h>
-#include <fastrtps/transport/UDPv6TransportDescriptor.h>
-#include <fastrtps/transport/TCPv4TransportDescriptor.h>
-#include <fastrtps/transport/TCPv6TransportDescriptor.h>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-
-#include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <tinyxml2.h>
 
 #include <fastdds/dds/log/FileConsumer.hpp>
 #include <fastdds/dds/log/StdoutConsumer.hpp>
 #include <fastdds/dds/log/StdoutErrConsumer.hpp>
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
+#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastrtps/transport/TCPv4TransportDescriptor.h>
+#include <fastrtps/transport/TCPv6TransportDescriptor.h>
+#include <fastrtps/transport/UDPv4TransportDescriptor.h>
+#include <fastrtps/transport/UDPv6TransportDescriptor.h>
+#include <fastrtps/xmlparser/XMLParserCommon.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
+#include <fastrtps/xmlparser/XMLTree.h>
 
-#include <tinyxml2.h>
+#include <rtps/network/utils/netmask_filter.hpp>
+#include <rtps/xmlparser/XMLParserUtils.hpp>
 
 namespace eprosima {
 namespace fastrtps {
 namespace xmlparser {
+
+using namespace eprosima::fastdds::xml::detail;
 
 XMLP_ret XMLParser::loadDefaultXMLFile(
         up_base_node_t& root)
@@ -150,6 +154,10 @@ XMLP_ret XMLParser::parseXML(
                     {
                         root->addChild(std::move(library_node));
                     }
+                }
+                else if (strcmp(tag, DOMAINPARTICIPANT_FACTORY) == 0)
+                {
+                    ret = parseXMLDomainParticipantFactoryProf(node, *root);
                 }
                 else if (strcmp(tag, PARTICIPANT) == 0)
                 {
@@ -279,9 +287,10 @@ XMLP_ret XMLParser::parseXMLTransportData(
         </xs:complexType>
      */
 
-    XMLP_ret ret = XMLP_ret::XML_OK;
-    std::string sId = "";
-    sp_transport_t pDescriptor = nullptr;
+    if (XMLP_ret::XML_OK != validateXMLTransportElements(*p_root))
+    {
+        return XMLP_ret::XML_ERROR;
+    }
 
     tinyxml2::XMLElement* p_aux0 = nullptr;
     p_aux0 = p_root->FirstChildElement(TRANSPORT_ID);
@@ -290,17 +299,15 @@ XMLP_ret XMLParser::parseXMLTransportData(
         EPROSIMA_LOG_ERROR(XMLPARSER, "Not found '" << TRANSPORT_ID << "' attribute");
         return XMLP_ret::XML_ERROR;
     }
-    else
+
+    XMLP_ret ret = XMLP_ret::XML_OK;
+    sp_transport_t pDescriptor = nullptr;
+
+    std::string sId = get_element_text(p_aux0);
+    if (sId.empty())
     {
-        if (p_aux0->GetText() != nullptr)
-        {
-            sId = p_aux0->GetText();
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "'" << TRANSPORT_ID << "' attribute cannot be empty");
-            return XMLP_ret::XML_ERROR;
-        }
+        EPROSIMA_LOG_ERROR(XMLPARSER, "'" << TRANSPORT_ID << "' attribute cannot be empty");
+        return XMLP_ret::XML_ERROR;
     }
 
     p_aux0 = p_root->FirstChildElement(TYPE);
@@ -309,111 +316,172 @@ XMLP_ret XMLParser::parseXMLTransportData(
         EPROSIMA_LOG_ERROR(XMLPARSER, "Not found '" << TYPE << "' attribute");
         return XMLP_ret::XML_ERROR;
     }
+
+    std::string sType = get_element_text(p_aux0);
+    if (sType.empty())
+    {
+        EPROSIMA_LOG_ERROR(XMLPARSER, "'" << TYPE << "' attribute cannot be empty");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    if (sType == UDPv4 || sType == UDPv6)
+    {
+        std::shared_ptr<rtps::UDPTransportDescriptor> pUDPDesc;
+        if (sType == UDPv4)
+        {
+            pDescriptor = pUDPDesc = std::make_shared<rtps::UDPv4TransportDescriptor>();
+        }
+        else
+        {
+            pDescriptor = pUDPDesc = std::make_shared<rtps::UDPv6TransportDescriptor>();
+        }
+
+        // Output UDP Socket
+        if (nullptr != (p_aux0 = p_root->FirstChildElement(UDP_OUTPUT_PORT)))
+        {
+            int iSocket = 0;
+            if (XMLP_ret::XML_OK != getXMLInt(p_aux0, &iSocket, 0) || iSocket < 0 || iSocket > 65535)
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+            pUDPDesc->m_output_udp_socket = static_cast<uint16_t>(iSocket);
+        }
+        // Non-blocking send
+        if (nullptr != (p_aux0 = p_root->FirstChildElement(NON_BLOCKING_SEND)))
+        {
+            if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &pUDPDesc->non_blocking_send, 0))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+    }
+    else if (sType == TCPv4)
+    {
+        pDescriptor = std::make_shared<rtps::TCPv4TransportDescriptor>();
+        ret = parseXMLCommonTCPTransportData(p_root, pDescriptor);
+        if (ret != XMLP_ret::XML_OK)
+        {
+            return ret;
+        }
+        else
+        {
+            std::shared_ptr<rtps::TCPv4TransportDescriptor> pTCPv4Desc =
+                    std::dynamic_pointer_cast<rtps::TCPv4TransportDescriptor>(pDescriptor);
+
+            // Wan Address
+            if (nullptr != (p_aux0 = p_root->FirstChildElement(TCP_WAN_ADDR)))
+            {
+                std::string s;
+                if (XMLP_ret::XML_OK != getXMLString(p_aux0, &s, 0))
+                {
+                    return XMLP_ret::XML_ERROR;
+                }
+                pTCPv4Desc->set_WAN_address(s);
+            }
+        }
+    }
+    else if (sType == TCPv6)
+    {
+        pDescriptor = std::make_shared<rtps::TCPv6TransportDescriptor>();
+        ret = parseXMLCommonTCPTransportData(p_root, pDescriptor);
+        if (ret != XMLP_ret::XML_OK)
+        {
+            return ret;
+        }
+    }
+    else if (sType == SHM)
+    {
+        pDescriptor = std::make_shared<fastdds::rtps::SharedMemTransportDescriptor>();
+        ret = parseXMLCommonSharedMemTransportData(p_root, pDescriptor);
+        if (ret != XMLP_ret::XML_OK)
+        {
+            return ret;
+        }
+    }
     else
     {
-        std::string sType;
-        if (p_aux0->GetText() != nullptr)
-        {
-            sType = p_aux0->GetText();
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "'" << TYPE << "' attribute cannot be empty");
-            return XMLP_ret::XML_ERROR;
-        }
-
-        if (sType == UDPv4 || sType == UDPv6)
-        {
-            if (sType == UDPv4)
-            {
-                pDescriptor = std::make_shared<rtps::UDPv4TransportDescriptor>();
-            }
-            else
-            {
-                pDescriptor = std::make_shared<rtps::UDPv6TransportDescriptor>();
-            }
-
-            std::shared_ptr<rtps::UDPTransportDescriptor> pUDPDesc =
-                    std::dynamic_pointer_cast<rtps::UDPTransportDescriptor>(pDescriptor);
-            // Output UDP Socket
-            if (nullptr != (p_aux0 = p_root->FirstChildElement(UDP_OUTPUT_PORT)))
-            {
-                int iSocket = 0;
-                if (XMLP_ret::XML_OK != getXMLInt(p_aux0, &iSocket, 0) || iSocket < 0 || iSocket > 65535)
-                {
-                    return XMLP_ret::XML_ERROR;
-                }
-                pUDPDesc->m_output_udp_socket = static_cast<uint16_t>(iSocket);
-            }
-            // Non-blocking send
-            if (nullptr != (p_aux0 = p_root->FirstChildElement(NON_BLOCKING_SEND)))
-            {
-                if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &pUDPDesc->non_blocking_send, 0))
-                {
-                    return XMLP_ret::XML_ERROR;
-                }
-            }
-        }
-        else if (sType == TCPv4)
-        {
-            pDescriptor = std::make_shared<rtps::TCPv4TransportDescriptor>();
-            ret = parseXMLCommonTCPTransportData(p_root, pDescriptor);
-            if (ret != XMLP_ret::XML_OK)
-            {
-                return ret;
-            }
-            else
-            {
-                std::shared_ptr<rtps::TCPv4TransportDescriptor> pTCPv4Desc =
-                        std::dynamic_pointer_cast<rtps::TCPv4TransportDescriptor>(pDescriptor);
-
-                // Wan Address
-                if (nullptr != (p_aux0 = p_root->FirstChildElement(TCP_WAN_ADDR)))
-                {
-                    std::string s;
-                    if (XMLP_ret::XML_OK != getXMLString(p_aux0, &s, 0))
-                    {
-                        return XMLP_ret::XML_ERROR;
-                    }
-                    pTCPv4Desc->set_WAN_address(s);
-                }
-            }
-        }
-        else if (sType == TCPv6)
-        {
-            pDescriptor = std::make_shared<rtps::TCPv6TransportDescriptor>();
-            ret = parseXMLCommonTCPTransportData(p_root, pDescriptor);
-            if (ret != XMLP_ret::XML_OK)
-            {
-                return ret;
-            }
-        }
-        else if (sType == SHM)
-        {
-            pDescriptor = std::make_shared<fastdds::rtps::SharedMemTransportDescriptor>();
-            ret = parseXMLCommonSharedMemTransportData(p_root, pDescriptor);
-            if (ret != XMLP_ret::XML_OK)
-            {
-                return ret;
-            }
-        }
-        else
-        {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid transport type: '" << sType << "'");
-            return XMLP_ret::XML_ERROR;
-        }
-
-        if (sType != SHM)
-        {
-            ret = parseXMLCommonTransportData(p_root, pDescriptor);
-            if (ret != XMLP_ret::XML_OK)
-            {
-                return ret;
-            }
-        }
-
-        XMLProfileManager::insertTransportById(sId, pDescriptor);
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid transport type: '" << sType << "'");
+        return XMLP_ret::XML_ERROR;
     }
+
+    ret = parseXMLCommonTransportData(p_root, pDescriptor);
+    if (ret != XMLP_ret::XML_OK)
+    {
+        return ret;
+    }
+
+    std::shared_ptr<fastdds::rtps::PortBasedTransportDescriptor> temp_1 =
+            std::dynamic_pointer_cast<fastdds::rtps::PortBasedTransportDescriptor>(pDescriptor);
+    ret = parseXMLPortBasedTransportData(p_root, temp_1);
+    if (ret != XMLP_ret::XML_OK)
+    {
+        return ret;
+    }
+
+    if (sType != SHM)
+    {
+        std::shared_ptr<fastdds::rtps::SocketTransportDescriptor> temp_2 =
+                std::dynamic_pointer_cast<fastdds::rtps::SocketTransportDescriptor>(pDescriptor);
+        ret = parseXMLSocketTransportData(p_root, temp_2);
+        if (ret != XMLP_ret::XML_OK)
+        {
+            return ret;
+        }
+    }
+
+    XMLProfileManager::insertTransportById(sId, pDescriptor);
+    return ret;
+}
+
+XMLP_ret XMLParser::validateXMLTransportElements(
+        tinyxml2::XMLElement& p_root)
+{
+    XMLP_ret ret = XMLP_ret::XML_OK;
+    for (tinyxml2::XMLElement* p_aux0 = p_root.FirstChildElement(); p_aux0 != nullptr;
+            p_aux0 = p_aux0->NextSiblingElement())
+    {
+        const char* name = p_aux0->Name();
+        if (!(strcmp(name, TRANSPORT_ID) == 0 ||
+                strcmp(name, TYPE) == 0 ||
+                strcmp(name, SEND_BUFFER_SIZE) == 0 ||
+                strcmp(name, RECEIVE_BUFFER_SIZE) == 0 ||
+                strcmp(name, MAX_MESSAGE_SIZE) == 0 ||
+                strcmp(name, MAX_INITIAL_PEERS_RANGE) == 0 ||
+                strcmp(name, WHITE_LIST) == 0 ||
+                strcmp(name, NETMASK_FILTER) == 0 ||
+                strcmp(name, NETWORK_INTERFACES) == 0 ||
+                strcmp(name, TTL) == 0 ||
+                strcmp(name, NON_BLOCKING_SEND) == 0 ||
+                strcmp(name, UDP_OUTPUT_PORT) == 0 ||
+                strcmp(name, TCP_WAN_ADDR) == 0 ||
+                strcmp(name, KEEP_ALIVE_FREQUENCY) == 0 ||
+                strcmp(name, KEEP_ALIVE_TIMEOUT) == 0 ||
+                strcmp(name, MAX_LOGICAL_PORT) == 0 ||
+                strcmp(name, LOGICAL_PORT_RANGE) == 0 ||
+                strcmp(name, LOGICAL_PORT_INCREMENT) == 0 ||
+                strcmp(name, LISTENING_PORTS) == 0 ||
+                strcmp(name, CALCULATE_CRC) == 0 ||
+                strcmp(name, CHECK_CRC) == 0 ||
+                strcmp(name, KEEP_ALIVE_THREAD) == 0 ||
+                strcmp(name, ACCEPT_THREAD) == 0 ||
+                strcmp(name, ENABLE_TCP_NODELAY) == 0 ||
+                strcmp(name, TCP_NEGOTIATION_TIMEOUT) == 0 ||
+                strcmp(name, TLS) == 0 ||
+                strcmp(name, SEGMENT_SIZE) == 0 ||
+                strcmp(name, PORT_QUEUE_CAPACITY) == 0 ||
+                strcmp(name, HEALTHY_CHECK_TIMEOUT_MS) == 0 ||
+                strcmp(name, RTPS_DUMP_FILE) == 0 ||
+                strcmp(name, DEFAULT_RECEPTION_THREADS) == 0 ||
+                strcmp(name, RECEPTION_THREADS) == 0 ||
+                strcmp(name, DUMP_THREAD) == 0 ||
+                strcmp(name, PORT_OVERFLOW_POLICY) == 0 ||
+                strcmp(name, SEGMENT_OVERFLOW_POLICY) == 0))
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'transportDescriptorType'. Name: " << name);
+            ret = XMLP_ret::XML_ERROR;
+        }
+    }
+
     return ret;
 }
 
@@ -426,28 +494,103 @@ XMLP_ret XMLParser::parseXMLCommonTransportData(
             <xs:all minOccurs="0">
                 <xs:element name="transport_id" type="stringType"/>
                 <xs:element name="type" type="stringType"/>
-                <xs:element name="sendBufferSize" type="int32Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="receiveBufferSize" type="int32Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="TTL" type="uint8Type" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="maxMessageSize" type="uint32Type" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="maxInitialPeersRange" type="uint32Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="interfaceWhiteList" type="addressListType" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="wan_addr" type="stringType" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="output_port" type="uint16Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="keep_alive_frequency_ms" type="uint32Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="keep_alive_timeout_ms" type="uint32Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="max_logical_port" type="uint16Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="logical_port_range" type="uint16Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="logical_port_increment" type="uint16Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="metadata_logical_port" type="uint16Type" minOccurs="0" maxOccurs="1"/>
-                <xs:element name="listening_ports" type="portListType" minOccurs="0" maxOccurs="1"/>
             </xs:all>
         </xs:complexType>
      */
+    tinyxml2::XMLElement* p_aux0 = nullptr;
+    const char* name = nullptr;
+    for (p_aux0 = p_root->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
+    {
+        name = p_aux0->Name();
+        if (strcmp(name, MAX_MESSAGE_SIZE) == 0)
+        {
+            // maxMessageSize - uint32Type
+            uint32_t uSize = 0;
+            if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &uSize, 0))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+            p_transport->maxMessageSize = uSize;
+        }
+        else if (strcmp(name, MAX_INITIAL_PEERS_RANGE) == 0)
+        {
+            // maxInitialPeersRange - uint32Type
+            uint32_t uRange = 0;
+            if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &uRange, 0))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+            p_transport->maxInitialPeersRange = uRange;
+        }
+    }
+    return XMLP_ret::XML_OK;
+}
 
-    std::shared_ptr<rtps::SocketTransportDescriptor> pDesc =
-            std::dynamic_pointer_cast<rtps::SocketTransportDescriptor>(p_transport);
+XMLP_ret XMLParser::parseXMLPortBasedTransportData(
+        tinyxml2::XMLElement* p_root,
+        std::shared_ptr<fastdds::rtps::PortBasedTransportDescriptor> p_transport)
+{
+    /*
+        <xs:complexType name="rtpsTransportDescriptorType">
+            <xs:all minOccurs="0">
+                <xs:element name="default_reception_threads" type="threadSettingsType" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="reception_threads" type="receptionThreadsListType" minOccurs="0" maxOccurs="1"/>
+            </xs:all>
+        </xs:complexType>
+     */
+    tinyxml2::XMLElement* p_aux0 = nullptr;
+    const char* name = nullptr;
+    for (p_aux0 = p_root->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
+    {
+        name = p_aux0->Name();
+        if (strcmp(name, DEFAULT_RECEPTION_THREADS) == 0)
+        {
+            fastdds::rtps::ThreadSettings thread_settings;
+            if (getXMLThreadSettings(*p_aux0, thread_settings) == XMLP_ret::XML_OK)
+            {
+                p_transport->default_reception_threads(thread_settings);
+            }
+            else
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Incorrect thread settings");
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, RECEPTION_THREADS) == 0)
+        {
+            fastdds::rtps::PortBasedTransportDescriptor::ReceptionThreadsConfigMap reception_threads;
+            if (parseXMLReceptionThreads(*p_aux0, reception_threads) == XMLP_ret::XML_OK)
+            {
+                p_transport->reception_threads(reception_threads);
+            }
+            else
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Incorrect thread settings");
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+    }
+    return XMLP_ret::XML_OK;
+}
 
+XMLP_ret XMLParser::parseXMLSocketTransportData(
+        tinyxml2::XMLElement* p_root,
+        std::shared_ptr<fastdds::rtps::SocketTransportDescriptor> p_transport)
+{
+    /*
+        <xs:complexType name="rtpsTransportDescriptorType">
+            <xs:all minOccurs="0">
+                <xs:element name="sendBufferSize" type="int32Type" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="receiveBufferSize" type="int32Type" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="TTL" type="uint8Type" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="interfaceWhiteList" type="addressListType" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="netmask_filter" type="netmaskFilterType" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="interfaces" type="interfacesType" minOccurs="0" maxOccurs="1"/>
+            </xs:all>
+        </xs:complexType>
+     */
     tinyxml2::XMLElement* p_aux0 = nullptr;
     const char* name = nullptr;
     for (p_aux0 = p_root->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
@@ -461,7 +604,7 @@ XMLP_ret XMLParser::parseXMLCommonTransportData(
             {
                 return XMLP_ret::XML_ERROR;
             }
-            pDesc->sendBufferSize = iSize;
+            p_transport->sendBufferSize = iSize;
         }
         else if (strcmp(name, RECEIVE_BUFFER_SIZE) == 0)
         {
@@ -471,7 +614,7 @@ XMLP_ret XMLParser::parseXMLCommonTransportData(
             {
                 return XMLP_ret::XML_ERROR;
             }
-            pDesc->receiveBufferSize = iSize;
+            p_transport->receiveBufferSize = iSize;
         }
         else if (strcmp(name, TTL) == 0)
         {
@@ -481,27 +624,7 @@ XMLP_ret XMLParser::parseXMLCommonTransportData(
             {
                 return XMLP_ret::XML_ERROR;
             }
-            pDesc->TTL = static_cast<uint8_t>(iTTL);
-        }
-        else if (strcmp(name, MAX_MESSAGE_SIZE) == 0)
-        {
-            // maxMessageSize - uint32Type
-            uint32_t uSize = 0;
-            if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &uSize, 0))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-            std::dynamic_pointer_cast<rtps::TransportDescriptorInterface>(p_transport)->maxMessageSize = uSize;
-        }
-        else if (strcmp(name, MAX_INITIAL_PEERS_RANGE) == 0)
-        {
-            // maxInitialPeersRange - uint32Type
-            uint32_t uRange = 0;
-            if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &uRange, 0))
-            {
-                return XMLP_ret::XML_ERROR;
-            }
-            pDesc->maxInitialPeersRange = uRange;
+            p_transport->TTL = static_cast<uint8_t>(iTTL);
         }
         else if (strcmp(name, WHITE_LIST) == 0)
         {
@@ -511,12 +634,12 @@ XMLP_ret XMLParser::parseXMLCommonTransportData(
                     p_aux1 != nullptr; p_aux1 = p_aux1->NextSiblingElement())
             {
                 address = p_aux1->Name();
-                if (strcmp(address, ADDRESS) == 0)
+                if (strcmp(address, ADDRESS) == 0 || strcmp(address, NETWORK_INTERFACE) == 0)
                 {
-                    const char* text = p_aux1->GetText();
-                    if (nullptr != text)
+                    std::string text = get_element_text(p_aux1);
+                    if (!text.empty())
                     {
-                        pDesc->interfaceWhiteList.emplace_back(text);
+                        p_transport->interfaceWhiteList.emplace_back(text);
                     }
                 }
                 else
@@ -526,25 +649,206 @@ XMLP_ret XMLParser::parseXMLCommonTransportData(
                 }
             }
         }
-        else if (strcmp(name, TCP_WAN_ADDR) == 0 || strcmp(name, UDP_OUTPUT_PORT) == 0 ||
-                strcmp(name, TRANSPORT_ID) == 0 || strcmp(name, TYPE) == 0 ||
-                strcmp(name, KEEP_ALIVE_FREQUENCY) == 0 || strcmp(name, KEEP_ALIVE_TIMEOUT) == 0 ||
-                strcmp(name, MAX_LOGICAL_PORT) == 0 || strcmp(name, LOGICAL_PORT_RANGE) == 0 ||
-                strcmp(name, LOGICAL_PORT_INCREMENT) == 0 || strcmp(name, LISTENING_PORTS) == 0 ||
-                strcmp(name, CALCULATE_CRC) == 0 || strcmp(name, CHECK_CRC) == 0 ||
-                strcmp(name, ENABLE_TCP_NODELAY) == 0 || strcmp(name, TLS) == 0 ||
-                strcmp(name, TCP_NEGOTIATION_TIMEOUT) == 0 ||
-                strcmp(name, NON_BLOCKING_SEND) == 0  ||
-                strcmp(name, SEGMENT_SIZE) == 0 || strcmp(name, PORT_QUEUE_CAPACITY) == 0 ||
-                strcmp(name, PORT_OVERFLOW_POLICY) == 0 || strcmp(name, SEGMENT_OVERFLOW_POLICY) == 0 ||
-                strcmp(name, HEALTHY_CHECK_TIMEOUT_MS) == 0 || strcmp(name, HEALTHY_CHECK_TIMEOUT_MS) == 0 ||
-                strcmp(name, RTPS_DUMP_FILE) == 0)
+        else if (strcmp(name, NETMASK_FILTER) == 0)
         {
-            // Parsed outside of this method
+            std::string netmask_filter_str;
+            if (XMLP_ret::XML_OK != getXMLString(p_aux0, &netmask_filter_str, 0))
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'netmask_filter'.");
+                return XMLP_ret::XML_ERROR;
+            }
+
+            try
+            {
+                p_transport->netmask_filter = fastdds::rtps::network::netmask_filter::string_to_netmask_filter_kind(
+                    netmask_filter_str);
+            }
+            catch (const std::invalid_argument& e)
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'netmask_filter' : " << e.what());
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, NETWORK_INTERFACES) == 0)
+        {
+            if (XMLP_ret::XML_OK != parseXMLInterfaces(p_aux0, p_transport))
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Failed to parse 'interfaces' element.");
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+    }
+    return XMLP_ret::XML_OK;
+}
+
+XMLP_ret XMLParser::parseXMLInterfaces(
+        tinyxml2::XMLElement* p_root,
+        std::shared_ptr<fastdds::rtps::SocketTransportDescriptor> p_transport)
+{
+    /*
+        <xs:complexType name="interfacesType">
+            <xs:all>
+                <xs:element name="allowlist" type="allowlistType" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="blocklist" type="blocklistType" minOccurs="0" maxOccurs="1"/>
+            </xs:all>
+        </xs:complexType>
+     */
+    tinyxml2::XMLElement* p_aux0 = nullptr;
+    const char* name = nullptr;
+    for (p_aux0 = p_root->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
+    {
+        name = p_aux0->Name();
+        if (strcmp(name, ALLOWLIST) == 0)
+        {
+            if (XMLP_ret::XML_OK != parseXMLAllowlist(p_aux0, p_transport))
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Failed to parse 'allowlist'.");
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, BLOCKLIST) == 0)
+        {
+            if (XMLP_ret::XML_OK != parseXMLBlocklist(p_aux0, p_transport))
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Failed to parse 'blocklist'.");
+                return XMLP_ret::XML_ERROR;
+            }
         }
         else
         {
-            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found in 'interfaces'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+    }
+    return XMLP_ret::XML_OK;
+}
+
+XMLP_ret XMLParser::parseXMLAllowlist(
+        tinyxml2::XMLElement* p_root,
+        std::shared_ptr<fastdds::rtps::SocketTransportDescriptor> p_transport)
+{
+    /*
+        <xs:complexType name="allowlistType">
+            <xs:sequence minOccurs="0" maxOccurs="unbounded">
+                <xs:element name="interface" minOccurs="0" maxOccurs="unbounded">
+                    <xs:complexType>
+                        <xs:attribute name="name" type="string" use="required"/>
+                        <xs:attribute name="netmask_filter" type="netmaskFilterType" use="optional"/>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+        </xs:complexType>
+     */
+    static const char* INTERFACE_NAME = "interface";
+    static const char* NAME_ATTR_NAME = "name";
+    static const char* NETMASK_FILTER_ATTR_NAME = "netmask_filter";
+
+    const tinyxml2::XMLElement* p_aux0 = nullptr;
+    const char* name = nullptr;
+    for (p_aux0 = p_root->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
+    {
+        name = p_aux0->Name();
+        if (strcmp(name, INTERFACE_NAME) == 0)
+        {
+            // Parse interface name (device/ip)
+            std::string iface_name;
+            auto iface_name_attr = p_aux0->FindAttribute(NAME_ATTR_NAME);
+            if (nullptr != iface_name_attr)
+            {
+                iface_name = iface_name_attr->Value();
+                if (iface_name.empty())
+                {
+                    EPROSIMA_LOG_ERROR(XMLPARSER,
+                            "Failed to parse 'allowlist' element. Attribute 'name' cannot be empty.");
+                    return XMLP_ret::XML_ERROR;
+                }
+            }
+            else
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER,
+                        "Failed to parse 'allowlist' element. Required attribute 'name' not found.");
+                return XMLP_ret::XML_ERROR;
+            }
+
+            // Parse netmask filter
+            fastdds::rtps::NetmaskFilterKind netmask_filter{fastdds::rtps::NetmaskFilterKind::AUTO};
+            auto netmask_filter_attr = p_aux0->FindAttribute(NETMASK_FILTER_ATTR_NAME);
+            if (nullptr != netmask_filter_attr)
+            {
+                try
+                {
+                    netmask_filter = fastdds::rtps::network::netmask_filter::string_to_netmask_filter_kind(
+                        netmask_filter_attr->Value());
+                }
+                catch (const std::invalid_argument& e)
+                {
+                    EPROSIMA_LOG_ERROR(XMLPARSER,
+                            "Failed to parse 'allowlist' element. Invalid value found in 'netmask_filter' : " <<
+                            e.what());
+                    return XMLP_ret::XML_ERROR;
+                }
+            }
+            // Add valid item to allowlist
+            p_transport->interface_allowlist.emplace_back(iface_name, netmask_filter);
+        }
+        else
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found in 'allowlist'. Name: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+    }
+    return XMLP_ret::XML_OK;
+}
+
+XMLP_ret XMLParser::parseXMLBlocklist(
+        tinyxml2::XMLElement* p_root,
+        std::shared_ptr<fastdds::rtps::SocketTransportDescriptor> p_transport)
+{
+    /*
+        <xs:complexType name="blocklistType">
+            <xs:sequence minOccurs="0" maxOccurs="unbounded">
+                <xs:element name="interface" minOccurs="0" maxOccurs="unbounded">
+                    <xs:complexType>
+                        <xs:attribute name="name" type="string" use="required"/>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+       </xs:complexType>
+     */
+    static const char* INTERFACE_NAME = "interface";
+    static const char* NAME_ATTR_NAME = "name";
+
+    const tinyxml2::XMLElement* p_aux0 = nullptr;
+    const char* name = nullptr;
+    for (p_aux0 = p_root->FirstChildElement(); p_aux0 != nullptr; p_aux0 = p_aux0->NextSiblingElement())
+    {
+        name = p_aux0->Name();
+        if (strcmp(name, INTERFACE_NAME) == 0)
+        {
+            // Parse interface name (device/ip)
+            auto iface = p_aux0->FindAttribute(NAME_ATTR_NAME);
+            if (nullptr != iface)
+            {
+                std::string iface_name = iface->Value();
+                if (iface_name.empty())
+                {
+                    EPROSIMA_LOG_ERROR(XMLPARSER,
+                            "Failed to parse 'blocklist' element. Attribute 'name' cannot be empty.");
+                    return XMLP_ret::XML_ERROR;
+                }
+                // Add valid item to blocklist
+                p_transport->interface_blocklist.emplace_back(iface_name);
+            }
+            else
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER,
+                        "Failed to parse 'blocklist' element. Required attribute 'name' not found.");
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found in 'blocklist'. Name: " << name);
             return XMLP_ret::XML_ERROR;
         }
     }
@@ -572,6 +876,8 @@ XMLP_ret XMLParser::parseXMLCommonTCPTransportData(
                 <xs:element name="check_crc" type="boolType" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="enable_tcp_nodelay" type="boolType" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="tls" type="tlsConfigType" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="keep_alive_thread" type="threadSettingsType" minOccurs="0" maxOccurs="1"/>
+                <xs:element name="accept_thread" type="threadSettingsType" minOccurs="0" maxOccurs="1"/>
             </xs:all>
         </xs:complexType>
      */
@@ -644,6 +950,14 @@ XMLP_ret XMLParser::parseXMLCommonTCPTransportData(
                     return XMLP_ret::XML_ERROR;
                 }
             }
+            // non_blocking_send - boolType
+            else if (strcmp(name, NON_BLOCKING_SEND) == 0)
+            {
+                if (XMLP_ret::XML_OK != getXMLBool(p_aux0, &pTCPDesc->non_blocking_send, 0))
+                {
+                    return XMLP_ret::XML_ERROR;
+                }
+            }
             else if (strcmp(name, LISTENING_PORTS) == 0)
             {
                 // listening_ports uint16ListType
@@ -681,13 +995,21 @@ XMLP_ret XMLParser::parseXMLCommonTCPTransportData(
                     return XMLP_ret::XML_ERROR;
                 }
             }
-            else if (strcmp(name, TCP_WAN_ADDR) == 0 || strcmp(name, TRANSPORT_ID) == 0 ||
-                    strcmp(name, TYPE) == 0 || strcmp(name, SEND_BUFFER_SIZE) == 0 ||
-                    strcmp(name, RECEIVE_BUFFER_SIZE) == 0 || strcmp(name, TTL) == 0 ||
-                    strcmp(name, MAX_MESSAGE_SIZE) == 0 || strcmp(name, MAX_INITIAL_PEERS_RANGE) == 0 ||
-                    strcmp(name, WHITE_LIST) == 0)
+            else if (strcmp(name, KEEP_ALIVE_THREAD) == 0)
             {
-                // Parsed Outside of this method
+                if (getXMLThreadSettings(*p_aux0, pTCPDesc->keep_alive_thread) != XMLP_ret::XML_OK)
+                {
+                    EPROSIMA_LOG_ERROR(XMLPARSER, "Incorrect thread settings");
+                    return XMLP_ret::XML_ERROR;
+                }
+            }
+            else if (strcmp(name, ACCEPT_THREAD) == 0)
+            {
+                if (getXMLThreadSettings(*p_aux0, pTCPDesc->accept_thread) != XMLP_ret::XML_OK)
+                {
+                    EPROSIMA_LOG_ERROR(XMLPARSER, "Incorrect thread settings");
+                    return XMLP_ret::XML_ERROR;
+                }
             }
             else if (strcmp(name, TCP_NEGOTIATION_TIMEOUT) == 0)
             {
@@ -698,12 +1020,6 @@ XMLP_ret XMLParser::parseXMLCommonTCPTransportData(
                     return XMLP_ret::XML_ERROR;
                 }
                 pTCPDesc->tcp_negotiation_timeout = static_cast<uint32_t>(iTimeout);
-            }
-            else
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
-                return XMLP_ret::XML_ERROR;
             }
         }
     }
@@ -729,7 +1045,8 @@ XMLP_ret XMLParser::parseXMLCommonSharedMemTransportData(
                 <xs:element name="port_queue_capacity" type="uint32Type" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="healthy_check_timeout_ms" type="uint32Type" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="rtps_dump_file" type="stringType" minOccurs="0" maxOccurs="1"/>
-                </xs:all>
+                <xs:element name="dump_thread" type="threadSettingsType" minOccurs="0" maxOccurs="1"/>
+            </xs:all>
         </xs:complexType>
      */
 
@@ -777,36 +1094,17 @@ XMLP_ret XMLParser::parseXMLCommonSharedMemTransportData(
                 }
                 transport_descriptor->rtps_dump_file(str);
             }
-            else if (strcmp(name, MAX_MESSAGE_SIZE) == 0)
+            else if (strcmp(name, DUMP_THREAD) == 0)
             {
-                // maxMessageSize - uint32Type
-                uint32_t uSize = 0;
-                if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &uSize, 0))
+                fastdds::rtps::ThreadSettings thread_settings;
+                if (getXMLThreadSettings(*p_aux0, thread_settings) != XMLP_ret::XML_OK)
                 {
+                    EPROSIMA_LOG_ERROR(XMLPARSER, "Incorrect thread settings");
                     return XMLP_ret::XML_ERROR;
                 }
-                transport_descriptor->max_message_size(uSize);
+                transport_descriptor->dump_thread(thread_settings);
             }
-            else if (strcmp(name, MAX_INITIAL_PEERS_RANGE) == 0)
-            {
-                // maxInitialPeersRange - uint32Type
-                uint32_t uRange = 0;
-                if (XMLP_ret::XML_OK != getXMLUint(p_aux0, &uRange, 0))
-                {
-                    return XMLP_ret::XML_ERROR;
-                }
-                transport_descriptor->maxInitialPeersRange = uRange;
-            }
-            else if (strcmp(name, TRANSPORT_ID) == 0 || strcmp(name, TYPE) == 0)
-            {
-                // Parsed Outside of this method
-            }
-            else
-            {
-                EPROSIMA_LOG_ERROR(XMLPARSER,
-                        "Invalid element found into 'rtpsTransportDescriptorType'. Name: " << name);
-                return XMLP_ret::XML_ERROR;
-            }
+            // Do not parse nor fail on unkown tags; these may be parsed elsewhere
         }
     }
     else
@@ -1184,6 +1482,48 @@ XMLP_ret XMLParser::parse_tls_config(
     return ret;
 }
 
+XMLP_ret XMLParser::parseXMLReceptionThreads(
+        tinyxml2::XMLElement& p_root,
+        fastdds::rtps::PortBasedTransportDescriptor::ReceptionThreadsConfigMap& reception_threads)
+{
+    /*
+        <xs:complexType name="receptionThreadsListType">
+            <xs:sequence minOccurs="0" maxOccurs="unbounded">
+                <xs:element name="reception_thread" type="threadSettingsType" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+     */
+
+    /*
+     * The only allowed element is <reception_thread>
+     */
+    XMLP_ret ret = XMLP_ret::XML_OK;
+    for (tinyxml2::XMLElement* p_element = p_root.FirstChildElement(); p_element != nullptr;
+            p_element = p_element->NextSiblingElement())
+    {
+        if (strcmp(p_element->Name(), RECEPTION_THREAD) == 0)
+        {
+            uint32_t port = 0;
+            fastdds::rtps::ThreadSettings thread_settings;
+            ret = getXMLThreadSettingsWithPort(*p_element, thread_settings, port);
+            if (XMLP_ret::XML_OK != ret || reception_threads.count(port) != 0)
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing reception_threads thread settings. Port: " << port);
+                ret = XMLP_ret::XML_ERROR;
+                break;
+            }
+            reception_threads[port] = thread_settings;
+        }
+        else
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing reception_threads. Wrong tag: " << p_element->Name());
+            ret = XMLP_ret::XML_ERROR;
+            break;
+        }
+    }
+    return ret;
+}
+
 XMLP_ret XMLParser::parseXMLLibrarySettings(
         tinyxml2::XMLElement* p_root)
 {
@@ -1215,6 +1555,27 @@ XMLP_ret XMLParser::parseXMLLibrarySettings(
         }
 
         XMLProfileManager::library_settings(library_settings);
+    }
+
+    return ret;
+}
+
+XMLP_ret XMLParser::parseXMLDomainParticipantFactoryProf(
+        tinyxml2::XMLElement* p_root,
+        BaseNode& rootNode)
+{
+    XMLP_ret ret = XMLP_ret::XML_OK;
+    up_participantfactory_t factory_qos{new fastdds::dds::DomainParticipantFactoryQos};
+    up_node_participantfactory_t factory_node{new node_participantfactory_t{NodeType::DOMAINPARTICIPANT_FACTORY,
+                                                                            std::move(factory_qos)}};
+    if (XMLP_ret::XML_OK == fillDataNode(p_root, *factory_node))
+    {
+        rootNode.addChild(std::move(factory_node));
+    }
+    else
+    {
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Error parsing participant profile");
+        ret = XMLP_ret::XML_ERROR;
     }
 
     return ret;
@@ -1371,6 +1732,10 @@ XMLP_ret XMLParser::parseProfiles(
             {
                 parseOk &= parseXMLLibrarySettings(p_profile) == XMLP_ret::XML_OK;
             }
+            else if (strcmp(tag, DOMAINPARTICIPANT_FACTORY) == 0)
+            {
+                parseOk &= parseXMLDomainParticipantFactoryProf(p_profile, profilesNode) == XMLP_ret::XML_OK;
+            }
             else if (strcmp(tag, PARTICIPANT) == 0)
             {
                 parseOk &= parseXMLParticipantProf(p_profile, profilesNode) == XMLP_ret::XML_OK;
@@ -1438,6 +1803,7 @@ XMLP_ret XMLParser::parseLogConfig(
                 <xs:choice minOccurs="1">
                     <xs:element name="use_default" type="booleanCaps" minOccurs="0" maxOccurs="1"/>
                     <xs:element name="consumer" type="logConsumerType" minOccurs="0" maxOccurs="unbounded"/>
+                    <xs:element name="thread_settings" type="threadSettingsType" minOccurs="0" maxOccurs="1"/>
                 </xs:choice>
             </xs:sequence>
         </xs:complexType>
@@ -1460,16 +1826,30 @@ XMLP_ret XMLParser::parseLogConfig(
         p_aux0 = p_root;
     }
 
+    std::set<std::string> tags_present;
     tinyxml2::XMLElement* p_element = p_aux0->FirstChildElement();
+    fastdds::rtps::ThreadSettings thread_settings;
+    bool set_thread_settings = false;
 
     while (ret == XMLP_ret::XML_OK && nullptr != p_element)
     {
+        const char* name = p_element->Name();
         const char* tag = p_element->Value();
+
+        // Fail on duplicated not allowed elements
+        if (strcmp(tag, CONSUMER) != 0 && tags_present.count(name) != 0)
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'log'. Tag: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present.emplace(name);
+
         if (nullptr != tag)
         {
             if (strcmp(tag, USE_DEFAULT) == 0)
             {
-                if (nullptr == p_element->GetText())
+                std::string auxBool = get_element_text(p_element);
+                if (auxBool.empty())
                 {
                     EPROSIMA_LOG_ERROR(XMLPARSER, "Cannot get text from tag: '" << tag << "'");
                     ret = XMLP_ret::XML_ERROR;
@@ -1478,7 +1858,6 @@ XMLP_ret XMLParser::parseLogConfig(
                 if (ret == XMLP_ret::XML_OK)
                 {
                     bool use_default = true;
-                    std::string auxBool = p_element->GetText();
                     if (std::strcmp(auxBool.c_str(), "FALSE") == 0)
                     {
                         use_default = false;
@@ -1493,6 +1872,18 @@ XMLP_ret XMLParser::parseLogConfig(
             {
                 ret = parseXMLConsumer(*p_element);
             }
+            else if (strcmp(tag, THREAD_SETTINGS) == 0)
+            {
+                ret = getXMLThreadSettings(*p_element, thread_settings);
+                if (ret == XMLP_ret::XML_OK)
+                {
+                    set_thread_settings = true;
+                }
+                else
+                {
+                    EPROSIMA_LOG_ERROR(XMLPARSER, "Incorrect thread settings");
+                }
+            }
             else
             {
                 EPROSIMA_LOG_ERROR(XMLPARSER, "Not expected tag: '" << tag << "'");
@@ -1502,8 +1893,13 @@ XMLP_ret XMLParser::parseLogConfig(
 
         if (ret == XMLP_ret::XML_OK)
         {
-            p_element = p_element->NextSiblingElement(CONSUMER);
+            p_element = p_element->NextSiblingElement();
         }
+    }
+
+    if (ret == XMLP_ret::XML_OK && set_thread_settings)
+    {
+        fastdds::dds::Log::SetThreadConfig(thread_settings);
     }
 
     return ret;
@@ -1519,7 +1915,7 @@ XMLP_ret XMLParser::parseXMLConsumer(
 
     if (p_element != nullptr)
     {
-        std::string classStr = p_element->GetText();
+        std::string classStr = get_element_text(p_element);
 
         if (std::strcmp(classStr.c_str(), "StdoutConsumer") == 0)
         {
@@ -1553,7 +1949,7 @@ XMLP_ret XMLParser::parseXMLConsumer(
                     if (nullptr != (p_auxName = property->FirstChildElement(NAME)))
                     {
                         // Get property name
-                        std::string s = p_auxName->GetText();
+                        std::string s = get_element_text(p_auxName);
 
                         if (std::strcmp(s.c_str(), "stderr_threshold") == 0)
                         {
@@ -1576,7 +1972,7 @@ XMLP_ret XMLParser::parseXMLConsumer(
                             if (nullptr != (p_auxValue = property->FirstChildElement(VALUE)))
                             {
                                 // Get property value and use it to set the threshold.
-                                std::string threshold_str = p_auxValue->GetText();
+                                std::string threshold_str = get_element_text(p_auxValue);
                                 if (std::strcmp(threshold_str.c_str(), "Log::Kind::Error") == 0)
                                 {
                                     threshold = Log::Kind::Error;
@@ -1633,16 +2029,12 @@ XMLP_ret XMLParser::parseXMLConsumer(
                     // name - stringType
                     if (nullptr != (p_auxName = property->FirstChildElement(NAME)))
                     {
-                        std::string s = p_auxName->GetText();
+                        std::string s = get_element_text(p_auxName);
 
                         if (std::strcmp(s.c_str(), "filename") == 0)
                         {
-                            if (nullptr != (p_auxValue = property->FirstChildElement(VALUE)) &&
-                                    nullptr != p_auxValue->GetText())
-                            {
-                                outputFile = p_auxValue->GetText();
-                            }
-                            else
+                            if (nullptr == (p_auxValue = property->FirstChildElement(VALUE)) ||
+                                    !get_element_text(p_auxValue, outputFile))
                             {
                                 EPROSIMA_LOG_ERROR(XMLParser, "Filename value cannot be found for " << classStr
                                                                                                     << " log consumer.");
@@ -1651,10 +2043,10 @@ XMLP_ret XMLParser::parseXMLConsumer(
                         }
                         else if (std::strcmp(s.c_str(), "append") == 0)
                         {
+                            std::string auxBool;
                             if (nullptr != (p_auxValue = property->FirstChildElement(VALUE)) &&
-                                    nullptr != p_auxValue->GetText())
+                                    get_element_text(p_auxValue, auxBool))
                             {
-                                std::string auxBool = p_auxValue->GetText();
                                 if (std::strcmp(auxBool.c_str(), "TRUE") == 0)
                                 {
                                     append = true;
@@ -1785,6 +2177,54 @@ XMLP_ret XMLParser::fillDataNode(
 
 XMLP_ret XMLParser::fillDataNode(
         tinyxml2::XMLElement* p_profile,
+        DataNode<fastdds::dds::DomainParticipantFactoryQos>& factory_node)
+{
+    /*
+       <xs:complexType name="domainParticipantFactoryProfileType">
+        <xs:all>
+            <xs:element name="qos" type="domainParticipantFactoryQosPoliciesType" minOccurs="0" maxOccurs="1"/>
+        </xs:all>
+        <xs:attribute name="profile_name" type="string" use="required"/>
+        <xs:attribute name="is_default_profile" type="boolean" use="optional"/>
+       </xs:complexType>
+     */
+
+    if (nullptr == p_profile)
+    {
+        EPROSIMA_LOG_ERROR(XMLPARSER, "Bad parameters!");
+        return XMLP_ret::XML_ERROR;
+    }
+
+    addAllAttributes(p_profile, factory_node);
+
+    /*
+     * The only allowed element <qos>, and its max is 1; look for it.
+     */
+    std::set<std::string> tags_present;
+    for (tinyxml2::XMLElement* p_element = p_profile->FirstChildElement(); p_element != nullptr;
+            p_element = p_element->NextSiblingElement())
+    {
+        const char* name = p_element->Name();
+        if (tags_present.count(name) != 0)
+        {
+            EPROSIMA_LOG_ERROR(XMLPARSER, "Duplicated element found in 'participant'. Tag: " << name);
+            return XMLP_ret::XML_ERROR;
+        }
+        tags_present.emplace(name);
+
+        if (strcmp(p_element->Name(), QOS) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLDomainParticipantFactoryQos(*p_element, *factory_node.get()))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+    }
+    return XMLP_ret::XML_OK;
+}
+
+XMLP_ret XMLParser::fillDataNode(
+        tinyxml2::XMLElement* p_profile,
         DataNode<ParticipantAttributes>& participant_node)
 {
     /*
@@ -1799,6 +2239,7 @@ XMLP_ret XMLParser::fillDataNode(
                 <xs:element name="defaultMulticastLocatorList" type="locatorListType" minOccurs="0"/>
                 <xs:element name="sendSocketBufferSize" type="uint32Type" minOccurs="0"/>
                 <xs:element name="listenSocketBufferSize" type="uint32Type" minOccurs="0"/>
+                <xs:element name="netmask_filter" type="netmaskFilterType" minOccurs="0" maxOccurs="1"/>
                 <xs:element name="builtin" type="builtinAttributesType" minOccurs="0"/>
                 <xs:element name="port" type="portType" minOccurs="0"/>
                 <xs:element name="userData" type="octetVectorType" minOccurs="0"/>
@@ -1952,6 +2393,26 @@ XMLP_ret XMLParser::fillDataNode(
                 return XMLP_ret::XML_ERROR;
             }
         }
+        else if (strcmp(name, NETMASK_FILTER) == 0)
+        {
+            std::string netmask_filter_str;
+            if (XMLP_ret::XML_OK != getXMLString(p_aux0, &netmask_filter_str, 0))
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'netmask_filter'.");
+                return XMLP_ret::XML_ERROR;
+            }
+
+            try
+            {
+                participant_node.get()->rtps.netmaskFilter =
+                        fastdds::rtps::network::netmask_filter::string_to_netmask_filter_kind(netmask_filter_str);
+            }
+            catch (const std::invalid_argument& e)
+            {
+                EPROSIMA_LOG_ERROR(XMLPARSER, "Invalid element found into 'netmask_filter' : " << e.what());
+                return XMLP_ret::XML_ERROR;
+            }
+        }
         else if (strcmp(name, BUILTIN) == 0)
         {
             // builtin
@@ -2024,11 +2485,12 @@ XMLP_ret XMLParser::fillDataNode(
         {
             // builtinTransports
             eprosima::fastdds::rtps::BuiltinTransports bt;
-            if (XMLP_ret::XML_OK != getXMLBuiltinTransports(p_aux0, &bt, ident))
+            eprosima::fastdds::rtps::BuiltinTransportsOptions bt_opts;
+            if (XMLP_ret::XML_OK != getXMLBuiltinTransports(p_aux0, &bt, &bt_opts, ident))
             {
                 return XMLP_ret::XML_ERROR;
             }
-            participant_node.get()->rtps.setup_transports(bt);
+            participant_node.get()->rtps.setup_transports(bt, bt_opts);
         }
         else if (strcmp(name, PROPERTIES_POLICY) == 0)
         {
@@ -2047,6 +2509,49 @@ XMLP_ret XMLParser::fillDataNode(
                 return XMLP_ret::XML_ERROR;
             }
             participant_node.get()->rtps.setName(s.c_str());
+        }
+        else if (strcmp(name, BUILTIN_CONTROLLERS_SENDER_THREAD) == 0)
+        {
+            if (XMLP_ret::XML_OK !=
+                    getXMLThreadSettings(*p_aux0,
+                    participant_node.get()->rtps.builtin_controllers_sender_thread))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, TIMED_EVENTS_THREAD) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLThreadSettings(*p_aux0, participant_node.get()->rtps.timed_events_thread))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, DISCOVERY_SERVER_THREAD) == 0)
+        {
+            if (XMLP_ret::XML_OK != getXMLThreadSettings(*p_aux0, participant_node.get()->rtps.discovery_server_thread))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, BUILTIN_TRANSPORTS_RECEPTION_THREADS) == 0)
+        {
+            if (XMLP_ret::XML_OK !=
+                    getXMLThreadSettings(*p_aux0,
+                    participant_node.get()->rtps.builtin_transports_reception_threads))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+        }
+        else if (strcmp(name, SECURITY_LOG_THREAD) == 0)
+        {
+#if HAVE_SECURITY
+            if (XMLP_ret::XML_OK != getXMLThreadSettings(*p_aux0, participant_node.get()->rtps.security_log_thread))
+            {
+                return XMLP_ret::XML_ERROR;
+            }
+#else
+            EPROSIMA_LOG_WARNING(XMLPARSER, "Ignoring '" << SECURITY_LOG_THREAD << "' since security is disabled");
+#endif // if HAVE_SECURITY
         }
         else
         {

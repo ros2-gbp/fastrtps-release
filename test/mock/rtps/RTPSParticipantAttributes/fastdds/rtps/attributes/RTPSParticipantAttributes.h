@@ -27,15 +27,19 @@
 #include <fastdds/rtps/attributes/PropertyPolicy.h>
 #include <fastdds/rtps/attributes/RTPSParticipantAllocationAttributes.hpp>
 #include <fastdds/rtps/attributes/ServerAttributes.h>
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastdds/rtps/common/PortParameters.h>
 #include <fastdds/rtps/common/Time_t.h>
+#include <fastdds/rtps/common/Types.h>
 #include <fastdds/rtps/flowcontrol/FlowControllerDescriptor.hpp>
 #include <fastdds/rtps/flowcontrol/ThroughputControllerDescriptor.h>
 #include <fastdds/rtps/resources/ResourceManagement.h>
+#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
 #include <fastdds/rtps/transport/TransportInterface.h>
-#include <fastrtps/utils/fixed_size_string.hpp>
+#include <fastrtps/fastrtps_dll.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
+#include <fastrtps/utils/fixed_size_string.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -380,6 +384,9 @@ public:
     //! TypeLookup Service settings
     TypeLookupSettings typelookup_config;
 
+    //! Network Configuration
+    NetworkConfigSet_t network_configuration;
+
     //! Metatraffic Unicast Locator List
     LocatorList_t metatrafficUnicastLocatorList;
 
@@ -423,6 +430,7 @@ public:
                (this->use_WriterLivelinessProtocol == b.use_WriterLivelinessProtocol) &&
                (typelookup_config.use_client == b.typelookup_config.use_client) &&
                (typelookup_config.use_server == b.typelookup_config.use_server) &&
+               (this->network_configuration == b.network_configuration) &&
                (this->metatrafficUnicastLocatorList == b.metatrafficUnicastLocatorList) &&
                (this->metatrafficMulticastLocatorList == b.metatrafficMulticastLocatorList) &&
                (this->metatraffic_external_unicast_locators == b.metatraffic_external_unicast_locators) &&
@@ -461,6 +469,7 @@ public:
                (this->ignore_non_matching_locators == b.ignore_non_matching_locators) &&
                (this->sendSocketBufferSize == b.sendSocketBufferSize) &&
                (this->listenSocketBufferSize == b.listenSocketBufferSize) &&
+               (this->netmaskFilter == b.netmaskFilter) &&
                (this->builtin == b.builtin) &&
                (this->port == b.port) &&
                (this->userData == b.userData) &&
@@ -469,7 +478,15 @@ public:
                (this->useBuiltinTransports == b.useBuiltinTransports) &&
                (this->properties == b.properties) &&
                (this->prefix == b.prefix) &&
-               (this->flow_controllers == b.flow_controllers);
+               (this->flow_controllers == b.flow_controllers) &&
+               (this->builtin_controllers_sender_thread == b.builtin_controllers_sender_thread) &&
+               (this->timed_events_thread == b.timed_events_thread) &&
+#if HAVE_SECURITY
+               (this->security_log_thread == b.security_log_thread) &&
+#endif // if HAVE_SECURITY
+               (this->discovery_server_thread == b.discovery_server_thread) &&
+               (this->builtin_transports_reception_threads == b.builtin_transports_reception_threads);
+
     }
 
     /**
@@ -481,6 +498,22 @@ public:
             fastdds::rtps::BuiltinTransports /*transports*/)
     {
         // Only include UDPv4 behavior for mock tests
+        setup_transports_default(*this);
+        useBuiltinTransports = false;
+    }
+
+    /**
+     * Provides a way of easily configuring transport related configuration on certain pre-defined scenarios with
+     * certain options. Options only take effect if the selected builtin transport is LARGE_DATA.
+     *
+     * @param transports Defines the transport configuration scenario to setup.
+     * @param options Defines the options to be used in the transport configuration.
+     */
+    void setup_transports(
+            fastdds::rtps::BuiltinTransports /*transports*/,
+            const fastdds::rtps::BuiltinTransportsOptions& /*options*/)
+    {
+        // Only include UDPv4 behavior for mock tests, ignore options
         setup_transports_default(*this);
         useBuiltinTransports = false;
     }
@@ -499,6 +532,7 @@ public:
         auto descriptor = std::make_shared<fastrtps::rtps::UDPv4TransportDescriptor>();
         descriptor->sendBufferSize = att.sendSocketBufferSize;
         descriptor->receiveBufferSize = att.listenSocketBufferSize;
+        descriptor->default_reception_threads(att.builtin_transports_reception_threads);
 
         return descriptor;
     }
@@ -535,6 +569,9 @@ public:
      * Default value: 0.
      */
     uint32_t listenSocketBufferSize = 0;
+
+    //! Netmask filter configuration
+    fastdds::rtps::NetmaskFilterKind netmaskFilter = fastdds::rtps::NetmaskFilterKind::AUTO;
 
     //! Optionally allows user to define the GuidPrefix_t
     GuidPrefix_t prefix;
@@ -592,10 +629,34 @@ public:
     //! Flow controllers.
     FlowControllerDescriptorList flow_controllers;
 
+    //! Thread settings for the builtin flow controllers sender threads
+    fastdds::rtps::ThreadSettings builtin_controllers_sender_thread;
+
+    //! Thread settings for the timed events thread
+    fastdds::rtps::ThreadSettings timed_events_thread;
+
+    //! Thread settings for the discovery server thread
+    fastdds::rtps::ThreadSettings discovery_server_thread;
+
+    //! Thread settings for the builtin transports reception threads
+    fastdds::rtps::ThreadSettings builtin_transports_reception_threads;
+
+#if HAVE_SECURITY
+    //! Thread settings for the security log thread
+    fastdds::rtps::ThreadSettings security_log_thread;
+#endif // if HAVE_SECURITY
+
+    /*! Maximum message size used to avoid fragmentation, setted ONLY in LARGE_DATA. If this value is
+     * not zero, the network factory will allow the initialization of UDP transports with maxMessageSize
+     * higher than 65500 KB (s_maximumMessageSize).
+     */
+    uint32_t max_msg_size_no_frag = 0;
+
 private:
 
     //! Name of the participant.
     string_255 name{"RTPSParticipant"};
+
 };
 
 }  // namespace rtps

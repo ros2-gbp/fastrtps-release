@@ -14,11 +14,6 @@
 
 #include "BlackboxTests.hpp"
 
-#include "TCPReqRepHelloWorldRequester.hpp"
-#include "TCPReqRepHelloWorldReplier.hpp"
-#include "PubSubReader.hpp"
-#include "PubSubWriter.hpp"
-
 #include <chrono>
 #include <thread>
 #include <random>
@@ -28,6 +23,10 @@
 #include <fastrtps/transport/TCPv4TransportDescriptor.h>
 #include <fastrtps/transport/TCPv6TransportDescriptor.h>
 
+#include "../api/dds-pim/TCPReqRepHelloWorldRequester.hpp"
+#include "../api/dds-pim/TCPReqRepHelloWorldReplier.hpp"
+#include "PubSubReader.hpp"
+#include "PubSubWriter.hpp"
 #include "DatagramInjectionTransport.hpp"
 
 using namespace eprosima::fastrtps;
@@ -48,6 +47,10 @@ public:
         use_ipv6 = std::get<1>(GetParam());
         if (use_ipv6)
         {
+#ifdef __APPLE__
+            // TODO: fix IPv6 issues related with zone ID
+            GTEST_SKIP() << "TCPv6 tests are disabled in Mac";
+#endif // ifdef __APPLE__
             test_transport_ = std::make_shared<TCPv6TransportDescriptor>();
         }
         else
@@ -671,7 +674,7 @@ TEST(TransportTCP, Client_reconnection)
     delete requester;
 }
 
-// Test copy constructor and copy assignment for TCPv4
+// Test zero listening port for TCPv4
 TEST_P(TransportTCP, TCPv4_autofill_port)
 {
     PubSubReader<HelloWorldPubSubType> p1(TEST_TOPIC_NAME);
@@ -701,7 +704,7 @@ TEST_P(TransportTCP, TCPv4_autofill_port)
     EXPECT_TRUE(IPLocator::getPhysicalPort(p2_locators.begin()[0]) == port);
 }
 
-// Test copy constructor and copy assignment for TCPv6
+// Test zero listening port for TCPv6
 TEST_P(TransportTCP, TCPv6_autofill_port)
 {
     PubSubReader<HelloWorldPubSubType> p1(TEST_TOPIC_NAME);
@@ -840,20 +843,98 @@ TEST_P(TransportTCP, large_data_topology)
     writers.clear();
 }
 
+// This test verifies that if having a server with several listening ports, only the first one is used.
+TEST_P(TransportTCP, multiple_listening_ports)
+{
+    // Create a server with several listening ports
+    PubSubReader<HelloWorldPubSubType>* server = new PubSubReader<HelloWorldPubSubType>(TEST_TOPIC_NAME);
+    uint16_t server_port_1 = 10000;
+    uint16_t server_port_2 = 10001;
+
+    std::shared_ptr<TCPTransportDescriptor> server_transport;
+    if (use_ipv6)
+    {
+        server_transport = std::make_shared<TCPv6TransportDescriptor>();
+    }
+    else
+    {
+        server_transport = std::make_shared<TCPv4TransportDescriptor>();
+    }
+    server_transport->add_listener_port(server_port_1);
+    server_transport->add_listener_port(server_port_2);
+    server->disable_builtin_transport().add_user_transport_to_pparams(server_transport).init();
+    ASSERT_TRUE(server->isInitialized());
+
+    // Create two clients each one connecting to a different port
+    PubSubWriter<HelloWorldPubSubType>* client_1 = new PubSubWriter<HelloWorldPubSubType>(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldPubSubType>* client_2 = new PubSubWriter<HelloWorldPubSubType>(TEST_TOPIC_NAME);
+    std::shared_ptr<TCPTransportDescriptor> client_transport_1;
+    std::shared_ptr<TCPTransportDescriptor> client_transport_2;
+    Locator_t initialPeerLocator_1;
+    Locator_t initialPeerLocator_2;
+    if (use_ipv6)
+    {
+        client_transport_1 = std::make_shared<TCPv6TransportDescriptor>();
+        client_transport_2 = std::make_shared<TCPv6TransportDescriptor>();
+        initialPeerLocator_1.kind = LOCATOR_KIND_TCPv6;
+        initialPeerLocator_2.kind = LOCATOR_KIND_TCPv6;
+        IPLocator::setIPv6(initialPeerLocator_1, "::1");
+        IPLocator::setIPv6(initialPeerLocator_2, "::1");
+    }
+    else
+    {
+        client_transport_1 = std::make_shared<TCPv4TransportDescriptor>();
+        client_transport_2 = std::make_shared<TCPv4TransportDescriptor>();
+        initialPeerLocator_1.kind = LOCATOR_KIND_TCPv4;
+        initialPeerLocator_2.kind = LOCATOR_KIND_TCPv4;
+        IPLocator::setIPv4(initialPeerLocator_1, 127, 0, 0, 1);
+        IPLocator::setIPv4(initialPeerLocator_2, 127, 0, 0, 1);
+    }
+    client_1->disable_builtin_transport().add_user_transport_to_pparams(client_transport_1);
+    client_2->disable_builtin_transport().add_user_transport_to_pparams(client_transport_2);
+    initialPeerLocator_1.port = server_port_1;
+    initialPeerLocator_2.port = server_port_2;
+    LocatorList_t initial_peer_list_1;
+    LocatorList_t initial_peer_list_2;
+    initial_peer_list_1.push_back(initialPeerLocator_1);
+    initial_peer_list_2.push_back(initialPeerLocator_2);
+    client_1->initial_peers(initial_peer_list_1);
+    client_2->initial_peers(initial_peer_list_2);
+    client_1->init();
+    client_2->init();
+    ASSERT_TRUE(client_1->isInitialized());
+    ASSERT_TRUE(client_2->isInitialized());
+
+    // Wait for discovery.
+    server->wait_discovery();
+    client_1->wait_discovery();
+    client_2->wait_discovery(std::chrono::seconds(1));
+    EXPECT_EQ(server->get_matched(), 1U);
+    EXPECT_EQ(client_1->get_matched(), 1U);
+    EXPECT_EQ(client_2->get_matched(), 0U);
+
+    // Send data
+    auto data = default_helloworld_data_generator();
+    server->startReception(data);
+    client_1->send(data);
+    // In this test all data should be sent.
+    ASSERT_TRUE(data.empty());
+    // Block server until reception finished.
+    server->block_for_all();
+    // Wait for all data to be acked.
+    EXPECT_TRUE(client_1->waitForAllAcked(std::chrono::milliseconds(100)));
+
+    // Release TCP client and server resources.
+    delete client_1;
+    delete client_2;
+    delete server;
+}
+
 // Test TCP send resource cleaning. This test matches a server with a client and then releases the
 // client resources. After PDP unbind message, the server removes the client
 // from the send resource list.
 TEST_P(TransportTCP, send_resource_cleanup)
 {
-
-#if defined(__APPLE__)
-    if (use_ipv6)
-    {
-        GTEST_SKIP() << "macOS TCPv6 transport skipped";
-        return;
-    }
-#endif // if defined(__APPLE__)
-
     eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Warning);
 
     using eprosima::fastdds::rtps::DatagramInjectionTransportDescriptor;
@@ -992,15 +1073,6 @@ TEST_P(TransportTCP, send_resource_cleanup)
 // the send resource should not be removed.
 TEST_P(TransportTCP, send_resource_cleanup_initial_peer)
 {
-
-#if defined(__APPLE__)
-    if (use_ipv6)
-    {
-        GTEST_SKIP() << "macOS TCPv6 transport skipped";
-        return;
-    }
-#endif // if defined(__APPLE__)
-
     eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Warning);
 
     using eprosima::fastdds::rtps::DatagramInjectionTransportDescriptor;
@@ -1251,6 +1323,66 @@ TEST_P(TransportTCP, large_message_large_data_send_receive)
     EXPECT_TRUE(data.empty());
 
     reader.block_for_all();
+}
+
+// Test CreateInitialConnection for TCP
+TEST_P(TransportTCP, TCP_initial_peers_connection)
+{
+    PubSubWriter<HelloWorldPubSubType> p1(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> p2(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> p3(TEST_TOPIC_NAME);
+
+    // Add TCP Transport with listening port
+    auto p1_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    p1_transport->add_listener_port(global_port);
+    auto p2_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    p2_transport->add_listener_port(global_port + 1);
+    auto p3_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    p3_transport->add_listener_port(global_port - 1);
+
+    // Add initial peer to clients
+    Locator_t initialPeerLocator;
+    initialPeerLocator.kind = LOCATOR_KIND_TCPv4;
+    IPLocator::setIPv4(initialPeerLocator, 127, 0, 0, 1);
+    initialPeerLocator.port = global_port;
+    LocatorList_t initial_peer_list;
+    initial_peer_list.push_back(initialPeerLocator);
+
+    // Setup participants
+    p1.disable_builtin_transport()
+            .add_user_transport_to_pparams(p1_transport);
+
+    p2.disable_builtin_transport()
+            .initial_peers(initial_peer_list)
+            .add_user_transport_to_pparams(p2_transport);
+
+    p3.disable_builtin_transport()
+            .initial_peers(initial_peer_list)
+            .add_user_transport_to_pparams(p3_transport);
+
+    // Init participants
+    p1.init();
+    p2.init();
+    p3.init();
+    ASSERT_TRUE(p1.isInitialized());
+    ASSERT_TRUE(p2.isInitialized());
+    ASSERT_TRUE(p3.isInitialized());
+
+    // Wait for discovery
+    p1.wait_discovery(2, std::chrono::seconds(0));
+    p2.wait_discovery(std::chrono::seconds(0), 1);
+    p3.wait_discovery(std::chrono::seconds(0), 1);
+
+    // Send and receive data
+    auto data = default_helloworld_data_generator();
+    p2.startReception(data);
+    p3.startReception(data);
+
+    p1.send(data);
+    EXPECT_TRUE(data.empty());
+
+    p2.block_for_all();
+    p3.block_for_all();
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P

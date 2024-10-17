@@ -12,26 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
+#include <cstdlib>
+#include <fstream>
+#include <memory>
+#include <sstream>
+#include <thread>
+
+#include <gtest/gtest.h>
+#include <tinyxml2.h>
+
+#include <fastdds/dds/core/policy/QosPolicies.hpp>
+#include <fastdds/dds/domain/qos/DomainParticipantFactoryQos.hpp>
+#include <fastdds/dds/log/FileConsumer.hpp>
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/dds/log/OStreamConsumer.hpp>
-#include <fastdds/dds/log/FileConsumer.hpp>
 #include <fastdds/dds/log/StdoutErrConsumer.hpp>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastrtps/utils/IPLocator.h>
+#include <fastdds/rtps/transport/network/AllowedNetworkInterface.hpp>
+#include <fastdds/rtps/transport/network/BlockedNetworkInterface.hpp>
+#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 #include <fastrtps/transport/TCPTransportDescriptor.h>
 #include <fastrtps/transport/UDPTransportDescriptor.h>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-#include <tinyxml2.h>
-#include <gtest/gtest.h>
-#include <memory>
-#include <thread>
-#include <chrono>
-#include <sstream>
-#include <fstream>
-#include <stdlib.h>
+#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
+
+#include "../common/env_var_utils.hpp"
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
+using namespace eprosima::testing;
 using namespace ::testing;
 
 using eprosima::fastdds::dds::Log;
@@ -52,19 +62,25 @@ void TestClearConsumersFunc()
     log_mock->ClearConsumers();
 }
 
+void TestSetThreadConfigFunc()
+{
+    log_mock->SetThreadConfig();
+}
+
 std::function<void(std::unique_ptr<LogConsumer>&&)> Log::RegisterConsumerFunc = TestRegisterConsumerFunc;
 std::function<void()> Log::ClearConsumersFunc = TestClearConsumersFunc;
+std::function<void()> Log::SetThreadConfigFunc = TestSetThreadConfigFunc;
 
-class XMLProfileParserTests : public ::testing::Test
+class XMLProfileParserBasicTests : public ::testing::Test
 {
 public:
 
-    XMLProfileParserTests()
+    XMLProfileParserBasicTests()
     {
         log_mock = new testing::StrictMock<LogMock>();
     }
 
-    ~XMLProfileParserTests()
+    ~XMLProfileParserBasicTests()
     {
         delete log_mock;
     }
@@ -73,8 +89,220 @@ protected:
 
     void SetUp() override
     {
+        // Unload the profiles that might have been loaded by a previous test
         xmlparser::XMLProfileManager::DeleteInstance();
     }
+
+};
+
+class XMLProfileParserTests : public XMLProfileParserBasicTests, public testing::WithParamInterface<bool>
+{
+protected:
+
+    void SetUp() override
+    {
+        XMLProfileParserBasicTests::SetUp();
+
+        // Use plain file by default
+        xml_filename_ = "test_xml_profile.xml";
+
+        // Check if loading from environment variables should be tested
+        if (GetParam())
+        {
+            // Use different file
+            xml_filename_ = "test_xml_profile_env_var.xml";
+
+            // Set environment variables values
+            for (const std::pair<std::string, std::string>& value : c_environment_values_)
+            {
+                set_environment_variable(value.first.c_str(), value.second.c_str());
+            }
+        }
+    }
+
+    void TearDown() override
+    {
+        if (GetParam())
+        {
+            for (const std::pair<std::string, std::string>& value : c_environment_values_)
+            {
+                clear_environment_variable(value.first.c_str());
+            }
+        }
+    }
+
+    std::string xml_filename_ = "test_xml_profile.xml";
+
+    const std::pair<std::string, std::string> c_environment_values_[167]
+    {
+        {"XML_PROFILES_ENV_VAR_1",   "123"},
+        {"XML_PROFILES_ENV_VAR_2",   "4"},
+        {"XML_PROFILES_ENV_VAR_3",   "1"},
+        {"XML_PROFILES_ENV_VAR_4",   "10"},
+        {"XML_PROFILES_ENV_VAR_5",   "20"},
+        {"XML_PROFILES_ENV_VAR_6",   "2"},
+        {"XML_PROFILES_ENV_VAR_7",   "10"},
+        {"XML_PROFILES_ENV_VAR_8",   "20"},
+        {"XML_PROFILES_ENV_VAR_9",   "2"},
+        {"XML_PROFILES_ENV_VAR_10",  "10"},
+        {"XML_PROFILES_ENV_VAR_11",  "20"},
+        {"XML_PROFILES_ENV_VAR_12",  "2"},
+        {"XML_PROFILES_ENV_VAR_13",  "127"},
+        {"XML_PROFILES_ENV_VAR_14",  "true"},
+        {"XML_PROFILES_ENV_VAR_15",  "192.168.1.2"},
+        {"XML_PROFILES_ENV_VAR_16",  "2019"},
+        {"XML_PROFILES_ENV_VAR_17",  "239.255.0.1"},
+        {"XML_PROFILES_ENV_VAR_18",  "2021"},
+        {"XML_PROFILES_ENV_VAR_19",  "true"},
+        {"XML_PROFILES_ENV_VAR_20",  "10.10.10.10"},
+        {"XML_PROFILES_ENV_VAR_21",  "2001"},
+        {"XML_PROFILES_ENV_VAR_22",  "32"},
+        {"XML_PROFILES_ENV_VAR_23",  "1000"},
+        {"XML_PROFILES_ENV_VAR_24",  "SIMPLE"},
+        {"XML_PROFILES_ENV_VAR_25",  "SIMPLE"},
+        {"XML_PROFILES_ENV_VAR_26",  "FILTER_SAME_PROCESS | FILTER_DIFFERENT_HOST"},
+        {"XML_PROFILES_ENV_VAR_27",  "10"},
+        {"XML_PROFILES_ENV_VAR_28",  "333"},
+        {"XML_PROFILES_ENV_VAR_29",  "DURATION_INFINITY"},
+        {"XML_PROFILES_ENV_VAR_30",  "2"},
+        {"XML_PROFILES_ENV_VAR_31",  "1"},
+        {"XML_PROFILES_ENV_VAR_32",  "827"},
+        {"XML_PROFILES_ENV_VAR_33",  "false"},
+        {"XML_PROFILES_ENV_VAR_34",  "true"},
+        {"XML_PROFILES_ENV_VAR_35",  "false"},
+        {"XML_PROFILES_ENV_VAR_36",  "false"},
+        {"XML_PROFILES_ENV_VAR_37",  "192.168.1.5"},
+        {"XML_PROFILES_ENV_VAR_38",  "9999"},
+        {"XML_PROFILES_ENV_VAR_39",  "192.168.1.6"},
+        {"XML_PROFILES_ENV_VAR_40",  "6666"},
+        {"XML_PROFILES_ENV_VAR_41",  "239.255.0.2"},
+        {"XML_PROFILES_ENV_VAR_42",  "32"},
+        {"XML_PROFILES_ENV_VAR_43",  "239.255.0.3"},
+        {"XML_PROFILES_ENV_VAR_44",  "2112"},
+        {"XML_PROFILES_ENV_VAR_45",  "10.10.10.10"},
+        {"XML_PROFILES_ENV_VAR_46",  "2002"},
+        {"XML_PROFILES_ENV_VAR_47",  "239.255.0.1"},
+        {"XML_PROFILES_ENV_VAR_48",  "21120"},
+        {"XML_PROFILES_ENV_VAR_49",  "PREALLOCATED"},
+        {"XML_PROFILES_ENV_VAR_50",  "PREALLOCATED"},
+        {"XML_PROFILES_ENV_VAR_51",  "1000"},
+        {"XML_PROFILES_ENV_VAR_52",  "2000"},
+        {"XML_PROFILES_ENV_VAR_53",  "55"},
+        {"XML_PROFILES_ENV_VAR_54",  "true"},
+        {"XML_PROFILES_ENV_VAR_55",  "true"},
+        {"XML_PROFILES_ENV_VAR_56",  "12"},
+        {"XML_PROFILES_ENV_VAR_57",  "34"},
+        {"XML_PROFILES_ENV_VAR_58",  "56"},
+        {"XML_PROFILES_ENV_VAR_59",  "78"},
+        {"XML_PROFILES_ENV_VAR_60",  "90"},
+        {"XML_PROFILES_ENV_VAR_61",  "123"},
+        {"XML_PROFILES_ENV_VAR_62",  "456"},
+        {"XML_PROFILES_ENV_VAR_63",  "9898"},
+        {"XML_PROFILES_ENV_VAR_64",  "true"},
+        {"XML_PROFILES_ENV_VAR_65",  "test_name"},
+        {"XML_PROFILES_ENV_VAR_66",  "56.30.0.ce"},
+        {"XML_PROFILES_ENV_VAR_67",  "KEEP_LAST"},
+        {"XML_PROFILES_ENV_VAR_68",  "50"},
+        {"XML_PROFILES_ENV_VAR_69",  "432"},
+        {"XML_PROFILES_ENV_VAR_70",  "1"},
+        {"XML_PROFILES_ENV_VAR_71",  "100"},
+        {"XML_PROFILES_ENV_VAR_72",  "123"},
+        {"XML_PROFILES_ENV_VAR_73",  "TRANSIENT_LOCAL"},
+        {"XML_PROFILES_ENV_VAR_74",  "MANUAL_BY_PARTICIPANT"},
+        {"XML_PROFILES_ENV_VAR_75",  "1"},
+        {"XML_PROFILES_ENV_VAR_76",  "2"},
+        {"XML_PROFILES_ENV_VAR_77",  "DURATION_INFINITY"},
+        {"XML_PROFILES_ENV_VAR_78",  "BEST_EFFORT"},
+        {"XML_PROFILES_ENV_VAR_79",  "0"},
+        {"XML_PROFILES_ENV_VAR_80",  "0"},
+        {"XML_PROFILES_ENV_VAR_81",  "partition_name_a"},
+        {"XML_PROFILES_ENV_VAR_82",  "partition_name_b"},
+        {"XML_PROFILES_ENV_VAR_83",  "ASYNCHRONOUS"},
+        {"XML_PROFILES_ENV_VAR_84",  "56.30.0.1"},
+        {"XML_PROFILES_ENV_VAR_85",  "5.3.1.0"},
+        {"XML_PROFILES_ENV_VAR_86",  "5.3.1.0.F1"},
+        {"XML_PROFILES_ENV_VAR_87",  "0"},
+        {"XML_PROFILES_ENV_VAR_88",  "0"},
+        {"XML_PROFILES_ENV_VAR_89",  "11"},
+        {"XML_PROFILES_ENV_VAR_90",  "32"},
+        {"XML_PROFILES_ENV_VAR_91",  "0"},
+        {"XML_PROFILES_ENV_VAR_92",  "0"},
+        {"XML_PROFILES_ENV_VAR_93",  "121"},
+        {"XML_PROFILES_ENV_VAR_94",  "332"},
+        {"XML_PROFILES_ENV_VAR_95",  "192.168.1.3"},
+        {"XML_PROFILES_ENV_VAR_96",  "197"},
+        {"XML_PROFILES_ENV_VAR_97",  "192.168.1.9"},
+        {"XML_PROFILES_ENV_VAR_98",  "219"},
+        {"XML_PROFILES_ENV_VAR_99",  "239.255.0.1"},
+        {"XML_PROFILES_ENV_VAR_100", "2020"},
+        {"XML_PROFILES_ENV_VAR_101", ""},
+        {"XML_PROFILES_ENV_VAR_102", "1989"},
+        {"XML_PROFILES_ENV_VAR_103", "true"},
+        {"XML_PROFILES_ENV_VAR_104", "10.10.10.10"},
+        {"XML_PROFILES_ENV_VAR_105", "2001"},
+        {"XML_PROFILES_ENV_VAR_106", "DYNAMIC"},
+        {"XML_PROFILES_ENV_VAR_107", "67"},
+        {"XML_PROFILES_ENV_VAR_108", "87"},
+        {"XML_PROFILES_ENV_VAR_109", "10"},
+        {"XML_PROFILES_ENV_VAR_110", "10"},
+        {"XML_PROFILES_ENV_VAR_111", "0"},
+        {"XML_PROFILES_ENV_VAR_112", "KEEP_ALL"},
+        {"XML_PROFILES_ENV_VAR_113", "1001"},
+        {"XML_PROFILES_ENV_VAR_114", "52"},
+        {"XML_PROFILES_ENV_VAR_115", "25"},
+        {"XML_PROFILES_ENV_VAR_116", "32"},
+        {"XML_PROFILES_ENV_VAR_117", "37"},
+        {"XML_PROFILES_ENV_VAR_118", "PERSISTENT"},
+        {"XML_PROFILES_ENV_VAR_119", "MANUAL_BY_TOPIC"},
+        {"XML_PROFILES_ENV_VAR_120", "11"},
+        {"XML_PROFILES_ENV_VAR_121", "22"},
+        {"XML_PROFILES_ENV_VAR_122", "0"},
+        {"XML_PROFILES_ENV_VAR_123", "0"},
+        {"XML_PROFILES_ENV_VAR_124", "RELIABLE"},
+        {"XML_PROFILES_ENV_VAR_125", "DURATION_INFINITY"},
+        {"XML_PROFILES_ENV_VAR_126", "partition_name_c"},
+        {"XML_PROFILES_ENV_VAR_127", "partition_name_d"},
+        {"XML_PROFILES_ENV_VAR_128", "partition_name_e"},
+        {"XML_PROFILES_ENV_VAR_129", "partition_name_f"},
+        {"XML_PROFILES_ENV_VAR_130", "56.30.0.1"},
+        {"XML_PROFILES_ENV_VAR_131", "5.3.1.0"},
+        {"XML_PROFILES_ENV_VAR_132", "5.3.1.0.F1"},
+        {"XML_PROFILES_ENV_VAR_133", "0"},
+        {"XML_PROFILES_ENV_VAR_134", "0"},
+        {"XML_PROFILES_ENV_VAR_135", "18"},
+        {"XML_PROFILES_ENV_VAR_136", "81"},
+        {"XML_PROFILES_ENV_VAR_137", "192.168.1.10"},
+        {"XML_PROFILES_ENV_VAR_138", "196"},
+        {"XML_PROFILES_ENV_VAR_139", "212"},
+        {"XML_PROFILES_ENV_VAR_140", "239.255.0.10"},
+        {"XML_PROFILES_ENV_VAR_141", "220"},
+        {"XML_PROFILES_ENV_VAR_142", "239.255.0.11"},
+        {"XML_PROFILES_ENV_VAR_143", "9891"},
+        {"XML_PROFILES_ENV_VAR_144", "true"},
+        {"XML_PROFILES_ENV_VAR_145", "10.10.10.10"},
+        {"XML_PROFILES_ENV_VAR_146", "2001"},
+        {"XML_PROFILES_ENV_VAR_147", "true"},
+        {"XML_PROFILES_ENV_VAR_148", "PREALLOCATED_WITH_REALLOC"},
+        {"XML_PROFILES_ENV_VAR_149", "13"},
+        {"XML_PROFILES_ENV_VAR_150", "31"},
+        {"XML_PROFILES_ENV_VAR_151", "10"},
+        {"XML_PROFILES_ENV_VAR_152", "10"},
+        {"XML_PROFILES_ENV_VAR_153", "0"},
+        {"XML_PROFILES_ENV_VAR_154", "KEEP_ALL"},
+        {"XML_PROFILES_ENV_VAR_155", "1001"},
+        {"XML_PROFILES_ENV_VAR_156", "FULL"},
+        {"XML_PROFILES_ENV_VAR_157", "true"},
+        {"XML_PROFILES_ENV_VAR_158", "-1"},
+        {"XML_PROFILES_ENV_VAR_159", "0"},
+        {"XML_PROFILES_ENV_VAR_160", "0"},
+        {"XML_PROFILES_ENV_VAR_161", "-1"},
+        {"XML_PROFILES_ENV_VAR_162", "ON"},
+        {"XML_PROFILES_ENV_VAR_163", "test_flow_controller"},
+        {"XML_PROFILES_ENV_VAR_164", "HIGH_PRIORITY"},
+        {"XML_PROFILES_ENV_VAR_165", "2048"},
+        {"XML_PROFILES_ENV_VAR_166",  "45"},
+        {"XML_PROFILES_ENV_VAR_167",  "test_flow_controller"}
+    };
 
 };
 
@@ -103,7 +331,7 @@ static void check_external_locator(
     EXPECT_FALSE(true);
 }
 
-TEST_F(XMLProfileParserTests, XMLParserRootLibrarySettings)
+TEST_F(XMLProfileParserBasicTests, XMLParserRootLibrarySettings)
 {
     ASSERT_EQ(xmlparser::XMLP_ret::XML_OK,
             xmlparser::XMLProfileManager::loadXMLFile("test_xml_root_library_settings_profile.xml"));
@@ -112,7 +340,7 @@ TEST_F(XMLProfileParserTests, XMLParserRootLibrarySettings)
     EXPECT_EQ(library_settings.intraprocess_delivery, IntraprocessDeliveryType::INTRAPROCESS_USER_DATA_ONLY);
 }
 
-TEST_F(XMLProfileParserTests, XMLoadProfiles)
+TEST_F(XMLProfileParserBasicTests, XMLoadProfiles)
 {
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
             xmlparser::XMLProfileManager::loadXMLFile("test_xml_profile.xml"));
@@ -137,7 +365,7 @@ TEST_F(XMLProfileParserTests, XMLoadProfiles)
  * 3. Check return on parsing of an XMLElement with an empty profiles tag
  * 4. Check return on parsing of an XMLElement with a root element different from <profiles>
  */
-TEST_F(XMLProfileParserTests, loadXMLProfiles)
+TEST_F(XMLProfileParserBasicTests, loadXMLProfiles)
 {
     tinyxml2::XMLDocument xml_doc;
     tinyxml2::XMLElement* titleElement;
@@ -188,7 +416,7 @@ TEST_F(XMLProfileParserTests, loadXMLProfiles)
  * 1. Check correct return
  * 2. Check error return
  */
-TEST_F(XMLProfileParserTests, loadXMLDynamicTypes)
+TEST_F(XMLProfileParserBasicTests, loadXMLDynamicTypes)
 {
     tinyxml2::XMLDocument xml_doc;
     tinyxml2::XMLElement* titleElement;
@@ -229,10 +457,10 @@ TEST_F(XMLProfileParserTests, loadXMLDynamicTypes)
     }
 }
 
-TEST_F(XMLProfileParserTests, XMLParserLibrarySettings)
+TEST_P(XMLProfileParserTests, XMLParserLibrarySettings)
 {
     ASSERT_EQ(xmlparser::XMLP_ret::XML_OK,
-            xmlparser::XMLProfileManager::loadXMLFile("test_xml_profile.xml"));
+            xmlparser::XMLProfileManager::loadXMLFile(xml_filename_));
 
     const LibrarySettingsAttributes& library_settings = xmlparser::XMLProfileManager::library_settings();
     EXPECT_EQ(library_settings.intraprocess_delivery, IntraprocessDeliveryType::INTRAPROCESS_FULL);
@@ -241,13 +469,13 @@ TEST_F(XMLProfileParserTests, XMLParserLibrarySettings)
 /*
  * Checks the XML validated participant parsing
  */
-TEST_F(XMLProfileParserTests, XMLParserParticipant)
+TEST_P(XMLProfileParserTests, XMLParserParticipant)
 {
     std::string participant_profile = std::string("test_participant_profile");
     ParticipantAttributes participant_atts;
 
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
-            xmlparser::XMLProfileManager::loadXMLFile("test_xml_profile.xml"));
+            xmlparser::XMLProfileManager::loadXMLFile(xml_filename_));
     EXPECT_EQ(  xmlparser::XMLP_ret::XML_OK,
             xmlparser::XMLProfileManager::fillParticipantAttributes(participant_profile, participant_atts));
 
@@ -323,6 +551,8 @@ TEST_F(XMLProfileParserTests, XMLParserParticipant)
     EXPECT_EQ(builtin.readerPayloadSize, 1000u);
     EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
+    EXPECT_TRUE(builtin.typelookup_config.use_client);
+    EXPECT_TRUE(builtin.typelookup_config.use_server);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
     EXPECT_EQ(port.participantIDGain, 56);
@@ -336,13 +566,14 @@ TEST_F(XMLProfileParserTests, XMLParserParticipant)
     EXPECT_EQ(rtps_atts.flow_controllers.at(0)->max_bytes_per_period, 2048);
     EXPECT_EQ(rtps_atts.flow_controllers.at(0)->period_ms, 45u);
     EXPECT_EQ(rtps_atts.useBuiltinTransports, true);
+    EXPECT_EQ(rtps_atts.netmaskFilter, eprosima::fastdds::rtps::NetmaskFilterKind::ON);
     EXPECT_EQ(std::string(rtps_atts.getName()), "test_name");
 }
 
 /*
  * Checks the participant parsing (with deprecated but supported elements)
  */
-TEST_F(XMLProfileParserTests, XMLParserParticipantDeprecated)
+TEST_F(XMLProfileParserBasicTests, XMLParserParticipantDeprecated)
 {
     std::string participant_profile = std::string("test_participant_profile");
     ParticipantAttributes participant_atts;
@@ -424,6 +655,8 @@ TEST_F(XMLProfileParserTests, XMLParserParticipantDeprecated)
     EXPECT_EQ(builtin.readerPayloadSize, 1000u);
     EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
+    EXPECT_TRUE(builtin.typelookup_config.use_client);
+    EXPECT_TRUE(builtin.typelookup_config.use_server);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
     EXPECT_EQ(port.participantIDGain, 56);
@@ -443,12 +676,12 @@ TEST_F(XMLProfileParserTests, XMLParserParticipantDeprecated)
 /*
  * Checks the XML validated participant default profile parsing
  */
-TEST_F(XMLProfileParserTests, XMLParserDefaultParticipantProfile)
+TEST_P(XMLProfileParserTests, XMLParserDefaultParticipantProfile)
 {
     ParticipantAttributes participant_atts;
 
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
-            xmlparser::XMLProfileManager::loadXMLFile("test_xml_profile.xml"));
+            xmlparser::XMLProfileManager::loadXMLFile(xml_filename_));
     xmlparser::XMLProfileManager::getDefaultParticipantAttributes(participant_atts);
 
     EXPECT_EQ(participant_atts.domainId, 123u);
@@ -509,6 +742,8 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultParticipantProfile)
     EXPECT_EQ(builtin.readerPayloadSize, 1000u);
     EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
+    EXPECT_TRUE(builtin.typelookup_config.use_client);
+    EXPECT_TRUE(builtin.typelookup_config.use_server);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
     EXPECT_EQ(port.participantIDGain, 56);
@@ -528,7 +763,7 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultParticipantProfile)
 /*
  * Checks the participant default profile parsing (with deprecated but supported elements)
  */
-TEST_F(XMLProfileParserTests, XMLParserDefaultParticipantProfileDeprecated)
+TEST_F(XMLProfileParserBasicTests, XMLParserDefaultParticipantProfileDeprecated)
 {
     ParticipantAttributes participant_atts;
 
@@ -594,6 +829,8 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultParticipantProfileDeprecated)
     EXPECT_EQ(builtin.readerPayloadSize, 1000u);
     EXPECT_EQ(builtin.writerPayloadSize, 2000u);
     EXPECT_EQ(builtin.mutation_tries, 55u);
+    EXPECT_TRUE(builtin.typelookup_config.use_client);
+    EXPECT_TRUE(builtin.typelookup_config.use_server);
     EXPECT_EQ(port.portBase, 12);
     EXPECT_EQ(port.domainIDGain, 34);
     EXPECT_EQ(port.participantIDGain, 56);
@@ -613,13 +850,13 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultParticipantProfileDeprecated)
 /*
  * Checks the XML validated data writer parsing
  */
-TEST_F(XMLProfileParserTests, XMLParserPublisher)
+TEST_P(XMLProfileParserTests, XMLParserPublisher)
 {
     std::string publisher_profile = std::string("test_publisher_profile");
     PublisherAttributes publisher_atts;
 
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
-            xmlparser::XMLProfileManager::loadXMLFile("test_xml_profile.xml"));
+            xmlparser::XMLProfileManager::loadXMLFile(xml_filename_));
     EXPECT_EQ(  xmlparser::XMLP_ret::XML_OK,
             xmlparser::XMLProfileManager::fillPublisherAttributes(publisher_profile, publisher_atts));
 
@@ -689,7 +926,7 @@ TEST_F(XMLProfileParserTests, XMLParserPublisher)
 /*
  * Checks the data writer parsing (with deprecated but supported elements)
  */
-TEST_F(XMLProfileParserTests, XMLParserPublisherDeprecated)
+TEST_F(XMLProfileParserBasicTests, XMLParserPublisherDeprecated)
 {
     std::string publisher_profile = std::string("test_publisher_profile");
     PublisherAttributes publisher_atts;
@@ -765,12 +1002,12 @@ TEST_F(XMLProfileParserTests, XMLParserPublisherDeprecated)
 /*
  * Checks the XML validated data writer default profile parsing
  */
-TEST_F(XMLProfileParserTests, XMLParserDefaultPublisherProfile)
+TEST_P(XMLProfileParserTests, XMLParserDefaultPublisherProfile)
 {
     PublisherAttributes publisher_atts;
 
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
-            xmlparser::XMLProfileManager::loadXMLFile("test_xml_profile.xml"));
+            xmlparser::XMLProfileManager::loadXMLFile(xml_filename_));
     xmlparser::XMLProfileManager::getDefaultPublisherAttributes(publisher_atts);
 
     TopicAttributes& pub_topic = publisher_atts.topic;
@@ -839,7 +1076,7 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultPublisherProfile)
 /*
  * Checks the data writer default profile parsing (with deprecated but supported elements)
  */
-TEST_F(XMLProfileParserTests, XMLParserDefaultPublisherProfileDeprecated)
+TEST_F(XMLProfileParserBasicTests, XMLParserDefaultPublisherProfileDeprecated)
 {
     PublisherAttributes publisher_atts;
 
@@ -913,13 +1150,13 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultPublisherProfileDeprecated)
 /*
  * Checks the XML validated data reader parsing
  */
-TEST_F(XMLProfileParserTests, XMLParserSubscriber)
+TEST_P(XMLProfileParserTests, XMLParserSubscriber)
 {
     std::string subscriber_profile = std::string("test_subscriber_profile");
     SubscriberAttributes subscriber_atts;
 
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
-            xmlparser::XMLProfileManager::loadXMLFile("test_xml_profile.xml"));
+            xmlparser::XMLProfileManager::loadXMLFile(xml_filename_));
     EXPECT_EQ(  xmlparser::XMLP_ret::XML_OK,
             xmlparser::XMLProfileManager::fillSubscriberAttributes(subscriber_profile, subscriber_atts));
 
@@ -985,7 +1222,7 @@ TEST_F(XMLProfileParserTests, XMLParserSubscriber)
 /*
  * Checks the data reader parsing (with deprecated but supported elements)
  */
-TEST_F(XMLProfileParserTests, XMLParserSubscriberDeprecated)
+TEST_F(XMLProfileParserBasicTests, XMLParserSubscriberDeprecated)
 {
     std::string subscriber_profile = std::string("test_subscriber_profile");
     SubscriberAttributes subscriber_atts;
@@ -1057,12 +1294,12 @@ TEST_F(XMLProfileParserTests, XMLParserSubscriberDeprecated)
 /*
  * Checks the XML validated data reader default profile parsing
  */
-TEST_F(XMLProfileParserTests, XMLParserDefaultSubscriberProfile)
+TEST_P(XMLProfileParserTests, XMLParserDefaultSubscriberProfile)
 {
     SubscriberAttributes subscriber_atts;
 
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
-            xmlparser::XMLProfileManager::loadXMLFile("test_xml_profile.xml"));
+            xmlparser::XMLProfileManager::loadXMLFile(xml_filename_));
     xmlparser::XMLProfileManager::getDefaultSubscriberAttributes(subscriber_atts);
 
     TopicAttributes& sub_topic = subscriber_atts.topic;
@@ -1127,7 +1364,7 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultSubscriberProfile)
 /*
  * Checks the data reader default profile parsing (with deprecated but supported elements)
  */
-TEST_F(XMLProfileParserTests, XMLParserDefaultSubscriberProfileDeprecated)
+TEST_F(XMLProfileParserBasicTests, XMLParserDefaultSubscriberProfileDeprecated)
 {
     SubscriberAttributes subscriber_atts;
 
@@ -1199,7 +1436,7 @@ TEST_F(XMLProfileParserTests, XMLParserDefaultSubscriberProfileDeprecated)
  * 1. Check if attributes were filled correctly
  * 2. Check error return on a missing requester profile name
  */
-TEST_F(XMLProfileParserTests, XMLParserRequesterProfile)
+TEST_F(XMLProfileParserBasicTests, XMLParserRequesterProfile)
 {
     std::string requester_profile = std::string("test_requester_profile");
     RequesterAttributes requester_atts;
@@ -1236,7 +1473,7 @@ TEST_F(XMLProfileParserTests, XMLParserRequesterProfile)
  * 1. Check if attributes were filled correctly
  * 2. Check error return on a missing replier profile name
  */
-TEST_F(XMLProfileParserTests, XMLParserReplierProfile)
+TEST_F(XMLProfileParserBasicTests, XMLParserReplierProfile)
 {
     std::string replier_profile = std::string("test_replier_profile");
     ReplierAttributes replier_atts;
@@ -1270,7 +1507,7 @@ TEST_F(XMLProfileParserTests, XMLParserReplierProfile)
 
 #if HAVE_SECURITY
 
-TEST_F(XMLProfileParserTests, XMLParserSecurity)
+TEST_F(XMLProfileParserBasicTests, XMLParserSecurity)
 {
     std::string participant_profile = std::string("test_participant_security_profile");
     ParticipantAttributes participant_atts;
@@ -1338,7 +1575,7 @@ TEST_F(XMLProfileParserTests, XMLParserSecurity)
 
 #endif // if HAVE_SECURITY
 
-TEST_F(XMLProfileParserTests, file_xml_consumer_append)
+TEST_F(XMLProfileParserBasicTests, file_xml_consumer_append)
 {
     using namespace eprosima::fastdds::dds;
 
@@ -1347,7 +1584,7 @@ TEST_F(XMLProfileParserTests, file_xml_consumer_append)
     xmlparser::XMLProfileManager::loadXMLFile("log_node_file_append_profile.xml");
 }
 
-TEST_F(XMLProfileParserTests, log_inactive)
+TEST_F(XMLProfileParserBasicTests, log_inactive)
 {
     EXPECT_CALL(*log_mock, ClearConsumers()).Times(1);
     xmlparser::XMLProfileManager::loadXMLFile("log_inactive_profile.xml");
@@ -1360,7 +1597,7 @@ TEST_F(XMLProfileParserTests, log_inactive)
  *    2. `RegisterConsumer()` is called, meaning a `StdoutErrConsumer` was registered.
  *    3. The return code of `loadXMLFile` is `XMLP_ret::XML_OK`, meaning that the property was correctly set.
  */
-TEST_F(XMLProfileParserTests, log_register_stdouterr)
+TEST_F(XMLProfileParserBasicTests, log_register_stdouterr)
 {
     using namespace eprosima::fastdds::dds;
 
@@ -1379,7 +1616,7 @@ TEST_F(XMLProfileParserTests, log_register_stdouterr)
  *    2. `RegisterConsumer()` is called, meaning a `StdoutErrConsumer` was registered.
  *    3. The return code of `loadXMLFile` is `XMLP_ret::XML_ERROR`, meaning that the property was NOT correctly set.
  */
-TEST_F(XMLProfileParserTests, log_register_stdouterr_wrong_property_name)
+TEST_F(XMLProfileParserBasicTests, log_register_stdouterr_wrong_property_name)
 {
     using namespace eprosima::fastdds::dds;
 
@@ -1398,7 +1635,7 @@ TEST_F(XMLProfileParserTests, log_register_stdouterr_wrong_property_name)
  *    2. `RegisterConsumer()` is called, meaning a `StdoutErrConsumer` was registered.
  *    3. The return code of `loadXMLFile` is `XMLP_ret::XML_ERROR`, meaning that the property was NOT correctly set.
  */
-TEST_F(XMLProfileParserTests, log_register_stdouterr_wrong_property_value)
+TEST_F(XMLProfileParserBasicTests, log_register_stdouterr_wrong_property_value)
 {
     using namespace eprosima::fastdds::dds;
 
@@ -1420,7 +1657,7 @@ TEST_F(XMLProfileParserTests, log_register_stdouterr_wrong_property_value)
  *       this case, the first `stderr_threshold` property will be used, but the function will warn of an incorrect XML
  *       configuration.
  */
-TEST_F(XMLProfileParserTests, log_register_stdouterr_two_thresholds)
+TEST_F(XMLProfileParserBasicTests, log_register_stdouterr_two_thresholds)
 {
     using namespace eprosima::fastdds::dds;
 
@@ -1431,15 +1668,16 @@ TEST_F(XMLProfileParserTests, log_register_stdouterr_two_thresholds)
     ASSERT_EQ(eprosima::fastrtps::xmlparser::XMLP_ret::XML_ERROR, ret);
 }
 
-TEST_F(XMLProfileParserTests, file_and_default)
+TEST_F(XMLProfileParserBasicTests, file_and_default)
 {
     using namespace eprosima::fastdds::dds;
 
     EXPECT_CALL(*log_mock, RegisterConsumer(IsFileConsumer())).Times(1);
+    EXPECT_CALL(*log_mock, SetThreadConfig()).Times(1);
     xmlparser::XMLProfileManager::loadXMLFile("log_def_file_profile.xml");
 }
 
-TEST_F(XMLProfileParserTests, tls_config)
+TEST_F(XMLProfileParserBasicTests, tls_config)
 {
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
             xmlparser::XMLProfileManager::loadXMLFile("tls_config_profile.xml"));
@@ -1492,8 +1730,10 @@ TEST_F(XMLProfileParserTests, tls_config)
     EXPECT_EQ(descriptor->tls_config.handshake_role, TCPTransportDescriptor::TLSConfig::TLSHandShakeRole::SERVER);
 }
 
-TEST_F(XMLProfileParserTests, UDP_transport_descriptors_config)
+TEST_F(XMLProfileParserBasicTests, UDP_transport_descriptors_config)
 {
+    using namespace eprosima::fastdds::rtps;
+
     ASSERT_EQ(  xmlparser::XMLP_ret::XML_OK,
             xmlparser::XMLProfileManager::loadXMLFile("UDP_transport_descriptors_config_profile.xml"));
 
@@ -1511,11 +1751,15 @@ TEST_F(XMLProfileParserTests, UDP_transport_descriptors_config)
     EXPECT_EQ(descriptor->maxInitialPeersRange, 100u);
     EXPECT_EQ(descriptor->interfaceWhiteList.size(), 2u);
     EXPECT_EQ(descriptor->interfaceWhiteList[0], "192.168.1.41");
-    EXPECT_EQ(descriptor->interfaceWhiteList[1], "127.0.0.1");
+    EXPECT_EQ(descriptor->interfaceWhiteList[1], "lo");
+    EXPECT_EQ(descriptor->netmask_filter, NetmaskFilterKind::ON);
+    EXPECT_EQ(descriptor->interface_allowlist[0], AllowedNetworkInterface("wlp59s0", NetmaskFilterKind::ON));
+    EXPECT_EQ(descriptor->interface_allowlist[1], AllowedNetworkInterface("127.0.0.1", NetmaskFilterKind::AUTO));
+    EXPECT_EQ(descriptor->interface_blocklist[0], BlockedNetworkInterface("docker0"));
     EXPECT_EQ(descriptor->m_output_udp_socket, 5101u);
 }
 
-TEST_F(XMLProfileParserTests, SHM_transport_descriptors_config)
+TEST_F(XMLProfileParserBasicTests, SHM_transport_descriptors_config)
 {
     ASSERT_EQ(xmlparser::XMLP_ret::XML_OK,
             xmlparser::XMLProfileManager::loadXMLFile("SHM_transport_descriptors_config_profile.xml"));
@@ -1538,7 +1782,7 @@ TEST_F(XMLProfileParserTests, SHM_transport_descriptors_config)
 /*
  * Test return code of the insertTransportById method when trying to insert two transports with the same id
  */
-TEST_F(XMLProfileParserTests, insertTransportByIdNegativeClauses)
+TEST_F(XMLProfileParserBasicTests, insertTransportByIdNegativeClauses)
 {
     std::shared_ptr<eprosima::fastdds::rtps::TransportDescriptorInterface> transport;
     EXPECT_EQ(true, xmlparser::XMLProfileManager::insertTransportById("duplicated_id", transport));
@@ -1548,7 +1792,7 @@ TEST_F(XMLProfileParserTests, insertTransportByIdNegativeClauses)
 /*
  * Test return code of the getDynamicTypeByName method when trying to retrieve a type which has not been parsed
  */
-TEST_F(XMLProfileParserTests, getDynamicTypeByNameNegativeClausesNegativeClauses)
+TEST_F(XMLProfileParserBasicTests, getDynamicTypeByNameNegativeClausesNegativeClauses)
 {
     EXPECT_EQ(nullptr, xmlparser::XMLProfileManager::getDynamicTypeByName("wrong_type"));
 }
@@ -1556,7 +1800,7 @@ TEST_F(XMLProfileParserTests, getDynamicTypeByNameNegativeClausesNegativeClauses
 /*
  * Test return code of the CreateDynamicPubSubType method when trying to retrieve a type which has not been parsed
  */
-TEST_F(XMLProfileParserTests, CreateDynamicPubSubType)
+TEST_F(XMLProfileParserBasicTests, CreateDynamicPubSubType)
 {
     EXPECT_EQ(nullptr, xmlparser::XMLProfileManager::CreateDynamicPubSubType("wrong_type"));
 }
@@ -1565,7 +1809,7 @@ TEST_F(XMLProfileParserTests, CreateDynamicPubSubType)
  * Test return code of the getTransportById method when trying to retrieve a transport descriptor which has not been
  * parsed
  */
-TEST_F(XMLProfileParserTests, getTransportByIdNegativeClauses)
+TEST_F(XMLProfileParserBasicTests, getTransportByIdNegativeClauses)
 {
     EXPECT_EQ(nullptr, xmlparser::XMLProfileManager::getTransportById("wrong_type"));
 }
@@ -1578,7 +1822,7 @@ TEST_F(XMLProfileParserTests, getTransportByIdNegativeClauses)
  *  2. A corrrect rooted profile element is parsed, return value of XMLP_ret::XML_OK is expected
  *  3. An incorrect profile element is parsed, return value of XMLP_ret::XML_ERROR is expected
  */
-TEST_F(XMLProfileParserTests, extract_profiles_ok)
+TEST_F(XMLProfileParserBasicTests, extract_profiles_ok)
 {
     tinyxml2::XMLDocument xml_doc;
     {
@@ -1627,7 +1871,7 @@ TEST_F(XMLProfileParserTests, extract_profiles_ok)
  * The expected return value is XMLP_ret::XML_NOK.
  * Checks a combination of a correct profile with an incorrect profile of each profile type
  */
-TEST_F(XMLProfileParserTests, extract_profiles_nok)
+TEST_F(XMLProfileParserBasicTests, extract_profiles_nok)
 {
     tinyxml2::XMLDocument xml_doc;
 
@@ -1670,7 +1914,7 @@ TEST_F(XMLProfileParserTests, extract_profiles_nok)
  * The expected return value is XMLP_ret::XML_ERROR.
  * Checks an incorrect profile of each type as the only present in the profiles tag
  */
-TEST_F(XMLProfileParserTests, extract_profiles_error)
+TEST_F(XMLProfileParserBasicTests, extract_profiles_error)
 {
     tinyxml2::XMLDocument xml_doc;
 
@@ -1725,7 +1969,7 @@ TEST_F(XMLProfileParserTests, extract_profiles_error)
  *  1. Empty profile name
  *  2. Loading the same profile twice
  */
-TEST_F(XMLProfileParserTests, extract_type_profiles)
+TEST_F(XMLProfileParserBasicTests, extract_type_profiles)
 {
     tinyxml2::XMLDocument xml_doc;
 
@@ -1834,7 +2078,7 @@ TEST_F(XMLProfileParserTests, extract_type_profiles)
  * participant_atts_none skips the default and obtains the values from the constructors.
  * participant_atts_default contains the attributes in the default file in this folder which should be different.
  */
-TEST_F(XMLProfileParserTests, skip_default_xml)
+TEST_F(XMLProfileParserBasicTests, skip_default_xml)
 {
     const char* xml =
             "                                                                                                          \
@@ -1877,7 +2121,7 @@ TEST_F(XMLProfileParserTests, skip_default_xml)
  * - participant_atts_default contains the attributes in the default file in this folder.
  * - participant_atts_file contains the attributes in the default file created by the test.
  */
-TEST_F(XMLProfileParserTests, default_env_variable)
+TEST_F(XMLProfileParserBasicTests, default_env_variable)
 {
     const char* xml =
             "                                                                                                                  \
@@ -1918,7 +2162,7 @@ TEST_F(XMLProfileParserTests, default_env_variable)
  *  5. On parsing the same file twice, expect XMLP_ret::XML_OK.
  *  6. On parsing an incorrect element inside profiles element, expect XMLP_ret::XML_ERROR.
  */
-TEST_F(XMLProfileParserTests, loadXMLFile)
+TEST_F(XMLProfileParserBasicTests, loadXMLFile)
 {
     using namespace eprosima::fastdds::dds;
 
@@ -2033,7 +2277,7 @@ TEST_F(XMLProfileParserTests, loadXMLFile)
 /**
  * This test checks positive and negative cases for parsing of external locators related configuration
  */
-TEST_F(XMLProfileParserTests, external_locators_feature)
+TEST_F(XMLProfileParserBasicTests, external_locators_feature)
 {
     struct TestCase
     {
@@ -2985,6 +3229,924 @@ TEST_F(XMLProfileParserTests, external_locators_feature)
         xmlparser::XMLProfileManager::DeleteInstance();
     }
 }
+
+/**
+ * This test checks positive and negative cases for parsing of ThreadSettings in Log
+ */
+TEST_F(XMLProfileParserBasicTests, log_thread_settings_qos)
+{
+    struct TestCase
+    {
+        std::string title;
+        std::string xml;
+        xmlparser::XMLP_ret result;
+    };
+
+    std::vector<TestCase> test_cases =
+    {
+        /* Log test cases */
+        {
+            "log_thread_settings_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <log>
+                        <thread_settings>
+                            <scheduling_policy>-1</scheduling_policy>
+                            <priority>0</priority>
+                            <affinity>0</affinity>
+                            <stack_size>-1</stack_size>
+                        </thread_settings>
+                    </log>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK
+        },
+        {
+            "log_thread_settings_duplicate",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <log>
+                        <thread_settings>
+                            <scheduling_policy>-1</scheduling_policy>
+                            <priority>0</priority>
+                            <affinity>0</affinity>
+                            <stack_size>-1</stack_size>
+                        </thread_settings>
+                        <thread_settings>
+                            <scheduling_policy>-1</scheduling_policy>
+                            <priority>0</priority>
+                            <affinity>0</affinity>
+                            <stack_size>-1</stack_size>
+                        </thread_settings>
+                    </log>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR
+        },
+        {
+            "log_thread_settings_wrong",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <log>
+                        <thread_settings>
+                            <scheduling_policy>-1</scheduling_policy>
+                            <priority>0</priority>
+                            <affinity>0</affinity>
+                            <stack_size>-1</stack_size>
+                            <wrong_tag>0</wrong_tag>
+                        </thread_settings>
+                    </log>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR
+        },
+    };
+
+    EXPECT_CALL(*log_mock, SetThreadConfig()).Times(1);
+    for (const TestCase& test : test_cases)
+    {
+        EXPECT_EQ(test.result, xmlparser::XMLProfileManager::loadXMLString(test.xml.c_str(), test.xml.length())) <<
+            " test_case = [" << test.title << "]";
+        xmlparser::XMLProfileManager::DeleteInstance();
+    }
+}
+
+/**
+ * This test checks positive and negative cases for parsing of DomainParticipantFactory Qos
+ */
+TEST_F(XMLProfileParserBasicTests, domainparticipantfactory)
+{
+    using namespace eprosima::fastdds::dds;
+    using namespace eprosima::fastdds::rtps;
+    struct TestCase
+    {
+        std::string title;
+        std::string xml;
+        xmlparser::XMLP_ret result;
+        EntityFactoryQosPolicy entity_factory;
+        ThreadSettings shm_watchdog_thread;
+        ThreadSettings file_watch_threads;
+    };
+
+    ThreadSettings default_thread_settings;
+    ThreadSettings modified_thread_settings;
+    modified_thread_settings.scheduling_policy = 12;
+    modified_thread_settings.priority = 12;
+    modified_thread_settings.affinity = 12;
+    modified_thread_settings.stack_size = 12;
+
+    std::vector<TestCase> test_cases =
+    {
+        /* DomainParticipantFactory cases */
+        {
+            "entity_factory_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            EntityFactoryQosPolicy(false),
+            default_thread_settings,
+            default_thread_settings
+        },
+        {
+            "shm_watchdog_thread_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <shm_watchdog_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </shm_watchdog_thread>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            EntityFactoryQosPolicy(true),
+            modified_thread_settings,
+            default_thread_settings
+        },
+        {
+            "file_watch_threads_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <file_watch_threads>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </file_watch_threads>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            EntityFactoryQosPolicy(true),
+            default_thread_settings,
+            modified_thread_settings
+        },
+        {
+            "all_present_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                            <shm_watchdog_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </shm_watchdog_thread>
+                            <file_watch_threads>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </file_watch_threads>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            EntityFactoryQosPolicy(false),
+            modified_thread_settings,
+            modified_thread_settings
+        },
+        {
+            "qos_duplicated",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                        </qos>
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            EntityFactoryQosPolicy(true),
+            default_thread_settings,
+            default_thread_settings
+        },
+        {
+            "entity_factory_wrong_tag",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <wrong_tag>false</wrong_tag>
+                            </entity_factory>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            EntityFactoryQosPolicy(true),
+            default_thread_settings,
+            default_thread_settings
+        },
+        {
+            "entity_factory_duplicated_autoenable_created_entities_tag",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            EntityFactoryQosPolicy(true),
+            default_thread_settings,
+            default_thread_settings
+        },
+        {
+            "entity_factory_duplicated_autoenable_created_entities_and_wrong_tag",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                                <wrong_tag>false</wrong_tag>
+                            </entity_factory>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            EntityFactoryQosPolicy(true),
+            default_thread_settings,
+            default_thread_settings
+        },
+        {
+            "entity_factory_duplicated",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                            <shm_watchdog_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </shm_watchdog_thread>
+                            <file_watch_threads>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </file_watch_threads>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            EntityFactoryQosPolicy(true),
+            modified_thread_settings,
+            modified_thread_settings
+        },
+        {
+            "shm_watchdog_thread_duplicated",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                            <shm_watchdog_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </shm_watchdog_thread>
+                            <shm_watchdog_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </shm_watchdog_thread>
+                            <file_watch_threads>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </file_watch_threads>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            EntityFactoryQosPolicy(true),
+            modified_thread_settings,
+            modified_thread_settings
+        },
+        {
+            "file_watch_threads_duplicated",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <domainparticipant_factory profile_name="factory" is_default_profile="true">
+                        <qos>
+                            <entity_factory>
+                                <autoenable_created_entities>false</autoenable_created_entities>
+                            </entity_factory>
+                            <shm_watchdog_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </shm_watchdog_thread>
+                            <file_watch_threads>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </file_watch_threads>
+                            <file_watch_threads>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </file_watch_threads>
+                        </qos>
+                        </domainparticipant_factory>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            EntityFactoryQosPolicy(true),
+            modified_thread_settings,
+            modified_thread_settings
+        }
+    };
+
+    for (const TestCase& test : test_cases)
+    {
+        EXPECT_EQ(test.result, xmlparser::XMLProfileManager::loadXMLString(test.xml.c_str(), test.xml.length())) <<
+            " test_case = [" << test.title << "]";
+        if (test.result == xmlparser::XMLP_ret::XML_OK)
+        {
+            using namespace eprosima::fastdds::dds;
+
+            DomainParticipantFactoryQos profile_qos;
+            ASSERT_EQ(xmlparser::XMLP_ret::XML_OK,
+                    xmlparser::XMLProfileManager::fillDomainParticipantFactoryQos("factory", profile_qos));
+
+            DomainParticipantFactoryQos default_qos;
+            xmlparser::XMLProfileManager::getDefaultDomainParticipantFactoryQos(default_qos);
+
+            ASSERT_EQ(profile_qos, default_qos);
+            ASSERT_EQ(profile_qos.entity_factory(), test.entity_factory);
+            ASSERT_EQ(profile_qos.shm_watchdog_thread(), test.shm_watchdog_thread);
+            ASSERT_EQ(profile_qos.file_watch_threads(), test.file_watch_threads);
+        }
+        xmlparser::XMLProfileManager::DeleteInstance();
+    }
+}
+
+/**
+ * This test checks positive and negative cases for parsing of DomainParticipant ThreadSettings
+ */
+TEST_F(XMLProfileParserBasicTests, participant_thread_settings)
+{
+    using namespace eprosima::fastdds::dds;
+    using namespace eprosima::fastdds::rtps;
+    struct TestCase
+    {
+        std::string title;
+        std::string xml;
+        xmlparser::XMLP_ret result;
+        ThreadSettings builtin_controllers_sender_thread;
+        ThreadSettings timed_events_thread;
+        ThreadSettings discovery_server_thread;
+        ThreadSettings builtin_transports_reception_threads;
+#if HAVE_SECURITY
+        ThreadSettings security_log_thread;
+#endif // if HAVE_SECURITY
+    };
+
+    ThreadSettings default_thread_settings;
+    ThreadSettings modified_thread_settings;
+    modified_thread_settings.scheduling_policy = 12;
+    modified_thread_settings.priority = 12;
+    modified_thread_settings.affinity = 12;
+    modified_thread_settings.stack_size = 12;
+
+    std::vector<TestCase> test_cases =
+    {
+        {
+            "builtin_controllers_sender_thread_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <builtin_controllers_sender_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </builtin_controllers_sender_thread>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            modified_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+#if HAVE_SECURITY
+            default_thread_settings
+#endif // if HAVE_SECURITY
+        },
+        {
+            "builtin_controllers_sender_thread_nok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <builtin_controllers_sender_thread>
+                                <wrong>12</wrong>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </builtin_controllers_sender_thread>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            modified_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+#if HAVE_SECURITY
+            default_thread_settings
+#endif // if HAVE_SECURITY
+        },
+        {
+            "timed_events_thread_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <timed_events_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </timed_events_thread>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            default_thread_settings,
+            modified_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+#if HAVE_SECURITY
+            default_thread_settings
+#endif // if HAVE_SECURITY
+        },
+        {
+            "timed_events_thread_nok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <timed_events_thread>
+                                <wrong>12</wrong>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </timed_events_thread>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            default_thread_settings,
+            modified_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+#if HAVE_SECURITY
+            default_thread_settings
+#endif // if HAVE_SECURITY
+        },
+        {
+            "discovery_server_thread_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <discovery_server_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </discovery_server_thread>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            default_thread_settings,
+            default_thread_settings,
+            modified_thread_settings,
+            default_thread_settings,
+#if HAVE_SECURITY
+            default_thread_settings
+#endif // if HAVE_SECURITY
+        },
+        {
+            "discovery_server_thread_nok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <discovery_server_thread>
+                                <wrong>12</wrong>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </discovery_server_thread>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            default_thread_settings,
+            default_thread_settings,
+            modified_thread_settings,
+            default_thread_settings,
+#if HAVE_SECURITY
+            default_thread_settings
+#endif // if HAVE_SECURITY
+        },
+        {
+            "builtin_transports_reception_threads_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <builtin_transports_reception_threads>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </builtin_transports_reception_threads>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            default_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+            modified_thread_settings,
+#if HAVE_SECURITY
+            default_thread_settings
+#endif // if HAVE_SECURITY
+        },
+        {
+            "builtin_transports_reception_threads_nok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <builtin_transports_reception_threads>
+                                <wrong>12</wrong>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </builtin_transports_reception_threads>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            default_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+            modified_thread_settings,
+#if HAVE_SECURITY
+            default_thread_settings
+#endif // if HAVE_SECURITY
+        },
+#if HAVE_SECURITY
+        {
+            "security_log_thread_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <security_log_thread>
+                                <scheduling_policy>12</scheduling_policy>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </security_log_thread>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            default_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+            modified_thread_settings
+        },
+        {
+            "security_log_thread_nok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <participant profile_name="participant" is_default_profile="true">
+                        <rtps>
+                            <security_log_thread>
+                                <wrong>12</wrong>
+                                <priority>12</priority>
+                                <affinity>12</affinity>
+                                <stack_size>12</stack_size>
+                            </security_log_thread>
+                        </rtps>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            default_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+            default_thread_settings,
+            modified_thread_settings
+        },
+#endif // if HAVE_SECURITY
+    };
+
+    for (const TestCase& test : test_cases)
+    {
+        EXPECT_EQ(test.result, xmlparser::XMLProfileManager::loadXMLString(test.xml.c_str(), test.xml.length())) <<
+            " test_case = [" << test.title << "]";
+        if (test.result == xmlparser::XMLP_ret::XML_OK)
+        {
+            using namespace eprosima::fastdds::dds;
+
+            ParticipantAttributes profile_attr;
+            ASSERT_EQ(xmlparser::XMLP_ret::XML_OK,
+                    xmlparser::XMLProfileManager::fillParticipantAttributes("participant", profile_attr));
+
+            ParticipantAttributes default_attr;
+            xmlparser::XMLProfileManager::getDefaultParticipantAttributes(default_attr);
+
+            ASSERT_EQ(profile_attr, default_attr);
+            ASSERT_EQ(profile_attr.rtps.builtin_controllers_sender_thread, test.builtin_controllers_sender_thread);
+            ASSERT_EQ(profile_attr.rtps.timed_events_thread, test.timed_events_thread);
+            ASSERT_EQ(profile_attr.rtps.discovery_server_thread, test.discovery_server_thread);
+            ASSERT_EQ(profile_attr.rtps.builtin_transports_reception_threads,
+                    test.builtin_transports_reception_threads);
+#if HAVE_SECURITY
+            ASSERT_EQ(profile_attr.rtps.security_log_thread, test.security_log_thread);
+#endif // if HAVE_SECURITY
+        }
+        xmlparser::XMLProfileManager::DeleteInstance();
+    }
+}
+
+/**
+ * This test checks positive and negative cases for parsing of DataReader ThreadSettings
+ */
+TEST_F(XMLProfileParserBasicTests, datareader_thread_settings)
+{
+    using namespace eprosima::fastdds::dds;
+    using namespace eprosima::fastdds::rtps;
+    struct TestCase
+    {
+        std::string title;
+        std::string xml;
+        xmlparser::XMLP_ret result;
+        ThreadSettings data_sharing_listener_thread;
+    };
+
+    ThreadSettings default_thread_settings;
+    ThreadSettings modified_thread_settings;
+    modified_thread_settings.scheduling_policy = 12;
+    modified_thread_settings.priority = 12;
+    modified_thread_settings.affinity = 12;
+    modified_thread_settings.stack_size = 12;
+
+    std::vector<TestCase> test_cases =
+    {
+        {
+            "data_sharing_listener_thread_ok",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <data_reader profile_name="datareader" is_default_profile="true">
+                            <qos>
+                                <data_sharing>
+                                    <kind>AUTOMATIC</kind>
+                                    <data_sharing_listener_thread>
+                                        <scheduling_policy>12</scheduling_policy>
+                                        <priority>12</priority>
+                                        <affinity>12</affinity>
+                                        <stack_size>12</stack_size>
+                                    </data_sharing_listener_thread>
+                                </data_sharing>
+                            </qos>
+                        </data_reader>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            modified_thread_settings
+        },
+        {
+            "data_sharing_listener_thread_empty",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <data_reader profile_name="datareader" is_default_profile="true">
+                            <qos>
+                                <data_sharing>
+                                    <kind>AUTOMATIC</kind>
+                                    <data_sharing_listener_thread>
+                                    </data_sharing_listener_thread>
+                                </data_sharing>
+                            </qos>
+                        </data_reader>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            default_thread_settings,
+        },
+        {
+            "no_data_sharing_listener_thread",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <data_reader profile_name="datareader" is_default_profile="true">
+                            <qos>
+                                <data_sharing>
+                                    <kind>AUTOMATIC</kind>
+                                </data_sharing>
+                            </qos>
+                        </data_reader>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_OK,
+            default_thread_settings,
+        },
+        {
+            "data_sharing_listener_thread_wrong_value",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <data_reader profile_name="datareader" is_default_profile="true">
+                            <qos>
+                                <data_sharing>
+                                    <kind>AUTOMATIC</kind>
+                                    <data_sharing_listener_thread>
+                                        <scheduling_policy>aa</scheduling_policy>
+                                        <priority>0</priority>
+                                        <affinity>0</affinity>
+                                        <stack_size>0</stack_size>
+                                    </data_sharing_listener_thread>
+                                </data_sharing>
+                            </qos>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            default_thread_settings,
+        },
+        {
+            "data_sharing_listener_thread_wrong_tag",
+            R"(
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                    <profiles>
+                        <data_reader profile_name="datareader" is_default_profile="true">
+                            <qos>
+                                <data_sharing>
+                                    <kind>AUTOMATIC</kind>
+                                    <data_sharing_listener_thread>
+                                        <wrong>-1</wrong>
+                                        <priority>0</priority>
+                                        <affinity>0</affinity>
+                                        <stack_size>0</stack_size>
+                                    </data_sharing_listener_thread>
+                                </data_sharing>
+                            </qos>
+                        </participant>
+                    </profiles>
+                </dds>)",
+            xmlparser::XMLP_ret::XML_ERROR,
+            default_thread_settings,
+        },
+    };
+
+    for (const TestCase& test : test_cases)
+    {
+        EXPECT_EQ(test.result, xmlparser::XMLProfileManager::loadXMLString(test.xml.c_str(), test.xml.length())) <<
+            " test_case = [" << test.title << "]";
+        if (test.result == xmlparser::XMLP_ret::XML_OK)
+        {
+            SubscriberAttributes profile_attr;
+            ASSERT_EQ(xmlparser::XMLP_ret::XML_OK,
+                    xmlparser::XMLProfileManager::fillSubscriberAttributes("datareader", profile_attr));
+
+            SubscriberAttributes default_attr;
+            xmlparser::XMLProfileManager::getDefaultSubscriberAttributes(default_attr);
+
+            ASSERT_EQ(profile_attr, default_attr);
+            ASSERT_EQ(profile_attr.qos.data_sharing.data_sharing_listener_thread(), test.data_sharing_listener_thread);
+        }
+        xmlparser::XMLProfileManager::DeleteInstance();
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(XMLProfileParserTests, XMLProfileParserTests, testing::Values(false));
+INSTANTIATE_TEST_SUITE_P(XMLProfileParserEnvVarTests, XMLProfileParserTests, testing::Values(true));
 
 int main(
         int argc,

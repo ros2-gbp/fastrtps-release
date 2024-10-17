@@ -21,13 +21,15 @@
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <fastdds/rtps/writer/RTPSWriter.h>
-#include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
-#include <fastdds/rtps/history/IChangePool.h>
-#include <fastdds/rtps/history/IPayloadPool.h>
-#include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
 #include <condition_variable>
 #include <mutex>
+
+#include <fastdds/rtps/common/VendorId_t.hpp>
+#include <fastdds/rtps/history/IChangePool.h>
+#include <fastdds/rtps/history/IPayloadPool.h>
+#include <fastdds/rtps/interfaces/IReaderDataFilter.hpp>
+#include <fastdds/rtps/writer/RTPSWriter.h>
+#include <fastrtps/utils/collections/ResourceLimitedVector.hpp>
 
 namespace eprosima {
 namespace fastrtps {
@@ -134,7 +136,7 @@ public:
     /**
      * Add a specific change to all ReaderLocators.
      * @param p Pointer to the change.
-     * @param max_blocking_time
+     * @param[in] max_blocking_time Maximum time this method has to complete the task.
      */
     void unsent_change_added_to_history(
             CacheChange_t* p,
@@ -143,10 +145,12 @@ public:
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
      * @param a_change Pointer to the change that is going to be removed.
+     * @param[in] max_blocking_time Maximum time this method has to complete the task.
      * @return True if removed correctly.
      */
     bool change_removed_by_history(
-            CacheChange_t* a_change) override;
+            CacheChange_t* a_change,
+            const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time) override;
 
     /**
      * Sends a change directly to a intraprocess reader.
@@ -364,6 +368,7 @@ public:
      * @param[in] final_flag       Final flag field of the submessage.
      * @param[out] result          true if the writer could process the submessage.
      *                             Only valid when returned value is true.
+     * @param[in] origin_vendor_id VendorId of the source participant from which the message was received
      * @return true when the submessage was destinated to this writer, false otherwise.
      */
     bool process_acknack(
@@ -372,7 +377,8 @@ public:
             uint32_t ack_count,
             const SequenceNumberSet_t& sn_set,
             bool final_flag,
-            bool& result) override;
+            bool& result,
+            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown) override;
 
     /**
      * Process an incoming NACKFRAG submessage.
@@ -383,6 +389,7 @@ public:
      * @param[in] fragments_state  Sequence number field of the submessage.
      * @param[out] result          true if the writer could process the submessage.
      *                             Only valid when returned value is true.
+     * @param[in] origin_vendor_id VendorId of the source participant from which the message was received
      * @return true when the submessage was destinated to this writer, false otherwise.
      */
     virtual bool process_nack_frag(
@@ -391,7 +398,8 @@ public:
             uint32_t ack_count,
             const SequenceNumber_t& seq_num,
             const FragmentNumberSet_t fragments_state,
-            bool& result) override;
+            bool& result,
+            fastdds::rtps::VendorId_t origin_vendor_id = c_VendorId_Unknown) override;
 
     /**
      * @brief Set a content filter to perform content filtering on this writer.
@@ -439,6 +447,11 @@ public:
     {
         return locator_selector_async_;
     }
+
+#ifdef FASTDDS_STATISTICS
+    bool get_connections(
+            fastdds::statistics::rtps::ConnectionList& connection_list) override;
+#endif // ifdef FASTDDS_STATISTICS
 
 private:
 

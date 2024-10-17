@@ -69,15 +69,10 @@ jobs:
           path: src/fastrtps
           ref: ${{ inputs.fastdds_ref }}
 
-      - name: Install Fix Python version
-        uses: eProsima/eProsima-CI/external/setup-python@v0
-        with:
-          python-version: '3.11'
-
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
@@ -145,15 +140,10 @@ jobs:
           name: build_artifacts_fastdds_asan_${{ inputs.label }}
           path: ${{ github.workspace }}
 
-      - name: Install Fix Python version
-        uses: eProsima/eProsima-CI/external/setup-python@v0
-        with:
-          python-version: '3.11'
-
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
@@ -198,7 +188,7 @@ jobs:
           colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/asan.meta
           colcon_build_args: ${{ inputs.colcon_build_args }}
           cmake_args: ${{ inputs.cmake_args }}
-          cmake_args_default: -DEPROSIMA_BUILD_TESTS=ON -DGTEST_INDIVIDUAL=ON -DRTPS_API_TESTS=ON -DFASTRTPS_API_TESTS=ON -DFASTDDS_PIM_API_TESTS=ON -DPERFORMANCE_TESTS=ON
+          cmake_args_default: -DEPROSIMA_BUILD_TESTS=ON -DRTPS_API_TESTS=ON -DFASTRTPS_API_TESTS=ON -DFASTDDS_PIM_API_TESTS=ON -DPERFORMANCE_TESTS=ON
           cmake_build_type: 'Debug'
           workspace: ${{ github.workspace }}
           workspace_dependencies: ''
@@ -243,15 +233,10 @@ jobs:
           name: build_artifacts_fastdds_asan_${{ inputs.label }}
           path: ${{ github.workspace }}
 
-      - name: Install Fix Python version
-        uses: eProsima/eProsima-CI/external/setup-python@v0
-        with:
-          python-version: '3.11'
-
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0
@@ -356,15 +341,10 @@ jobs:
           path: src/fastrtps
           ref: ${{ inputs.fastdds_ref }}
 
-      - name: Install Fix Python version
-        uses: eProsima/eProsima-CI/external/setup-python@v0
-        with:
-          python-version: '3.11'
-
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install apt packages
         uses: eProsima/eProsima-CI/ubuntu/install_apt_packages@v0

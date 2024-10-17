@@ -820,6 +820,8 @@ TEST(DDSDiscovery, DDSDiscoveryDoesNotDropUDPLocator)
 
     struct CustomDomainParticipantListener : public DomainParticipantListener
     {
+        using DomainParticipantListener::on_participant_discovery;
+
         std::mutex mtx;
         std::condition_variable cv;
         GUID_t guid;
@@ -838,9 +840,6 @@ TEST(DDSDiscovery, DDSDiscoveryDoesNotDropUDPLocator)
             }
         }
 
-    private:
-
-        using DomainParticipantListener::on_participant_discovery;
     };
 
     DomainParticipantFactory* factory = DomainParticipantFactory::get_instance();
@@ -892,6 +891,41 @@ TEST(DDSDiscovery, DDSDiscoveryDoesNotDropUDPLocator)
     perform_check("8.8.8.9", false);
 
     factory->delete_participant(part1);
+}
+
+/**
+ * This is a regression test for #1929
+ * Checks that the disposal of an matched Endpoint is correctly received
+ * by a remote participant when DYNAMIC_REUSABLE memory mode is used
+ */
+TEST(DDSDiscovery, WriterAndReaderMatchUsingDynamicReusableMemoryMode)
+{
+    using namespace eprosima::fastdds::dds;
+    using namespace eprosima::fastrtps::rtps;
+
+    WireProtocolConfigQos qos;
+
+    qos.builtin.readerHistoryMemoryPolicy = eprosima::fastrtps::rtps::DYNAMIC_REUSABLE_MEMORY_MODE;
+
+    PubSubWriter<HelloWorldPubSubType> writer("test");
+    PubSubReader<HelloWorldPubSubType> reader("test");
+
+    writer.set_wire_protocol_qos(qos).init();
+    ASSERT_TRUE(writer.isInitialized());
+
+    reader.set_wire_protocol_qos(qos).init();
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.wait_discovery();
+    reader.wait_discovery();
+
+    ASSERT_TRUE(reader.is_matched());
+    ASSERT_TRUE(writer.is_matched());
+
+    reader.delete_datareader();
+
+    ASSERT_TRUE(writer.wait_reader_undiscovery(std::chrono::seconds(3)));
+
 }
 
 /**
@@ -1843,6 +1877,8 @@ TEST(DDSDiscovery, DataracePDP)
     {
     public:
 
+        using DomainParticipantListener::on_participant_discovery;
+
         CustomDomainParticipantListener()
             : DomainParticipantListener()
             , discovery_future(discovery_promise.get_future())
@@ -1889,10 +1925,6 @@ TEST(DDSDiscovery, DataracePDP)
 
         std::promise<void> undiscovery_promise;
         std::future<void> undiscovery_future;
-
-    private:
-
-        using DomainParticipantListener::on_participant_discovery;
     };
 
     // Disable intraprocess

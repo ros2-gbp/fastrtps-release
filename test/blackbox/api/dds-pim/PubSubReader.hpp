@@ -499,6 +499,19 @@ public:
         return initialized_;
     }
 
+    bool delete_datareader()
+    {
+        ReturnCode_t ret(ReturnCode_t::RETCODE_ERROR);
+
+        if (subscriber_ && datareader_)
+        {
+            ret = subscriber_->delete_datareader(datareader_);
+            datareader_ = nullptr;
+        }
+
+        return (ReturnCode_t::RETCODE_OK == ret);
+    }
+
     virtual void destroy()
     {
         if (participant_ != nullptr)
@@ -608,13 +621,13 @@ public:
     }
 
     size_t block_for_unread_count_of(
-            size_t n_unread)
+            uint64_t n_unread)
     {
         block([this, n_unread]() -> bool
                 {
                     return current_unread_count_ >= n_unread;
                 });
-        return current_unread_count_;
+        return static_cast<size_t>(current_unread_count_);
     }
 
     void block(
@@ -1010,6 +1023,14 @@ public:
         return *this;
     }
 
+    PubSubReader& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports,
+            const eprosima::fastdds::rtps::BuiltinTransportsOptions& options)
+    {
+        participant_qos_.setup_transports(transports, options);
+        return *this;
+    }
+
     PubSubReader& setup_large_data_tcp(
             bool v6 = false,
             const uint16_t& port = 0,
@@ -1087,6 +1108,13 @@ public:
     PubSubReader& disable_builtin_transport()
     {
         participant_qos_.transport().use_builtin_transports = false;
+        return *this;
+    }
+
+    PubSubReader& set_wire_protocol_qos(
+            const eprosima::fastdds::dds::WireProtocolConfigQos& qos)
+    {
+        participant_qos_.wire_protocol() = qos;
         return *this;
     }
 
@@ -1613,6 +1641,13 @@ public:
         return *this;
     }
 
+    PubSubReader& data_representation(
+            const std::vector<eprosima::fastdds::dds::DataRepresentationId_t>& values)
+    {
+        datareader_qos_.type_consistency().representation.m_value = values;
+        return *this;
+    }
+
     bool update_partition(
             const std::string& partition)
     {
@@ -1855,9 +1890,19 @@ public:
         return status;
     }
 
-private:
+    eprosima::fastdds::dds::TypeSupport get_type_support()
+    {
+        return type_;
+    }
 
-    void receive_one(
+    eprosima::fastdds::dds::DomainParticipant* get_participant()
+    {
+        return participant_;
+    }
+
+protected:
+
+    virtual void receive_one(
             eprosima::fastdds::dds::DataReader* datareader,
             bool& returnedValue)
     {
@@ -1982,8 +2027,6 @@ private:
     //! functor to check which API to retrieve samples
     std::function<void (eprosima::fastdds::dds::DataReader* datareader, bool&)> receive_;
 
-protected:
-
     void receive(
             eprosima::fastdds::dds::DataReader* datareader,
             bool& returnedValue)
@@ -2075,7 +2118,7 @@ protected:
     std::map<LastSeqInfo, eprosima::fastrtps::rtps::SequenceNumber_t> last_seq;
     std::atomic<size_t> current_processed_count_;
     std::atomic<size_t> number_samples_expected_;
-    std::atomic<size_t> current_unread_count_;
+    std::atomic<uint64_t> current_unread_count_;
     bool discovery_result_;
 
     std::string xml_file_ = "";

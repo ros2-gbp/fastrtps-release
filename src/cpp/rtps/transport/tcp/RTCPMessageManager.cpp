@@ -16,13 +16,17 @@
  * @file RTCPMessageManager.cpp
  *
  */
+
+#include <rtps/transport/tcp/RTCPMessageManager.h>
+
+#include <thread>
+
 #include <fastdds/rtps/transport/TCPv4TransportDescriptor.h>
 #include <fastdds/rtps/transport/TCPv6TransportDescriptor.h>
 #include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/utils/IPLocator.h>
 #include <fastrtps/utils/System.h>
 #include <rtps/transport/tcp/RTCPHeader.h>
-#include <rtps/transport/tcp/RTCPMessageManager.h>
 #include <rtps/transport/TCPChannelResource.h>
 #include <rtps/transport/TCPTransportInterface.h>
 
@@ -679,11 +683,13 @@ ResponseCode RTCPMessageManager::processKeepAliveResponse(
 ResponseCode RTCPMessageManager::processRTCPMessage(
         std::shared_ptr<TCPChannelResource>& channel,
         octet* receive_buffer,
-        size_t receivedSize)
+        size_t receivedSize,
+        fastrtps::rtps::Endianness_t msg_endian)
 {
     ResponseCode responseCode(RETCODE_OK);
 
     TCPControlMsgHeader controlHeader = *(reinterpret_cast<TCPControlMsgHeader*>(receive_buffer));
+    controlHeader.valid_endianness(msg_endian);
     //memcpy(&controlHeader, receive_buffer, TCPControlMsgHeader::size());
     size_t dataSize = controlHeader.length() - TCPControlMsgHeader::size();
     size_t bufferSize = dataSize + 4;

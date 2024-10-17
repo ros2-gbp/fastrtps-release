@@ -27,18 +27,8 @@ on:
         description: 'Branch or tag of Fast DDS repository (https://github.com/eProsima/Fast-DDS)'
         required: true
         type: string
-      fastcdr-branch:
-        description: 'Branch or tag of Fast CDR repository (https://github.com/eProsima/Fast-CDR)'
-        required: false
-        type: string
-        default: '1.0.x'
       security:
         description: 'Enable security features'
-        required: false
-        type: boolean
-        default: true
-      run-build:
-        description: 'Build Fast DDS (CI skipped otherwise)'
         required: false
         type: boolean
         default: true
@@ -63,7 +53,6 @@ defaults:
 jobs:
   fastdds_build:
     runs-on: ${{ inputs.os-image }}
-    if: ${{ inputs.run-build == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -115,20 +104,6 @@ jobs:
         if: ${{ inputs.use-ccache == true }}
         with:
           api_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get Fast CDR branch
-        id: get_fastcdr_branch
-        uses: eProsima/eProsima-CI/ubuntu/get_related_branch_from_repo@v0
-        with:
-          remote_repository: eProsima/Fast-CDR
-          fallback_branch: ${{ inputs.fastcdr-branch }}
-
-      - name: Download Fast CDR
-        uses: eProsima/eProsima-CI/external/checkout@v0
-        with:
-          repository: eProsima/Fast-CDR
-          path: ${{ github.workspace }}/src/fastcdr
-          ref: ${{ steps.get_fastcdr_branch.outputs.deduced_branch }}
 
       - name: Fetch Fast DDS dependencies
         uses: eProsima/eProsima-CI/multiplatform/vcs_import@v0
@@ -231,7 +206,7 @@ jobs:
           colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/fastdds_build.meta ${{ github.workspace }}/src/fastrtps/.github/workflows/config/fastdds_test.meta
           colcon_build_args: ${{ inputs.colcon-args }}
           cmake_args: '${{ env.security-cmake-flag }} ${{ inputs.cmake-args }}'
-          cmake_args_default: '${{ env.colcon-build-default-cmake-args }} -DFASTDDS_EXAMPLE_TESTS=ON'
+          cmake_args_default: '${{ env.colcon-build-default-cmake-args }}'
           cmake_build_type: ${{ matrix.cmake-build-type }}
           workspace: ${{ github.workspace }}
 
@@ -307,7 +282,7 @@ jobs:
         uses: eProsima/eProsima-CI/ubuntu/get_related_branch_from_repo@v0
         with:
           remote_repository: eProsima/Fast-DDS-python
-          fallback_branch: '1.2.x'
+          fallback_branch: '1.4.x'
 
       - name: Download Fast DDS Python repo
         uses: eProsima/eProsima-CI/external/checkout@v0
@@ -321,11 +296,10 @@ jobs:
         uses: eProsima/eProsima-CI/multiplatform/colcon_build@v0
         with:
           colcon_meta_file: ${{ github.workspace }}/src/fastrtps/.github/workflows/config/fastdds_build.meta
-          colcon_build_args: ${{ inputs.colcon-args }} --packages-select fastdds_python
+          colcon_build_args: ${{ inputs.colcon-args }}
           cmake_args: '${{ env.security-cmake-flag }} ${{ inputs.cmake-args }}'
           cmake_args_default: ''
           cmake_build_type: ${{ matrix.cmake-build-type }}
-          workspace_dependencies: ${{ github.workspace }}/install
           workspace: ${{ github.workspace }}
 
       - name: Upload python build artifacts
@@ -470,7 +444,7 @@ jobs:
         uses: eProsima/eProsima-CI/ubuntu/get_related_branch_from_repo@v0
         with:
           remote_repository: eProsima/Fast-DDS-docs
-          fallback_branch: '2.10.x'
+          fallback_branch: '2.14.x'
 
       - name: Download Fast DDS documentation repo
         uses: eProsima/eProsima-CI/external/checkout@v0
@@ -577,7 +551,7 @@ jobs:
         uses: eProsima/eProsima-CI/ubuntu/get_related_branch_from_repo@v0
         with:
           remote_repository: eProsima/ShapesDemo
-          fallback_branch: '2.10.x'
+          fallback_branch: '2.14.x'
 
       - name: Download Shapes Demo repo
         uses: eProsima/eProsima-CI/external/checkout@v0
@@ -590,7 +564,7 @@ jobs:
       # Do not setup python as it will internally modify the pythonLocation env variable
       # and we want to use a fix version
       - name: Install Qt
-        uses: eProsima/eProsima-CI/external/install_qt@v0
+        uses: jurplel/install-qt-action@v2.13.0
         with:
           version: '5.15.2'
           dir: '${{ github.workspace }}/qt_installation/'
@@ -657,7 +631,7 @@ jobs:
         uses: eProsima/eProsima-CI/ubuntu/get_related_branch_from_repo@v0
         with:
           remote_repository: eProsima/Discovery-Server
-          fallback_branch: 'v1.2.1'
+          fallback_branch: '1.2.x'
 
       - name: Download Discovery Server repo
         uses: eProsima/eProsima-CI/external/checkout@v0
@@ -851,16 +825,5 @@ jobs:
           colcon_build_args: ${{ inputs.colcon-args }}
           cmake_args: '-DBUILD_SHARED_LIBS=OFF ${{ env.security-cmake-flag }} ${{ inputs.cmake-args }}'
           cmake_args_default: ${{ env.colcon-build-default-cmake-args }}
-          cmake_build_type: ${{ matrix.cmake-build-type }}
-          workspace: ${{ github.workspace }}
-
-      - name: Clean workspace - No shared libs
-        run: |
-          cd ${{ github.workspace }}
-          rm -rf build install log
-          
-      - name: Vanilla colcon build
-        uses: eProsima/eProsima-CI/multiplatform/colcon_build@v0
-        with:
           cmake_build_type: ${{ matrix.cmake-build-type }}
           workspace: ${{ github.workspace }}

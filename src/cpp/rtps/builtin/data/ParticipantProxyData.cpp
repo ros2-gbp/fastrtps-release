@@ -22,16 +22,17 @@
 #include <chrono>
 #include <mutex>
 
+#include <fastdds/core/policy/ParameterList.hpp>
+#include <fastdds/core/policy/QosPoliciesSerializer.hpp>
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
 #include <fastdds/rtps/builtin/data/ReaderProxyData.h>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
+#include <fastdds/rtps/common/VendorId_t.hpp>
 #include <fastdds/rtps/resources/TimedEvent.h>
 #include <fastrtps/utils/TimeConversion.h>
 
-#include <fastdds/core/policy/ParameterList.hpp>
-#include <fastdds/core/policy/QosPoliciesSerializer.hpp>
 #include <rtps/network/NetworkFactory.h>
 #include <rtps/transport/shared_mem/SHMLocator.hpp>
 
@@ -45,12 +46,15 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+using ::operator <<;
+
 ParticipantProxyData::ParticipantProxyData(
         const RTPSParticipantAllocationAttributes& allocation)
     : m_protocolVersion(c_ProtocolVersion)
     , m_VendorId(c_VendorId_Unknown)
     , m_expectsInlineQos(false)
     , m_availableBuiltinEndpoints(0)
+    , m_networkConfiguration(0)
     , metatraffic_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
     , default_locators(allocation.locators.max_unicast_locators, allocation.locators.max_multicast_locators)
     , m_manualLivelinessCount ()
@@ -76,6 +80,7 @@ ParticipantProxyData::ParticipantProxyData(
     , m_VendorId(pdata.m_VendorId)
     , m_expectsInlineQos(pdata.m_expectsInlineQos)
     , m_availableBuiltinEndpoints(pdata.m_availableBuiltinEndpoints)
+    , m_networkConfiguration(pdata.m_networkConfiguration)
     , metatraffic_locators(pdata.metatraffic_locators)
     , default_locators(pdata.default_locators)
     , m_manualLivelinessCount ()
@@ -154,6 +159,9 @@ uint32_t ParticipantProxyData::get_serialized_size(
 
     // PID_PARTICIPANT_GUID
     ret_val += 4 + PARAMETER_GUID_LENGTH;
+
+    // PID_NETWORK_CONFIGURATION_SET
+    ret_val += 4 + PARAMETER_NETWORKCONFIGSET_LENGTH;
 
     // PID_METATRAFFIC_MULTICAST_LOCATOR
     ret_val += static_cast<uint32_t>((4 + PARAMETER_LOCATOR_LENGTH) * metatraffic_locators.multicast.size());
@@ -255,6 +263,14 @@ bool ParticipantProxyData::writeToCDRMessage(
     {
         ParameterGuid_t p(fastdds::dds::PID_PARTICIPANT_GUID, PARAMETER_GUID_LENGTH, m_guid);
         if (!fastdds::dds::ParameterSerializer<ParameterGuid_t>::add_to_cdr_message(p, msg))
+        {
+            return false;
+        }
+    }
+    {
+        ParameterNetworkConfigSet_t p(fastdds::dds::PID_NETWORK_CONFIGURATION_SET, PARAMETER_NETWORKCONFIGSET_LENGTH);
+        p.netconfigSet = m_networkConfiguration;
+        if (!fastdds::dds::ParameterSerializer<ParameterNetworkConfigSet_t>::add_to_cdr_message(p, msg))
         {
             return false;
         }
@@ -374,9 +390,11 @@ bool ParticipantProxyData::readFromCDRMessage(
         CDRMessage_t* msg,
         bool use_encapsulation,
         const NetworkFactory& network,
-        bool is_shm_transport_available)
+        bool is_shm_transport_available,
+        bool should_filter_locators,
+        fastdds::rtps::VendorId_t source_vendor_id)
 {
-    auto param_process = [this, &network, &is_shm_transport_available](
+    auto param_process = [this, &network, &is_shm_transport_available, &should_filter_locators, source_vendor_id](
         CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
                 switch (pid)
@@ -448,6 +466,32 @@ bool ParticipantProxyData::readFromCDRMessage(
                         m_key = p.guid;
                         break;
                     }
+                    case fastdds::dds::PID_NETWORK_CONFIGURATION_SET:
+                    {
+                        VendorId_t local_vendor_id = source_vendor_id;
+                        if (c_VendorId_Unknown == local_vendor_id)
+                        {
+                            local_vendor_id = ((c_VendorId_Unknown == m_VendorId) ? c_VendorId_eProsima : m_VendorId);
+                        }
+
+                        // Ignore custom PID when coming from other vendors
+                        if (c_VendorId_eProsima != local_vendor_id)
+                        {
+                            EPROSIMA_LOG_INFO(RTPS_PROXY_DATA,
+                                    "Ignoring custom PID" << pid << " from vendor " << local_vendor_id);
+                            return true;
+                        }
+
+                        ParameterNetworkConfigSet_t p(pid, plength);
+                        if (!fastdds::dds::ParameterSerializer<ParameterNetworkConfigSet_t>::read_from_cdr_message(p,
+                                msg, plength))
+                        {
+                            return false;
+                        }
+
+                        m_networkConfiguration = p.netconfigSet;
+                        break;
+                    }
                     case fastdds::dds::PID_METATRAFFIC_MULTICAST_LOCATOR:
                     {
                         ParameterLocator_t p(pid, plength);
@@ -457,14 +501,22 @@ bool ParticipantProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator))
+                        if (!should_filter_locators)
                         {
-                            ProxyDataFilters::filter_locators(
-                                is_shm_transport_available,
-                                metatraffic_locators,
-                                temp_locator,
-                                false);
+                            metatraffic_locators.add_multicast_locator(p.locator);
+                        }
+                        else
+                        {
+                            Locator_t temp_locator;
+                            if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration,
+                                    m_guid.is_from_this_host()))
+                            {
+                                ProxyDataFilters::filter_locators(
+                                    is_shm_transport_available,
+                                    metatraffic_locators,
+                                    temp_locator,
+                                    false);
+                            }
                         }
                         break;
                     }
@@ -477,14 +529,22 @@ bool ParticipantProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator))
+                        if (!should_filter_locators)
                         {
-                            ProxyDataFilters::filter_locators(
-                                is_shm_transport_available,
-                                metatraffic_locators,
-                                temp_locator,
-                                true);
+                            metatraffic_locators.add_unicast_locator(p.locator);
+                        }
+                        else
+                        {
+                            Locator_t temp_locator;
+                            if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration,
+                                    m_guid.is_from_this_host()))
+                            {
+                                ProxyDataFilters::filter_locators(
+                                    is_shm_transport_available,
+                                    metatraffic_locators,
+                                    temp_locator,
+                                    true);
+                            }
                         }
                         break;
                     }
@@ -497,14 +557,22 @@ bool ParticipantProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator))
+                        if (!should_filter_locators)
                         {
-                            ProxyDataFilters::filter_locators(
-                                is_shm_transport_available,
-                                default_locators,
-                                temp_locator,
-                                true);
+                            default_locators.add_unicast_locator(p.locator);
+                        }
+                        else
+                        {
+                            Locator_t temp_locator;
+                            if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration,
+                                    m_guid.is_from_this_host()))
+                            {
+                                ProxyDataFilters::filter_locators(
+                                    is_shm_transport_available,
+                                    default_locators,
+                                    temp_locator,
+                                    true);
+                            }
                         }
                         break;
                     }
@@ -517,14 +585,22 @@ bool ParticipantProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator))
+                        if (!should_filter_locators)
                         {
-                            ProxyDataFilters::filter_locators(
-                                is_shm_transport_available,
-                                default_locators,
-                                temp_locator,
-                                false);
+                            default_locators.add_multicast_locator(p.locator);
+                        }
+                        else
+                        {
+                            Locator_t temp_locator;
+                            if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration,
+                                    m_guid.is_from_this_host()))
+                            {
+                                ProxyDataFilters::filter_locators(
+                                    is_shm_transport_available,
+                                    default_locators,
+                                    temp_locator,
+                                    false);
+                            }
                         }
                         break;
                     }
@@ -666,6 +742,7 @@ void ParticipantProxyData::clear()
     m_VendorId = c_VendorId_Unknown;
     m_expectsInlineQos = false;
     m_availableBuiltinEndpoints = 0;
+    m_networkConfiguration = 0;
     metatraffic_locators.unicast.clear();
     metatraffic_locators.multicast.clear();
     default_locators.unicast.clear();
@@ -695,6 +772,7 @@ void ParticipantProxyData::copy(
     m_VendorId[0] = pdata.m_VendorId[0];
     m_VendorId[1] = pdata.m_VendorId[1];
     m_availableBuiltinEndpoints = pdata.m_availableBuiltinEndpoints;
+    m_networkConfiguration = pdata.m_networkConfiguration;
     metatraffic_locators = pdata.metatraffic_locators;
     default_locators = pdata.default_locators;
     m_participantName = pdata.m_participantName;

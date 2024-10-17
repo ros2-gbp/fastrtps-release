@@ -16,7 +16,12 @@
 #define _FASTDDS_UDP_CHANNEL_RESOURCE_INFO_
 
 #include <asio.hpp>
+
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
 #include <fastdds/rtps/common/Locator.h>
+#include <fastdds/rtps/common/LocatorWithMask.hpp>
+#include <fastdds/rtps/transport/network/NetmaskFilterKind.hpp>
+
 #include <rtps/transport/ChannelResource.h>
 
 namespace eprosima {
@@ -28,7 +33,25 @@ class UDPTransportInterface;
 
 #if defined(ASIO_HAS_MOVE)
 // Typedefs
-typedef asio::ip::udp::socket eProsimaUDPSocket;
+class eProsimaUDPSocket : public asio::ip::udp::socket
+{
+public:
+
+    explicit eProsimaUDPSocket(
+            asio::io_service& io_service)
+        : asio::ip::udp::socket(io_service)
+    {
+    }
+
+    bool should_filter(
+            const Locator& dest_locator)
+    {
+        return netmask_filter == NetmaskFilterKind::ON && !locator.matches(dest_locator);
+    }
+
+    LocatorWithMask locator;
+    NetmaskFilterKind netmask_filter = NetmaskFilterKind::AUTO;
+};
 typedef eProsimaUDPSocket& eProsimaUDPSocketRef;
 
 // UDP
@@ -53,7 +76,7 @@ inline eProsimaUDPSocket moveSocket(
 inline eProsimaUDPSocket createUDPSocket(
         asio::io_service& io_service)
 {
-    return asio::ip::udp::socket(io_service);
+    return eProsimaUDPSocket(io_service);
 }
 
 inline eProsimaUDPSocket& getRefFromPtr(
@@ -64,7 +87,25 @@ inline eProsimaUDPSocket& getRefFromPtr(
 
 #else
 // Typedefs
-typedef std::shared_ptr<asio::ip::udp::socket> eProsimaUDPSocket;
+class eProsimaUDPSocket : public std::shared_ptr<asio::ip::udp::socket>
+{
+public:
+
+    explicit eProsimaUDPSocket(
+            asio::io_service& io_service)
+        : shared_ptr<asio::ip::udp::socket>(io_service)
+    {
+    }
+
+    bool should_filter(
+            const Locator& dest_locator)
+    {
+        return netmask_filter == NetmaskFilterKind::ON && !locator.matches(dest_locator);
+    }
+
+    LocatorWithMask locator;
+    NetmaskFilterKind netmask_filter = NetmaskFilterKind::AUTO;
+};
 typedef eProsimaUDPSocket eProsimaUDPSocketRef;
 
 // UDP
@@ -89,7 +130,7 @@ inline eProsimaUDPSocket moveSocket(
 inline eProsimaUDPSocket createUDPSocket(
         asio::io_service& io_service)
 {
-    return std::make_shared<asio::ip::udp::socket>(io_service);
+    return eProsimaUDPSocket(io_service);
 }
 
 inline eProsimaUDPSocket getRefFromPtr(
@@ -110,7 +151,8 @@ public:
             uint32_t maxMsgSize,
             const Locator& locator,
             const std::string& sInterface,
-            TransportReceiverInterface* receiver);
+            TransportReceiverInterface* receiver,
+            const ThreadSettings& thread_config);
 
     virtual ~UDPChannelResource() override;
 
@@ -146,13 +188,13 @@ public:
         return getSocketPtr(socket_);
     }
 
-    inline void interface(
-            const std::string& interface)
+    inline void iface(
+            const std::string& iface)
     {
-        interface_ = interface;
+        interface_ = iface;
     }
 
-    inline const std::string& interface() const
+    inline const std::string& iface() const
     {
         return interface_;
     }

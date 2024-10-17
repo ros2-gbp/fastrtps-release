@@ -47,7 +47,7 @@
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <rtps/common/GuidUtils.hpp>
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
+#include <rtps/network/utils/external_locators.hpp>
 #include <utils/Host.hpp>
 #include <utils/SystemInfo.hpp>
 
@@ -66,6 +66,13 @@ std::shared_ptr<RTPSDomainImpl> RTPSDomainImpl::get_instance()
 {
     static std::shared_ptr<RTPSDomainImpl> instance = std::make_shared<RTPSDomainImpl>();
     return instance;
+}
+
+void RTPSDomain::set_filewatch_thread_config(
+        const fastdds::rtps::ThreadSettings& watch_thread,
+        const fastdds::rtps::ThreadSettings& callback_thread)
+{
+    RTPSDomainImpl::set_filewatch_thread_config(watch_thread, callback_thread);
 }
 
 void RTPSDomain::stopAll()
@@ -145,8 +152,10 @@ RTPSParticipant* RTPSDomainImpl::createParticipant(
         std::string filename = SystemInfo::get_environment_file();
         if (!filename.empty() && SystemInfo::file_exists(filename))
         {
+            std::lock_guard<std::mutex> guard(instance->m_mutex);
             // Create filewatch
-            instance->file_watch_handle_ = SystemInfo::watch_file(filename, RTPSDomainImpl::file_watch_callback);
+            instance->file_watch_handle_ = SystemInfo::watch_file(filename, RTPSDomainImpl::file_watch_callback,
+                            instance->watch_thread_config_, instance->callback_thread_config_);
         }
         else if (!filename.empty())
         {
@@ -180,7 +189,7 @@ RTPSParticipant* RTPSDomainImpl::createParticipant(
     {
         fastdds::rtps::LocatorList locators;
         fastrtps::rtps::IPFinder::getIP4Address(&locators);
-        fastdds::rtps::ExternalLocatorsProcessor::add_external_locators(locators,
+        fastdds::rtps::network::external_locators::add_external_locators(locators,
                 PParam.builtin.metatraffic_external_unicast_locators);
         uint16_t host_id = Host::compute_id(locators);
         guidP.value[2] = static_cast<octet>(host_id & 0xFF);
@@ -856,6 +865,16 @@ void RTPSDomainImpl::file_watch_callback()
     {
         participant.second->environment_file_has_changed();
     }
+}
+
+void RTPSDomainImpl::set_filewatch_thread_config(
+        const fastdds::rtps::ThreadSettings& watch_thread,
+        const fastdds::rtps::ThreadSettings& callback_thread)
+{
+    auto instance = get_instance();
+    std::lock_guard<std::mutex> guard(instance->m_mutex);
+    instance->watch_thread_config_ = watch_thread;
+    instance->callback_thread_config_ = callback_thread;
 }
 
 } // namespace rtps

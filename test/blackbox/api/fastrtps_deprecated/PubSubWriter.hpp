@@ -754,6 +754,14 @@ public:
         return *this;
     }
 
+    PubSubWriter& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports,
+            const eprosima::fastdds::rtps::BuiltinTransportsOptions& options)
+    {
+        participant_attr_.rtps.setup_transports(transports, options);
+        return *this;
+    }
+
     PubSubWriter& setup_large_data_tcp(
             bool v6 = false,
             const uint16_t& port = 0,
@@ -1249,6 +1257,7 @@ public:
             uint32_t sockerBufferSize)
     {
         participant_attr_.rtps.listenSocketBufferSize = sockerBufferSize;
+        participant_attr_.rtps.sendSocketBufferSize = sockerBufferSize;
         return *this;
     }
 
@@ -1263,6 +1272,13 @@ public:
             int32_t participantId)
     {
         participant_attr_.rtps.participantID = participantId;
+        return *this;
+    }
+
+    PubSubWriter& set_events_thread_settings(
+            const eprosima::fastdds::rtps::ThreadSettings& settings)
+    {
+        participant_attr_.rtps.timed_events_thread = settings;
         return *this;
     }
 

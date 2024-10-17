@@ -26,6 +26,8 @@
 #include <fastdds/dds/log/StdoutErrConsumer.hpp>
 #include <fastdds/dds/log/Colors.hpp>
 #include <utils/SystemInfo.hpp>
+#include <utils/thread.hpp>
+#include <utils/threading.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -129,10 +131,21 @@ struct LogResources
         error_string_filter_.reset(new std::regex(filter));
     }
 
+    //! Sets thread configuration for the logging thread.
+    void SetThreadConfig(
+            const rtps::ThreadSettings& config)
+    {
+        std::lock_guard<std::mutex> guard(cv_mutex_);
+        thread_settings_ = config;
+    }
+
     //! Returns the logging_ engine to configuration defaults.
     void Reset()
     {
-        std::unique_lock<std::mutex> configGuard(config_mutex_);
+        rtps::ThreadSettings thr_config{};
+        SetThreadConfig(thr_config);
+
+        std::lock_guard<std::mutex> configGuard(config_mutex_);
         category_filter_.reset();
         filename_filter_.reset();
         error_string_filter_.reset();
@@ -153,7 +166,7 @@ struct LogResources
     {
         std::unique_lock<std::mutex> guard(cv_mutex_);
 
-        if (!logging_ && !logging_thread_)
+        if (!logging_ && !logging_thread_.joinable())
         {
             // already killed
             return;
@@ -161,28 +174,26 @@ struct LogResources
 
         /*   Flush() two steps strategy:
 
-             We must assure Log::Run swaps the queues twice
-             because its the only way the content in the background queue
+             I must assure Log::Run swaps the queues because only swapping the queues the background content
              will be consumed (first Run() loop).
 
-             Then, we must assure the new front queue content is consumed (second Run() loop).
+             Then, I must assure the new front queue content is consumed (second Run() loop).
          */
 
-        int last_loop = current_loop_;
+        int last_loop = -1;
 
         for (int i = 0; i < 2; ++i)
         {
             cv_.wait(guard,
                     [&]()
                     {
-                        /* We must avoid:
-                         + the two calls be processed without an intermediate Run() loop
-                           (by using last_loop sequence number and checking if the foreground queue is empty)
+                        /* I must avoid:
+                         + the two calls be processed without an intermediate Run() loop (by using last_loop sequence number)
                          + deadlock by absence of Run() loop activity (by using BothEmpty() call)
                          */
                         return !logging_ ||
-                        logs_.BothEmpty() ||
-                        (last_loop != current_loop_ && logs_.Empty());
+                        (logs_.Empty() &&
+                        (last_loop != current_loop_ || logs_.BothEmpty()));
                     });
 
             last_loop = current_loop_;
@@ -230,19 +241,13 @@ struct LogResources
             work_ = false;
         }
 
-        if (logging_thread_)
+        if (logging_thread_.joinable())
         {
             cv_.notify_all();
-            // The #ifdef workaround here is due to an unsolved MSVC bug, which Microsoft has announced
-            // they have no intention of solving: https://connect.microsoft.com/VisualStudio/feedback/details/747145
-            // Each VS version deals with post-main deallocation of threads in a very different way.
-#if !defined(_WIN32) || defined(FASTRTPS_STATIC_LINK) || _MSC_VER >= 1800
-            if (logging_thread_->joinable() && logging_thread_->get_id() != std::this_thread::get_id())
+            if (!logging_thread_.is_calling_thread())
             {
-                logging_thread_->join();
+                logging_thread_.join();
             }
-#endif // if !defined(_WIN32) || defined(FASTRTPS_STATIC_LINK) || _MSC_VER >= 1800
-            logging_thread_.reset();
         }
     }
 
@@ -251,10 +256,14 @@ private:
     void StartThread()
     {
         std::unique_lock<std::mutex> guard(cv_mutex_);
-        if (!logging_ && !logging_thread_)
+        if (!logging_ && !logging_thread_.joinable())
         {
             logging_ = true;
-            logging_thread_.reset(new std::thread(&LogResources::run, this));
+            auto thread_fn = [this]()
+                    {
+                        run();
+                    };
+            logging_thread_ = eprosima::create_thread(thread_fn, thread_settings_, "dds.log");
         }
     }
 
@@ -334,7 +343,7 @@ private:
 
     fastrtps::DBQueue<Log::Entry> logs_;
     std::vector<std::unique_ptr<LogConsumer>> consumers_;
-    std::unique_ptr<std::thread> logging_thread_;
+    eprosima::thread logging_thread_;
 
     // Condition variable segment.
     std::condition_variable cv_;
@@ -352,7 +361,7 @@ private:
     std::unique_ptr<std::regex> error_string_filter_;
 
     std::atomic<Log::Kind> verbosity_;
-
+    rtps::ThreadSettings thread_settings_;
 };
 
 const std::shared_ptr<LogResources>& get_log_resources()
@@ -438,6 +447,12 @@ void Log::SetErrorStringFilter(
     detail::get_log_resources()->SetErrorStringFilter(filter);
 }
 
+void Log::SetThreadConfig(
+        const rtps::ThreadSettings& config)
+{
+    detail::get_log_resources()->SetThreadConfig(config);
+}
+
 void LogConsumer::print_timestamp(
         std::ostream& stream,
         const Log::Entry& entry,
@@ -459,11 +474,7 @@ void LogConsumer::print_header(
 
     std::string white = (color) ? C_B_WHITE : "";
 
-    std::string kind = (entry.kind == Log::Kind::Error) ? "Error" :
-            (entry.kind == Log::Kind::Warning) ? "Warning" :
-            (entry.kind == Log::Kind::Info) ? "Info" : "";
-
-    stream << c_b_color << "[" << white << entry.context.category << c_b_color << " " << kind << "] ";
+    stream << c_b_color << "[" << white << entry.context.category << c_b_color << " " << entry.kind << "] ";
 }
 
 void LogConsumer::print_context(
