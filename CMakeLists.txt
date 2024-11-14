@@ -30,7 +30,7 @@ endif()
 ###############################################################################
 # Project                                                                     #
 ###############################################################################
-project(fastrtps VERSION "2.10.5" LANGUAGES C CXX)
+project(fastrtps VERSION "2.10.6" LANGUAGES C CXX)
 
 set(PROJECT_NAME_LARGE "Fast RTPS")
 string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UPPER)
@@ -568,7 +568,7 @@ option(INSTALL_EXAMPLES "Install example" OFF)
 if(INSTALL_EXAMPLES)
   # Install examples
   install(DIRECTORY ${PROJECT_SOURCE_DIR}/examples/cpp
-      DESTINATION examples/
+      DESTINATION examples
       COMPONENT examples
       PATTERN "examples/CMakeLists.txt" EXCLUDE
       )
@@ -579,7 +579,7 @@ option(INSTALL_TOOLS "Install tools" OFF)
 if(INSTALL_TOOLS)
   # Install tools
   install(DIRECTORY ${PROJECT_SOURCE_DIR}/tools
-      DESTINATION tools/
+      DESTINATION tools
       COMPONENT tools
       PATTERN "tools/CMakeLists.txt" EXCLUDE
       )
