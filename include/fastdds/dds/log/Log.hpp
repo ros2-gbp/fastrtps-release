@@ -15,11 +15,11 @@
 #ifndef _FASTDDS_DDS_LOG_LOG_HPP_
 #define _FASTDDS_DDS_LOG_LOG_HPP_
 
-#include <regex>
-#include <sstream>
-
-#include <fastdds/rtps/attributes/ThreadSettings.hpp>
 #include <fastrtps/fastrtps_dll.h>
+#include <thread>
+#include <sstream>
+#include <atomic>
+#include <regex>
 
 /**
  * eProsima log layer. Logging categories and verbosity can be specified dynamically at runtime.
@@ -131,10 +131,6 @@ public:
     RTPS_DllAPI static void SetErrorStringFilter(
             const std::regex&);
 
-    //! Sets thread configuration for the logging thread.
-    RTPS_DllAPI static void SetThreadConfig(
-            const rtps::ThreadSettings&);
-
     //! Returns the logging engine to configuration defaults.
     RTPS_DllAPI static void Reset();
 
@@ -177,32 +173,6 @@ public:
             const Log::Context&,
             Log::Kind);
 };
-
-//! Streams Log::Kind serialization
-inline std::ostream& operator <<(
-        std::ostream& output,
-        const Log::Kind& kind)
-{
-    switch (kind){
-        case Log::Kind::Info:
-            output << "Info";
-            break;
-
-        case Log::Kind::Warning:
-            output << "Warning";
-            break;
-
-        case Log::Kind::Error:
-            output << "Error";
-            break;
-
-        default:
-            output << "Invalid Verbosity Kind.";
-            break;
-    }
-
-    return output;
-}
 
 /**
  * Consumes a log entry to output it somewhere.

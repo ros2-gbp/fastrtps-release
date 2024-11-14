@@ -17,20 +17,18 @@
  *
  */
 
-#include "SubscriberModule.hpp"
-
-#include <chrono>
-#include <fstream>
-#include <string>
-#include <thread>
-
 #include <asio.hpp>
 
+#include "SubscriberModule.hpp"
+
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/subscriber/DataReader.hpp>
-#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 #include <fastdds/dds/subscriber/qos/SubscriberQos.hpp>
+#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
+#include <fastdds/dds/subscriber/DataReader.hpp>
+
+#include <fstream>
+#include <string>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastrtps::rtps;
@@ -132,16 +130,34 @@ bool SubscriberModule::init(
 
 bool SubscriberModule::run(
         bool notexit,
+        const uint32_t rescan_interval,
         uint32_t timeout)
 {
-    return run_for(notexit, std::chrono::milliseconds(timeout));
+    return run_for(notexit, rescan_interval, std::chrono::milliseconds(timeout));
 }
 
 bool SubscriberModule::run_for(
         bool notexit,
+        const uint32_t rescan_interval,
         const std::chrono::milliseconds& timeout)
 {
     bool returned_value = false;
+
+    std::thread net_rescan_thread([this, rescan_interval]()
+            {
+                if (rescan_interval > 0)
+                {
+                    auto interval = std::chrono::seconds(rescan_interval);
+                    while (run_)
+                    {
+                        std::this_thread::sleep_for(interval);
+                        if (run_)
+                        {
+                            participant_->set_qos(participant_->get_qos());
+                        }
+                    }
+                }
+            });
 
     while (notexit && run_)
     {
@@ -191,6 +207,9 @@ bool SubscriberModule::run_for(
         EPROSIMA_LOG_INFO(SUBSCRIBER_MODULE, "ERROR: detected more than " << publishers_ << " publishers");
         returned_value = false;
     }
+
+    run_ = false;
+    net_rescan_thread.join();
 
     return returned_value;
 }
@@ -262,11 +281,6 @@ void SubscriberModule::on_subscription_matched(
 void SubscriberModule::on_data_available(
         DataReader* reader)
 {
-    if (die_on_data_received_)
-    {
-        std::abort();
-    }
-
     EPROSIMA_LOG_INFO(SUBSCRIBER_MODULE, "Subscriber on_data_available from :" << participant_->guid());
 
     if (zero_copy_)

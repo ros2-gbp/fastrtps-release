@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.16.3)
 
 project(AdvancedConfigurationExample VERSION 1 LANGUAGES CXX)
 
@@ -22,7 +22,7 @@ if(NOT fastcdr_FOUND)
 endif()
 
 if(NOT fastrtps_FOUND)
-    find_package(fastrtps 2.12 REQUIRED)
+    find_package(fastrtps REQUIRED)
 endif()
 
 #Check C++11
@@ -49,5 +49,3 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} fastrtps fastcdr fastdds::optionparser)
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION examples/cpp/dds/${PROJECT_NAME}/${BIN_INSTALL_DIR})
-
-file(COPY shm_off.xml DESTINATION ${PROJECT_BINARY_DIR})

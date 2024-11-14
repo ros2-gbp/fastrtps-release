@@ -15,16 +15,10 @@
 #ifndef _FASTDDS_SHAREDMEM_LOG_H_
 #define _FASTDDS_SHAREDMEM_LOG_H_
 
-#include <thread>
-
-#include <fastdds/rtps/attributes/ThreadSettings.hpp>
 #include <fastdds/rtps/common/Locator.h>
 #include <fastrtps/utils/DBQueue.h>
-
 #include <rtps/transport/shared_mem/SharedMemManager.hpp>
 #include <utils/SystemInfo.hpp>
-#include <utils/thread.hpp>
-#include <utils/threading.hpp>
 
 namespace eprosima {
 namespace fastdds {
@@ -205,14 +199,6 @@ class PacketsLog
 {
 public:
 
-    PacketsLog(
-            uint32_t thread_id,
-            const ThreadSettings& thread_config)
-        : thread_id_(thread_id)
-        , thread_config_(thread_config)
-    {
-    }
-
     ~PacketsLog()
     {
         Flush();
@@ -250,7 +236,7 @@ public:
     {
         std::unique_lock<std::mutex> guard(resources_.cv_mutex);
 
-        if (!resources_.logging && !resources_.logging_thread.joinable())
+        if (!resources_.logging && !resources_.logging_thread)
         {
             // already killed
             return;
@@ -294,26 +280,31 @@ public:
             resources_.work = false;
         }
 
-        if (resources_.logging_thread.joinable())
+        if (resources_.logging_thread)
         {
             resources_.cv.notify_all();
-            resources_.logging_thread.join();
+            // The #ifdef workaround here is due to an unsolved MSVC bug, which Microsoft has announced
+            // they have no intention of solving: https://connect.microsoft.com/VisualStudio/feedback/details/747145
+            // Each VS version deals with post-main deallocation of threads in a very different way.
+    #if !defined(_WIN32) || defined(FASTRTPS_STATIC_LINK) || _MSC_VER >= 1800
+            resources_.logging_thread->join();
+    #endif // if !defined(_WIN32) || defined(FASTRTPS_STATIC_LINK) || _MSC_VER >= 1800
+            resources_.logging_thread.reset();
         }
     }
+
+    // Note: In VS2013, if you're linking this class statically, you will have to call KillThread before leaving
+    // main, due to an unsolved MSVC bug.
 
     void QueueLog(
             const typename TPacketConsumer::Pkt& packet)
     {
         {
             std::unique_lock<std::mutex> guard(resources_.cv_mutex);
-            if (!resources_.logging && !resources_.logging_thread.joinable())
+            if (!resources_.logging && !resources_.logging_thread)
             {
                 resources_.logging = true;
-                auto fn = [this]()
-                        {
-                            run();
-                        };
-                resources_.logging_thread = create_thread(fn, thread_config_, "dds.shmd.%u", thread_id_);
+                resources_.logging_thread.reset(new std::thread(&PacketsLog<TPacketConsumer>::run, this));
             }
         }
 
@@ -336,7 +327,7 @@ private:
     {
         eprosima::fastrtps::DBQueue<typename TPacketConsumer::Pkt> logs;
         std::vector<std::unique_ptr<SHMPacketFileConsumer>> consumers;
-        eprosima::thread logging_thread;
+        std::unique_ptr<std::thread> logging_thread;
 
         // Condition variable segment.
         std::condition_variable cv;
@@ -358,8 +349,6 @@ private:
     };
 
     Resources resources_;
-    uint32_t thread_id_;
-    ThreadSettings thread_config_;
 
     void run()
     {

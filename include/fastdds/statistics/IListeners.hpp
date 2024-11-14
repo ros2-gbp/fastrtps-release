@@ -27,6 +27,7 @@ namespace fastdds {
 namespace statistics {
 
 class Data;
+enum EventKind : uint32_t;
 
 struct IListener
 {

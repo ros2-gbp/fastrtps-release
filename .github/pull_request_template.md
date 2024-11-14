@@ -18,12 +18,6 @@
 -->
 
 <!--
-    In case of bug fixes, please provide the list of supported branches where this fix should be also merged.
-    Please uncomment following line, adjusting the corresponding target branches for the backport.
--->
-<!-- @Mergifyio backport 2.13.x 2.10.x -->
-
-<!--
     In case of critical bug fix, please uncomment following line, adjusting the corresponding LTS target branches for the backport.
 -->
 <!-- @Mergifyio backport 2.6.x -->

@@ -21,11 +21,9 @@
 
 #include "OwnershipStrengthPublisher.h"
 
-#include <chrono>
-#include <sstream>
-#include <thread>
-
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+
+#include <sstream>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastrtps::rtps;

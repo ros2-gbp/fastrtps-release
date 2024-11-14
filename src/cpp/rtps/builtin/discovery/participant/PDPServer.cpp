@@ -30,6 +30,7 @@
 #include <fastdds/rtps/participant/RTPSParticipantListener.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
 #include <fastdds/rtps/writer/StatefulWriter.h>
+#include <fastdds/rtps/transport/TCPTransportDescriptor.h>
 
 #include <fastdds/rtps/history/WriterHistory.h>
 #include <fastdds/rtps/history/ReaderHistory.h>
@@ -160,10 +161,7 @@ bool PDPServer::init(
     getRTPSParticipant()->enableReader(edp->publications_reader_.first);
 
     // Initialize server dedicated thread.
-    const RTPSParticipantAttributes& part_attr = getRTPSParticipant()->getRTPSParticipantAttributes();
-    uint32_t id_for_thread = static_cast<uint32_t>(part_attr.participantID);
-    const fastdds::rtps::ThreadSettings& thr_config = part_attr.discovery_server_thread;
-    resource_event_thread_.init_thread(thr_config, "dds.ds_ev.%u", id_for_thread);
+    resource_event_thread_.init_thread();
 
     /*
         Given the fact that a participant is either a client or a server the
@@ -505,11 +503,19 @@ bool PDPServer::create_ds_pdp_reliable_endpoints(
     {
         eprosima::shared_lock<eprosima::shared_mutex> disc_lock(mp_builtin->getDiscoveryMutex());
 
+        // TCP Clients need to handle logical ports
+        if (mp_RTPSParticipant->has_tcp_transports())
+        {
+            for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
+            {
+                mp_RTPSParticipant->create_tcp_connections(it.metatrafficUnicastLocatorList);
+            }
+        }
+
         for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
         {
-            auto entry = LocatorSelectorEntry::create_fully_selected_entry(
-                it.metatrafficUnicastLocatorList, it.metatrafficMulticastLocatorList);
-            mp_RTPSParticipant->createSenderResources(entry);
+            mp_RTPSParticipant->createSenderResources(it.metatrafficMulticastLocatorList);
+            mp_RTPSParticipant->createSenderResources(it.metatrafficUnicastLocatorList);
 
             if (!secure)
             {
@@ -1177,14 +1183,18 @@ void PDPServer::update_remote_servers_list()
 
     eprosima::shared_lock<eprosima::shared_mutex> disc_lock(mp_builtin->getDiscoveryMutex());
 
+    // TCP Clients need to handle logical ports
+    bool set_logicals = mp_RTPSParticipant->has_tcp_transports();
+
     for (const eprosima::fastdds::rtps::RemoteServerAttributes& it : mp_builtin->m_DiscoveryServers)
     {
         if (!endpoints->reader.reader_->matched_writer_is_matched(it.GetPDPWriter()) ||
                 !endpoints->writer.writer_->matched_reader_is_matched(it.GetPDPReader()))
         {
-            auto entry = LocatorSelectorEntry::create_fully_selected_entry(
-                it.metatrafficUnicastLocatorList, it.metatrafficMulticastLocatorList);
-            mp_RTPSParticipant->createSenderResources(entry);
+            if (set_logicals)
+            {
+                mp_RTPSParticipant->create_tcp_connections(it.metatrafficUnicastLocatorList);
+            }
         }
 
         if (!endpoints->reader.reader_->matched_writer_is_matched(it.GetPDPWriter()))

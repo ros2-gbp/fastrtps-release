@@ -75,22 +75,10 @@ detail::Locator_s to_statistics_type(
     return *reinterpret_cast<detail::Locator_s*>(&locator);
 }
 
-fastrtps::rtps::Locator_t to_fastdds_type(
-        detail::Locator_s locator)
-{
-    return *reinterpret_cast<fastrtps::rtps::Locator_t*>(&locator);
-}
-
 detail::GUID_s to_statistics_type(
         fastrtps::rtps::GUID_t guid)
 {
     return *reinterpret_cast<detail::GUID_s*>(&guid);
-}
-
-fastrtps::rtps::GUID_t to_fastdds_type(
-        detail::GUID_s guid)
-{
-    return *reinterpret_cast<fastrtps::rtps::GUID_t*>(&guid);
 }
 
 detail::SampleIdentity_s to_statistics_type(
@@ -394,7 +382,7 @@ void StatisticsParticipantImpl::process_network_timestamp(
 {
     using namespace eprosima::fastrtps::rtps;
 
-    if (!are_statistics_writers_enabled(EventKindBits::NETWORK_LATENCY))
+    if (!are_statistics_writers_enabled(EventKind::NETWORK_LATENCY))
     {
         return;
     }
@@ -432,7 +420,7 @@ void StatisticsParticipantImpl::process_network_sequence(
         const rtps::StatisticsSubmessageData::Sequence& seq,
         uint64_t datagram_size)
 {
-    if (!are_statistics_writers_enabled(EventKindBits::RTPS_LOST))
+    if (!are_statistics_writers_enabled(EventKind::RTPS_LOST))
     {
         return;
     }
@@ -490,7 +478,7 @@ void StatisticsParticipantImpl::process_network_sequence(
         Data data;
         // note that the setter sets RTPS_SENT by default
         data.entity2locator_traffic(notification);
-        data._d(EventKindBits::RTPS_LOST);
+        data._d(EventKind::RTPS_LOST);
 
         for_each_listener([&data](const Key& listener)
                 {
@@ -506,7 +494,7 @@ void StatisticsParticipantImpl::on_rtps_sent(
     using namespace std;
     using eprosima::fastrtps::rtps::RTPSParticipantImpl;
 
-    if (!are_statistics_writers_enabled(EventKindBits::RTPS_SENT))
+    if (!are_statistics_writers_enabled(EventKind::RTPS_SENT))
     {
         return;
     }
@@ -542,7 +530,7 @@ void StatisticsParticipantImpl::on_entity_discovery(
 {
     using namespace fastrtps;
 
-    if (!are_statistics_writers_enabled(EventKindBits::DISCOVERED_ENTITY))
+    if (!are_statistics_writers_enabled(EventKind::DISCOVERED_ENTITY))
     {
         return;
     }
@@ -601,7 +589,7 @@ void StatisticsParticipantImpl::on_entity_discovery(
 void StatisticsParticipantImpl::on_pdp_packet(
         const uint32_t packages)
 {
-    if (!are_statistics_writers_enabled(EventKindBits::PDP_PACKETS))
+    if (!are_statistics_writers_enabled(EventKind::PDP_PACKETS))
     {
         return;
     }
@@ -619,7 +607,7 @@ void StatisticsParticipantImpl::on_pdp_packet(
     Data data;
     // note that the setter sets RESENT_DATAS by default
     data.entity_count(notification);
-    data._d(EventKindBits::PDP_PACKETS);
+    data._d(EventKind::PDP_PACKETS);
 
     for_each_listener([&data](const std::shared_ptr<IListener>& listener)
             {
@@ -630,7 +618,7 @@ void StatisticsParticipantImpl::on_pdp_packet(
 void StatisticsParticipantImpl::on_edp_packet(
         const uint32_t packages)
 {
-    if (!are_statistics_writers_enabled(EventKindBits::EDP_PACKETS))
+    if (!are_statistics_writers_enabled(EventKind::EDP_PACKETS))
     {
         return;
     }
@@ -648,7 +636,7 @@ void StatisticsParticipantImpl::on_edp_packet(
     Data data;
     // note that the setter sets RESENT_DATAS by default
     data.entity_count(notification);
-    data._d(EventKindBits::EDP_PACKETS);
+    data._d(EventKind::EDP_PACKETS);
 
     for_each_listener([&data](const std::shared_ptr<IListener>& listener)
             {

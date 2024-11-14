@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
-
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-
-#include <fastdds/rtps/transport/PortBasedTransportDescriptor.hpp>
 #include <fastdds/rtps/transport/TransportInterface.h>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 
 using namespace eprosima::fastdds::rtps;
 
@@ -37,7 +33,7 @@ static constexpr uint32_t shm_default_healthy_check_timeout_ms = 1000;
 // SharedMemTransportDescriptor
 //*********************************************************
 SharedMemTransportDescriptor::SharedMemTransportDescriptor()
-    : PortBasedTransportDescriptor(shm_default_segment_size, s_maximumInitialPeersRange)
+    : TransportDescriptorInterface(shm_default_segment_size, s_maximumInitialPeersRange)
     , segment_size_(shm_default_segment_size)
     , port_queue_capacity_(shm_default_port_queue_capacity)
     , healthy_check_timeout_ms_(shm_default_healthy_check_timeout_ms)
@@ -53,8 +49,7 @@ bool SharedMemTransportDescriptor::operator ==(
            this->port_queue_capacity_ == t.port_queue_capacity() &&
            this->healthy_check_timeout_ms_ == t.healthy_check_timeout_ms() &&
            this->rtps_dump_file_ == t.rtps_dump_file() &&
-           this->dump_thread_ == t.dump_thread() &&
-           PortBasedTransportDescriptor::operator ==(t));
+           TransportDescriptorInterface::operator ==(t));
 }
 
 #ifdef FASTDDS_SHM_TRANSPORT_DISABLED

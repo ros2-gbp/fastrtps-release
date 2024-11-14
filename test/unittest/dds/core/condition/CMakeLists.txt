@@ -32,59 +32,36 @@ set(CONDITION_TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/StatusConditionImpl.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/WaitSet.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/WaitSetImpl.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${LOG_SOURCES}
     ConditionTests.cpp)
 
 add_executable(ConditionTests ${CONDITION_TESTS_SOURCE})
 target_compile_definitions(ConditionTests PRIVATE
-    BOOST_ASIO_STANDALONE
-    ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(ConditionTests PRIVATE
-    ${Asio_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_BINARY_DIR}/include
     ${PROJECT_SOURCE_DIR}/src/cpp
     )
 target_link_libraries(ConditionTests GTest::gtest)
-gtest_discover_tests(ConditionTests)
+add_gtest(ConditionTests SOURCES ${CONDITION_TESTS_SOURCE})
 
 ### ConditionNotifier ###
 set(CONDITION_NOTIFIER_TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/Condition.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/ConditionNotifier.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${LOG_SOURCES}
     ConditionNotifierTests.cpp)
 
 add_executable(ConditionNotifierTests ${CONDITION_NOTIFIER_TESTS_SOURCE})
 target_compile_definitions(ConditionNotifierTests PRIVATE
-    BOOST_ASIO_STANDALONE
-    ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(ConditionNotifierTests PRIVATE
-    ${Asio_INCLUDE_DIR}
     mock/WaitSetImpl
     ${GTEST_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/include
@@ -92,34 +69,23 @@ target_include_directories(ConditionNotifierTests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp
     )
 target_link_libraries(ConditionNotifierTests GTest::gtest GTest::gmock)
-gtest_discover_tests(ConditionNotifierTests)
+add_gtest(ConditionNotifierTests SOURCES ${CONDITION_NOTIFIER_TESTS_SOURCE})
 
 ### StatusConditionImpl ###
 set(STATUS_CONDITION_IMPL_TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/Condition.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/StatusCondition.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/StatusConditionImpl.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${LOG_SOURCES}
     StatusConditionImplTests.cpp)
 
 add_executable(StatusConditionImplTests ${STATUS_CONDITION_IMPL_TESTS_SOURCE})
 target_compile_definitions(StatusConditionImplTests PRIVATE
-    BOOST_ASIO_STANDALONE
-    ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(StatusConditionImplTests PRIVATE
-    ${Asio_INCLUDE_DIR}
     mock/ConditionNotifier
     ${GTEST_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/include
@@ -127,33 +93,22 @@ target_include_directories(StatusConditionImplTests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp
     )
 target_link_libraries(StatusConditionImplTests GTest::gtest GTest::gmock)
-gtest_discover_tests(StatusConditionImplTests)
+add_gtest(StatusConditionImplTests SOURCES ${STATUS_CONDITION_IMPL_TESTS_SOURCE})
 
 ### WaitSetImpl ###
 set(WAITSET_IMPL_TESTS_SOURCE
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/Condition.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/core/condition/WaitSetImpl.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/LocatorWithMask.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/netmask_filter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/network/utils/network.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetmaskFilterKind.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/transport/network/NetworkInterfaceWithFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
     ${LOG_SOURCES}
     WaitSetImplTests.cpp)
 
 add_executable(WaitSetImplTests ${WAITSET_IMPL_TESTS_SOURCE})
 target_compile_definitions(WaitSetImplTests PRIVATE
-    BOOST_ASIO_STANDALONE
-    ASIO_STANDALONE
     $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(WaitSetImplTests PRIVATE
-    ${Asio_INCLUDE_DIR}
     mock/ConditionNotifier
     ${GTEST_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/include
@@ -161,4 +116,11 @@ target_include_directories(WaitSetImplTests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp
     )
 target_link_libraries(WaitSetImplTests GTest::gtest GTest::gmock)
-gtest_discover_tests(WaitSetImplTests)
+add_gtest(WaitSetImplTests SOURCES ${WAITSET_IMPL_TESTS_SOURCE})
+
+if(ANDROID)
+    set_property(TARGET ConditionTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET ConditionNotifierTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET StatusConditionImplTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+    set_property(TARGET WaitSetImplTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
+endif()

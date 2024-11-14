@@ -33,14 +33,10 @@
 
 #include <fastdds/core/policy/ParameterList.hpp>
 #include <rtps/builtin/discovery/participant/PDPEndpoints.hpp>
-#include <rtps/network/utils/external_locators.hpp>
+#include <rtps/network/ExternalLocatorsProcessor.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <mutex>
-
-#ifdef FASTDDS_STATISTICS
-#include <statistics/rtps/monitor-service/interfaces/IConnectionsObserver.hpp>
-#endif //FASTDDS_STATISTICS
 
 using ParameterList = eprosima::fastdds::dds::ParameterList;
 
@@ -107,7 +103,7 @@ void PDPListener::onNewCacheChangeAdded(
         CDRMessage_t msg(change->serializedPayload);
         temp_participant_data_.clear();
         if (temp_participant_data_.readFromCDRMessage(&msg, true, parent_pdp_->getRTPSParticipant()->network_factory(),
-                parent_pdp_->getRTPSParticipant()->has_shm_transport(), true, change_in->vendor_id))
+                parent_pdp_->getRTPSParticipant()->has_shm_transport()))
         {
             // After correctly reading it
             change->instanceHandle = temp_participant_data_.m_key;
@@ -120,7 +116,7 @@ void PDPListener::onNewCacheChangeAdded(
 
             // Filter locators
             const auto& pattr = parent_pdp_->getRTPSParticipant()->getAttributes();
-            fastdds::rtps::network::external_locators::filter_remote_locators(temp_participant_data_,
+            fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators(temp_participant_data_,
                     pattr.builtin.metatraffic_external_unicast_locators, pattr.default_external_unicast_locators,
                     pattr.ignore_non_matching_locators);
 
@@ -160,15 +156,6 @@ void PDPListener::onNewCacheChangeAdded(
         reader->getMutex().unlock();
         if (parent_pdp_->remove_remote_participant(guid, ParticipantDiscoveryInfo::REMOVED_PARTICIPANT))
         {
-#ifdef FASTDDS_STATISTICS
-            //! Removal of a participant proxy should trigger
-            //! a connections update on the local participant connection list
-            if (nullptr != parent_pdp_->getRTPSParticipant()->get_connections_observer())
-            {
-                parent_pdp_->getRTPSParticipant()->get_connections_observer()->on_local_entity_connections_change(
-                    parent_pdp_->getRTPSParticipant()->getGuid());
-            }
-#endif //FASTDDS_STATISTICS
             reader->getMutex().lock();
             // All changes related with this participant have been removed from history by remove_remote_participant
             return;
@@ -263,16 +250,6 @@ void PDPListener::process_alive_data(
             }
         }
     }
-
-#ifdef FASTDDS_STATISTICS
-    //! Addition or update of a participant proxy should trigger
-    //! a connections update on the local participant connection list
-    if (nullptr != parent_pdp_->getRTPSParticipant()->get_connections_observer())
-    {
-        parent_pdp_->getRTPSParticipant()->get_connections_observer()->on_local_entity_connections_change(
-            parent_pdp_->getRTPSParticipant()->getGuid());
-    }
-#endif //FASTDDS_STATISTICS
 
     // Take again the reader lock
     reader->getMutex().lock();

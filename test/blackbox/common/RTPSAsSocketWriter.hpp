@@ -136,29 +136,17 @@ public:
             eprosima::fastrtps::rtps::CacheChange_t* ch = writer_->new_change([&]() -> uint32_t
                             {
                                 size_t current_alignment =  4 + magicword_.size() + 1;
-#if FASTCDR_VERSION_MAJOR == 1
                                 return (uint32_t)(current_alignment + type::getCdrSerializedSize(*it,
                                 current_alignment));
-#else
-                                eprosima::fastcdr::CdrSizeCalculator calculator(eprosima::fastdds::rtps::
-                                        DEFAULT_XCDR_VERSION);
-                                return (uint32_t)(current_alignment +
-                                calculator.calculate_serialized_size(*it, current_alignment));
-#endif // FASTCDR_VERSION_MAJOR == 1
                             }
                             , eprosima::fastrtps::rtps::ALIVE);
 
             eprosima::fastcdr::FastBuffer buffer((char*)ch->serializedPayload.data, ch->serializedPayload.max_size);
-            eprosima::fastcdr::Cdr cdr(buffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
-                    eprosima::fastcdr::CdrVersion::DDS_CDR);
+            eprosima::fastcdr::Cdr cdr(buffer);
 
             cdr << magicword_;
             cdr << *it;
-#if FASTCDR_VERSION_MAJOR == 1
             ch->serializedPayload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
-#else
-            ch->serializedPayload.length = static_cast<uint32_t>(cdr.get_serialized_data_length());
-#endif // FASTCDR_VERSION_MAJOR == 1
 
             history_->add_change(ch);
             it = msgs.erase(it);

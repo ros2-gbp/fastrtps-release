@@ -28,8 +28,7 @@ enum class NodeType
     LOG,
     REQUESTER,
     REPLIER,
-    LIBRARY_SETTINGS,
-    DOMAINPARTICIPANT_FACTORY
+    LIBRARY_SETTINGS
 };
 
 class BaseNode

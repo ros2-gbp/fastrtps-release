@@ -184,11 +184,9 @@ const EntityId_t& get_entity_id(
 
 RTPSMessageGroup::RTPSMessageGroup(
         RTPSParticipantImpl* participant,
-        bool internal_buffer,
-        std::chrono::steady_clock::time_point max_blocking_time_point)
+        bool internal_buffer)
     : participant_(participant)
-    , max_blocking_time_point_(max_blocking_time_point)
-    , send_buffer_(!internal_buffer ? participant->get_send_buffer(max_blocking_time_point) : nullptr)
+    , send_buffer_(!internal_buffer ? participant->get_send_buffer() : nullptr)
     , internal_buffer_(internal_buffer)
 {
     // Avoid warning when neither SECURITY nor DEBUG is used
@@ -233,12 +231,14 @@ RTPSMessageGroup::RTPSMessageGroup(
         Endpoint* endpoint,
         RTPSMessageSenderInterface* msg_sender,
         std::chrono::steady_clock::time_point max_blocking_time_point)
-    : RTPSMessageGroup(participant, false, max_blocking_time_point)
+    : RTPSMessageGroup(participant)
 {
     assert(endpoint);
 
     endpoint_ = endpoint;
     sender_ = msg_sender;
+    max_blocking_time_point_ = max_blocking_time_point;
+    max_blocking_time_is_set_ = true;
 }
 
 RTPSMessageGroup::~RTPSMessageGroup() noexcept(false)
@@ -311,7 +311,8 @@ void RTPSMessageGroup::send()
             eprosima::fastdds::statistics::rtps::add_statistics_submessage(msgToSend);
 
             if (!sender_->send(msgToSend,
-                    max_blocking_time_point_))
+                    max_blocking_time_is_set_ ? max_blocking_time_point_ : (std::chrono::steady_clock::now() +
+                    std::chrono::hours(24))))
             {
                 throw timeout();
             }

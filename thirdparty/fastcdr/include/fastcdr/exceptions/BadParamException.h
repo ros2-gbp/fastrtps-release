@@ -21,7 +21,7 @@ namespace eprosima {
 namespace fastcdr {
 namespace exception {
 /*!
- * @brief This class is thrown as an exception when an invalid parameter is being serialized.
+ * @brief This class is thrown as an exception when a invalid parameter was being serialized.
  * @ingroup EXCEPTIONMODULE
  */
 class BadParamException : public Exception
@@ -31,7 +31,7 @@ public:
     /*!
      * @brief Default constructor.
      *
-     * @param message An error message. This message pointer is copied.
+     * @param message A error message. This message pointer is copied.
      */
     Cdr_DllAPI BadParamException(
             const char* const& message) noexcept;
@@ -44,6 +44,7 @@ public:
     Cdr_DllAPI BadParamException(
             const BadParamException& ex) noexcept;
 
+#if HAVE_CXX0X
     /*!
      * @brief Default move constructor.
      *
@@ -51,6 +52,7 @@ public:
      */
     Cdr_DllAPI BadParamException(
             BadParamException&& ex) noexcept;
+#endif // if HAVE_CXX0X
 
     /*!
      * @brief Assigment operation.
@@ -60,6 +62,7 @@ public:
     Cdr_DllAPI BadParamException& operator =(
             const BadParamException& ex) noexcept;
 
+#if HAVE_CXX0X
     /*!
      * @brief Assigment operation.
      *
@@ -67,12 +70,13 @@ public:
      */
     BadParamException& operator =(
             BadParamException&& ex) noexcept;
+#endif // if HAVE_CXX0X
 
-    //! @brief Default destructor
+    //! @brief Default constructor
     virtual Cdr_DllAPI ~BadParamException() noexcept;
 
     //! @brief This function throws the object as exception.
-    Cdr_DllAPI void raise() const override;
+    virtual Cdr_DllAPI void raise() const;
 
     //! @brief Default message used in the library.
     static Cdr_DllAPI const char* const BAD_PARAM_MESSAGE_DEFAULT;

@@ -17,7 +17,6 @@
 
 #include <atomic>
 #include <list>
-#include <thread>
 #include <unordered_map>
 
 #include <foonathan/memory/container.hpp>
@@ -737,11 +736,6 @@ public:
                     global_port_->pop(*global_listener_, was_cell_freed);
 
                     auto segment = shared_mem_manager_->find_segment(buffer_descriptor.source_segment_id);
-                    if (!segment)
-                    {
-                        // Descriptor points to non-existing segment: discard
-                        continue;
-                    }
                     auto buffer_node =
                             static_cast<BufferNode*>(segment->get_address_from_offset(buffer_descriptor.
                                     buffer_node_offset));
@@ -1311,14 +1305,7 @@ private:
         else // Is a new segment
         {
             auto segment_name = global_segment_.domain_name() + "_" + id.to_string();
-            try
-            {
-                segment = std::make_shared<SharedMemSegment>(boost::interprocess::open_only, segment_name);
-            }
-            catch (std::exception&)
-            {
-                return segment;
-            }
+            segment = std::make_shared<SharedMemSegment>(boost::interprocess::open_only, segment_name);
             auto segment_wrapper = std::make_shared<SegmentWrapper>(shared_from_this(), segment, id, segment_name);
 
             ids_segments_[id.get()] = segment_wrapper;
