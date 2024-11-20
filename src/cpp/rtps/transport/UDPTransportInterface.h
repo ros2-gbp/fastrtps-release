@@ -49,7 +49,7 @@ public:
             const Locator&) override;
 
     //! Removes all outbound sockets on the given port.
-    void CloseOutputChannel(
+    void SenderResourceHasBeenClosed(
             eProsimaUDPSocket& socket);
 
     //! Reports whether Locators correspond to the same port.
@@ -282,6 +282,7 @@ protected:
             bool return_loopback = false);
 
     std::atomic_bool rescan_interfaces_ = {true};
+
 };
 
 } // namespace rtps

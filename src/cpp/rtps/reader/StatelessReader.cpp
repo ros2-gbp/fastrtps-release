@@ -18,23 +18,23 @@
  */
 
 #include <fastdds/rtps/reader/StatelessReader.h>
-#include <fastdds/rtps/history/ReaderHistory.h>
-#include <fastdds/rtps/reader/ReaderListener.h>
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/common/CacheChange.h>
-#include <fastdds/rtps/builtin/BuiltinProtocols.h>
-#include <fastdds/rtps/builtin/liveliness/WLP.h>
-#include <fastdds/rtps/writer/LivelinessManager.h>
-#include <rtps/participant/RTPSParticipantImpl.h>
-#include <rtps/DataSharing/DataSharingListener.hpp>
-#include <rtps/DataSharing/ReaderPool.hpp>
 
-#include "rtps/RTPSDomainImpl.hpp"
-
+#include <cassert>
 #include <mutex>
 #include <thread>
 
-#include <cassert>
+#include "reader_utils.hpp"
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/builtin/BuiltinProtocols.h>
+#include <fastdds/rtps/builtin/liveliness/WLP.h>
+#include <fastdds/rtps/common/CacheChange.h>
+#include <fastdds/rtps/history/ReaderHistory.h>
+#include <fastdds/rtps/reader/ReaderListener.h>
+#include <fastdds/rtps/writer/LivelinessManager.h>
+#include <rtps/DataSharing/DataSharingListener.hpp>
+#include <rtps/DataSharing/ReaderPool.hpp>
+#include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/RTPSDomainImpl.hpp>
 
 #define IDSTRING "(ID:" << std::this_thread::get_id() << ") " <<
 
@@ -194,10 +194,21 @@ bool StatelessReader::matched_writer_remove(
         auto wlp = mp_RTPSParticipant->wlp();
         if ( wlp != nullptr)
         {
+            LivelinessData::WriterStatus writer_liveliness_status;
             wlp->sub_liveliness_manager_->remove_writer(
                 writer_guid,
                 liveliness_kind_,
-                liveliness_lease_duration_);
+                liveliness_lease_duration_,
+                writer_liveliness_status);
+
+            if (writer_liveliness_status == LivelinessData::WriterStatus::ALIVE)
+            {
+                wlp->update_liveliness_changed_status(writer_guid, this, -1, 0);
+            }
+            else if (writer_liveliness_status == LivelinessData::WriterStatus::NOT_ALIVE)
+            {
+                wlp->update_liveliness_changed_status(writer_guid, this, 0, -1);
+            }
         }
         else
         {
@@ -470,9 +481,10 @@ bool StatelessReader::processDataMsg(
                 return false;
             }
 
-            if (data_filter_ && !data_filter_->is_relevant(*change, m_guid))
+            if (!fastdds::rtps::change_is_relevant_for_filter(*change, m_guid, data_filter_))
             {
                 update_last_notified(change->writerGUID, change->sequenceNumber);
+                // Change was filtered out, so there isn't anything else to do
                 return true;
             }
 
@@ -600,6 +612,26 @@ bool StatelessReader::processDataFragMsg(
                 {
                     if (work_change->sequenceNumber < change_to_add->sequenceNumber)
                     {
+                        SequenceNumber_t updated_seq = work_change->sequenceNumber;
+                        SequenceNumber_t previous_seq{ 0, 0 };
+                        previous_seq = update_last_notified(writer_guid, updated_seq);
+
+                        // Notify lost samples
+                        auto listener = getListener();
+                        if (listener != nullptr)
+                        {
+                            if (SequenceNumber_t{ 0, 0 } != previous_seq)
+                            {
+                                assert(previous_seq < updated_seq);
+                                uint64_t tmp = (updated_seq - previous_seq).to64long();
+                                int32_t lost_samples =
+                                        tmp > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()) ?
+                                        std::numeric_limits<int32_t>::max() : static_cast<int32_t>(tmp);
+                                assert (0 < lost_samples);
+                                listener->on_sample_lost(this, lost_samples);
+                            }
+                        }
+
                         // Pending change should be dropped. Check if it can be reused
                         if (sampleSize <= work_change->serializedPayload.max_size)
                         {
@@ -663,7 +695,8 @@ bool StatelessReader::processDataFragMsg(
                 {
                     // Temporarilly assign the inline qos while evaluating the data filter
                     change_completed->inline_qos = incomingChange->inline_qos;
-                    bool filtered_out = data_filter_ && !data_filter_->is_relevant(*change_completed, m_guid);
+                    bool filtered_out = !fastdds::rtps::change_is_relevant_for_filter(*change_completed, m_guid,
+                                    data_filter_);
                     change_completed->inline_qos = SerializedPayload_t();
 
                     if (filtered_out)

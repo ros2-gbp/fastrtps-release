@@ -144,9 +144,35 @@ public:
             size_t size,
             asio::error_code& ec) = 0;
 
+    /**
+     * @brief Gets the remote endpoint of the socket connection.
+     * @throws Exception on failure.
+     * @return asio::ip::tcp::endpoint of the remote endpoint.
+     */
     virtual asio::ip::tcp::endpoint remote_endpoint() const = 0;
 
+    /**
+     * @brief Gets the local endpoint of the socket connection.
+     * @throws Exception on failure.
+     * @return asio::ip::tcp::endpoint of the local endpoint.
+     */
     virtual asio::ip::tcp::endpoint local_endpoint() const = 0;
+
+    /**
+     * @brief Gets the remote endpoint, setting error code if any.
+     * @param ec Set to indicate what error occurred, if any.
+     * @return asio::ip::tcp::endpoint of the remote endpoint or returns a default-constructed endpoint object if an error occurred.
+     */
+    virtual asio::ip::tcp::endpoint remote_endpoint(
+            asio::error_code& ec) const = 0;
+
+    /**
+     * @brief Gets the local endpoint, setting error code if any.
+     * @param ec Set to indicate what error occurred, if any.
+     * @return asio::ip::tcp::endpoint of the remote endpoint or returns a default-constructed endpoint object if an error occurred.
+     */
+    virtual asio::ip::tcp::endpoint local_endpoint(
+            asio::error_code& ec) const = 0;
 
     virtual void set_options(
             const TCPTransportDescriptor* options) = 0;
@@ -207,6 +233,16 @@ protected:
     bool check_socket_send_buffer(
             const size_t& msg_size,
             const asio::ip::tcp::socket::native_handle_type& socket_native_handle);
+
+    /**
+     * @brief Set descriptor options on a socket.
+     *
+     * @param socket Socket on which to set the options.
+     * @param options Descriptor with the options to set.
+     */
+    static void set_socket_options(
+            asio::basic_socket<asio::ip::tcp>& socket,
+            const TCPTransportDescriptor* options);
 
     TCPConnectionType tcp_connection_type_;
 
