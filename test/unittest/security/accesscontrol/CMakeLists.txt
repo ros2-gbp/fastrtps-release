@@ -99,9 +99,7 @@ target_link_libraries(AccessControlTests
     ${TINYXML2_LIBRARY}
     $<$<BOOL:${LibP11_FOUND}>:eProsima_p11>  # $<TARGET_NAME_IF_EXISTS:eProsima_p11>
     )
-if(QNX)
-    target_link_libraries(AccessControlTests socket)
-endif()
+
 if(MSVC OR MSVC_IDE)
     target_link_libraries(AccessControlTests ${PRIVACY} iphlpapi Shlwapi)
 endif()
@@ -110,7 +108,3 @@ endif()
 add_gtest(AccessControlTests
     SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AccessControlTests.cpp
     ENVIRONMENTS "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs")
-
-if(ANDROID)
-    set_property(TARGET AccessControlTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()

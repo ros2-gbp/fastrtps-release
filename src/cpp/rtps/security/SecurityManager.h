@@ -519,11 +519,6 @@ private:
             return participant_data_;
         }
 
-        bool check_guid_comes_from(
-                Authentication* const auth_plugin,
-                const GUID_t& adjusted,
-                const GUID_t& original);
-
         AuthenticationStatus get_auth_status() const
         {
             std::lock_guard<std::mutex> g(mtx_);
@@ -535,8 +530,12 @@ private:
             {
                 return AUTHENTICATION_NOT_AVAILABLE;
             }
-
         }
+
+        bool check_guid_comes_from(
+                Authentication* const auth_plugin,
+                const GUID_t& adjusted,
+                const GUID_t& original);
 
     private:
 

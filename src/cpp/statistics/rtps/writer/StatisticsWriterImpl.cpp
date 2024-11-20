@@ -19,15 +19,12 @@
 #include <statistics/rtps/StatisticsBase.hpp>
 
 #include <fastdds/rtps/writer/RTPSWriter.h>
-#include <statistics/types/types.h>
+
+using namespace eprosima::fastdds::statistics;
 
 using eprosima::fastrtps::RecursiveTimedMutex;
 using eprosima::fastrtps::rtps::RTPSWriter;
 using eprosima::fastrtps::rtps::GUID_t;
-
-namespace eprosima {
-namespace fastdds {
-namespace statistics {
 
 StatisticsWriterImpl::StatisticsWriterImpl()
 {
@@ -64,14 +61,9 @@ const GUID_t& StatisticsWriterImpl::get_guid() const
 }
 
 void StatisticsWriterImpl::on_sample_datas(
-        const fastrtps::rtps::SampleIdentity& sample_identity,
+        const eprosima::fastrtps::rtps::SampleIdentity& sample_identity,
         size_t num_sent_submessages)
 {
-    if (!are_statistics_writers_enabled(EventKind::SAMPLE_DATAS))
-    {
-        return;
-    }
-
     SampleIdentityCount notification;
     notification.sample_id(to_statistics_type(sample_identity));
     notification.count(static_cast<uint64_t>(num_sent_submessages));
@@ -97,11 +89,6 @@ void StatisticsWriterImpl::on_data_generated(
 
 void StatisticsWriterImpl::on_data_sent()
 {
-    if (!are_statistics_writers_enabled(EventKind::DATA_COUNT))
-    {
-        return;
-    }
-
     EntityCount notification;
     notification.guid(to_statistics_type(get_guid()));
 
@@ -126,11 +113,6 @@ void StatisticsWriterImpl::on_data_sent()
 void StatisticsWriterImpl::on_heartbeat(
         uint32_t count)
 {
-    if (!are_statistics_writers_enabled(EventKind::HEARTBEAT_COUNT))
-    {
-        return;
-    }
-
     EntityCount notification;
     notification.guid(to_statistics_type(get_guid()));
     notification.count(count);
@@ -149,11 +131,6 @@ void StatisticsWriterImpl::on_heartbeat(
 
 void StatisticsWriterImpl::on_gap()
 {
-    if (!are_statistics_writers_enabled(EventKind::GAP_COUNT))
-    {
-        return;
-    }
-
     EntityCount notification;
     notification.guid(to_statistics_type(get_guid()));
 
@@ -178,11 +155,6 @@ void StatisticsWriterImpl::on_resent_data(
         uint32_t to_send)
 {
     if ( 0 == to_send )
-    {
-        return;
-    }
-
-    if (!are_statistics_writers_enabled(EventKind::RESENT_DATAS))
     {
         return;
     }
@@ -214,11 +186,6 @@ void StatisticsWriterImpl::on_publish_throughput(
 
     if (payload > 0 )
     {
-        if (!are_statistics_writers_enabled(EventKind::PUBLICATION_THROUGHPUT))
-        {
-            return;
-        }
-
         // update state
         time_point<steady_clock> former_timepoint;
         auto& current_timepoint = get_members()->last_history_change_;
@@ -243,7 +210,3 @@ void StatisticsWriterImpl::on_publish_throughput(
                 });
     }
 }
-
-}  // namespace statistics
-}  // namespace fastdds
-}  // namespace eprosima

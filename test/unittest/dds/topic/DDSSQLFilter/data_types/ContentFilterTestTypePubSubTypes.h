@@ -47,7 +47,7 @@ public:
 
     eProsima_user_DllExport StructTypePubSubType();
 
-    eProsima_user_DllExport virtual ~StructTypePubSubType() override;
+    eProsima_user_DllExport virtual ~StructTypePubSubType();
 
     eProsima_user_DllExport virtual bool serialize(
             void* data,
@@ -113,7 +113,7 @@ public:
 
     eProsima_user_DllExport ContentFilterTestTypePubSubType();
 
-    eProsima_user_DllExport virtual ~ContentFilterTestTypePubSubType() override;
+    eProsima_user_DllExport virtual ~ContentFilterTestTypePubSubType();
 
     eProsima_user_DllExport virtual bool serialize(
             void* data,

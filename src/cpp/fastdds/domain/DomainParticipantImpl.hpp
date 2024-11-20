@@ -20,11 +20,6 @@
 #ifndef _FASTDDS_PARTICIPANTIMPL_HPP_
 #define _FASTDDS_PARTICIPANTIMPL_HPP_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-
-#include <atomic>
-#include <mutex>
-#include <condition_variable>
-
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/participant/RTPSParticipantListener.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
@@ -42,7 +37,6 @@
 #include <fastrtps/types/TypesBase.h>
 
 #include "fastdds/topic/DDSSQLFilter/DDSFilterFactory.hpp"
-#include <fastdds/topic/TopicProxyFactory.hpp>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
@@ -108,34 +102,14 @@ public:
             const DomainParticipantQos& qos);
 
     ReturnCode_t set_listener(
-            DomainParticipantListener* listener,
-            const std::chrono::seconds timeout = std::chrono::seconds::max())
+            DomainParticipantListener* listener)
     {
-        auto time_out = std::chrono::time_point<std::chrono::system_clock>::max();
-        if (timeout < std::chrono::seconds::max())
-        {
-            auto now = std::chrono::system_clock::now();
-            time_out = now + timeout;
-        }
-
-        std::unique_lock<std::mutex> lock(mtx_gs_);
-        if (!cv_gs_.wait_until(lock, time_out, [this]
-                {
-                    // Proceed if no callbacks are being executed
-                    return !(rtps_listener_.callback_counter_ > 0);
-                }))
-        {
-            return ReturnCode_t::RETCODE_ERROR;
-        }
-
-        rtps_listener_.callback_counter_ = (listener == nullptr) ? -1 : 0;
         listener_ = listener;
         return ReturnCode_t::RETCODE_OK;
     }
 
-    DomainParticipantListener* get_listener() const
+    const DomainParticipantListener* get_listener() const
     {
-        std::lock_guard<std::mutex> _(mtx_gs_);
         return listener_;
     }
 
@@ -239,37 +213,6 @@ public:
             TopicListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all());
 
-    /**
-     * Gives access to an existing (or ready to exist) enabled Topic.
-     * It should be noted that the returned Topic is a local object that acts as a proxy to designate the global
-     * concept of topic.
-     * Topics obtained by means of find_topic, must also be deleted by means of delete_topic so that the local
-     * resources can be released.
-     * If a Topic is obtained multiple times by means of find_topic or create_topic, it must also be deleted that same
-     * number of times using delete_topic.
-     *
-     * @param topic_name Topic name
-     * @param timeout Maximum time to wait for the Topic
-     * @return Pointer to the existing Topic, nullptr in case of error or timeout
-     */
-    Topic* find_topic(
-            const std::string& topic_name,
-            const fastrtps::Duration_t& timeout);
-
-    /**
-     * Implementation of Topic::set_listener that propagates the listener and mask to all the TopicProxy
-     * objects held by the same TopicProxy factory in a thread-safe way.
-     *
-     * @param factory  TopicProxyFactory managing the topic on which the listener should be changed.
-     * @param listener Listener to assign to all the TopicProxy objects owned by the factory.
-     * @param mask     StatusMask to assign to all the TopicProxy objects owned by the factory.
-     */
-    void set_topic_listener(
-            const TopicProxyFactory* factory,
-            TopicImpl* topic,
-            TopicListener* listener,
-            const StatusMask& mask);
-
     ReturnCode_t delete_topic(
             const Topic* topic);
 
@@ -328,40 +271,25 @@ public:
 
     // TODO Subscriber* get_builtin_subscriber();
 
-    /**
-     * @brief Locally ignore a remote domain participant.
-     *
-     * @param[in] handle Identifier of the remote participant to ignore.
-     * @return RETCODE_NOT_ENABLED if the participant is not enabled.
-     *         RETCODE_ERROR if unable to ignore.
-     *         RETCODE_OK if successful.
-     *
-     */
-    ReturnCode_t ignore_participant(
+    /* TODO
+       bool ignore_participant(
             const InstanceHandle_t& handle);
+     */
 
     /* TODO
        bool ignore_topic(
             const InstanceHandle_t& handle);
      */
 
-    /**
-     * @brief Locally ignore a remote datawriter.
-     *
-     * @param[in] handle Identifier of the remote datawriter to ignore.
-     * @return true if correctly ignored. False otherwise.
-     */
-    bool ignore_publication(
+    /* TODO
+       bool ignore_publication(
             const InstanceHandle_t& handle);
+     */
 
-    /**
-     * @brief Locally ignore a remote datareader.
-     *
-     * @param[in] handle Identifier of the remote datareader to ignore.
-     * @return true if correctly ignored. False otherwise.
-     */
-    bool ignore_subscription(
+    /* TODO
+       bool ignore_subscription(
             const InstanceHandle_t& handle);
+     */
 
     DomainId_t get_domain_id() const;
 
@@ -431,27 +359,17 @@ public:
     ReturnCode_t get_current_time(
             fastrtps::Time_t& current_time) const;
 
-    const DomainParticipant* get_participant() const
-    {
-        std::lock_guard<std::mutex> _(mtx_gs_);
-        return participant_;
-    }
+    const DomainParticipant* get_participant() const;
 
-    DomainParticipant* get_participant()
-    {
-        std::lock_guard<std::mutex> _(mtx_gs_);
-        return participant_;
-    }
+    DomainParticipant* get_participant();
 
-    const fastrtps::rtps::RTPSParticipant* get_rtps_participant() const
+    const fastrtps::rtps::RTPSParticipant* rtps_participant() const
     {
-        std::lock_guard<std::mutex> _(mtx_gs_);
         return rtps_participant_;
     }
 
-    fastrtps::rtps::RTPSParticipant* get_rtps_participant()
+    fastrtps::rtps::RTPSParticipant* rtps_participant()
     {
-        std::lock_guard<std::mutex> _(mtx_gs_);
         return rtps_participant_;
     }
 
@@ -529,7 +447,7 @@ public:
     DomainParticipantListener* get_listener_for(
             const StatusMask& status);
 
-    std::atomic<uint32_t>& id_counter()
+    uint32_t& id_counter()
     {
         return id_counter_;
     }
@@ -560,12 +478,6 @@ protected:
     //!Participant Listener
     DomainParticipantListener* listener_;
 
-    //! getter/setter mutex
-    mutable std::mutex mtx_gs_;
-
-    //! getter/setter condition variable
-    std::condition_variable cv_gs_;
-
     //!Publisher maps
     std::map<Publisher*, PublisherImpl*> publishers_;
     std::map<InstanceHandle_t, Publisher*> publishers_by_handle_;
@@ -585,13 +497,12 @@ protected:
     mutable std::mutex mtx_types_;
 
     //!Topic map
-    std::map<std::string, TopicProxyFactory*> topics_;
+    std::map<std::string, TopicImpl*> topics_;
     std::map<InstanceHandle_t, Topic*> topics_by_handle_;
     std::map<std::string, std::unique_ptr<ContentFilteredTopic>> filtered_topics_;
     std::map<std::string, IContentFilterFactory*> filter_factories_;
     DDSSQLFilter::DDSFilterFactory dds_sql_filter_factory_;
     mutable std::mutex mtx_topics_;
-    std::condition_variable cond_topics_;
 
     TopicQos default_topic_qos_;
 
@@ -610,59 +521,10 @@ protected:
     // All parent's child requests
     std::map<fastrtps::rtps::SampleIdentity, std::vector<fastrtps::rtps::SampleIdentity>> parent_requests_;
 
-    std::atomic<uint32_t> id_counter_;
+    uint32_t id_counter_ = 0;
 
     class MyRTPSParticipantListener : public fastrtps::rtps::RTPSParticipantListener
     {
-        struct Sentry
-        {
-            Sentry(
-                    MyRTPSParticipantListener* listener)
-                : listener_(listener)
-                , on_guard_(false)
-            {
-                std::lock_guard<std::mutex> _(listener_->participant_->mtx_gs_);
-                if (listener_ != nullptr && listener_->participant_ != nullptr &&
-                        listener_->participant_->listener_ != nullptr &&
-                        listener_->participant_->participant_ != nullptr)
-                {
-                    if (listener_->callback_counter_ >= 0)
-                    {
-                        ++listener_->callback_counter_;
-                        on_guard_ = true;
-                    }
-                }
-            }
-
-            ~Sentry()
-            {
-                if (on_guard_)
-                {
-                    bool notify = false;
-                    {
-                        std::lock_guard<std::mutex> lock(listener_->participant_->mtx_gs_);
-                        assert(
-                            listener_ != nullptr && listener_->participant_ != nullptr && listener_->participant_->listener_ != nullptr &&
-                            listener_->participant_->participant_ != nullptr);
-                        --listener_->callback_counter_;
-                        notify = !listener_->callback_counter_;
-                    }
-                    if (notify)
-                    {
-                        listener_->participant_->cv_gs_.notify_all();
-                    }
-                }
-            }
-
-            operator bool () const
-            {
-                return on_guard_;
-            }
-
-            MyRTPSParticipantListener* listener_ = nullptr;
-            bool on_guard_;
-        };
-
     public:
 
         MyRTPSParticipantListener(
@@ -673,13 +535,11 @@ protected:
 
         virtual ~MyRTPSParticipantListener() override
         {
-            assert(!(callback_counter_ > 0));
         }
 
         void onParticipantDiscovery(
                 fastrtps::rtps::RTPSParticipant* participant,
-                fastrtps::rtps::ParticipantDiscoveryInfo&& info,
-                bool& should_be_ignored) override;
+                fastrtps::rtps::ParticipantDiscoveryInfo&& info) override;
 
 #if HAVE_SECURITY
         void onParticipantAuthentication(
@@ -715,13 +575,7 @@ protected:
                 const fastrtps::types::TypeInformation& type_information) override;
 
         DomainParticipantImpl* participant_;
-        int callback_counter_ = 0;
 
-    private:
-
-        using fastrtps::rtps::RTPSParticipantListener::onParticipantDiscovery;
-        using fastrtps::rtps::RTPSParticipantListener::onReaderDiscovery;
-        using fastrtps::rtps::RTPSParticipantListener::onWriterDiscovery;
     }
     rtps_listener_;
 

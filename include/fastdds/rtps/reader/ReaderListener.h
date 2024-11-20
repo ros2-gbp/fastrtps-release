@@ -22,7 +22,6 @@
 
 #include <fastdds/dds/core/status/LivelinessChangedStatus.hpp>
 #include <fastdds/dds/core/status/SubscriptionMatchedStatus.hpp>
-#include <fastdds/dds/core/status/SampleRejectedStatus.hpp>
 #include <fastdds/rtps/builtin/data/WriterProxyData.h>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/common/MatchingInfo.h>
@@ -151,63 +150,6 @@ public:
         static_cast<void>(reason);
         static_cast<void>(writer_guid);
         static_cast<void>(writer_info);
-    }
-
-    /**
-     * This method is called when the reader rejects a samples.
-     *
-     * @param reader  Pointer to the RTPSReader.
-     * @param reason  Indicates reason for sample rejection.
-     * @param change  Pointer to the CacheChange_t. This is a const pointer to const data
-     *                to indicate that the user should not dispose of this data himself.
-     */
-    virtual void on_sample_rejected(
-            RTPSReader* reader,
-            eprosima::fastdds::dds::SampleRejectedStatusKind reason,
-            const CacheChange_t* const change)
-    {
-        static_cast<void>(reader);
-        static_cast<void>(reason);
-        static_cast<void>(change);
-    }
-
-    /**
-     * This method is called when new CacheChange_t objects are made available to the user.
-     * @note This method is currently never called. Implementation will be added in future releases.
-     *
-     * @param [in]  reader                            Pointer to the reader performing the notification.
-     * @param [in]  writer_guid                       GUID of the writer from which the changes were received.
-     * @param [in]  first_sequence                    Sequence number of the first change made available.
-     * @param [in]  last_sequence                     Sequence number of the last change made available.
-     *                                                It will always be greater or equal than @c first_sequence.
-     * @param [out] should_notify_individual_changes  Whether the individual changes should be notified by means of
-     *                                                @c onNewCacheChangeAdded.
-     */
-    virtual void on_data_available(
-            RTPSReader* reader,
-            const GUID_t& writer_guid,
-            const SequenceNumber_t& first_sequence,
-            const SequenceNumber_t& last_sequence,
-            bool& should_notify_individual_changes)
-    {
-        static_cast<void>(reader);
-        static_cast<void>(writer_guid);
-        static_cast<void>(first_sequence);
-        static_cast<void>(last_sequence);
-
-        should_notify_individual_changes = true;
-    }
-
-    /**
-     * This method is called when a new Writer is discovered, with a Topic that
-     * matches the name of a local reader, but with an incompatible type
-     *
-     * @param reader Pointer to the RTPSReader.
-     */
-    virtual void on_incompatible_type(
-            RTPSReader* reader)
-    {
-        static_cast<void>(reader);
     }
 
 };

@@ -144,13 +144,6 @@ public:
         return true;
     }
 
-    /**
-     * This method fills the sample identity parameter to the cdr_message.
-     * The PID used is the standard PID_RELATED_SAMPLE_IDENTITY.
-     * @param cdr_message Message to be filled up.
-     * @param sample_id Sample id.
-     * @return true if operation is successful, false if the operation would overflow the maximum size of the message.
-     */
     static bool add_parameter_sample_identity(
             fastrtps::rtps::CDRMessage_t* cdr_message,
             const fastrtps::rtps::SampleIdentity& sample_id)
@@ -161,33 +154,6 @@ public:
         }
 
         fastrtps::rtps::CDRMessage::addUInt16(cdr_message, fastdds::dds::PID_RELATED_SAMPLE_IDENTITY);
-        fastrtps::rtps::CDRMessage::addUInt16(cdr_message, 24);
-        fastrtps::rtps::CDRMessage::addData(cdr_message,
-                sample_id.writer_guid().guidPrefix.value, fastrtps::rtps::GuidPrefix_t::size);
-        fastrtps::rtps::CDRMessage::addData(cdr_message,
-                sample_id.writer_guid().entityId.value, fastrtps::rtps::EntityId_t::size);
-        fastrtps::rtps::CDRMessage::addInt32(cdr_message, sample_id.sequence_number().high);
-        fastrtps::rtps::CDRMessage::addUInt32(cdr_message, sample_id.sequence_number().low);
-        return true;
-    }
-
-    /**
-     * This method fills the sample identity parameter to the cdr_message.
-     * The PID used is the legacy PID_RELATED_SAMPLE_IDENTITY: PID_CUSTOM_RELATED_SAMPLE_IDENTITY, due to backwards compatibility compliance.
-     * @param cdr_message Message to be filled up.
-     * @param sample_id Sample id.
-     * @return true if operation is successful, false if the operation would overflow the maximum size of the message.
-     */
-    static bool add_parameter_custom_related_sample_identity(
-            fastrtps::rtps::CDRMessage_t* cdr_message,
-            const fastrtps::rtps::SampleIdentity& sample_id)
-    {
-        if (cdr_message->pos + 28 > cdr_message->max_size)
-        {
-            return false;
-        }
-
-        fastrtps::rtps::CDRMessage::addUInt16(cdr_message, fastdds::dds::PID_CUSTOM_RELATED_SAMPLE_IDENTITY);
         fastrtps::rtps::CDRMessage::addUInt16(cdr_message, 24);
         fastrtps::rtps::CDRMessage::addData(cdr_message,
                 sample_id.writer_guid().guidPrefix.value, fastrtps::rtps::GuidPrefix_t::size);
@@ -251,7 +217,7 @@ inline bool ParameterSerializer<ParameterLocator_t>::read_content_from_cdr_messa
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_LOCATOR_LENGTH)
+    if (parameter_length != PARAMETER_LOCATOR_LENGTH)
     {
         return false;
     }
@@ -273,7 +239,7 @@ inline bool ParameterSerializer<ParameterKey_t>::read_content_from_cdr_message(
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_KEY_HASH_LENGTH)
+    if (parameter_length != PARAMETER_KEY_HASH_LENGTH)
     {
         return false;
     }
@@ -343,7 +309,7 @@ inline bool ParameterSerializer<ParameterPort_t>::read_content_from_cdr_message(
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_PORT_LENGTH)
+    if (parameter_length != PARAMETER_PORT_LENGTH)
     {
         return false;
     }
@@ -367,7 +333,7 @@ inline bool ParameterSerializer<ParameterGuid_t>::read_content_from_cdr_message(
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_GUID_LENGTH)
+    if (parameter_length != PARAMETER_GUID_LENGTH)
     {
         return false;
     }
@@ -394,7 +360,7 @@ inline bool ParameterSerializer<ParameterProtocolVersion_t>::read_content_from_c
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_PROTOCOL_LENGTH)
+    if (parameter_length != PARAMETER_PROTOCOL_LENGTH)
     {
         return false;
     }
@@ -422,7 +388,7 @@ inline bool ParameterSerializer<ParameterVendorId_t>::read_content_from_cdr_mess
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_VENDOR_LENGTH)
+    if (parameter_length != PARAMETER_VENDOR_LENGTH)
     {
         return false;
     }
@@ -447,7 +413,7 @@ inline bool ParameterSerializer<ParameterIP4Address_t>::read_content_from_cdr_me
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_IP4_LENGTH)
+    if (parameter_length != PARAMETER_IP4_LENGTH)
     {
         return false;
     }
@@ -473,7 +439,7 @@ inline bool ParameterSerializer<ParameterBool_t>::read_content_from_cdr_message(
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_BOOL_LENGTH)
+    if (parameter_length != PARAMETER_BOOL_LENGTH)
     {
         return false;
     }
@@ -501,7 +467,7 @@ inline bool ParameterSerializer<ParameterStatusInfo_t>::read_content_from_cdr_me
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_STATUS_INFO_LENGTH)
+    if (parameter_length != PARAMETER_STATUS_INFO_LENGTH)
     {
         return false;
     }
@@ -530,7 +496,7 @@ inline bool ParameterSerializer<ParameterCount_t>::read_content_from_cdr_message
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_COUNT_LENGTH)
+    if (parameter_length != PARAMETER_COUNT_LENGTH)
     {
         return false;
     }
@@ -552,7 +518,7 @@ inline bool ParameterSerializer<ParameterEntityId_t>::read_content_from_cdr_mess
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_ENTITYID_LENGTH)
+    if (parameter_length != PARAMETER_ENTITYID_LENGTH)
     {
         return false;
     }
@@ -576,7 +542,7 @@ inline bool ParameterSerializer<ParameterTime_t>::read_content_from_cdr_message(
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_TIME_LENGTH)
+    if (parameter_length != PARAMETER_TIME_LENGTH)
     {
         return false;
     }
@@ -604,7 +570,7 @@ inline bool ParameterSerializer<ParameterBuiltinEndpointSet_t>::read_content_fro
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_BUILTINENDPOINTSET_LENGTH)
+    if (parameter_length != PARAMETER_BUILTINENDPOINTSET_LENGTH)
     {
         return false;
     }
@@ -761,7 +727,7 @@ inline bool ParameterSerializer<ParameterSampleIdentity_t>::read_content_from_cd
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_SAMPLEIDENTITY_LENGTH)
+    if (parameter_length != PARAMETER_SAMPLEIDENTITY_LENGTH)
     {
         return false;
     }
@@ -1039,7 +1005,7 @@ inline bool ParameterSerializer<ParameterParticipantSecurityInfo_t>::read_conten
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_PARTICIPANT_SECURITY_INFO_LENGTH)
+    if (parameter_length != PARAMETER_PARTICIPANT_SECURITY_INFO_LENGTH)
     {
         return false;
     }
@@ -1065,7 +1031,7 @@ inline bool ParameterSerializer<ParameterEndpointSecurityInfo_t>::read_content_f
         fastrtps::rtps::CDRMessage_t* cdr_message,
         const uint16_t parameter_length)
 {
-    if (parameter_length < PARAMETER_ENDPOINT_SECURITY_INFO_LENGTH)
+    if (parameter_length != PARAMETER_ENDPOINT_SECURITY_INFO_LENGTH)
     {
         return false;
     }

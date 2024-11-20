@@ -26,35 +26,18 @@
 #include <fastdds/dds/domain/qos/DomainParticipantFactoryQos.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 
-#include <map>
-#include <memory>
 #include <mutex>
+#include <map>
 
 using eprosima::fastrtps::types::ReturnCode_t;
 
 namespace eprosima {
-
-namespace fastrtps {
-namespace rtps {
-
-class RTPSDomainImpl;
-
-namespace detail {
-class TopicPayloadPoolRegistry;
-}  // namespace detail
-}  // namespace rtps
-}  // namespace fastrtps
-
 namespace fastdds {
 namespace dds {
 
 class DomainParticipantListener;
 class DomainParticipant;
 class DomainParticipantImpl;
-
-namespace detail {
-struct LogResources;
-}  // namespace detail
 
 /**
  * Class DomainParticipantFactory
@@ -67,18 +50,11 @@ class DomainParticipantFactory
 public:
 
     /**
-     * Returns the DomainParticipantFactory singleton instance.
+     * Returns the DomainParticipantFactory singleton.
      *
-     * @return A raw pointer to the DomainParticipantFactory singleton instance.
+     * @return The DomainParticipantFactory singleton.
      */
     RTPS_DllAPI static DomainParticipantFactory* get_instance();
-
-    /**
-     * Returns the DomainParticipantFactory singleton instance.
-     *
-     * @return A shared pointer to the DomainParticipantFactory singleton instance.
-     */
-    RTPS_DllAPI static std::shared_ptr<DomainParticipantFactory> get_shared_instance();
 
     /**
      * Create a Participant.
@@ -139,7 +115,7 @@ public:
      * Returns all participants that belongs to the specified domain_id.
      *
      * @param domain_id
-     * @return previously created DomainParticipant instances within the specified domain
+     * @return previously created DomainParticipants within the specified domain
      */
     RTPS_DllAPI std::vector<DomainParticipant*> lookup_participants(
             DomainId_t domain_id) const;
@@ -235,15 +211,6 @@ public:
             size_t length);
 
     /**
-     * Check the validity of the provided static discovery XML file
-     *
-     * @param xml_file xml file path
-     * @return RETCODE_OK if the validation is successful, RETCODE_ERROR otherwise.
-     */
-    RTPS_DllAPI ReturnCode_t check_xml_static_discovery(
-            std::string& xml_file);
-
-    /**
      * This operation returns the value of the DomainParticipantFactory QoS policies.
      *
      * @param qos DomaParticipantFactoryQos reference where the qos is returned
@@ -308,16 +275,10 @@ protected:
     DomainParticipantFactoryQos factory_qos_;
 
     DomainParticipantQos default_participant_qos_;
-
-    std::shared_ptr<fastrtps::rtps::detail::TopicPayloadPoolRegistry> topic_pool_;
-
-    std::shared_ptr<fastrtps::rtps::RTPSDomainImpl> rtps_domain_;
-
-    std::shared_ptr<detail::LogResources> log_resources_;
 };
 
-}  // namespace dds
-}  // namespace fastdds
-}  // namespace eprosima
+} /* namespace dds */
+} /* namespace fastdds */
+} /* namespace eprosima */
 
 #endif /* _FASTDDS_DOMAINPARTICIPANT_HPP_*/

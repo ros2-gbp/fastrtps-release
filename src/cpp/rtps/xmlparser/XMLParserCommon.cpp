@@ -20,7 +20,6 @@ namespace xmlparser {
 
 const char* DEFAULT_FASTRTPS_ENV_VARIABLE = "FASTRTPS_DEFAULT_PROFILES_FILE";
 const char* DEFAULT_FASTRTPS_PROFILES = "DEFAULT_FASTRTPS_PROFILES.xml";
-const char* DEFAULT_STATISTICS_DATAWRITER_PROFILE = "GENERIC_STATISTICS_PROFILE";
 const char* SKIP_DEFAULT_XML_FILE = "SKIP_DEFAULT_XML_FILE";
 
 const char* ROOT = "dds";
@@ -87,7 +86,6 @@ const char* INTRAPROCESS_DELIVERY = "intraprocess_delivery";
 /// RTPS Participant attributes
 const char* ALLOCATION = "allocation";
 const char* PREFIX = "prefix";
-const char* DEF_EXT_UNI_LOC_LIST = "default_external_unicast_locators";
 const char* DEF_UNI_LOC_LIST = "defaultUnicastLocatorList";
 const char* DEF_MULTI_LOC_LIST = "defaultMulticastLocatorList";
 const char* SEND_SOCK_BUF_SIZE = "sendSocketBufferSize";
@@ -123,7 +121,6 @@ const char* MAX_PARTITIONS = "max_partitions";
 const char* TOPIC = "topic";
 const char* QOS = "qos";
 const char* TIMES = "times";
-const char* EXT_UNI_LOC_LIST = "external_unicast_locators";
 const char* UNI_LOC_LIST = "unicastLocatorList";
 const char* MULTI_LOC_LIST = "multicastLocatorList";
 const char* REM_LOC_LIST = "remoteLocatorList";
@@ -137,7 +134,6 @@ const char* MATCHED_SUBSCRIBERS_ALLOCATION = "matchedSubscribersAllocation";
 const char* MATCHED_PUBLISHERS_ALLOCATION = "matchedPublishersAllocation";
 
 ///
-const char* IGN_NON_MATCHING_LOCS = "ignore_non_matching_locators";
 const char* PROPERTIES = "properties";
 const char* BIN_PROPERTIES = "binary_properties";
 const char* PROPERTY = "property";
@@ -284,7 +280,6 @@ const char* LEASE_ANNOUNCE = "leaseAnnouncement";
 const char* INITIAL_ANNOUNCEMENTS = "initialAnnouncements";
 const char* AVOID_BUILTIN_MULTICAST = "avoid_builtin_multicast";
 const char* SIMPLE_EDP = "simpleEDP";
-const char* META_EXT_UNI_LOC_LIST = "metatraffic_external_unicast_locators";
 const char* META_UNI_LOC_LIST = "metatrafficUnicastLocatorList";
 const char* META_MULTI_LOC_LIST = "metatrafficMulticastLocatorList";
 const char* INIT_PEERS_LIST = "initialPeersList";
@@ -415,7 +410,6 @@ const char* TLS_DEFAULT_VERIFY_PATH = "default_verify_path";
 const char* TLS_VERIFY_DEPTH = "verify_depth";
 const char* TLS_RSA_PRIVATE_KEY_FILE = "rsa_private_key_file";
 const char* TLS_HANDSHAKE_ROLE = "handshake_role";
-const char* TLS_SERVER_NAME = "server_name";
 
 // TLS HandShake Role
 const char* TLS_HANDSHAKE_ROLE_DEFAULT = "DEFAULT";

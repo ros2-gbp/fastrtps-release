@@ -34,14 +34,11 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define HelloWorld_max_cdr_typesize 137ULL;
-#define HelloWorld_max_key_cdr_typesize 0ULL;
-
 HelloWorld::HelloWorld()
 {
-    // unsigned short m_index
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1a052a00
     m_index = 0;
-    // string m_message
+    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@4d826d77
     m_message ="";
 
 }
@@ -60,7 +57,7 @@ HelloWorld::HelloWorld(
 }
 
 HelloWorld::HelloWorld(
-        HelloWorld&& x) noexcept 
+        HelloWorld&& x)
 {
     m_index = x.m_index;
     m_message = std::move(x.m_message);
@@ -77,7 +74,7 @@ HelloWorld& HelloWorld::operator =(
 }
 
 HelloWorld& HelloWorld::operator =(
-        HelloWorld&& x) noexcept
+        HelloWorld&& x)
 {
 
     m_index = x.m_index;
@@ -102,8 +99,16 @@ bool HelloWorld::operator !=(
 size_t HelloWorld::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return HelloWorld_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 128 + 1;
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t HelloWorld::getCdrSerializedSize(
@@ -128,7 +133,7 @@ void HelloWorld::serialize(
 {
 
     scdr << m_index;
-    scdr << m_message.c_str();
+    scdr << m_message;
 
 }
 
@@ -137,11 +142,7 @@ void HelloWorld::deserialize(
 {
 
     dcdr >> m_index;
-    {
-        std::string aux;
-        dcdr >> aux;
-        m_message = aux.c_str();
-    }
+    dcdr >> m_message;
 }
 
 /*!
@@ -177,7 +178,7 @@ uint16_t& HelloWorld::index()
  * @param _message New value to be copied in member message
  */
 void HelloWorld::message(
-        const eprosima::fastrtps::fixed_string<128>& _message)
+        const std::string& _message)
 {
     m_message = _message;
 }
@@ -187,7 +188,7 @@ void HelloWorld::message(
  * @param _message New value to be moved in member message
  */
 void HelloWorld::message(
-        eprosima::fastrtps::fixed_string<128>&& _message)
+        std::string&& _message)
 {
     m_message = std::move(_message);
 }
@@ -196,7 +197,7 @@ void HelloWorld::message(
  * @brief This function returns a constant reference to member message
  * @return Constant reference to member message
  */
-const eprosima::fastrtps::fixed_string<128>& HelloWorld::message() const
+const std::string& HelloWorld::message() const
 {
     return m_message;
 }
@@ -205,17 +206,21 @@ const eprosima::fastrtps::fixed_string<128>& HelloWorld::message() const
  * @brief This function returns a reference to member message
  * @return Reference to member message
  */
-eprosima::fastrtps::fixed_string<128>& HelloWorld::message()
+std::string& HelloWorld::message()
 {
     return m_message;
 }
 
-
 size_t HelloWorld::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return HelloWorld_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+
+
+    return current_align;
 }
 
 bool HelloWorld::isKeyDefined()
@@ -227,4 +232,5 @@ void HelloWorld::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
+      
 }

@@ -22,9 +22,9 @@
 
 #include <string>
 
+#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastrtps/fastrtps_dll.h>
 #include <fastdds/dds/core/policy/QosPolicies.hpp>
-#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastdds/rtps/flowcontrol/FlowControllerDescriptor.hpp>
 
 namespace eprosima {

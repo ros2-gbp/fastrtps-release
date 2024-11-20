@@ -17,7 +17,7 @@
 
 #include <fastdds/rtps/transport/ChainingTransport.h>
 #include <fastdds/rtps/transport/ChainingTransportDescriptor.h>
-#include <fastdds/rtps/transport/SenderResource.h>
+#include <fastdds/rtps/network/SenderResource.h>
 
 using SenderResource = eprosima::fastrtps::rtps::SenderResource;
 

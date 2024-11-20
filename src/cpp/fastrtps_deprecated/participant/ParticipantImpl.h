@@ -233,12 +233,6 @@ private:
 
         ParticipantImpl* mp_participantimpl;
 
-    private:
-
-        using rtps::RTPSParticipantListener::onParticipantDiscovery;
-        using rtps::RTPSParticipantListener::onReaderDiscovery;
-        using rtps::RTPSParticipantListener::onWriterDiscovery;
-
     }
     m_rtps_listener;
 

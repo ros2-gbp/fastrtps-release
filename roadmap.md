@@ -15,7 +15,7 @@ at any time.
 
 Disclaimer:
 
-* This section has been last updated in December 2022.
+* This section has been last updated in March 2022.
   Please take into account its content could be obsolete.
 
 ## Short term
@@ -23,20 +23,25 @@ Disclaimer:
 The following list of features are planned to be addressed in the short term, and incorporated into the following
 minor release of the product:
 
+* Content filtered topic support on DataWriter
 * Complete support for dynamic network interfaces
-* XML generation tool
-* DDS-XTypes 1.3
-* Monitor service to keep track of discovery events.
-* Tier 1 support for QNX platforms.
+* ReadCondition implementation
+* Secure Discovery Server
+* DataReader, DataWriter and DomainParticipant DDS API implementation:
+    - `DataReader::get_sample_lost_status`
+    - `DataReader::lookup_instance`
+    - `DataWriter::get_key_value`
+    - `DataWriter::write_w_timestamp`
+    - `DomainParticipant::find_topic`
+* Android support
 
 ## Medium term
 
 The following list of features are planned to be addressed in the medium term, typically within the subsequent
 release(s) generated in the next **9 months** after next planned release:
 
-* Support for Time-based filter QoS
 * Service aware DataWriter
-* Thread configuration QoS.
+* DDS-XTypes 1.3
 
 ## Long term
 
@@ -47,3 +52,4 @@ Please feel free to contact us if you wish to get involved in the implementation
 * Full DDS API compliance
 * Compliance with DDS-XML
 * Low bandwidth transports
+* ISO 26262 compliance

@@ -17,7 +17,6 @@
 #define _RTPS_RTPSDOMAINIMPL_HPP_
 
 #include <chrono>
-#include <memory>
 #include <thread>
 #include <unordered_map>
 
@@ -31,8 +30,6 @@
 
 #include <utils/SystemInfo.hpp>
 
-#include <utils/shared_memory/BoostAtExitRegistry.hpp>
-
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
@@ -44,83 +41,6 @@ namespace rtps {
 class RTPSDomainImpl
 {
 public:
-
-    typedef std::pair<RTPSParticipant*, RTPSParticipantImpl*> t_p_RTPSParticipant;
-
-    /**
-     * Get singleton instance.
-     *
-     * @return Shared pointer to RTPSDomainImpl singleton instance.
-     */
-    static std::shared_ptr<RTPSDomainImpl> get_instance();
-
-    /**
-     * Method to shut down all RTPSParticipants, readers, writers, etc.
-     * It must be called at the end of the process to avoid memory leaks.
-     * It also shut downs the DomainRTPSParticipant.
-     *
-     * \post After this call, all the pointers to RTPS entities are invalidated and their use may
-     *       result in undefined behaviour.
-     */
-    static void stopAll();
-
-    /**
-     * @brief Create a RTPSParticipant.
-     * @param domain_id DomainId to be used by the RTPSParticipant (80 by default).
-     * @param enabled True if the RTPSParticipant should be enabled on creation. False if it will be enabled later with RTPSParticipant::enable()
-     * @param attrs RTPSParticipant Attributes.
-     * @param plisten Pointer to the ParticipantListener.
-     * @return Pointer to the RTPSParticipant.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSParticipant() or stopAll(),
-     *          so its use may result in undefined behaviour.
-     */
-    static RTPSParticipant* createParticipant(
-            uint32_t domain_id,
-            bool enabled,
-            const RTPSParticipantAttributes& attrs,
-            RTPSParticipantListener* plisten);
-
-    /**
-     * Remove a RTPSWriter.
-     * @param writer Pointer to the writer you want to remove.
-     * @return  True if correctly removed.
-     */
-    static bool removeRTPSWriter(
-            RTPSWriter* writer);
-
-    /**
-     * Remove a RTPSReader.
-     * @param reader Pointer to the reader you want to remove.
-     * @return  True if correctly removed.
-     */
-    static bool removeRTPSReader(
-            RTPSReader* reader);
-
-    /**
-     * Remove a RTPSParticipant and delete all its associated Writers, Readers, resources, etc.
-     * @param[in] p Pointer to the RTPSParticipant;
-     * @return True if correct.
-     */
-    static bool removeRTPSParticipant(
-            RTPSParticipant* p);
-
-    /**
-     * Creates a RTPSParticipant as default server or client if ROS_MASTER_URI environment variable is set.
-     * @param domain_id DDS domain associated
-     * @param enabled True if the RTPSParticipant should be enabled on creation. False if it will be enabled later with RTPSParticipant::enable()
-     * @param attrs RTPSParticipant Attributes.
-     * @param listen Pointer to the ParticipantListener.
-     * @return Pointer to the RTPSParticipant.
-     *
-     * \warning The returned pointer is invalidated after a call to removeRTPSParticipant() or stopAll(),
-     *          so its use may result in undefined behaviour.
-     */
-    static RTPSParticipant* clientServerEnvironmentCreationOverride(
-            uint32_t domain_id,
-            bool enabled,
-            const RTPSParticipantAttributes& attrs,
-            RTPSParticipantListener* listen /*= nullptr*/);
 
     /**
      * Create a RTPSWriter in a participant.
@@ -149,10 +69,8 @@ public:
      * @param [in, out] participant_id   Participant identifier for which to generate the GUID.
      *                                   When negative, it will be modified to the first non-existent participant id.
      * @param [out]     guid             GUID corresponding to participant_id
-     *
-     * @return True value if guid was created. False in other case.
      */
-    static bool create_participant_guid(
+    static void create_participant_guid(
             int32_t& participant_id,
             GUID_t& guid);
 
@@ -165,6 +83,31 @@ public:
      */
     static RTPSParticipantImpl* find_local_participant(
             const GUID_t& guid);
+
+    /**
+     * Apply a predicate to every local participant.
+     *
+     * Will apply the predicate to all the participants registered by a call to RTPSDomain::createParticipant.
+     *
+     * @param pred   Unary function that accepts a std::pair<RTPSParticipant*,RTPSParticipantImpl*> const ref as
+     *               argument and returns a value convertible to bool.
+     *               The value returned indicates whether the loop should continue or not.
+     *               The function shall not modify its argument.
+     *               This can either be a function pointer or a function object.
+     */
+    template<class UnaryPredicate>
+    static void for_each_participant(
+            UnaryPredicate pred)
+    {
+        std::lock_guard<std::mutex> guard(RTPSDomain::m_mutex);
+        for (const RTPSDomain::t_p_RTPSParticipant& participant : RTPSDomain::m_RTPSParticipants)
+        {
+            if (!pred(participant))
+            {
+                break;
+            }
+        }
+    }
 
     /**
      * Find a local-process reader.
@@ -203,7 +146,7 @@ public:
      */
     static void file_watch_callback();
 
-private:
+    static FileWatchHandle file_watch_handle_;
 
     /**
      * @brief Get Id to create a RTPSParticipant.
@@ -212,35 +155,14 @@ private:
      *
      * @return Different ID for each call.
      */
-    uint32_t getNewId();
+    static uint32_t getNewId();
 
-    bool prepare_participant_id(
+    static bool prepare_participant_id(
             int32_t input_id,
             uint32_t& participant_id);
 
-    /**
-     * Reserves a participant id.
-     * @param [in, out] participant_id   Participant identifier for reservation.
-     *                                   When negative, it will be modified to the first non-reserved participant id.
-     *
-     * @return True value if reservation was possible. False in other case.
-     */
-    bool reserve_participant_id(
-            int32_t& participant_id);
-
-    uint32_t get_id_for_prefix(
+    static uint32_t get_id_for_prefix(
             uint32_t participant_id);
-
-    void removeRTPSParticipant_nts(
-            t_p_RTPSParticipant&);
-
-    std::shared_ptr<eprosima::detail::BoostAtExitRegistry> boost_singleton_handler_ { eprosima::detail::
-                                                                                              BoostAtExitRegistry::
-                                                                                              get_instance() };
-
-    std::mutex m_mutex;
-
-    std::vector<t_p_RTPSParticipant> m_RTPSParticipants;
 
     struct ParticipantIDState
     {
@@ -249,9 +171,7 @@ private:
         bool used = false;
     };
 
-    std::unordered_map<uint32_t, ParticipantIDState> m_RTPSParticipantIDs;
-
-    FileWatchHandle file_watch_handle_;
+    static std::unordered_map<uint32_t, ParticipantIDState> m_RTPSParticipantIDs;
 };
 
 } // namespace rtps

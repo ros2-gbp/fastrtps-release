@@ -1013,40 +1013,6 @@ TEST_F(SHMTransportTests, port_lock_read_exclusive)
     port = shared_mem_manager->open_port(0, 1, 1000, SharedMemGlobal::Port::OpenMode::ReadExclusive);
 }
 
-// Regression test for redmine issue #20701
-TEST_F(SHMTransportTests, port_lock_read_shared_then_exclusive)
-{
-    const std::string domain_name("SHMTests");
-
-    auto shared_mem_manager = SharedMemManager::create(domain_name);
-
-    shared_mem_manager->remove_port(0);
-
-    auto port = shared_mem_manager->open_port(0, 1, 1000, SharedMemGlobal::Port::OpenMode::ReadShared);
-    ASSERT_THROW(shared_mem_manager->open_port(0, 1, 1000, SharedMemGlobal::Port::OpenMode::ReadExclusive),
-            std::exception);
-
-    port.reset();
-    port = shared_mem_manager->open_port(0, 1, 1000, SharedMemGlobal::Port::OpenMode::ReadExclusive);
-}
-
-// Regression test for redmine issue #20701
-TEST_F(SHMTransportTests, port_lock_read_exclusive_then_shared)
-{
-    const std::string domain_name("SHMTests");
-
-    auto shared_mem_manager = SharedMemManager::create(domain_name);
-
-    shared_mem_manager->remove_port(0);
-
-    auto port = shared_mem_manager->open_port(0, 1, 1000, SharedMemGlobal::Port::OpenMode::ReadExclusive);
-    ASSERT_THROW(shared_mem_manager->open_port(0, 1, 1000, SharedMemGlobal::Port::OpenMode::ReadShared),
-            std::exception);
-
-    port.reset();
-    port = shared_mem_manager->open_port(0, 1, 1000, SharedMemGlobal::Port::OpenMode::ReadShared);
-}
-
 TEST_F(SHMTransportTests, robust_exclusive_lock)
 {
     const std::string lock_name = "robust_exclusive_lock_test1_el";
@@ -1525,25 +1491,27 @@ TEST_F(SHMTransportTests, port_not_ok_listener_recover)
     thread_listener.join();
 }
 
-//! This test has been updated to avoid flakiness #20993
 TEST_F(SHMTransportTests, buffer_recover)
 {
     const std::string domain_name("SHMTests");
 
     auto shared_mem_manager = SharedMemManager::create(domain_name);
+
     auto segment = shared_mem_manager->create_segment(3, 3);
 
     shared_mem_manager->remove_port(1);
     auto pub_sub1_write = shared_mem_manager->open_port(1, 8, 1000, SharedMemGlobal::Port::OpenMode::Write);
+
     shared_mem_manager->remove_port(2);
     auto pub_sub2_write = shared_mem_manager->open_port(2, 8, 1000, SharedMemGlobal::Port::OpenMode::Write);
 
     auto sub1_read = shared_mem_manager->open_port(1, 8, 1000, SharedMemGlobal::Port::OpenMode::ReadExclusive);
+
     auto sub2_read = shared_mem_manager->open_port(2, 8, 1000, SharedMemGlobal::Port::OpenMode::ReadExclusive);
 
     bool exit_listeners = false;
 
-    uint32_t listener1_sleep_ms = 150u;
+    uint32_t listener1_sleep_ms = 400u;
     uint32_t listener2_sleep_ms = 100u;
 
     auto listener1 = sub1_read->create_listener();
@@ -1555,7 +1523,7 @@ TEST_F(SHMTransportTests, buffer_recover)
                         {
                             auto buffer = listener1->pop();
 
-                            if (nullptr != buffer)
+                            if (buffer)
                             {
                                 listener1_recv_count.fetch_add(1);
                                 // This is a slow listener
@@ -1575,9 +1543,12 @@ TEST_F(SHMTransportTests, buffer_recover)
                         {
                             auto buffer = listener2->pop();
 
-                            if (nullptr != buffer)
+                            if (buffer)
                             {
-                                listener2_recv_count.fetch_add(1);
+                                {
+                                    std::lock_guard<SharedMemSegment::mutex> lock(received_mutex);
+                                    listener2_recv_count.fetch_add(1);
+                                }
                                 std::this_thread::sleep_for(std::chrono::milliseconds(listener2_sleep_ms));
                                 buffer.reset();
                                 received_cv.notify_one();
@@ -1590,7 +1561,7 @@ TEST_F(SHMTransportTests, buffer_recover)
 
     bool is_port_ok = false;
 
-    while (listener2_recv_count.load() < 32u)
+    while (listener1_recv_count.load() < 16u)
     {
         {
             // The segment should never overflow
@@ -1619,13 +1590,14 @@ TEST_F(SHMTransportTests, buffer_recover)
         }
     }
 
+    // The slow listener is 4 times slower than the fast one
+    ASSERT_LT(listener1_recv_count.load() * 3, listener2_recv_count.load());
+    ASSERT_GT(listener1_recv_count.load(), listener2_recv_count.load() / 5);
     std::cout << "Test1:"
               << " Listener1_recv_count " << listener1_recv_count.load()
               << " Listener2_recv_count " << listener2_recv_count.load()
               << std::endl;
-    // The slow listener is almost 2 times slower than the fast one
-    EXPECT_LT(listener1_recv_count.load(), listener2_recv_count.load());
-    EXPECT_GE(listener1_recv_count.load() * 2, listener2_recv_count.load());
+
     // Test 2 (with port overflow)
     listener2_sleep_ms = 0u;
     send_counter = 0u;
@@ -1676,48 +1648,17 @@ TEST_F(SHMTransportTests, buffer_recover)
 
     exit_listeners = true;
 
-    // This third part of the test just tries to cleanly
-    // exit the threads.
-
-    // At this point, listeners are blocked
-    // in the pop() method, and the ring buffers
-    // may (or not) be full.
-
-    //  In order to make the listeners exit the pop() method
-    //  we have to options:
-    //  - Waiting for the port_timeout_ms
-    //  - try pushing another buffer, so that cv could be
-    //   notified.
-
-    // Sleeping the thread waiting for the port timeout
-    // is more risky as the healthy timeout port watchdog
-    // can be triggered, so we choose the second option.
-
     {
         auto buf = segment->alloc_buffer(1u, std::chrono::steady_clock::time_point());
-        bool buffer_pushed = false;
         {
             is_port_ok = false;
-            while (!buffer_pushed)
-            {
-                buffer_pushed = pub_sub1_write->try_push(buf, is_port_ok);
-                //! In any case port should not be ok
-                ASSERT_TRUE(is_port_ok);
-                std::this_thread::sleep_for(std::chrono::milliseconds(150));
-            }
+            ASSERT_TRUE(pub_sub1_write->try_push(buf, is_port_ok));
+            ASSERT_TRUE(is_port_ok);
         }
-
-        buffer_pushed = false;
-
         {
             is_port_ok = false;
-            while (!buffer_pushed)
-            {
-                buffer_pushed = pub_sub2_write->try_push(buf, is_port_ok);
-                //! In any case port should not be ok
-                ASSERT_TRUE(is_port_ok);
-                std::this_thread::sleep_for(std::chrono::milliseconds(150));
-            }
+            ASSERT_TRUE(pub_sub2_write->try_push(buf, is_port_ok));
+            ASSERT_TRUE(is_port_ok);
         }
     }
 
@@ -2259,116 +2200,14 @@ TEST_F(SHMTransportTests, dump_file)
         std::string dump_text((std::istreambuf_iterator<char>(dump_file)),
                 std::istreambuf_iterator<char>());
 
-        ASSERT_EQ(dump_text.length(), 310u);
-        ASSERT_EQ(dump_text.c_str()[306], '6');
-        ASSERT_EQ(dump_text.c_str()[307], 'f');
-        ASSERT_EQ(dump_text.c_str()[308], 10);
-        ASSERT_EQ(dump_text.c_str()[309], 10);
+        ASSERT_EQ(dump_text.length(), 312u);
+        ASSERT_EQ(dump_text.c_str()[308], '6');
+        ASSERT_EQ(dump_text.c_str()[309], 'f');
+        ASSERT_EQ(dump_text.c_str()[310], 10);
+        ASSERT_EQ(dump_text.c_str()[311], 10);
     }
 
     std::remove(log_file.c_str());
-}
-
-TEST_F(SHMTransportTests, named_mutex_concurrent_open_create)
-{
-    const std::string domain_name("SHMTests");
-
-    auto shared_mem_manager = SharedMemManager::create(domain_name);
-    SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
-    MockPortSharedMemGlobal port_mocker;
-
-    port_mocker.remove_port_mutex(domain_name, 0);
-
-    Semaphore sem_get_port;
-    Semaphore sem_end_thread_get_port;
-    std::thread thread_get_port([&]
-            {
-                auto port_mutex = port_mocker.get_port_mutex(domain_name, 0, false);
-
-                sem_get_port.post();
-                sem_end_thread_get_port.wait();
-            }
-            );
-
-    auto global_port = shared_mem_global->open_port(0, 1, 1000);
-
-    sem_get_port.wait();
-    sem_end_thread_get_port.post();
-    thread_get_port.join();
-}
-
-TEST_F(SHMTransportTests, named_mutex_concurrent_open)
-{
-    const std::string domain_name("SHMTests");
-
-    auto shared_mem_manager = SharedMemManager::create(domain_name);
-    SharedMemGlobal* shared_mem_global = shared_mem_manager->global_segment();
-    MockPortSharedMemGlobal port_mocker;
-
-    port_mocker.remove_port_mutex(domain_name, 0);
-
-    auto global_port = shared_mem_global->open_port(0, 1, 1000);
-
-    Semaphore sem_lock_done;
-    Semaphore sem_second_lock;
-    Semaphore sem_second_lock_done;
-    Semaphore sem_end_thread_locker;
-    std::atomic<int> lock_count(0);
-    std::thread thread_locker([&]
-            {
-                // lock has to be done in another thread because
-                // boost::inteprocess_named_mutex and  interprocess_mutex are recursive in Win32
-                auto port_mutex = port_mocker.get_port_mutex(domain_name, 0);
-                bool locked = port_mutex->try_lock();
-                if (locked)
-                {
-                    ++lock_count;
-                }
-
-                sem_lock_done.post();
-                sem_second_lock.wait();
-
-                if (locked)
-                {
-                    port_mutex->unlock();
-                }
-                else
-                {
-                    port_mutex->lock();
-                    ++lock_count;
-                }
-
-                sem_second_lock_done.post();
-                sem_end_thread_locker.wait();
-            }
-            );
-
-    auto port_mutex = port_mocker.get_port_mutex(domain_name, 0);
-    bool locked = port_mutex->try_lock();
-    if (locked)
-    {
-        ++lock_count;
-    }
-
-    sem_lock_done.wait();
-    ASSERT_EQ(lock_count, 1);
-
-    sem_second_lock.post();
-    if (locked)
-    {
-        port_mutex->unlock();
-    }
-    else
-    {
-        port_mutex->lock();
-        ++lock_count;
-    }
-
-    sem_second_lock_done.wait();
-    ASSERT_EQ(lock_count, 2);
-
-    sem_end_thread_locker.post();
-    thread_locker.join();
 }
 
 int main(

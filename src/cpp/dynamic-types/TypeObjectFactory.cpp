@@ -25,7 +25,6 @@
 #include <fastrtps/types/AnnotationDescriptor.h>
 #include <fastrtps/utils/md5.h>
 #include <fastdds/dds/log/Log.hpp>
-#include <atomic>
 #include <sstream>
 
 namespace eprosima {
@@ -43,62 +42,30 @@ public:
 
 };
 
-enum class TypeObjectFactoryInstanceState
-{
-    NOT_CREATED = 0,  // Instance has not been created
-    CREATING = 1,     // Instance is being created
-    CREATED = 2,      // Instance has been created
-    DESTROYING = 3    // Instance is being destroyed
-};
-
-static std::atomic<TypeObjectFactoryInstanceState> g_instance_state{TypeObjectFactoryInstanceState::NOT_CREATED};
 static TypeObjectFactoryReleaser s_releaser;
 static TypeObjectFactory* g_instance = nullptr;
-
 TypeObjectFactory* TypeObjectFactory::get_instance()
 {
-    TypeObjectFactoryInstanceState expected_state = TypeObjectFactoryInstanceState::NOT_CREATED;
-
-    // Wait until the instance is either created or destroyed
-    while (!g_instance_state.compare_exchange_weak(expected_state, TypeObjectFactoryInstanceState::CREATING))
+    if (g_instance == nullptr)
     {
-        // If it is already created, return it
-        if (expected_state == TypeObjectFactoryInstanceState::CREATED)
-        {
-            return g_instance;
-        }
-
-        // Prepare for retry
-        expected_state = TypeObjectFactoryInstanceState::NOT_CREATED;
+        g_instance = new TypeObjectFactory();
+        g_instance->create_builtin_annotations();
     }
-
-    auto instance = new TypeObjectFactory();
-    g_instance = instance;
-    g_instance_state.store(TypeObjectFactoryInstanceState::CREATED);
-
-    return instance;
+    return g_instance;
 }
 
 ReturnCode_t TypeObjectFactory::delete_instance()
 {
-    TypeObjectFactoryInstanceState expected_state = TypeObjectFactoryInstanceState::CREATED;
-    if (g_instance_state.compare_exchange_strong(expected_state, TypeObjectFactoryInstanceState::DESTROYING))
+    if (g_instance != nullptr)
     {
         delete g_instance;
         g_instance = nullptr;
-        g_instance_state.store(TypeObjectFactoryInstanceState::NOT_CREATED);
         return ReturnCode_t::RETCODE_OK;
     }
     return ReturnCode_t::RETCODE_ERROR;
 }
 
 TypeObjectFactory::TypeObjectFactory()
-{
-    create_basic_identifiers();
-    create_builtin_annotations();
-}
-
-void TypeObjectFactory::create_basic_identifiers()
 {
     std::unique_lock<std::recursive_mutex> scoped(m_MutexIdentifiers);
     // Generate basic TypeIdentifiers
@@ -229,7 +196,7 @@ TypeObjectFactory::~TypeObjectFactory()
 
 void TypeObjectFactory::create_builtin_annotations()
 {
-    register_builtin_annotations_types(this);
+    register_builtin_annotations_types(g_instance);
 }
 
 void TypeObjectFactory::nullify_all_entries(
@@ -1932,7 +1899,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                 const TypeIdentifier* auxMem = get_stored_type_identifier(&member->common().member_type_id());
                 if (auxMem == nullptr)
                 {
-                    EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Struct) auxMem is nullptr, but original member has "
+                    logWarning(DYNAMIC_TYPES, "(Struct) auxMem is nullptr, but original member has "
                             << (int)member->common().member_type_id()._d());
                 }
                 MemberDescriptor memDesc;
@@ -1964,7 +1931,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                     const TypeIdentifier* anno_id = get_stored_type_identifier(&annotation.annotation_typeid());
                     if (anno_id == nullptr)
                     {
-                        EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
+                        logWarning(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
                             << (int)annotation.annotation_typeid()._d());
                     }
                     AnnotationDescriptor anno_desc;
@@ -2039,7 +2006,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                 const TypeIdentifier* auxMem = get_primitive_type_identifier(member->common().holder_type());
                 if (auxMem == nullptr)
                 {
-                    EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Bitset) auxMem is nullptr, but original member has "
+                    logWarning(DYNAMIC_TYPES, "(Bitset) auxMem is nullptr, but original member has "
                             << (int)member->common().holder_type());
                 }
                 MemberDescriptor memDesc;
@@ -2055,7 +2022,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
             }
             return bitsetType->build();
 
-            //EPROSIMA_LOG_ERROR(XTYPES, "Bitset isn't supported by DynamicType");
+            //logError(XTYPES, "Bitset isn't supported by DynamicType");
             //return nullptr;
         }
         case TK_UNION:
@@ -2077,7 +2044,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                 const TypeIdentifier* auxMem = get_stored_type_identifier(&member->common().type_id());
                 if (auxMem == nullptr)
                 {
-                    EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Union) auxMem is nullptr, but original member has "
+                    logWarning(DYNAMIC_TYPES, "(Union) auxMem is nullptr, but original member has "
                             << (int)member->common().type_id()._d());
                 }
                 MemberDescriptor memDesc;
@@ -2120,7 +2087,7 @@ DynamicType_ptr TypeObjectFactory::build_dynamic_type(
                 const TypeIdentifier* aux_mem = get_stored_type_identifier(&member.common().member_type_id());
                 if (aux_mem == nullptr)
                 {
-                    EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Annotation) aux_mem is nullptr, but original member has "
+                    logWarning(DYNAMIC_TYPES, "(Annotation) aux_mem is nullptr, but original member has "
                             << (int)member.common().member_type_id()._d());
                 }
 
@@ -2156,7 +2123,7 @@ void TypeObjectFactory::apply_type_annotations(
         const TypeIdentifier* anno_id = get_stored_type_identifier(&annotation.annotation_typeid());
         if (anno_id == nullptr)
         {
-            EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
+            logWarning(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
                     << (int)annotation.annotation_typeid()._d());
         }
         AnnotationDescriptor anno_desc;
@@ -2181,7 +2148,7 @@ void TypeObjectFactory::apply_member_annotations(
         const TypeIdentifier* anno_id = get_stored_type_identifier(&annotation.annotation_typeid());
         if (anno_id == nullptr)
         {
-            EPROSIMA_LOG_WARNING(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
+            logWarning(DYNAMIC_TYPES, "(Annotation) anno_id is nullptr, but original member has "
                     << (int)annotation.annotation_typeid()._d());
         }
         AnnotationDescriptor anno_desc;

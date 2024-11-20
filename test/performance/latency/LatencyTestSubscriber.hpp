@@ -68,8 +68,6 @@ public:
 
     void run();
 
-    void destroy_user_entities();
-
     bool test(
             uint32_t datasize);
 

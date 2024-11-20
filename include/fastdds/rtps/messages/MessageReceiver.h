@@ -77,10 +77,7 @@ private:
     std::vector<RTPSWriter*> associated_writers_;
     std::unordered_map<EntityId_t, std::vector<RTPSReader*>> associated_readers_;
 
-#if !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
-    //!Pointer to the RTPSParticipantImpl
     RTPSParticipantImpl* participant_;
-#endif // if !defined(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION)
     //!Protocol version of the message
     ProtocolVersion_t source_version_;
     //!VendorID that created the message
@@ -162,7 +159,6 @@ private:
      * -Return an error if the message is malformed.
      * @param[in,out] msg      Pointer to the message
      * @param[in] smh          Pointer to the submessage header
-     * @param[out] WriterID    Writer EntityID (only for DATA messages)
      * @param[in] was_decoded  Whether the submessage being processed came from decoding a secured submessage
      * @return True if correct, false otherwise
      */
@@ -172,14 +168,12 @@ private:
      *
      * @param msg
      * @param smh
-     * @param writerID
      * @param was_decoded
      * @return
      */
     bool proc_Submsg_Data(
             CDRMessage_t* msg,
             SubmessageHeader_t* smh,
-            EntityId_t& writerID,
             bool was_decoded) const;
     bool proc_Submsg_DataFrag(
             CDRMessage_t* msg,

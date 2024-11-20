@@ -61,7 +61,7 @@ ReturnCode_t AnnotationDescriptor::copy_from(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error copying AnnotationDescriptor, invalid input descriptor");
+        logError(DYN_TYPES, "Error copying AnnotationDescriptor, invalid input descriptor");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
     return ReturnCode_t::RETCODE_OK;

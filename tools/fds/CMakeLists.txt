@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.16.3)
 
-project(fast-discovery-server VERSION 1.0.1 LANGUAGES CXX)
+project(fast-discovery-server VERSION 1.0.0 LANGUAGES C CXX)
 
 ###############################################################################
 # Load external dependencies
@@ -107,12 +107,6 @@ install(TARGETS ${PROJECT_NAME}
 install(EXPORT ${PROJECT_NAME}-targets
         DESTINATION ${INSTALL_DESTINATION_PATH}
         NAMESPACE fastdds::
-        COMPONENT cmake
-        )
-
-# export xsd schema
-install(FILES ../../resources/xsd/fastRTPS_profiles.xsd
-        DESTINATION ${DATA_INSTALL_DIR}
         COMPONENT cmake
         )
 

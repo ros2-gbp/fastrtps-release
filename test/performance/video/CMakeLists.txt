@@ -140,10 +140,10 @@ if(GST_FOUND)
     ###########################################################################
     set(
         VIDEO_TEST_LIST
-        video_interprocess_best_effort_profile
-        video_interprocess_reliable_profile
-        video_interprocess_best_effort_tcp_profile
-        video_interprocess_reliable_tcp_profile
+        interprocess_best_effort
+        interprocess_reliable
+        interprocess_best_effort_tcp
+        interprocess_reliable_tcp
     )
 
     ###########################################################################

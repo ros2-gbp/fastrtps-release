@@ -21,32 +21,13 @@ set(GUID_UTILS_TESTS_SOURCE GuidUtilsTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPFinder.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/utils/IPLocator.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
-
-if(ANDROID)
-    if (ANDROID_NATIVE_API_LEVEL LESS 24)
-        list(APPEND GUID_UTILS_TESTS_SOURCE
-            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-            )
-        list(APPEND CACHECHANGETESTS_SOURCE
-            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
-            )
-
-    endif()
-endif()
-
-
+    ${PROJECT_SOURCE_DIR}/src/cpp/utils/md5.cpp)
 set(SEQUENCENUMBERTESTS_SOURCE SequenceNumberTests.cpp)
 set(PORTPARAMETERSTESTS_SOURCE PortParametersTests.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/Log.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/OStreamConsumer.cpp
     ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutConsumer.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/utils/SystemInfo.cpp)
-
-set(TIMETESTS_SOURCE TimeTests.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/common/Time_t.cpp)
+    ${PROJECT_SOURCE_DIR}/src/cpp/fastdds/log/StdoutErrConsumer.cpp)
 
 add_executable(CacheChangeTests ${CACHECHANGETESTS_SOURCE})
 target_compile_definitions(CacheChangeTests PRIVATE
@@ -68,12 +49,8 @@ target_compile_definitions(GuidUtilsTests PRIVATE
 target_include_directories(GuidUtilsTests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp
     ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
-    ${Asio_INCLUDE_DIR}
-    $<$<BOOL:${ANDROID}>:${ANDROID_IFADDRS_INCLUDE_DIR}>)
+    ${Asio_INCLUDE_DIR})
 target_link_libraries(GuidUtilsTests GTest::gtest)
-if(QNX)
-    target_link_libraries(GuidUtilsTests socket)
-endif()
 if(MSVC OR MSVC_IDE)
     target_link_libraries(GuidUtilsTests ws2_32)
 endif()
@@ -95,8 +72,7 @@ target_compile_definitions(PortParametersTests PRIVATE
     $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
     )
 target_include_directories(PortParametersTests PRIVATE
-    ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include
-    ${PROJECT_SOURCE_DIR}/src/cpp)
+    ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
 target_link_libraries(PortParametersTests GTest::gtest)
 add_gtest(PortParametersTests SOURCES ${PORTPARAMETERSTESTS_SOURCE} LABELS "NoMemoryCheck")
 
@@ -150,27 +126,3 @@ target_include_directories(GuidTests PRIVATE
     ${PROJECT_SOURCE_DIR}/src/cpp)
 target_link_libraries(GuidTests GTest::gtest)
 add_gtest(GuidTests SOURCES ${GUIDTESTS_SOURCE} LABELS "NoMemoryCheck")
-
-if(ANDROID)
-    set_property(TARGET CacheChangeTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET EntityIdTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET GuidTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET GuidPrefixTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET GuidUtilsTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET PortParametersTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-    set_property(TARGET SequenceNumberTests PROPERTY CROSSCOMPILING_EMULATOR "adb;shell;cd;${CMAKE_CURRENT_BINARY_DIR};&&")
-endif()
-
-#############
-# Time test #
-#############
-
-add_executable(TimeTests ${TIMETESTS_SOURCE})
-target_compile_definitions(TimeTests PRIVATE
-    $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<STREQUAL:"${CMAKE_BUILD_TYPE}","Debug">>:__DEBUG>
-    $<$<BOOL:${INTERNAL_DEBUG}>:__INTERNALDEBUG> # Internal debug activated.
-    )
-target_include_directories(TimeTests PRIVATE ${GTEST_INCLUDE_DIRS}
-    ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include)
-target_link_libraries(TimeTests GTest::gtest)
-add_gtest(TimeTests SOURCES ${TIMETESTS_SOURCE} LABELS "NoMemoryCheck")

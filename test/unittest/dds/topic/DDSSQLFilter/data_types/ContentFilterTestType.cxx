@@ -27,6 +27,7 @@ char dummy;
 #endif  // _WIN32
 
 #include "ContentFilterTestType.h"
+#include "ContentFilterTestTypeTypeObject.h"
 #include <fastcdr/Cdr.h>
 
 #include <fastcdr/exceptions/BadParamException.h>
@@ -34,50 +35,43 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define StructType_max_cdr_typesize 336ULL;
-#define ContentFilterTestType_max_cdr_typesize 73112ULL;
-
-
-#define StructType_max_key_cdr_typesize 0ULL;
-#define ContentFilterTestType_max_key_cdr_typesize 0ULL;
-
-
-
 
 
 StructType::StructType()
 {
-    // char m_char_field
+    // m_char_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@76329302
     m_char_field = 0;
-    // octet m_uint8_field
+    // m_uint8_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@b59d31
     m_uint8_field = 0;
-    // short m_int16_field
+    // m_int16_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@62fdb4a6
     m_int16_field = 0;
-    // unsigned short m_uint16_field
+    // m_uint16_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@11e21d0e
     m_uint16_field = 0;
-    // long m_int32_field
+    // m_int32_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@3e77a1ed
     m_int32_field = 0;
-    // unsigned long m_uint32_field
+    // m_uint32_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@3ffcd140
     m_uint32_field = 0;
-    // long long m_int64_field
+    // m_int64_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@23bb8443
     m_int64_field = 0;
-    // unsigned long long m_uint64_field
+    // m_uint64_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1176dcec
     m_uint64_field = 0;
-    // float m_float_field
+    // m_float_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@120d6fe6
     m_float_field = 0.0;
-    // double m_double_field
+    // m_double_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4ba2ca36
     m_double_field = 0.0;
-    // long double m_long_double_field
+    // m_long_double_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@3444d69d
     m_long_double_field = 0.0;
-    // boolean m_bool_field
+    // m_bool_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1372ed45
     m_bool_field = false;
-    // string m_string_field
+    // m_string_field com.eprosima.idl.parser.typecode.StringTypeCode@6a79c292
     m_string_field ="";
-    // Color m_enum_field
+    // m_enum_field com.eprosima.idl.parser.typecode.EnumTypeCode@37574691
     m_enum_field = ::RED;
-    // Material m_enum2_field
+    // m_enum2_field com.eprosima.idl.parser.typecode.EnumTypeCode@25359ed8
     m_enum2_field = ::WOOD;
 
+    // Just to register all known types
+    registerContentFilterTestTypeTypes();
 }
 
 StructType::~StructType()
@@ -120,7 +114,7 @@ StructType::StructType(
 }
 
 StructType::StructType(
-        StructType&& x) noexcept 
+        StructType&& x)
 {
     m_char_field = x.m_char_field;
     m_uint8_field = x.m_uint8_field;
@@ -163,7 +157,7 @@ StructType& StructType::operator =(
 }
 
 StructType& StructType::operator =(
-        StructType&& x) noexcept
+        StructType&& x)
 {
 
     m_char_field = x.m_char_field;
@@ -201,8 +195,54 @@ bool StructType::operator !=(
 size_t StructType::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return StructType_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 16 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8); // 128 bits, but aligned as 64
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t StructType::getCdrSerializedSize(
@@ -276,7 +316,7 @@ void StructType::serialize(
     scdr << m_double_field;
     scdr << m_long_double_field;
     scdr << m_bool_field;
-    scdr << m_string_field.c_str();
+    scdr << m_string_field;
     scdr << (uint32_t)m_enum_field;
     scdr << (uint32_t)m_enum2_field;
 
@@ -743,12 +783,29 @@ Material& StructType::enum2_field()
 }
 
 
-
 size_t StructType::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return StructType_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    return current_align;
 }
 
 bool StructType::isKeyDefined()
@@ -760,141 +817,144 @@ void StructType::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
+                   
 }
 
 
 
 ContentFilterTestType::ContentFilterTestType()
 {
-    // char m_char_field
+    // m_char_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7d68ef40
     m_char_field = 0;
-    // octet m_uint8_field
+    // m_uint8_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1f1c7bf6
     m_uint8_field = 0;
-    // short m_int16_field
+    // m_int16_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@25b485ba
     m_int16_field = 0;
-    // unsigned short m_uint16_field
+    // m_uint16_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2b546384
     m_uint16_field = 0;
-    // long m_int32_field
+    // m_int32_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@20d3d15a
     m_int32_field = 0;
-    // unsigned long m_uint32_field
+    // m_uint32_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2893de87
     m_uint32_field = 0;
-    // long long m_int64_field
+    // m_int64_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@55ca8de8
     m_int64_field = 0;
-    // unsigned long long m_uint64_field
+    // m_uint64_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2c34f934
     m_uint64_field = 0;
-    // float m_float_field
+    // m_float_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@12d3a4e9
     m_float_field = 0.0;
-    // double m_double_field
+    // m_double_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@240237d2
     m_double_field = 0.0;
-    // long double m_long_double_field
+    // m_long_double_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@25a65b77
     m_long_double_field = 0.0;
-    // boolean m_bool_field
+    // m_bool_field com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2ed0fbae
     m_bool_field = false;
-    // string m_string_field
+    // m_string_field com.eprosima.idl.parser.typecode.StringTypeCode@212bf671
     m_string_field ="";
-    // Color m_enum_field
+    // m_enum_field com.eprosima.idl.parser.typecode.EnumTypeCode@37574691
     m_enum_field = ::RED;
-    // Material m_enum2_field
+    // m_enum2_field com.eprosima.idl.parser.typecode.EnumTypeCode@25359ed8
     m_enum2_field = ::WOOD;
-    // StructType m_struct_field
+    // m_struct_field com.eprosima.fastdds.idl.parser.typecode.StructTypeCode@14a2f921
 
-    // char m_array_char_field
-    memset(&m_array_char_field, 0, (3) * 1);
-    // octet m_array_uint8_field
-    memset(&m_array_uint8_field, 0, (3) * 1);
-    // short m_array_int16_field
-    memset(&m_array_int16_field, 0, (3) * 2);
-    // unsigned short m_array_uint16_field
-    memset(&m_array_uint16_field, 0, (3) * 2);
-    // long m_array_int32_field
-    memset(&m_array_int32_field, 0, (3) * 4);
-    // unsigned long m_array_uint32_field
-    memset(&m_array_uint32_field, 0, (3) * 4);
-    // long long m_array_int64_field
-    memset(&m_array_int64_field, 0, (3) * 8);
-    // unsigned long long m_array_uint64_field
-    memset(&m_array_uint64_field, 0, (3) * 8);
-    // float m_array_float_field
-    memset(&m_array_float_field, 0, (3) * 4);
-    // double m_array_double_field
-    memset(&m_array_double_field, 0, (3) * 8);
-    // long double m_array_long_double_field
-    memset(&m_array_long_double_field, 0, (3) * 16);
-    // boolean m_array_bool_field
-    memset(&m_array_bool_field, 0, (3) * 1);
-    // string m_array_string_field
+    // m_array_char_field com.eprosima.idl.parser.typecode.ArrayTypeCode@3c87521
+    memset(&m_array_char_field, 0, (max_array_size) * 1);
+    // m_array_uint8_field com.eprosima.idl.parser.typecode.ArrayTypeCode@2aece37d
+    memset(&m_array_uint8_field, 0, (max_array_size) * 1);
+    // m_array_int16_field com.eprosima.idl.parser.typecode.ArrayTypeCode@548a102f
+    memset(&m_array_int16_field, 0, (max_array_size) * 2);
+    // m_array_uint16_field com.eprosima.idl.parser.typecode.ArrayTypeCode@5762806e
+    memset(&m_array_uint16_field, 0, (max_array_size) * 2);
+    // m_array_int32_field com.eprosima.idl.parser.typecode.ArrayTypeCode@17c386de
+    memset(&m_array_int32_field, 0, (max_array_size) * 4);
+    // m_array_uint32_field com.eprosima.idl.parser.typecode.ArrayTypeCode@5af97850
+    memset(&m_array_uint32_field, 0, (max_array_size) * 4);
+    // m_array_int64_field com.eprosima.idl.parser.typecode.ArrayTypeCode@5ef60048
+    memset(&m_array_int64_field, 0, (max_array_size) * 8);
+    // m_array_uint64_field com.eprosima.idl.parser.typecode.ArrayTypeCode@1d548a08
+    memset(&m_array_uint64_field, 0, (max_array_size) * 8);
+    // m_array_float_field com.eprosima.idl.parser.typecode.ArrayTypeCode@16aa0a0a
+    memset(&m_array_float_field, 0, (max_array_size) * 4);
+    // m_array_double_field com.eprosima.idl.parser.typecode.ArrayTypeCode@780cb77
+    memset(&m_array_double_field, 0, (max_array_size) * 8);
+    // m_array_long_double_field com.eprosima.idl.parser.typecode.ArrayTypeCode@691a7f8f
+    memset(&m_array_long_double_field, 0, (max_array_size) * 16);
+    // m_array_bool_field com.eprosima.idl.parser.typecode.ArrayTypeCode@50a7bc6e
+    memset(&m_array_bool_field, 0, (max_array_size) * 1);
+    // m_array_string_field com.eprosima.idl.parser.typecode.ArrayTypeCode@161b062a
 
-    // Color m_array_enum_field
-    memset(&m_array_enum_field, 0, (3) * 4);
-    // Material m_array_enum2_field
-    memset(&m_array_enum2_field, 0, (3) * 4);
-    // StructType m_array_struct_field
+    // m_array_enum_field com.eprosima.idl.parser.typecode.ArrayTypeCode@17c1bced
+    memset(&m_array_enum_field, 0, (max_array_size) * 4);
+    // m_array_enum2_field com.eprosima.idl.parser.typecode.ArrayTypeCode@2d9d4f9d
+    memset(&m_array_enum2_field, 0, (max_array_size) * 4);
+    // m_array_struct_field com.eprosima.idl.parser.typecode.ArrayTypeCode@14ec4505
 
-    // sequence<char, 5> m_bounded_sequence_char_field
+    // m_bounded_sequence_char_field com.eprosima.idl.parser.typecode.SequenceTypeCode@3ee0fea4
 
-    // sequence<octet, 5> m_bounded_sequence_uint8_field
+    // m_bounded_sequence_uint8_field com.eprosima.idl.parser.typecode.SequenceTypeCode@48524010
 
-    // sequence<short, 5> m_bounded_sequence_int16_field
+    // m_bounded_sequence_int16_field com.eprosima.idl.parser.typecode.SequenceTypeCode@4b168fa9
 
-    // sequence<unsigned short, 5> m_bounded_sequence_uint16_field
+    // m_bounded_sequence_uint16_field com.eprosima.idl.parser.typecode.SequenceTypeCode@1a84f40f
 
-    // sequence<long, 5> m_bounded_sequence_int32_field
+    // m_bounded_sequence_int32_field com.eprosima.idl.parser.typecode.SequenceTypeCode@23282c25
 
-    // sequence<unsigned long, 5> m_bounded_sequence_uint32_field
+    // m_bounded_sequence_uint32_field com.eprosima.idl.parser.typecode.SequenceTypeCode@7920ba90
 
-    // sequence<long long, 5> m_bounded_sequence_int64_field
+    // m_bounded_sequence_int64_field com.eprosima.idl.parser.typecode.SequenceTypeCode@6b419da
 
-    // sequence<unsigned long long, 5> m_bounded_sequence_uint64_field
+    // m_bounded_sequence_uint64_field com.eprosima.idl.parser.typecode.SequenceTypeCode@3b2da18f
 
-    // sequence<float, 5> m_bounded_sequence_float_field
+    // m_bounded_sequence_float_field com.eprosima.idl.parser.typecode.SequenceTypeCode@5906ebcb
 
-    // sequence<double, 5> m_bounded_sequence_double_field
+    // m_bounded_sequence_double_field com.eprosima.idl.parser.typecode.SequenceTypeCode@258e2e41
 
-    // sequence<long double, 5> m_bounded_sequence_long_double_field
+    // m_bounded_sequence_long_double_field com.eprosima.idl.parser.typecode.SequenceTypeCode@3d299e3
 
-    // sequence<boolean, 5> m_bounded_sequence_bool_field
+    // m_bounded_sequence_bool_field com.eprosima.idl.parser.typecode.SequenceTypeCode@55a561cf
 
-    // sequence<string, 5> m_bounded_sequence_string_field
+    // m_bounded_sequence_string_field com.eprosima.idl.parser.typecode.SequenceTypeCode@3b938003
 
-    // sequence<Color, 5> m_bounded_sequence_enum_field
+    // m_bounded_sequence_enum_field com.eprosima.idl.parser.typecode.SequenceTypeCode@6f3b5d16
 
-    // sequence<Material, 5> m_bounded_sequence_enum2_field
+    // m_bounded_sequence_enum2_field com.eprosima.idl.parser.typecode.SequenceTypeCode@78b1cc93
 
-    // sequence<StructType, 5> m_bounded_sequence_struct_field
+    // m_bounded_sequence_struct_field com.eprosima.idl.parser.typecode.SequenceTypeCode@6646153
 
-    // sequence<char> m_unbounded_sequence_char_field
+    // m_unbounded_sequence_char_field com.eprosima.idl.parser.typecode.SequenceTypeCode@21507a04
 
-    // sequence<octet> m_unbounded_sequence_uint8_field
+    // m_unbounded_sequence_uint8_field com.eprosima.idl.parser.typecode.SequenceTypeCode@143640d5
 
-    // sequence<short> m_unbounded_sequence_int16_field
+    // m_unbounded_sequence_int16_field com.eprosima.idl.parser.typecode.SequenceTypeCode@6295d394
 
-    // sequence<unsigned short> m_unbounded_sequence_uint16_field
+    // m_unbounded_sequence_uint16_field com.eprosima.idl.parser.typecode.SequenceTypeCode@475e586c
 
-    // sequence<long> m_unbounded_sequence_int32_field
+    // m_unbounded_sequence_int32_field com.eprosima.idl.parser.typecode.SequenceTypeCode@657c8ad9
 
-    // sequence<unsigned long> m_unbounded_sequence_uint32_field
+    // m_unbounded_sequence_uint32_field com.eprosima.idl.parser.typecode.SequenceTypeCode@436a4e4b
 
-    // sequence<long long> m_unbounded_sequence_int64_field
+    // m_unbounded_sequence_int64_field com.eprosima.idl.parser.typecode.SequenceTypeCode@f2f2cc1
 
-    // sequence<unsigned long long> m_unbounded_sequence_uint64_field
+    // m_unbounded_sequence_uint64_field com.eprosima.idl.parser.typecode.SequenceTypeCode@3a079870
 
-    // sequence<float> m_unbounded_sequence_float_field
+    // m_unbounded_sequence_float_field com.eprosima.idl.parser.typecode.SequenceTypeCode@3b2cf7ab
 
-    // sequence<double> m_unbounded_sequence_double_field
+    // m_unbounded_sequence_double_field com.eprosima.idl.parser.typecode.SequenceTypeCode@2aa5fe93
 
-    // sequence<long double> m_unbounded_sequence_long_double_field
+    // m_unbounded_sequence_long_double_field com.eprosima.idl.parser.typecode.SequenceTypeCode@5c1a8622
 
-    // sequence<boolean> m_unbounded_sequence_bool_field
+    // m_unbounded_sequence_bool_field com.eprosima.idl.parser.typecode.SequenceTypeCode@5ad851c9
 
-    // sequence<string> m_unbounded_sequence_string_field
+    // m_unbounded_sequence_string_field com.eprosima.idl.parser.typecode.SequenceTypeCode@6156496
 
-    // sequence<Color> m_unbounded_sequence_enum_field
+    // m_unbounded_sequence_enum_field com.eprosima.idl.parser.typecode.SequenceTypeCode@3c153a1
 
-    // sequence<Material> m_unbounded_sequence_enum2_field
+    // m_unbounded_sequence_enum2_field com.eprosima.idl.parser.typecode.SequenceTypeCode@b62fe6d
 
-    // sequence<StructType> m_unbounded_sequence_struct_field
+    // m_unbounded_sequence_struct_field com.eprosima.idl.parser.typecode.SequenceTypeCode@13acb0d1
 
 
+    // Just to register all known types
+    registerContentFilterTestTypeTypes();
 }
 
 ContentFilterTestType::~ContentFilterTestType()
@@ -1035,7 +1095,7 @@ ContentFilterTestType::ContentFilterTestType(
 }
 
 ContentFilterTestType::ContentFilterTestType(
-        ContentFilterTestType&& x) noexcept 
+        ContentFilterTestType&& x)
 {
     m_char_field = x.m_char_field;
     m_uint8_field = x.m_uint8_field;
@@ -1176,7 +1236,7 @@ ContentFilterTestType& ContentFilterTestType::operator =(
 }
 
 ContentFilterTestType& ContentFilterTestType::operator =(
-        ContentFilterTestType&& x) noexcept
+        ContentFilterTestType&& x)
 {
 
     m_char_field = x.m_char_field;
@@ -1263,8 +1323,302 @@ bool ContentFilterTestType::operator !=(
 size_t ContentFilterTestType::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return ContentFilterTestType_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 16 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8); // 128 bits, but aligned as 64
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += StructType::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += ((max_array_size) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += ((max_array_size) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += ((max_array_size) * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += ((max_array_size) * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += ((max_array_size) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += ((max_array_size) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += ((max_array_size) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += ((max_array_size) * 16) + eprosima::fastcdr::Cdr::alignment(current_alignment, 16);
+
+
+    current_alignment += ((max_array_size) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    for(size_t a = 0; a < (max_array_size); ++a)
+    {
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+    }
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    for(size_t a = 0; a < (max_array_size); ++a)
+    {
+        current_alignment += StructType::getMaxCdrSerializedSize(current_alignment);}
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 16) + eprosima::fastcdr::Cdr::alignment(current_alignment, 16);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    for(size_t a = 0; a < max_seq_size; ++a)
+    {
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+    }
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (max_seq_size * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    for(size_t a = 0; a < max_seq_size; ++a)
+    {
+        current_alignment += StructType::getMaxCdrSerializedSize(current_alignment);}
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 16) + eprosima::fastcdr::Cdr::alignment(current_alignment, 16);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    for(size_t a = 0; a < 100; ++a)
+    {
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+    }
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (100 * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    for(size_t a = 0; a < 100; ++a)
+    {
+        current_alignment += StructType::getMaxCdrSerializedSize(current_alignment);}
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t ContentFilterTestType::getCdrSerializedSize(
@@ -1319,40 +1673,38 @@ size_t ContentFilterTestType::getCdrSerializedSize(
 
 
     current_alignment += StructType::getCdrSerializedSize(data.struct_field(), current_alignment);
+    current_alignment += ((max_array_size) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
-    current_alignment += ((3) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+    current_alignment += ((max_array_size) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
-    current_alignment += ((3) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+    current_alignment += ((max_array_size) * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
 
-    current_alignment += ((3) * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+    current_alignment += ((max_array_size) * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
 
-    current_alignment += ((3) * 2) + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
-    current_alignment += ((3) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
-    current_alignment += ((3) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += ((max_array_size) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
 
-    current_alignment += ((3) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+    current_alignment += ((max_array_size) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
 
-    current_alignment += ((3) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
-    current_alignment += ((3) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += ((max_array_size) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
 
-    current_alignment += ((3) * 8) + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+    current_alignment += ((max_array_size) * 16) + eprosima::fastcdr::Cdr::alignment(current_alignment, 16);
 
-    current_alignment += ((3) * 16) + eprosima::fastcdr::Cdr::alignment(current_alignment, 16);
-
-    current_alignment += ((3) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+    current_alignment += ((max_array_size) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
     for(size_t a = 0; a < data.array_string_field().size(); ++a)
     {
             current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + data.array_string_field().at(a).size() + 1;
 
     }
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
-    current_alignment += ((3) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
-
-    current_alignment += ((3) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+    current_alignment += ((max_array_size) * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
     for(size_t a = 0; a < data.array_struct_field().size(); ++a)
     {
@@ -1660,7 +2012,7 @@ void ContentFilterTestType::serialize(
     scdr << m_double_field;
     scdr << m_long_double_field;
     scdr << m_bool_field;
-    scdr << m_string_field.c_str();
+    scdr << m_string_field;
     scdr << (uint32_t)m_enum_field;
     scdr << (uint32_t)m_enum2_field;
     scdr << m_struct_field;
@@ -1688,12 +2040,7 @@ void ContentFilterTestType::serialize(
 
     scdr << m_array_bool_field;
 
-    for (const auto& str : m_array_string_field)
-    {
-        scdr << str.c_str();
-    }
-
-
+    scdr << m_array_string_field;
     scdr.serializeArray(reinterpret_cast<const uint32_t*>(m_array_enum_field.data()), m_array_enum_field.size());
 
 
@@ -1714,8 +2061,7 @@ void ContentFilterTestType::serialize(
     scdr << m_bounded_sequence_double_field;
     scdr << m_bounded_sequence_long_double_field;
     scdr << m_bounded_sequence_bool_field;
-    scdr << m_bounded_sequence_string_field;
-    scdr << static_cast<uint32_t>(m_bounded_sequence_enum_field.size());
+    scdr << m_bounded_sequence_string_field;scdr << static_cast<uint32_t>(m_bounded_sequence_enum_field.size());
     scdr.serializeArray(reinterpret_cast<const uint32_t*>(m_bounded_sequence_enum_field.data()), m_bounded_sequence_enum_field.size());
 
     scdr << static_cast<uint32_t>(m_bounded_sequence_enum2_field.size());
@@ -1734,8 +2080,7 @@ void ContentFilterTestType::serialize(
     scdr << m_unbounded_sequence_double_field;
     scdr << m_unbounded_sequence_long_double_field;
     scdr << m_unbounded_sequence_bool_field;
-    scdr << m_unbounded_sequence_string_field;
-    scdr << static_cast<uint32_t>(m_unbounded_sequence_enum_field.size());
+    scdr << m_unbounded_sequence_string_field;scdr << static_cast<uint32_t>(m_unbounded_sequence_enum_field.size());
     scdr.serializeArray(reinterpret_cast<const uint32_t*>(m_unbounded_sequence_enum_field.data()), m_unbounded_sequence_enum_field.size());
 
     scdr << static_cast<uint32_t>(m_unbounded_sequence_enum2_field.size());
@@ -1799,11 +2144,7 @@ void ContentFilterTestType::deserialize(
 
     dcdr >> m_array_bool_field;
 
-    for (auto& str : m_array_string_field)
-    {
-        dcdr >> str;}
-
-
+    dcdr >> m_array_string_field;
     dcdr.deserializeArray(reinterpret_cast<uint32_t*>(m_array_enum_field.data()), m_array_enum_field.size());
 
 
@@ -2341,7 +2682,7 @@ StructType& ContentFilterTestType::struct_field()
  * @param _array_char_field New value to be copied in member array_char_field
  */
 void ContentFilterTestType::array_char_field(
-        const std::array<char, 3>& _array_char_field)
+        const std::array<char, max_array_size>& _array_char_field)
 {
     m_array_char_field = _array_char_field;
 }
@@ -2351,7 +2692,7 @@ void ContentFilterTestType::array_char_field(
  * @param _array_char_field New value to be moved in member array_char_field
  */
 void ContentFilterTestType::array_char_field(
-        std::array<char, 3>&& _array_char_field)
+        std::array<char, max_array_size>&& _array_char_field)
 {
     m_array_char_field = std::move(_array_char_field);
 }
@@ -2360,7 +2701,7 @@ void ContentFilterTestType::array_char_field(
  * @brief This function returns a constant reference to member array_char_field
  * @return Constant reference to member array_char_field
  */
-const std::array<char, 3>& ContentFilterTestType::array_char_field() const
+const std::array<char, max_array_size>& ContentFilterTestType::array_char_field() const
 {
     return m_array_char_field;
 }
@@ -2369,7 +2710,7 @@ const std::array<char, 3>& ContentFilterTestType::array_char_field() const
  * @brief This function returns a reference to member array_char_field
  * @return Reference to member array_char_field
  */
-std::array<char, 3>& ContentFilterTestType::array_char_field()
+std::array<char, max_array_size>& ContentFilterTestType::array_char_field()
 {
     return m_array_char_field;
 }
@@ -2378,7 +2719,7 @@ std::array<char, 3>& ContentFilterTestType::array_char_field()
  * @param _array_uint8_field New value to be copied in member array_uint8_field
  */
 void ContentFilterTestType::array_uint8_field(
-        const std::array<uint8_t, 3>& _array_uint8_field)
+        const std::array<uint8_t, max_array_size>& _array_uint8_field)
 {
     m_array_uint8_field = _array_uint8_field;
 }
@@ -2388,7 +2729,7 @@ void ContentFilterTestType::array_uint8_field(
  * @param _array_uint8_field New value to be moved in member array_uint8_field
  */
 void ContentFilterTestType::array_uint8_field(
-        std::array<uint8_t, 3>&& _array_uint8_field)
+        std::array<uint8_t, max_array_size>&& _array_uint8_field)
 {
     m_array_uint8_field = std::move(_array_uint8_field);
 }
@@ -2397,7 +2738,7 @@ void ContentFilterTestType::array_uint8_field(
  * @brief This function returns a constant reference to member array_uint8_field
  * @return Constant reference to member array_uint8_field
  */
-const std::array<uint8_t, 3>& ContentFilterTestType::array_uint8_field() const
+const std::array<uint8_t, max_array_size>& ContentFilterTestType::array_uint8_field() const
 {
     return m_array_uint8_field;
 }
@@ -2406,7 +2747,7 @@ const std::array<uint8_t, 3>& ContentFilterTestType::array_uint8_field() const
  * @brief This function returns a reference to member array_uint8_field
  * @return Reference to member array_uint8_field
  */
-std::array<uint8_t, 3>& ContentFilterTestType::array_uint8_field()
+std::array<uint8_t, max_array_size>& ContentFilterTestType::array_uint8_field()
 {
     return m_array_uint8_field;
 }
@@ -2415,7 +2756,7 @@ std::array<uint8_t, 3>& ContentFilterTestType::array_uint8_field()
  * @param _array_int16_field New value to be copied in member array_int16_field
  */
 void ContentFilterTestType::array_int16_field(
-        const std::array<int16_t, 3>& _array_int16_field)
+        const std::array<int16_t, max_array_size>& _array_int16_field)
 {
     m_array_int16_field = _array_int16_field;
 }
@@ -2425,7 +2766,7 @@ void ContentFilterTestType::array_int16_field(
  * @param _array_int16_field New value to be moved in member array_int16_field
  */
 void ContentFilterTestType::array_int16_field(
-        std::array<int16_t, 3>&& _array_int16_field)
+        std::array<int16_t, max_array_size>&& _array_int16_field)
 {
     m_array_int16_field = std::move(_array_int16_field);
 }
@@ -2434,7 +2775,7 @@ void ContentFilterTestType::array_int16_field(
  * @brief This function returns a constant reference to member array_int16_field
  * @return Constant reference to member array_int16_field
  */
-const std::array<int16_t, 3>& ContentFilterTestType::array_int16_field() const
+const std::array<int16_t, max_array_size>& ContentFilterTestType::array_int16_field() const
 {
     return m_array_int16_field;
 }
@@ -2443,7 +2784,7 @@ const std::array<int16_t, 3>& ContentFilterTestType::array_int16_field() const
  * @brief This function returns a reference to member array_int16_field
  * @return Reference to member array_int16_field
  */
-std::array<int16_t, 3>& ContentFilterTestType::array_int16_field()
+std::array<int16_t, max_array_size>& ContentFilterTestType::array_int16_field()
 {
     return m_array_int16_field;
 }
@@ -2452,7 +2793,7 @@ std::array<int16_t, 3>& ContentFilterTestType::array_int16_field()
  * @param _array_uint16_field New value to be copied in member array_uint16_field
  */
 void ContentFilterTestType::array_uint16_field(
-        const std::array<uint16_t, 3>& _array_uint16_field)
+        const std::array<uint16_t, max_array_size>& _array_uint16_field)
 {
     m_array_uint16_field = _array_uint16_field;
 }
@@ -2462,7 +2803,7 @@ void ContentFilterTestType::array_uint16_field(
  * @param _array_uint16_field New value to be moved in member array_uint16_field
  */
 void ContentFilterTestType::array_uint16_field(
-        std::array<uint16_t, 3>&& _array_uint16_field)
+        std::array<uint16_t, max_array_size>&& _array_uint16_field)
 {
     m_array_uint16_field = std::move(_array_uint16_field);
 }
@@ -2471,7 +2812,7 @@ void ContentFilterTestType::array_uint16_field(
  * @brief This function returns a constant reference to member array_uint16_field
  * @return Constant reference to member array_uint16_field
  */
-const std::array<uint16_t, 3>& ContentFilterTestType::array_uint16_field() const
+const std::array<uint16_t, max_array_size>& ContentFilterTestType::array_uint16_field() const
 {
     return m_array_uint16_field;
 }
@@ -2480,7 +2821,7 @@ const std::array<uint16_t, 3>& ContentFilterTestType::array_uint16_field() const
  * @brief This function returns a reference to member array_uint16_field
  * @return Reference to member array_uint16_field
  */
-std::array<uint16_t, 3>& ContentFilterTestType::array_uint16_field()
+std::array<uint16_t, max_array_size>& ContentFilterTestType::array_uint16_field()
 {
     return m_array_uint16_field;
 }
@@ -2489,7 +2830,7 @@ std::array<uint16_t, 3>& ContentFilterTestType::array_uint16_field()
  * @param _array_int32_field New value to be copied in member array_int32_field
  */
 void ContentFilterTestType::array_int32_field(
-        const std::array<int32_t, 3>& _array_int32_field)
+        const std::array<int32_t, max_array_size>& _array_int32_field)
 {
     m_array_int32_field = _array_int32_field;
 }
@@ -2499,7 +2840,7 @@ void ContentFilterTestType::array_int32_field(
  * @param _array_int32_field New value to be moved in member array_int32_field
  */
 void ContentFilterTestType::array_int32_field(
-        std::array<int32_t, 3>&& _array_int32_field)
+        std::array<int32_t, max_array_size>&& _array_int32_field)
 {
     m_array_int32_field = std::move(_array_int32_field);
 }
@@ -2508,7 +2849,7 @@ void ContentFilterTestType::array_int32_field(
  * @brief This function returns a constant reference to member array_int32_field
  * @return Constant reference to member array_int32_field
  */
-const std::array<int32_t, 3>& ContentFilterTestType::array_int32_field() const
+const std::array<int32_t, max_array_size>& ContentFilterTestType::array_int32_field() const
 {
     return m_array_int32_field;
 }
@@ -2517,7 +2858,7 @@ const std::array<int32_t, 3>& ContentFilterTestType::array_int32_field() const
  * @brief This function returns a reference to member array_int32_field
  * @return Reference to member array_int32_field
  */
-std::array<int32_t, 3>& ContentFilterTestType::array_int32_field()
+std::array<int32_t, max_array_size>& ContentFilterTestType::array_int32_field()
 {
     return m_array_int32_field;
 }
@@ -2526,7 +2867,7 @@ std::array<int32_t, 3>& ContentFilterTestType::array_int32_field()
  * @param _array_uint32_field New value to be copied in member array_uint32_field
  */
 void ContentFilterTestType::array_uint32_field(
-        const std::array<uint32_t, 3>& _array_uint32_field)
+        const std::array<uint32_t, max_array_size>& _array_uint32_field)
 {
     m_array_uint32_field = _array_uint32_field;
 }
@@ -2536,7 +2877,7 @@ void ContentFilterTestType::array_uint32_field(
  * @param _array_uint32_field New value to be moved in member array_uint32_field
  */
 void ContentFilterTestType::array_uint32_field(
-        std::array<uint32_t, 3>&& _array_uint32_field)
+        std::array<uint32_t, max_array_size>&& _array_uint32_field)
 {
     m_array_uint32_field = std::move(_array_uint32_field);
 }
@@ -2545,7 +2886,7 @@ void ContentFilterTestType::array_uint32_field(
  * @brief This function returns a constant reference to member array_uint32_field
  * @return Constant reference to member array_uint32_field
  */
-const std::array<uint32_t, 3>& ContentFilterTestType::array_uint32_field() const
+const std::array<uint32_t, max_array_size>& ContentFilterTestType::array_uint32_field() const
 {
     return m_array_uint32_field;
 }
@@ -2554,7 +2895,7 @@ const std::array<uint32_t, 3>& ContentFilterTestType::array_uint32_field() const
  * @brief This function returns a reference to member array_uint32_field
  * @return Reference to member array_uint32_field
  */
-std::array<uint32_t, 3>& ContentFilterTestType::array_uint32_field()
+std::array<uint32_t, max_array_size>& ContentFilterTestType::array_uint32_field()
 {
     return m_array_uint32_field;
 }
@@ -2563,7 +2904,7 @@ std::array<uint32_t, 3>& ContentFilterTestType::array_uint32_field()
  * @param _array_int64_field New value to be copied in member array_int64_field
  */
 void ContentFilterTestType::array_int64_field(
-        const std::array<int64_t, 3>& _array_int64_field)
+        const std::array<int64_t, max_array_size>& _array_int64_field)
 {
     m_array_int64_field = _array_int64_field;
 }
@@ -2573,7 +2914,7 @@ void ContentFilterTestType::array_int64_field(
  * @param _array_int64_field New value to be moved in member array_int64_field
  */
 void ContentFilterTestType::array_int64_field(
-        std::array<int64_t, 3>&& _array_int64_field)
+        std::array<int64_t, max_array_size>&& _array_int64_field)
 {
     m_array_int64_field = std::move(_array_int64_field);
 }
@@ -2582,7 +2923,7 @@ void ContentFilterTestType::array_int64_field(
  * @brief This function returns a constant reference to member array_int64_field
  * @return Constant reference to member array_int64_field
  */
-const std::array<int64_t, 3>& ContentFilterTestType::array_int64_field() const
+const std::array<int64_t, max_array_size>& ContentFilterTestType::array_int64_field() const
 {
     return m_array_int64_field;
 }
@@ -2591,7 +2932,7 @@ const std::array<int64_t, 3>& ContentFilterTestType::array_int64_field() const
  * @brief This function returns a reference to member array_int64_field
  * @return Reference to member array_int64_field
  */
-std::array<int64_t, 3>& ContentFilterTestType::array_int64_field()
+std::array<int64_t, max_array_size>& ContentFilterTestType::array_int64_field()
 {
     return m_array_int64_field;
 }
@@ -2600,7 +2941,7 @@ std::array<int64_t, 3>& ContentFilterTestType::array_int64_field()
  * @param _array_uint64_field New value to be copied in member array_uint64_field
  */
 void ContentFilterTestType::array_uint64_field(
-        const std::array<uint64_t, 3>& _array_uint64_field)
+        const std::array<uint64_t, max_array_size>& _array_uint64_field)
 {
     m_array_uint64_field = _array_uint64_field;
 }
@@ -2610,7 +2951,7 @@ void ContentFilterTestType::array_uint64_field(
  * @param _array_uint64_field New value to be moved in member array_uint64_field
  */
 void ContentFilterTestType::array_uint64_field(
-        std::array<uint64_t, 3>&& _array_uint64_field)
+        std::array<uint64_t, max_array_size>&& _array_uint64_field)
 {
     m_array_uint64_field = std::move(_array_uint64_field);
 }
@@ -2619,7 +2960,7 @@ void ContentFilterTestType::array_uint64_field(
  * @brief This function returns a constant reference to member array_uint64_field
  * @return Constant reference to member array_uint64_field
  */
-const std::array<uint64_t, 3>& ContentFilterTestType::array_uint64_field() const
+const std::array<uint64_t, max_array_size>& ContentFilterTestType::array_uint64_field() const
 {
     return m_array_uint64_field;
 }
@@ -2628,7 +2969,7 @@ const std::array<uint64_t, 3>& ContentFilterTestType::array_uint64_field() const
  * @brief This function returns a reference to member array_uint64_field
  * @return Reference to member array_uint64_field
  */
-std::array<uint64_t, 3>& ContentFilterTestType::array_uint64_field()
+std::array<uint64_t, max_array_size>& ContentFilterTestType::array_uint64_field()
 {
     return m_array_uint64_field;
 }
@@ -2637,7 +2978,7 @@ std::array<uint64_t, 3>& ContentFilterTestType::array_uint64_field()
  * @param _array_float_field New value to be copied in member array_float_field
  */
 void ContentFilterTestType::array_float_field(
-        const std::array<float, 3>& _array_float_field)
+        const std::array<float, max_array_size>& _array_float_field)
 {
     m_array_float_field = _array_float_field;
 }
@@ -2647,7 +2988,7 @@ void ContentFilterTestType::array_float_field(
  * @param _array_float_field New value to be moved in member array_float_field
  */
 void ContentFilterTestType::array_float_field(
-        std::array<float, 3>&& _array_float_field)
+        std::array<float, max_array_size>&& _array_float_field)
 {
     m_array_float_field = std::move(_array_float_field);
 }
@@ -2656,7 +2997,7 @@ void ContentFilterTestType::array_float_field(
  * @brief This function returns a constant reference to member array_float_field
  * @return Constant reference to member array_float_field
  */
-const std::array<float, 3>& ContentFilterTestType::array_float_field() const
+const std::array<float, max_array_size>& ContentFilterTestType::array_float_field() const
 {
     return m_array_float_field;
 }
@@ -2665,7 +3006,7 @@ const std::array<float, 3>& ContentFilterTestType::array_float_field() const
  * @brief This function returns a reference to member array_float_field
  * @return Reference to member array_float_field
  */
-std::array<float, 3>& ContentFilterTestType::array_float_field()
+std::array<float, max_array_size>& ContentFilterTestType::array_float_field()
 {
     return m_array_float_field;
 }
@@ -2674,7 +3015,7 @@ std::array<float, 3>& ContentFilterTestType::array_float_field()
  * @param _array_double_field New value to be copied in member array_double_field
  */
 void ContentFilterTestType::array_double_field(
-        const std::array<double, 3>& _array_double_field)
+        const std::array<double, max_array_size>& _array_double_field)
 {
     m_array_double_field = _array_double_field;
 }
@@ -2684,7 +3025,7 @@ void ContentFilterTestType::array_double_field(
  * @param _array_double_field New value to be moved in member array_double_field
  */
 void ContentFilterTestType::array_double_field(
-        std::array<double, 3>&& _array_double_field)
+        std::array<double, max_array_size>&& _array_double_field)
 {
     m_array_double_field = std::move(_array_double_field);
 }
@@ -2693,7 +3034,7 @@ void ContentFilterTestType::array_double_field(
  * @brief This function returns a constant reference to member array_double_field
  * @return Constant reference to member array_double_field
  */
-const std::array<double, 3>& ContentFilterTestType::array_double_field() const
+const std::array<double, max_array_size>& ContentFilterTestType::array_double_field() const
 {
     return m_array_double_field;
 }
@@ -2702,7 +3043,7 @@ const std::array<double, 3>& ContentFilterTestType::array_double_field() const
  * @brief This function returns a reference to member array_double_field
  * @return Reference to member array_double_field
  */
-std::array<double, 3>& ContentFilterTestType::array_double_field()
+std::array<double, max_array_size>& ContentFilterTestType::array_double_field()
 {
     return m_array_double_field;
 }
@@ -2711,7 +3052,7 @@ std::array<double, 3>& ContentFilterTestType::array_double_field()
  * @param _array_long_double_field New value to be copied in member array_long_double_field
  */
 void ContentFilterTestType::array_long_double_field(
-        const std::array<long double, 3>& _array_long_double_field)
+        const std::array<long double, max_array_size>& _array_long_double_field)
 {
     m_array_long_double_field = _array_long_double_field;
 }
@@ -2721,7 +3062,7 @@ void ContentFilterTestType::array_long_double_field(
  * @param _array_long_double_field New value to be moved in member array_long_double_field
  */
 void ContentFilterTestType::array_long_double_field(
-        std::array<long double, 3>&& _array_long_double_field)
+        std::array<long double, max_array_size>&& _array_long_double_field)
 {
     m_array_long_double_field = std::move(_array_long_double_field);
 }
@@ -2730,7 +3071,7 @@ void ContentFilterTestType::array_long_double_field(
  * @brief This function returns a constant reference to member array_long_double_field
  * @return Constant reference to member array_long_double_field
  */
-const std::array<long double, 3>& ContentFilterTestType::array_long_double_field() const
+const std::array<long double, max_array_size>& ContentFilterTestType::array_long_double_field() const
 {
     return m_array_long_double_field;
 }
@@ -2739,7 +3080,7 @@ const std::array<long double, 3>& ContentFilterTestType::array_long_double_field
  * @brief This function returns a reference to member array_long_double_field
  * @return Reference to member array_long_double_field
  */
-std::array<long double, 3>& ContentFilterTestType::array_long_double_field()
+std::array<long double, max_array_size>& ContentFilterTestType::array_long_double_field()
 {
     return m_array_long_double_field;
 }
@@ -2748,7 +3089,7 @@ std::array<long double, 3>& ContentFilterTestType::array_long_double_field()
  * @param _array_bool_field New value to be copied in member array_bool_field
  */
 void ContentFilterTestType::array_bool_field(
-        const std::array<bool, 3>& _array_bool_field)
+        const std::array<bool, max_array_size>& _array_bool_field)
 {
     m_array_bool_field = _array_bool_field;
 }
@@ -2758,7 +3099,7 @@ void ContentFilterTestType::array_bool_field(
  * @param _array_bool_field New value to be moved in member array_bool_field
  */
 void ContentFilterTestType::array_bool_field(
-        std::array<bool, 3>&& _array_bool_field)
+        std::array<bool, max_array_size>&& _array_bool_field)
 {
     m_array_bool_field = std::move(_array_bool_field);
 }
@@ -2767,7 +3108,7 @@ void ContentFilterTestType::array_bool_field(
  * @brief This function returns a constant reference to member array_bool_field
  * @return Constant reference to member array_bool_field
  */
-const std::array<bool, 3>& ContentFilterTestType::array_bool_field() const
+const std::array<bool, max_array_size>& ContentFilterTestType::array_bool_field() const
 {
     return m_array_bool_field;
 }
@@ -2776,7 +3117,7 @@ const std::array<bool, 3>& ContentFilterTestType::array_bool_field() const
  * @brief This function returns a reference to member array_bool_field
  * @return Reference to member array_bool_field
  */
-std::array<bool, 3>& ContentFilterTestType::array_bool_field()
+std::array<bool, max_array_size>& ContentFilterTestType::array_bool_field()
 {
     return m_array_bool_field;
 }
@@ -2785,7 +3126,7 @@ std::array<bool, 3>& ContentFilterTestType::array_bool_field()
  * @param _array_string_field New value to be copied in member array_string_field
  */
 void ContentFilterTestType::array_string_field(
-        const std::array<std::string, 3>& _array_string_field)
+        const std::array<std::string, max_array_size>& _array_string_field)
 {
     m_array_string_field = _array_string_field;
 }
@@ -2795,7 +3136,7 @@ void ContentFilterTestType::array_string_field(
  * @param _array_string_field New value to be moved in member array_string_field
  */
 void ContentFilterTestType::array_string_field(
-        std::array<std::string, 3>&& _array_string_field)
+        std::array<std::string, max_array_size>&& _array_string_field)
 {
     m_array_string_field = std::move(_array_string_field);
 }
@@ -2804,7 +3145,7 @@ void ContentFilterTestType::array_string_field(
  * @brief This function returns a constant reference to member array_string_field
  * @return Constant reference to member array_string_field
  */
-const std::array<std::string, 3>& ContentFilterTestType::array_string_field() const
+const std::array<std::string, max_array_size>& ContentFilterTestType::array_string_field() const
 {
     return m_array_string_field;
 }
@@ -2813,7 +3154,7 @@ const std::array<std::string, 3>& ContentFilterTestType::array_string_field() co
  * @brief This function returns a reference to member array_string_field
  * @return Reference to member array_string_field
  */
-std::array<std::string, 3>& ContentFilterTestType::array_string_field()
+std::array<std::string, max_array_size>& ContentFilterTestType::array_string_field()
 {
     return m_array_string_field;
 }
@@ -2822,7 +3163,7 @@ std::array<std::string, 3>& ContentFilterTestType::array_string_field()
  * @param _array_enum_field New value to be copied in member array_enum_field
  */
 void ContentFilterTestType::array_enum_field(
-        const std::array<Color, 3>& _array_enum_field)
+        const std::array<Color, max_array_size>& _array_enum_field)
 {
     m_array_enum_field = _array_enum_field;
 }
@@ -2832,7 +3173,7 @@ void ContentFilterTestType::array_enum_field(
  * @param _array_enum_field New value to be moved in member array_enum_field
  */
 void ContentFilterTestType::array_enum_field(
-        std::array<Color, 3>&& _array_enum_field)
+        std::array<Color, max_array_size>&& _array_enum_field)
 {
     m_array_enum_field = std::move(_array_enum_field);
 }
@@ -2841,7 +3182,7 @@ void ContentFilterTestType::array_enum_field(
  * @brief This function returns a constant reference to member array_enum_field
  * @return Constant reference to member array_enum_field
  */
-const std::array<Color, 3>& ContentFilterTestType::array_enum_field() const
+const std::array<Color, max_array_size>& ContentFilterTestType::array_enum_field() const
 {
     return m_array_enum_field;
 }
@@ -2850,7 +3191,7 @@ const std::array<Color, 3>& ContentFilterTestType::array_enum_field() const
  * @brief This function returns a reference to member array_enum_field
  * @return Reference to member array_enum_field
  */
-std::array<Color, 3>& ContentFilterTestType::array_enum_field()
+std::array<Color, max_array_size>& ContentFilterTestType::array_enum_field()
 {
     return m_array_enum_field;
 }
@@ -2859,7 +3200,7 @@ std::array<Color, 3>& ContentFilterTestType::array_enum_field()
  * @param _array_enum2_field New value to be copied in member array_enum2_field
  */
 void ContentFilterTestType::array_enum2_field(
-        const std::array<Material, 3>& _array_enum2_field)
+        const std::array<Material, max_array_size>& _array_enum2_field)
 {
     m_array_enum2_field = _array_enum2_field;
 }
@@ -2869,7 +3210,7 @@ void ContentFilterTestType::array_enum2_field(
  * @param _array_enum2_field New value to be moved in member array_enum2_field
  */
 void ContentFilterTestType::array_enum2_field(
-        std::array<Material, 3>&& _array_enum2_field)
+        std::array<Material, max_array_size>&& _array_enum2_field)
 {
     m_array_enum2_field = std::move(_array_enum2_field);
 }
@@ -2878,7 +3219,7 @@ void ContentFilterTestType::array_enum2_field(
  * @brief This function returns a constant reference to member array_enum2_field
  * @return Constant reference to member array_enum2_field
  */
-const std::array<Material, 3>& ContentFilterTestType::array_enum2_field() const
+const std::array<Material, max_array_size>& ContentFilterTestType::array_enum2_field() const
 {
     return m_array_enum2_field;
 }
@@ -2887,7 +3228,7 @@ const std::array<Material, 3>& ContentFilterTestType::array_enum2_field() const
  * @brief This function returns a reference to member array_enum2_field
  * @return Reference to member array_enum2_field
  */
-std::array<Material, 3>& ContentFilterTestType::array_enum2_field()
+std::array<Material, max_array_size>& ContentFilterTestType::array_enum2_field()
 {
     return m_array_enum2_field;
 }
@@ -2896,7 +3237,7 @@ std::array<Material, 3>& ContentFilterTestType::array_enum2_field()
  * @param _array_struct_field New value to be copied in member array_struct_field
  */
 void ContentFilterTestType::array_struct_field(
-        const std::array<StructType, 3>& _array_struct_field)
+        const std::array<StructType, max_array_size>& _array_struct_field)
 {
     m_array_struct_field = _array_struct_field;
 }
@@ -2906,7 +3247,7 @@ void ContentFilterTestType::array_struct_field(
  * @param _array_struct_field New value to be moved in member array_struct_field
  */
 void ContentFilterTestType::array_struct_field(
-        std::array<StructType, 3>&& _array_struct_field)
+        std::array<StructType, max_array_size>&& _array_struct_field)
 {
     m_array_struct_field = std::move(_array_struct_field);
 }
@@ -2915,7 +3256,7 @@ void ContentFilterTestType::array_struct_field(
  * @brief This function returns a constant reference to member array_struct_field
  * @return Constant reference to member array_struct_field
  */
-const std::array<StructType, 3>& ContentFilterTestType::array_struct_field() const
+const std::array<StructType, max_array_size>& ContentFilterTestType::array_struct_field() const
 {
     return m_array_struct_field;
 }
@@ -2924,7 +3265,7 @@ const std::array<StructType, 3>& ContentFilterTestType::array_struct_field() con
  * @brief This function returns a reference to member array_struct_field
  * @return Reference to member array_struct_field
  */
-std::array<StructType, 3>& ContentFilterTestType::array_struct_field()
+std::array<StructType, max_array_size>& ContentFilterTestType::array_struct_field()
 {
     return m_array_struct_field;
 }
@@ -4113,12 +4454,78 @@ std::vector<StructType>& ContentFilterTestType::unbounded_sequence_struct_field(
     return m_unbounded_sequence_struct_field;
 }
 
-
 size_t ContentFilterTestType::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return ContentFilterTestType_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    return current_align;
 }
 
 bool ContentFilterTestType::isKeyDefined()
@@ -4130,4 +4537,5 @@ void ContentFilterTestType::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
+                                                                    
 }

@@ -61,7 +61,6 @@ bool ParameterList::updateCacheChangeFromInlineQos(
                         break;
                     }
 
-                    case PID_CUSTOM_RELATED_SAMPLE_IDENTITY:
                     case PID_RELATED_SAMPLE_IDENTITY:
                     {
                         if (plength >= 24)

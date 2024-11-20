@@ -103,7 +103,10 @@ ReturnCode_t DataWriter::write_w_timestamp(
         const InstanceHandle_t& handle,
         const fastrtps::Time_t& timestamp)
 {
-    return impl_->write_w_timestamp(data, handle, timestamp);
+    static_cast<void> (data);
+    static_cast<void> (handle);
+    static_cast<void> (timestamp);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 ReturnCode_t DataWriter::write_w_timestamp(
@@ -127,7 +130,10 @@ InstanceHandle_t DataWriter::register_instance_w_timestamp(
         void* instance,
         const fastrtps::Time_t& timestamp)
 {
-    return impl_->register_instance_w_timestamp(instance, timestamp);
+    static_cast<void> (instance);
+    static_cast<void> (timestamp);
+    logWarning(DATA_WRITER, "register_instance_w_timestamp method not yet implemented")
+    return HANDLE_NIL;
 }
 
 InstanceHandle_t DataWriter::register_instance_w_timestamp(
@@ -136,7 +142,7 @@ InstanceHandle_t DataWriter::register_instance_w_timestamp(
 {
     static_cast<void> (instance);
     static_cast<void> (timestamp);
-    EPROSIMA_LOG_WARNING(DATA_WRITER, "register_instance_w_timestamp method not yet implemented");
+    logWarning(DATA_WRITER, "register_instance_w_timestamp method not yet implemented")
     return HANDLE_NIL;
 }
 
@@ -152,7 +158,10 @@ ReturnCode_t DataWriter::unregister_instance_w_timestamp(
         const InstanceHandle_t& handle,
         const fastrtps::Time_t& timestamp)
 {
-    return impl_->unregister_instance_w_timestamp(instance, handle, timestamp);
+    static_cast<void> (instance);
+    static_cast<void> (handle);
+    static_cast<void> (timestamp);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 ReturnCode_t DataWriter::unregister_instance_w_timestamp(
@@ -177,7 +186,7 @@ InstanceHandle_t DataWriter::lookup_instance(
         const void* instance) const
 {
     static_cast<void> (instance);
-    EPROSIMA_LOG_WARNING(DATA_WRITER, "lookup_instance method not implemented");
+    logWarning(DATA_WRITER, "lookup_instance method not implemented")
     return HANDLE_NIL;
 }
 
@@ -193,7 +202,10 @@ ReturnCode_t DataWriter::dispose_w_timestamp(
         const InstanceHandle_t& handle,
         const fastrtps::Time_t& timestamp)
 {
-    return impl_->unregister_instance_w_timestamp(instance, handle, timestamp, true);
+    static_cast<void> (instance);
+    static_cast<void> (handle);
+    static_cast<void> (timestamp);
+    return ReturnCode_t::RETCODE_UNSUPPORTED;
 }
 
 const fastrtps::rtps::GUID_t& DataWriter::guid() const

@@ -44,16 +44,16 @@
 
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
-#if defined(UNBOUNDEDHELLOWORLD_SOURCE)
-#define UNBOUNDEDHELLOWORLD_DllAPI __declspec( dllexport )
+#if defined(UnboundedHelloWorld_SOURCE)
+#define UnboundedHelloWorld_DllAPI __declspec( dllexport )
 #else
-#define UNBOUNDEDHELLOWORLD_DllAPI __declspec( dllimport )
-#endif // UNBOUNDEDHELLOWORLD_SOURCE
+#define UnboundedHelloWorld_DllAPI __declspec( dllimport )
+#endif // UnboundedHelloWorld_SOURCE
 #else
-#define UNBOUNDEDHELLOWORLD_DllAPI
+#define UnboundedHelloWorld_DllAPI
 #endif  // EPROSIMA_USER_DLL_EXPORT
 #else
-#define UNBOUNDEDHELLOWORLD_DllAPI
+#define UnboundedHelloWorld_DllAPI
 #endif // _WIN32
 
 namespace eprosima {
@@ -65,7 +65,7 @@ class Cdr;
 
 /*!
  * @brief This class represents the structure UnboundedHelloWorld defined by the user in the IDL file.
- * @ingroup UnboundedHelloWorld
+ * @ingroup UNBOUNDEDHELLOWORLD
  */
 class UnboundedHelloWorld
 {
@@ -93,7 +93,7 @@ public:
      * @param x Reference to the object UnboundedHelloWorld that will be copied.
      */
     eProsima_user_DllExport UnboundedHelloWorld(
-            UnboundedHelloWorld&& x) noexcept;
+            UnboundedHelloWorld&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +107,7 @@ public:
      * @param x Reference to the object UnboundedHelloWorld that will be copied.
      */
     eProsima_user_DllExport UnboundedHelloWorld& operator =(
-            UnboundedHelloWorld&& x) noexcept;
+            UnboundedHelloWorld&& x);
 
     /*!
      * @brief Comparison operator.
@@ -169,11 +169,11 @@ public:
     eProsima_user_DllExport std::string& message();
 
     /*!
-    * @brief This function returns the maximum serialized size of an object
-    * depending on the buffer alignment.
-    * @param current_alignment Buffer alignment.
-    * @return Maximum serialized size.
-    */
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -229,8 +229,6 @@ private:
 
     uint16_t m_index;
     std::string m_message;
-
 };
 
 #endif // _FAST_DDS_GENERATED_UNBOUNDEDHELLOWORLD_H_
-

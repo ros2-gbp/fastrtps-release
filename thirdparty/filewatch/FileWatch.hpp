@@ -506,11 +506,9 @@ namespace filewatch {
                 struct stat result;
                 stat(_path.c_str(), &result);
 
-                using clock = std::chrono::system_clock;
-                using duration = clock::duration;
-                std::chrono::time_point<clock> current_time;
-                current_time += std::chrono::duration_cast<duration>(std::chrono::seconds(result.st_mtim.tv_sec));
-                current_time += std::chrono::duration_cast<duration>(std::chrono::nanoseconds(result.st_mtim.tv_nsec));
+                std::chrono::time_point<std::chrono::system_clock> current_time;
+                current_time += std::chrono::seconds(result.st_mtim.tv_sec);
+                current_time += std::chrono::nanoseconds(result.st_mtim.tv_nsec);
 
                 unsigned long current_size = result.st_size;
 
@@ -606,9 +604,8 @@ namespace filewatch {
             struct stat result;
             stat(_path.c_str(), &result);
 
-            using duration = std::chrono::system_clock::duration;
-            last_write_time_ += std::chrono::duration_cast<duration>(std::chrono::seconds(result.st_mtim.tv_sec));
-            last_write_time_ += std::chrono::duration_cast<duration>(std::chrono::nanoseconds(result.st_mtim.tv_nsec));
+            last_write_time_ += std::chrono::seconds(result.st_mtim.tv_sec);
+            last_write_time_ += std::chrono::nanoseconds(result.st_mtim.tv_nsec);
 
             // Initialize filesize
             last_size_ = result.st_size;

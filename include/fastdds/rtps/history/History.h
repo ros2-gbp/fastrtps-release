@@ -253,7 +253,7 @@ public:
      * Get the mutex
      * @return Mutex
      */
-    RTPS_DllAPI inline RecursiveTimedMutex* getMutex() const
+    RTPS_DllAPI inline RecursiveTimedMutex* getMutex()
     {
         assert(mp_mutex != nullptr);
         return mp_mutex;

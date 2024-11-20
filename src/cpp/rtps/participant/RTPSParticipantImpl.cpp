@@ -17,6 +17,8 @@
  *
  */
 
+#include <rtps/participant/RTPSParticipantImpl.h>
+
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -28,14 +30,11 @@
 #include <fastdds/rtps/attributes/ServerAttributes.h>
 #include <fastdds/rtps/builtin/BuiltinProtocols.h>
 #include <fastdds/rtps/builtin/discovery/endpoint/EDP.h>
-#include <fastdds/rtps/builtin/discovery/participant/PDP.h>
 #include <fastdds/rtps/builtin/discovery/participant/PDPSimple.h>
 #include <fastdds/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastdds/rtps/builtin/liveliness/WLP.h>
-#include <fastdds/rtps/common/EntityId_t.hpp>
 #include <fastdds/rtps/history/WriterHistory.h>
 #include <fastdds/rtps/messages/MessageReceiver.h>
-#include <fastdds/rtps/participant/ParticipantDiscoveryInfo.h>
 #include <fastdds/rtps/participant/RTPSParticipant.h>
 #include <fastdds/rtps/reader/StatelessReader.h>
 #include <fastdds/rtps/reader/StatefulReader.h>
@@ -60,8 +59,6 @@
 #include <rtps/builtin/discovery/participant/PDPServer.hpp>
 #include <rtps/builtin/discovery/participant/PDPClient.h>
 #include <rtps/history/BasicPayloadPool.hpp>
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
-#include <rtps/participant/RTPSParticipantImpl.h>
 #include <rtps/persistence/PersistenceService.h>
 #include <statistics/rtps/GuidUtils.hpp>
 #include <utils/SystemInfo.hpp>
@@ -97,7 +94,7 @@ static BuiltinTransports get_builtin_transports_from_env_var()
                 "LARGE_DATA", BuiltinTransports::LARGE_DATA,
                 "LARGE_DATAv6", BuiltinTransports::LARGE_DATAv6))
         {
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Wrong value '" << env_value << "' for environment variable '" <<
+            logError(RTPS_PARTICIPANT, "Wrong value '" << env_value << "' for environment variable '" <<
                     env_var_name << "'. Leaving as DEFAULT");
         }
     }
@@ -144,139 +141,12 @@ static bool get_unique_flows_parameters(
     return true;
 }
 
-// -- The following is a backport from 3.x of a PDP method
-static void local_participant_attributes_update_nts(
-        const RTPSParticipantAttributes& new_atts,
-        PDP* pdp,
-        RTPSParticipantImpl* participant)
-{
-    auto participant_data = pdp->getLocalParticipantProxyData();
-    participant_data->m_userData.data_vec(new_atts.userData);
-
-    // If we are intraprocess only, we do not need to update locators
-    bool announce_locators = !participant->is_intraprocess_only();
-    if (announce_locators)
-    {
-        // Clear all locators
-        participant_data->metatraffic_locators.unicast.clear();
-        participant_data->metatraffic_locators.multicast.clear();
-        participant_data->default_locators.unicast.clear();
-        participant_data->default_locators.multicast.clear();
-
-        // Update default locators
-        for (const Locator_t& loc : new_atts.defaultUnicastLocatorList)
-        {
-            participant_data->default_locators.add_unicast_locator(loc);
-        }
-        for (const Locator_t& loc : new_atts.defaultMulticastLocatorList)
-        {
-            participant_data->default_locators.add_multicast_locator(loc);
-        }
-
-        // Update metatraffic locators
-        for (const auto& locator : new_atts.builtin.metatrafficUnicastLocatorList)
-        {
-            participant_data->metatraffic_locators.add_unicast_locator(locator);
-        }
-        if (!new_atts.builtin.avoid_builtin_multicast ||
-                participant_data->metatraffic_locators.unicast.empty())
-        {
-            for (const auto& locator : new_atts.builtin.metatrafficMulticastLocatorList)
-            {
-                participant_data->metatraffic_locators.add_multicast_locator(locator);
-            }
-        }
-
-        namespace external_locators = fastdds::rtps::ExternalLocatorsProcessor;
-        external_locators::add_external_locators(*participant_data,
-                new_atts.builtin.metatraffic_external_unicast_locators,
-                new_atts.default_external_unicast_locators);
-    }
-}
-
-// -- The following is a backport from 3.x of a PDP method
-static void update_endpoint_locators_if_default_nts(
-        const std::vector<RTPSWriter*>& writers,
-        const std::vector<RTPSReader*>& readers,
-        const RTPSParticipantAttributes& old_atts,
-        const RTPSParticipantAttributes& new_atts,
-        PDP* pdp)
-{
-    // Check if default locators have changed
-    const auto& old_default_unicast = old_atts.defaultUnicastLocatorList;
-    const auto& old_default_multicast = old_atts.defaultMulticastLocatorList;
-    const auto& new_default_unicast = new_atts.defaultUnicastLocatorList;
-    const auto& new_default_multicast = new_atts.defaultMulticastLocatorList;
-
-    // Early return if there is no change in default unicast locators
-    if ((old_default_unicast == new_default_unicast) &&
-            (old_default_multicast == new_default_multicast))
-    {
-        return;
-    }
-
-    // Update proxies of endpoints with default configured locators
-    EDP* edp = pdp->getEDP();
-    for (RTPSWriter* writer : writers)
-    {
-        if ((old_default_multicast == writer->getAttributes().multicastLocatorList) &&
-                (old_default_unicast == writer->getAttributes().unicastLocatorList))
-        {
-            writer->getAttributes().multicastLocatorList = new_default_multicast;
-            writer->getAttributes().unicastLocatorList = new_default_unicast;
-
-            WriterProxyData* wdata = nullptr;
-            GUID_t participant_guid;
-            wdata = pdp->addWriterProxyData(writer->getGuid(), participant_guid,
-                            [](WriterProxyData* proxy, bool is_update,
-                            const ParticipantProxyData& participant)
-                            {
-                                static_cast<void>(is_update);
-                                assert(is_update);
-                                proxy->set_locators(participant.default_locators);
-                                return true;
-                            });
-            assert(wdata != nullptr);
-            edp->processLocalWriterProxyData(writer, wdata);
-        }
-    }
-    for (RTPSReader* reader : readers)
-    {
-        if ((old_default_multicast == reader->getAttributes().multicastLocatorList) &&
-                (old_default_unicast == reader->getAttributes().unicastLocatorList))
-        {
-            reader->getAttributes().multicastLocatorList = new_default_multicast;
-            reader->getAttributes().unicastLocatorList = new_default_unicast;
-
-            ReaderProxyData* rdata = nullptr;
-            GUID_t participant_guid;
-            rdata = pdp->addReaderProxyData(reader->getGuid(), participant_guid,
-                            [](ReaderProxyData* proxy, bool is_update,
-                            const ParticipantProxyData& participant)
-                            {
-                                static_cast<void>(is_update);
-                                assert(is_update);
-
-                                proxy->set_locators(participant.default_locators);
-                                return true;
-                            });
-            assert(rdata != nullptr);
-            edp->processLocalReaderProxyData(reader, rdata);
-        }
-    }
-}
-
 Locator_t& RTPSParticipantImpl::applyLocatorAdaptRule(
         Locator_t& loc)
 {
     // This is a completely made up rule
-    // It is transport responsibility to interpret this new port.
-    uint16_t delta = m_att.port.participantIDGain;
-    if (metatraffic_unicast_port_ == loc.port)
-    {
-        metatraffic_unicast_port_ += delta;
-    }
-    loc.port += delta;
+    // It is transport responsability to interpret this new port.
+    loc.port += m_att.port.participantIDGain;
     return loc;
 }
 
@@ -305,7 +175,6 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     , mp_mutex(new std::recursive_mutex())
     , is_intraprocess_only_(should_be_intraprocess_only(PParam))
     , has_shm_transport_(false)
-    , match_local_endpoints_(should_match_local_endpoints(PParam))
 {
     if (c_GuidPrefix_Unknown != persistence_guid)
     {
@@ -342,7 +211,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
                 {
                     if (pT->listening_ports.empty())
                     {
-                        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+                        logError(RTPS_PARTICIPANT,
                                 "Participant " << m_att.getName() << " with GUID " << m_guid <<
                                 " tries to create a TCP server for discovery server without providing a proper listening port.");
                         break;
@@ -390,7 +259,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
                 {
                     if (pT->listening_ports.empty())
                     {
-                        EPROSIMA_LOG_INFO(RTPS_PARTICIPANT,
+                        logInfo(RTPS_PARTICIPANT,
                                 "Participant " << m_att.getName() << " with GUID " << m_guid <<
                                 " tries to create a TCP client for discovery server without providing a proper listening port." <<
                                 " No TCP participants will be able to connect to this participant, but it will be able make connections.");
@@ -416,6 +285,7 @@ RTPSParticipantImpl::RTPSParticipantImpl(
             break;
     }
 
+
     // User defined transports
     for (const auto& transportDescriptor : m_att.userTransports)
     {
@@ -429,13 +299,13 @@ RTPSParticipantImpl::RTPSParticipantImpl(
             // SHM transport could be disabled
             if ((dynamic_cast<fastdds::rtps::SharedMemTransportDescriptor*>(transportDescriptor.get()) != nullptr))
             {
-                EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+                logError(RTPS_PARTICIPANT,
                         "Unable to Register SHM Transport. SHM Transport is not supported in"
                         " the current platform.");
             }
             else
             {
-                EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+                logError(RTPS_PARTICIPANT,
                         "User transport failed to register.");
             }
 
@@ -450,74 +320,13 @@ RTPSParticipantImpl::RTPSParticipantImpl(
         return;
     }
 
-#if HAVE_SECURITY
-    // Start security
-    if (!m_security_manager.init(
-                security_attributes_,
-                m_att.properties))
-    {
-        // Participant will be deleted, no need to allocate buffers or create builtin endpoints
-        return;
-    }
-#endif // if HAVE_SECURITY
-
-    setup_meta_traffic();
-    setup_user_traffic();
-    setup_initial_peers();
-    setup_output_traffic();
-
-#if HAVE_SECURITY
-    if (m_security_manager.is_security_active())
-    {
-        if (!m_security_manager.create_entities())
-        {
-            return;
-        }
-    }
-#endif // if HAVE_SECURITY
-
-    mp_builtinProtocols = new BuiltinProtocols();
-
-    // Initialize builtin protocols
-    if (!mp_builtinProtocols->initBuiltinProtocols(this, m_att.builtin))
-    {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "The builtin protocols were not correctly initialized");
-        return;
-    }
-
-    if (c_GuidPrefix_Unknown != persistence_guid)
-    {
-        EPROSIMA_LOG_INFO(RTPS_PARTICIPANT,
-                "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix
-                                     << " and persistence guid: " << persistence_guid);
-    }
-    else
-    {
-        EPROSIMA_LOG_INFO(RTPS_PARTICIPANT,
-                "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix);
-    }
-
-    initialized_ = true;
-}
-
-RTPSParticipantImpl::RTPSParticipantImpl(
-        uint32_t domain_id,
-        const RTPSParticipantAttributes& PParam,
-        const GuidPrefix_t& guidP,
-        RTPSParticipant* par,
-        RTPSParticipantListener* plisten)
-    : RTPSParticipantImpl(domain_id, PParam, guidP, c_GuidPrefix_Unknown, par, plisten)
-{
-}
-
-void RTPSParticipantImpl::setup_meta_traffic()
-{
     /* If metatrafficMulticastLocatorList is empty, add mandatory default Locators
        Else -> Take them */
 
     // Creation of metatraffic locator and receiver resources
     uint32_t metatraffic_multicast_port = m_att.port.getMulticastPort(domain_id_);
-    metatraffic_unicast_port_ = m_att.port.getUnicastPort(domain_id_, static_cast<uint32_t>(m_att.participantID));
+    uint32_t metatraffic_unicast_port = m_att.port.getUnicastPort(domain_id_,
+                    static_cast<uint32_t>(m_att.participantID));
     uint32_t meta_multicast_port_for_check = metatraffic_multicast_port;
 
     /* INSERT DEFAULT MANDATORY MULTICAST LOCATORS HERE */
@@ -543,89 +352,11 @@ void RTPSParticipantImpl::setup_meta_traffic()
         std::for_each(m_att.builtin.metatrafficUnicastLocatorList.begin(),
                 m_att.builtin.metatrafficUnicastLocatorList.end(), [&](Locator_t& locator)
                 {
-                    m_network_Factory.fillMetatrafficUnicastLocator(locator, metatraffic_unicast_port_);
+                    m_network_Factory.fillMetatrafficUnicastLocator(locator, metatraffic_unicast_port);
                 });
         m_network_Factory.NormalizeLocators(m_att.builtin.metatrafficUnicastLocatorList);
     }
 
-    if (is_intraprocess_only())
-    {
-        m_att.builtin.metatrafficUnicastLocatorList.clear();
-    }
-
-    createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false, true);
-    createReceiverResources(m_att.builtin.metatrafficMulticastLocatorList, false, false, true);
-
-    // Check metatraffic multicast port
-    if (0 < m_att.builtin.metatrafficMulticastLocatorList.size() &&
-            m_att.builtin.metatrafficMulticastLocatorList.begin()->port != meta_multicast_port_for_check)
-    {
-        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
-                "Metatraffic multicast port " << meta_multicast_port_for_check << " cannot be opened."
-                " It may is opened by another application. Discovery may fail.");
-    }
-
-    namespace external_locators = fastdds::rtps::ExternalLocatorsProcessor;
-    external_locators::set_listening_locators(m_att.builtin.metatraffic_external_unicast_locators,
-            m_att.builtin.metatrafficUnicastLocatorList);
-}
-
-void RTPSParticipantImpl::setup_user_traffic()
-{
-    // Creation of user locator and receiver resources
-    //If no default locators are defined we define some.
-    /* The reasoning here is the following.
-       If the parameters of the RTPS Participant don't hold default listening locators for the creation
-       of Endpoints, we make some for Unicast only.
-       If there is at least one listen locator of any kind, we do not create any default ones.
-       If there are no sending locators defined, we create default ones for the transports we implement.
-     */
-    if (m_att.defaultUnicastLocatorList.empty() && m_att.defaultMulticastLocatorList.empty())
-    {
-        //Default Unicast Locators in case they have not been provided
-        /* INSERT DEFAULT UNICAST LOCATORS FOR THE PARTICIPANT */
-        get_default_unicast_locators();
-        internal_default_locators_ = true;
-        EPROSIMA_LOG_INFO(RTPS_PARTICIPANT,
-                m_att.getName() << " Created with NO default Unicast Locator List, adding Locators:"
-                                << m_att.defaultUnicastLocatorList);
-    }
-    else
-    {
-        // Locator with port 0, calculate port.
-        uint32_t unicast_port = metatraffic_unicast_port_ + m_att.port.offsetd3 - m_att.port.offsetd1;
-        std::for_each(m_att.defaultUnicastLocatorList.begin(), m_att.defaultUnicastLocatorList.end(),
-                [&](Locator_t& loc)
-                {
-                    m_network_Factory.fill_default_locator_port(loc, unicast_port);
-                });
-        m_network_Factory.NormalizeLocators(m_att.defaultUnicastLocatorList);
-
-        // Locator with port 0, calculate port.
-        uint32_t multicast_port = m_network_Factory.calculate_well_known_port(domain_id_, m_att, true);
-        std::for_each(m_att.defaultMulticastLocatorList.begin(), m_att.defaultMulticastLocatorList.end(),
-                [&](Locator_t& loc)
-                {
-                    m_network_Factory.fill_default_locator_port(loc, multicast_port);
-                });
-    }
-
-    if (is_intraprocess_only())
-    {
-        m_att.defaultUnicastLocatorList.clear();
-        m_att.defaultMulticastLocatorList.clear();
-    }
-
-    createReceiverResources(m_att.defaultUnicastLocatorList, true, false, true);
-    createReceiverResources(m_att.defaultMulticastLocatorList, false, false, true);
-
-    namespace external_locators = fastdds::rtps::ExternalLocatorsProcessor;
-    external_locators::set_listening_locators(m_att.default_external_unicast_locators,
-            m_att.defaultUnicastLocatorList);
-}
-
-void RTPSParticipantImpl::setup_initial_peers()
-{
     // Initial peers
     if (m_att.builtin.initialPeersList.empty())
     {
@@ -642,10 +373,73 @@ void RTPSParticipantImpl::setup_initial_peers()
                     m_network_Factory.configureInitialPeerLocator(domain_id_, locator, m_att);
                 });
     }
-}
 
-void RTPSParticipantImpl::setup_output_traffic()
-{
+    // Creation of user locator and receiver resources
+    //If no default locators are defined we define some.
+    /* The reasoning here is the following.
+       If the parameters of the RTPS Participant don't hold default listening locators for the creation
+       of Endpoints, we make some for Unicast only.
+       If there is at least one listen locator of any kind, we do not create any default ones.
+       If there are no sending locators defined, we create default ones for the transports we implement.
+     */
+    if (m_att.defaultUnicastLocatorList.empty() && m_att.defaultMulticastLocatorList.empty())
+    {
+        //Default Unicast Locators in case they have not been provided
+        /* INSERT DEFAULT UNICAST LOCATORS FOR THE PARTICIPANT */
+        get_default_unicast_locators();
+        internal_default_locators_ = true;
+        logInfo(RTPS_PARTICIPANT, m_att.getName() << " Created with NO default Unicast Locator List, adding Locators:"
+                                                  << m_att.defaultUnicastLocatorList);
+    }
+    else
+    {
+        // Locator with port 0, calculate port.
+        std::for_each(m_att.defaultUnicastLocatorList.begin(), m_att.defaultUnicastLocatorList.end(),
+                [&](Locator_t& loc)
+                {
+                    m_network_Factory.fill_default_locator_port(domain_id_, loc, m_att, false);
+                });
+        m_network_Factory.NormalizeLocators(m_att.defaultUnicastLocatorList);
+
+        std::for_each(m_att.defaultMulticastLocatorList.begin(), m_att.defaultMulticastLocatorList.end(),
+                [&](Locator_t& loc)
+                {
+                    m_network_Factory.fill_default_locator_port(domain_id_, loc, m_att, true);
+                });
+    }
+
+#if HAVE_SECURITY
+    // Start security
+    if (!m_security_manager.init(
+                security_attributes_,
+                m_att.properties))
+    {
+        // Participant will be deleted, no need to allocate buffers or create builtin endpoints
+        return;
+    }
+#endif // if HAVE_SECURITY
+
+    if (is_intraprocess_only())
+    {
+        m_att.builtin.metatrafficUnicastLocatorList.clear();
+        m_att.defaultUnicastLocatorList.clear();
+        m_att.defaultMulticastLocatorList.clear();
+    }
+
+    createReceiverResources(m_att.builtin.metatrafficMulticastLocatorList, true, false, true);
+    createReceiverResources(m_att.builtin.metatrafficUnicastLocatorList, true, false, true);
+    createReceiverResources(m_att.defaultUnicastLocatorList, true, false, true);
+    createReceiverResources(m_att.defaultMulticastLocatorList, true, false, true);
+
+    // Check metatraffic multicast port
+    if (0 < m_att.builtin.metatrafficMulticastLocatorList.size() &&
+            m_att.builtin.metatrafficMulticastLocatorList.begin()->port != meta_multicast_port_for_check)
+    {
+        logWarning(RTPS_PARTICIPANT,
+                "Metatraffic multicast port " << meta_multicast_port_for_check << " cannot be opened."
+                " It may is opened by another application. Discovery may fail.");
+    }
+
     {
         const std::string* max_size_property =
                 PropertyPolicyHelper::find_property(m_att.properties, "fastdds.max_message_size");
@@ -657,7 +451,7 @@ void RTPSParticipantImpl::setup_output_traffic()
             }
             catch (const std::exception& e)
             {
-                EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error parsing max_message_size property: " << e.what());
+                logError(RTPS_WRITER, "Error parsing max_message_size property: " << e.what());
             }
         }
     }
@@ -695,6 +489,49 @@ void RTPSParticipantImpl::setup_output_traffic()
     {
         flow_controller_factory_.register_flow_controller(*flow_controller_desc.get());
     }
+
+
+#if HAVE_SECURITY
+    if (m_security_manager.is_security_active())
+    {
+        if (!m_security_manager.create_entities())
+        {
+            return;
+        }
+    }
+#endif // if HAVE_SECURITY
+
+    mp_builtinProtocols = new BuiltinProtocols();
+
+    // Initialize builtin protocols
+    if (!mp_builtinProtocols->initBuiltinProtocols(this, m_att.builtin))
+    {
+        logError(RTPS_PARTICIPANT, "The builtin protocols were not correctly initialized");
+        return;
+    }
+
+    if (c_GuidPrefix_Unknown != persistence_guid)
+    {
+        logInfo(RTPS_PARTICIPANT, "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix
+                                                       << " and persistence guid: " << persistence_guid);
+    }
+    else
+    {
+        logInfo(RTPS_PARTICIPANT,
+                "RTPSParticipant \"" << m_att.getName() << "\" with guidPrefix: " << m_guid.guidPrefix);
+    }
+
+    initialized_ = true;
+}
+
+RTPSParticipantImpl::RTPSParticipantImpl(
+        uint32_t domain_id,
+        const RTPSParticipantAttributes& PParam,
+        const GuidPrefix_t& guidP,
+        RTPSParticipant* par,
+        RTPSParticipantListener* plisten)
+    : RTPSParticipantImpl(domain_id, PParam, guidP, c_GuidPrefix_Unknown, par, plisten)
+{
 }
 
 void RTPSParticipantImpl::enable()
@@ -710,9 +547,13 @@ void RTPSParticipantImpl::enable()
 
 void RTPSParticipantImpl::disable()
 {
-    // Disabling event thread also disables participant announcement, so there is no need to call
-    // stopRTPSParticipantAnnouncement()
-    mp_event_thr.stop_thread();
+    if (nullptr == mp_builtinProtocols)
+    {
+        return;
+    }
+
+    // Ensure that other participants will not accidentally discover this one
+    stopRTPSParticipantAnnouncement();
 
     // Disable Retries on Transports
     m_network_Factory.Shutdown();
@@ -726,11 +567,10 @@ void RTPSParticipantImpl::disable()
 
     deleteAllUserEndpoints();
 
-    if (nullptr != mp_builtinProtocols)
-    {
-        delete(mp_builtinProtocols);
-        mp_builtinProtocols = nullptr;
-    }
+    mp_event_thr.stop_thread();
+
+    delete(mp_builtinProtocols);
+    mp_builtinProtocols = nullptr;
 }
 
 const std::vector<RTPSWriter*>& RTPSParticipantImpl::getAllWriters() const
@@ -768,7 +608,7 @@ RTPSParticipantImpl::~RTPSParticipantImpl()
 template <EndpointKind_t kind, octet no_key, octet with_key>
 bool RTPSParticipantImpl::preprocess_endpoint_attributes(
         const EntityId_t& entity_id,
-        std::atomic<uint32_t>& id_counter,
+        uint32_t& id_counter,
         EndpointAttributes& att,
         EntityId_t& entId)
 {
@@ -776,18 +616,17 @@ bool RTPSParticipantImpl::preprocess_endpoint_attributes(
 
     if (!att.unicastLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Unicast Locator List for " << debug_label << " contains invalid Locator");
+        logError(RTPS_PARTICIPANT, "Unicast Locator List for " << debug_label << " contains invalid Locator");
         return false;
     }
     if (!att.multicastLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
-                "Multicast Locator List for " << debug_label << " contains invalid Locator");
+        logError(RTPS_PARTICIPANT, "Multicast Locator List for " << debug_label << " contains invalid Locator");
         return false;
     }
     if (!att.remoteLocatorList.isValid())
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Remote Locator List for " << debug_label << " contains invalid Locator");
+        logError(RTPS_PARTICIPANT, "Remote Locator List for " << debug_label << " contains invalid Locator");
         return false;
     }
 
@@ -832,9 +671,9 @@ bool RTPSParticipantImpl::preprocess_endpoint_attributes(
             if (att.persistence_guid == c_Guid_Unknown)
             {
                 // Wrongly configured property
-                EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Cannot configure " << debug_label << "'s persistence GUID from '"
-                                                                         << persistence_guid_property->c_str()
-                                                                         << "'. Wrong input");
+                logError(RTPS_PARTICIPANT, "Cannot configure " << debug_label << "'s persistence GUID from '"
+                                                               << persistence_guid_property->c_str()
+                                                               << "'. Wrong input");
                 return false;
             }
         }
@@ -855,7 +694,7 @@ bool RTPSParticipantImpl::create_writer(
         const Functor& callback)
 {
     std::string type = (param.endpoint.reliabilityKind == RELIABLE) ? "RELIABLE" : "BEST_EFFORT";
-    EPROSIMA_LOG_INFO(RTPS_PARTICIPANT, "Creating writer of type " << type);
+    logInfo(RTPS_PARTICIPANT, "Creating writer of type " << type);
     EntityId_t entId;
     if (!preprocess_endpoint_attributes<WRITER, 0x03, 0x02>(entity_id, IdCounter, param.endpoint, entId))
     {
@@ -864,7 +703,7 @@ bool RTPSParticipantImpl::create_writer(
 
     if (existsEntityId(entId, WRITER))
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+        logError(RTPS_PARTICIPANT,
                 "A writer with the same entityId already exists in this RTPSParticipant");
         return false;
     }
@@ -888,9 +727,9 @@ bool RTPSParticipantImpl::create_writer(
         }
         else
         {
-            EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
+            logWarning(RTPS_PARTICIPANT,
                     "Throughput flow controller was configured while writer's publish mode is configured as synchronous." \
-                    "Throughput flow controller configuration is not taken into account.");
+                    "Throughput flow controller configuration is not taken into account.")
 
         }
     }
@@ -903,9 +742,9 @@ bool RTPSParticipantImpl::create_writer(
         }
         else
         {
-            EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
+            logWarning(RTPS_PARTICIPANT,
                     "Throughput flow controller was configured while writer's publish mode is configured as synchronous." \
-                    "Throughput flow controller configuration is not taken into account.");
+                    "Throughput flow controller configuration is not taken into account.")
         }
     }
 
@@ -923,11 +762,11 @@ bool RTPSParticipantImpl::create_writer(
         if (fastdds::rtps::FASTDDS_FLOW_CONTROLLER_DEFAULT != flow_controller_name &&
                 SYNCHRONOUS_WRITER == param.mode)
         {
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Cannot use a flow controller in synchronously publication mode.");
+            logError(RTPS_PARTICIPANT, "Cannot use a flow controller in synchronously publication mode.");
         }
         else
         {
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Cannot create the writer. Couldn't find flow controller "
+            logError(RTPS_PARTICIPANT, "Cannot create the writer. Couldn't find flow controller "
                     << flow_controller_name << " for writer.");
         }
         return false;
@@ -936,7 +775,7 @@ bool RTPSParticipantImpl::create_writer(
     // Check for unique_network_flows feature
     if (nullptr != PropertyPolicyHelper::find_property(param.endpoint.properties, "fastdds.unique_network_flows"))
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Unique network flows not supported on writers");
+        logError(RTPS_PARTICIPANT, "Unique network flows not supported on writers");
         return false;
     }
 
@@ -978,11 +817,6 @@ bool RTPSParticipantImpl::create_writer(
         delete(SWriter);
         return false;
     }
-
-    // Use participant's external locators if writer has none
-    // WARNING: call before createAndAssociateReceiverswithEndpoint, as the latter intentionally clears external
-    // locators list when using unique_flows feature
-    setup_external_locators(SWriter);
 
 #if HAVE_SECURITY
     if (!is_builtin)
@@ -1038,8 +872,6 @@ bool RTPSParticipantImpl::create_writer(
                         register_in_writer(listener->get_shared_ptr(), guid);
                     }
                 });
-
-        SWriter->set_enabled_statistics_writers_mask(StatisticsParticipantImpl::get_enabled_statistics_writers_mask());
     }
 
 #endif // FASTDDS_STATISTICS
@@ -1057,7 +889,7 @@ bool RTPSParticipantImpl::create_reader(
         const Functor& callback)
 {
     std::string type = (param.endpoint.reliabilityKind == RELIABLE) ? "RELIABLE" : "BEST_EFFORT";
-    EPROSIMA_LOG_INFO(RTPS_PARTICIPANT, "Creating reader of type " << type);
+    logInfo(RTPS_PARTICIPANT, "Creating reader of type " << type);
     EntityId_t entId;
     if (!preprocess_endpoint_attributes<READER, 0x04, 0x07>(entity_id, IdCounter, param.endpoint, entId))
     {
@@ -1066,7 +898,7 @@ bool RTPSParticipantImpl::create_reader(
 
     if (existsEntityId(entId, READER))
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+        logError(RTPS_PARTICIPANT,
                 "A reader with the same entityId already exists in this RTPSParticipant");
         return false;
     }
@@ -1113,11 +945,6 @@ bool RTPSParticipantImpl::create_reader(
     {
         return false;
     }
-
-    // Use participant's external locators if reader has none
-    // WARNING: call before createAndAssociateReceiverswithEndpoint, as the latter intentionally clears external
-    // locators list when using unique_flows feature
-    setup_external_locators(SReader);
 
 #if HAVE_SECURITY
 
@@ -1184,8 +1011,6 @@ bool RTPSParticipantImpl::create_reader(
                         register_in_reader(listener->get_shared_ptr(), guid);
                     }
                 });
-
-        SReader->set_enabled_statistics_writers_mask(StatisticsParticipantImpl::get_enabled_statistics_writers_mask());
     }
 
 #endif // FASTDDS_STATISTICS
@@ -1251,7 +1076,7 @@ bool RTPSParticipantImpl::createWriter(
 {
     if (!payload_pool)
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Trying to create writer with null payload pool");
+        logError(RTPS_PARTICIPANT, "Trying to create writer with null payload pool");
         return false;
     }
 
@@ -1301,7 +1126,7 @@ bool RTPSParticipantImpl::create_writer(
 {
     if (!payload_pool)
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Trying to create writer with null payload pool");
+        logError(RTPS_PARTICIPANT, "Trying to create writer with null payload pool");
         return false;
     }
 
@@ -1390,7 +1215,7 @@ bool RTPSParticipantImpl::createReader(
 {
     if (!payload_pool)
     {
-        EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Trying to create reader with null payload pool");
+        logError(RTPS_PARTICIPANT, "Trying to create reader with null payload pool");
         return false;
     }
 
@@ -1499,55 +1324,39 @@ bool RTPSParticipantImpl::registerReader(
 void RTPSParticipantImpl::update_attributes(
         const RTPSParticipantAttributes& patt)
 {
-    // Avoid ABBA with PDP mutex by using a local copy of the attributes
-    RTPSParticipantAttributes temp_atts;
-    {
-        std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-        temp_atts = m_att;
-    }
-
-    bool local_interfaces_changed = false;
-
+    bool update_pdp = false;
     // Check if new interfaces have been added
     if (internal_metatraffic_locators_)
     {
-        LocatorList_t metatraffic_unicast_locator_list = temp_atts.builtin.metatrafficUnicastLocatorList;
-        temp_atts.builtin.metatrafficUnicastLocatorList.clear();
-        get_default_metatraffic_locators(temp_atts);
-        if (!(metatraffic_unicast_locator_list == temp_atts.builtin.metatrafficUnicastLocatorList))
+        LocatorList_t metatraffic_unicast_locator_list = m_att.builtin.metatrafficUnicastLocatorList;
+        get_default_metatraffic_locators();
+        if (!(metatraffic_unicast_locator_list == m_att.builtin.metatrafficUnicastLocatorList))
         {
-            local_interfaces_changed = true;
-            EPROSIMA_LOG_INFO(RTPS_PARTICIPANT, temp_atts.getName() << " updated its metatraffic locators");
+            update_pdp = true;
+            m_network_Factory.update_network_interfaces();
+            logInfo(RTPS_PARTICIPANT, m_att.getName() << " updated its metatraffic locators");
         }
     }
     if (internal_default_locators_)
     {
-        LocatorList_t default_unicast_locator_list = temp_atts.defaultUnicastLocatorList;
-        temp_atts.defaultUnicastLocatorList.clear();
-        get_default_unicast_locators(temp_atts);
-        if (!(default_unicast_locator_list == temp_atts.defaultUnicastLocatorList))
+        LocatorList_t default_unicast_locator_list = m_att.defaultUnicastLocatorList;
+        get_default_unicast_locators();
+        if (!(default_unicast_locator_list == m_att.defaultUnicastLocatorList))
         {
-            local_interfaces_changed = true;
-            EPROSIMA_LOG_INFO(RTPS_PARTICIPANT,
-                    temp_atts.getName() << " updated default unicast locator list, current locators: "
-                                        << temp_atts.defaultUnicastLocatorList);
+            update_pdp = true;
+            logInfo(RTPS_PARTICIPANT, m_att.getName() << " updated default unicast locator list, current locators: "
+                                                      << m_att.defaultUnicastLocatorList);
         }
     }
 
-    if (local_interfaces_changed)
-    {
-        m_network_Factory.update_network_interfaces();
-    }
-
     auto pdp = mp_builtinProtocols->mp_PDP;
-    bool update_pdp = false;
 
     // Check if discovery servers need to be updated
     eprosima::fastdds::rtps::RemoteServerList_t converted_discovery_servers =
             patt.builtin.discovery_config.m_DiscoveryServers;
-    if (converted_discovery_servers != temp_atts.builtin.discovery_config.m_DiscoveryServers)
+    if (patt.builtin.discovery_config.m_DiscoveryServers != m_att.builtin.discovery_config.m_DiscoveryServers)
     {
-        for (auto& transportDescriptor : temp_atts.userTransports)
+        for (auto& transportDescriptor : m_att.userTransports)
         {
             TCPTransportDescriptor* pT = dynamic_cast<TCPTransportDescriptor*>(transportDescriptor.get());
             if (pT)
@@ -1572,16 +1381,16 @@ void RTPSParticipantImpl::update_attributes(
     }
 
     // Check if there are changes
-    if (converted_discovery_servers != temp_atts.builtin.discovery_config.m_DiscoveryServers
-            || patt.userData != temp_atts.userData
-            || local_interfaces_changed)
+    if (converted_discovery_servers != m_att.builtin.discovery_config.m_DiscoveryServers
+            || patt.userData != m_att.userData
+            || update_pdp)
     {
         update_pdp = true;
         std::vector<GUID_t> modified_servers;
         LocatorList_t modified_locators;
 
-        // Update RTPSParticipantAttributes members
-        temp_atts.userData = patt.userData;
+        // Update RTPSParticipantAttributes member
+        m_att.userData = patt.userData;
 
         // If there's no PDP don't process Discovery-related attributes.
         if (!pdp)
@@ -1589,26 +1398,9 @@ void RTPSParticipantImpl::update_attributes(
             return;
         }
 
-        // Update listening locators on external locators
-        {
-            namespace external_locators = fastdds::rtps::ExternalLocatorsProcessor;
-            if (local_interfaces_changed && internal_metatraffic_locators_)
-            {
-                external_locators::set_listening_locators(
-                    temp_atts.builtin.metatraffic_external_unicast_locators,
-                    temp_atts.builtin.metatrafficUnicastLocatorList);
-            }
-            if (local_interfaces_changed && internal_default_locators_)
-            {
-                external_locators::set_listening_locators(
-                    temp_atts.default_external_unicast_locators,
-                    temp_atts.defaultUnicastLocatorList);
-            }
-        }
-
         // Check that the remote servers list is consistent: all the already known remote servers must be included in
         // the list and either new remote servers are added or remote server listening locator is modified.
-        for (auto existing_server : temp_atts.builtin.discovery_config.m_DiscoveryServers)
+        for (auto existing_server : m_att.builtin.discovery_config.m_DiscoveryServers)
         {
             bool contained = false;
             for (auto incoming_server : converted_discovery_servers)
@@ -1630,9 +1422,9 @@ void RTPSParticipantImpl::update_attributes(
                         {
                             modified_servers.emplace_back(incoming_server.GetParticipant());
                             modified_locators.push_back(incoming_locator);
-                            EPROSIMA_LOG_INFO(RTPS_QOS_CHECK,
+                            logInfo(RTPS_QOS_CHECK,
                                     "DS Server: " << incoming_server.guidPrefix << " has modified its locators: "
-                                                  << incoming_locator << " being added");
+                                                  << incoming_locator << " being added")
                         }
                     }
                     contained = true;
@@ -1641,46 +1433,55 @@ void RTPSParticipantImpl::update_attributes(
             }
             if (!contained)
             {
-                EPROSIMA_LOG_ERROR(RTPS_QOS_CHECK,
+                logWarning(RTPS_QOS_CHECK,
                         "Discovery Servers cannot be removed from the list; they can only be added");
                 return;
             }
         }
 
-        // Update discovery information
         {
             std::lock_guard<std::recursive_mutex> lock(*pdp->getMutex());
-            local_participant_attributes_update_nts(temp_atts, pdp, this);
 
-            if (local_interfaces_changed && internal_default_locators_)
+            // Update user data
+            auto local_participant_proxy_data = pdp->getLocalParticipantProxyData();
+            local_participant_proxy_data->m_userData.data_vec(m_att.userData);
+
+            // Update metatraffic locators
+            for (auto locator : m_att.builtin.metatrafficMulticastLocatorList)
             {
-                std::lock_guard<shared_mutex> _(endpoints_list_mutex);
-                update_endpoint_locators_if_default_nts(m_userWriterList, m_userReaderList, m_att, temp_atts, pdp);
+                local_participant_proxy_data->metatraffic_locators.add_multicast_locator(locator);
+            }
+            for (auto locator : m_att.builtin.metatrafficUnicastLocatorList)
+            {
+                local_participant_proxy_data->metatraffic_locators.add_unicast_locator(locator);
             }
 
-            if (local_interfaces_changed)
+            // Update default locators
+            for (auto locator : m_att.defaultUnicastLocatorList)
             {
-                createSenderResources(temp_atts.builtin.metatrafficMulticastLocatorList);
-                createSenderResources(temp_atts.builtin.metatrafficUnicastLocatorList);
-                createSenderResources(temp_atts.defaultUnicastLocatorList);
+                local_participant_proxy_data->default_locators.add_unicast_locator(locator);
             }
+
+            createSenderResources(m_att.builtin.metatrafficMulticastLocatorList);
+            createSenderResources(m_att.builtin.metatrafficUnicastLocatorList);
+            createSenderResources(m_att.defaultUnicastLocatorList);
             if (!modified_locators.empty())
             {
                 createSenderResources(modified_locators);
             }
 
             // Update remote servers list
-            if (temp_atts.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::CLIENT ||
-                    temp_atts.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SUPER_CLIENT ||
-                    temp_atts.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SERVER ||
-                    temp_atts.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
+            if (m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::CLIENT ||
+                    m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SUPER_CLIENT ||
+                    m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SERVER ||
+                    m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
             {
                 // Add incoming servers if we don't know about them already or the listening locator has been modified
                 for (auto incoming_server : converted_discovery_servers)
                 {
                     eprosima::fastdds::rtps::RemoteServerList_t::iterator server_it;
-                    for (server_it = temp_atts.builtin.discovery_config.m_DiscoveryServers.begin();
-                            server_it != temp_atts.builtin.discovery_config.m_DiscoveryServers.end(); server_it++)
+                    for (server_it = m_att.builtin.discovery_config.m_DiscoveryServers.begin();
+                            server_it != m_att.builtin.discovery_config.m_DiscoveryServers.end(); server_it++)
                     {
                         if (server_it->guidPrefix == incoming_server.guidPrefix)
                         {
@@ -1697,21 +1498,21 @@ void RTPSParticipantImpl::update_attributes(
                             break;
                         }
                     }
-                    if (server_it == temp_atts.builtin.discovery_config.m_DiscoveryServers.end())
+                    if (server_it == m_att.builtin.discovery_config.m_DiscoveryServers.end())
                     {
-                        temp_atts.builtin.discovery_config.m_DiscoveryServers.push_back(incoming_server);
+                        m_att.builtin.discovery_config.m_DiscoveryServers.push_back(incoming_server);
                     }
                 }
 
                 // Update the servers list in builtin protocols
                 {
                     std::unique_lock<eprosima::shared_mutex> disc_lock(mp_builtinProtocols->getDiscoveryMutex());
-                    mp_builtinProtocols->m_DiscoveryServers = temp_atts.builtin.discovery_config.m_DiscoveryServers;
+                    mp_builtinProtocols->m_DiscoveryServers = m_att.builtin.discovery_config.m_DiscoveryServers;
                 }
 
                 // Notify PDPServer
-                if (temp_atts.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SERVER ||
-                        temp_atts.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
+                if (m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SERVER ||
+                        m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
                 {
                     fastdds::rtps::PDPServer* pdp_server = static_cast<fastdds::rtps::PDPServer*>(pdp);
                     pdp_server->update_remote_servers_list();
@@ -1722,8 +1523,8 @@ void RTPSParticipantImpl::update_attributes(
                     }
                 }
                 // Notify PDPClient
-                else if (temp_atts.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::CLIENT ||
-                        temp_atts.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SUPER_CLIENT)
+                else if (m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::CLIENT ||
+                        m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SUPER_CLIENT)
                 {
                     fastdds::rtps::PDPClient* pdp_client = static_cast<fastdds::rtps::PDPClient*>(pdp);
                     pdp_client->update_remote_servers_list();
@@ -1734,12 +1535,6 @@ void RTPSParticipantImpl::update_attributes(
                     }
                 }
             }
-        }
-
-        // Update the attributes data member
-        {
-            std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-            m_att = temp_atts;
         }
     }
 
@@ -1773,6 +1568,7 @@ bool RTPSParticipantImpl::updateLocalReader(
  *
  *
  */
+
 
 bool RTPSParticipantImpl::existsEntityId(
         const EntityId_t& ent,
@@ -1833,25 +1629,22 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
         - Launches the listener thread
      */
 
-    auto& attributes = pend->getAttributes();
     if (unique_flows)
     {
-        attributes.multicastLocatorList.clear();
-        attributes.unicastLocatorList = m_att.defaultUnicastLocatorList;
-        attributes.external_unicast_locators.clear();
+        pend->getAttributes().multicastLocatorList.clear();
+        pend->getAttributes().unicastLocatorList = m_att.defaultUnicastLocatorList;
 
         uint16_t port = initial_unique_port;
         while (port < final_unique_port)
         {
             // Set port on unicast locators
-            for (Locator_t& loc : attributes.unicastLocatorList)
+            for (Locator_t& loc : pend->getAttributes().unicastLocatorList)
             {
                 loc.port = port;
             }
 
             // Try creating receiver resources
-            LocatorList_t aux_locator_list = attributes.unicastLocatorList;
-            if (createReceiverResources(aux_locator_list, false, true, false))
+            if (createReceiverResources(pend->getAttributes().unicastLocatorList, false, true, false))
             {
                 break;
             }
@@ -1863,7 +1656,7 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
         // Fail when unique ports are exhausted
         if (port >= final_unique_port)
         {
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Unique flows requested but exhausted. Port range: "
+            logError(RTPS_PARTICIPANT, "Unique flows requested but exhausted. Port range: "
                     << initial_unique_port << "-" << final_unique_port);
             return false;
         }
@@ -1873,19 +1666,15 @@ bool RTPSParticipantImpl::createAndAssociateReceiverswithEndpoint(
         // 1 - Ask the network factory to generate the elements that do still not exist
         //Iterate through the list of unicast and multicast locators the endpoint has... unless its empty
         //In that case, just use the standard
-        if (attributes.unicastLocatorList.empty() && attributes.multicastLocatorList.empty())
+        if (pend->getAttributes().unicastLocatorList.empty() && pend->getAttributes().multicastLocatorList.empty())
         {
             // Take default locators from the participant.
-            attributes.unicastLocatorList = m_att.defaultUnicastLocatorList;
-            attributes.multicastLocatorList = m_att.defaultMulticastLocatorList;
-            attributes.external_unicast_locators = m_att.default_external_unicast_locators;
+            pend->getAttributes().unicastLocatorList = m_att.defaultUnicastLocatorList;
+            pend->getAttributes().multicastLocatorList = m_att.defaultMulticastLocatorList;
         }
-        createReceiverResources(attributes.unicastLocatorList, false, true, true);
-        createReceiverResources(attributes.multicastLocatorList, false, true, true);
+        createReceiverResources(pend->getAttributes().unicastLocatorList, false, true, true);
+        createReceiverResources(pend->getAttributes().multicastLocatorList, false, true, true);
     }
-
-    namespace external_locators = fastdds::rtps::ExternalLocatorsProcessor;
-    external_locators::set_listening_locators(attributes.external_unicast_locators, attributes.unicastLocatorList);
 
     // Associate the Endpoint with ReceiverControlBlock
     assignEndpointListenResources(pend);
@@ -1943,23 +1732,12 @@ bool RTPSParticipantImpl::createSendResources(
     {
         if (!m_network_Factory.build_send_resources(send_resource_list_, (*it)))
         {
-            EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT, "Cannot create send resource for endpoint remote locator (" <<
+            logWarning(RTPS_PARTICIPANT, "Cannot create send resource for endpoint remote locator (" <<
                     pend->getGuid() << ", " << (*it) << ")");
         }
     }
 
     return true;
-}
-
-void RTPSParticipantImpl::setup_external_locators(
-        Endpoint* endpoint)
-{
-    auto& attributes = endpoint->getAttributes();
-    if (attributes.external_unicast_locators.empty())
-    {
-        // Take external locators from the participant.
-        attributes.external_unicast_locators = m_att.default_external_unicast_locators;
-    }
 }
 
 bool RTPSParticipantImpl::createReceiverResources(
@@ -1968,11 +1746,8 @@ bool RTPSParticipantImpl::createReceiverResources(
         bool RegisterReceiver,
         bool log_when_creation_fails)
 {
-    auto input_list = Locator_list;
-    Locator_list.clear();
-
     std::vector<std::shared_ptr<ReceiverResource>> newItemsBuffer;
-    bool ret_val = input_list.empty();
+    bool ret_val = Locator_list.empty();
 
 #if HAVE_SECURITY
     // An auxilary buffer is needed in the ReceiverResource to to decrypt the message,
@@ -1983,31 +1758,23 @@ bool RTPSParticipantImpl::createReceiverResources(
     uint32_t max_receiver_buffer_size = (std::numeric_limits<uint32_t>::max)();
 #endif // if HAVE_SECURITY
 
-    for (auto it_loc = input_list.begin(); it_loc != input_list.end(); ++it_loc)
+    for (auto it_loc = Locator_list.begin(); it_loc != Locator_list.end(); ++it_loc)
     {
-        Locator_t loc = *it_loc;
-        bool ret = m_network_Factory.BuildReceiverResources(loc, newItemsBuffer, max_receiver_buffer_size);
+        bool ret = m_network_Factory.BuildReceiverResources(*it_loc, newItemsBuffer, max_receiver_buffer_size);
         if (!ret && ApplyMutation)
         {
             uint32_t tries = 0;
             while (!ret && (tries < m_att.builtin.mutation_tries))
             {
                 tries++;
-                applyLocatorAdaptRule(loc);
-                ret = m_network_Factory.BuildReceiverResources(loc, newItemsBuffer, max_receiver_buffer_size);
+                applyLocatorAdaptRule(*it_loc);
+                ret = m_network_Factory.BuildReceiverResources(*it_loc, newItemsBuffer, max_receiver_buffer_size);
             }
         }
 
-        if (ret)
+        if (!ret && log_when_creation_fails)
         {
-            Locator_list.push_back(loc);
-        }
-        else if (log_when_creation_fails)
-        {
-            std::string postfix = ApplyMutation ? ". Applied mutation until: " + IPLocator::to_string(loc) : "";
-            static_cast<void>(postfix); // Might be unused if log is disabled
-            EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
-                    "Could not create the specified receiver resource for '" << *it_loc << "'" << postfix);
+            logWarning(RTPS_PARTICIPANT, "Could not create the specified receiver resource");
         }
 
         ret_val |= !newItemsBuffer.empty();
@@ -2259,15 +2026,13 @@ void RTPSParticipantImpl::normalize_endpoint_locators(
         EndpointAttributes& endpoint_att)
 {
     // Locators with port 0, calculate port.
-    uint32_t unicast_port = metatraffic_unicast_port_ + m_att.port.offsetd3 - m_att.port.offsetd1;
     for (Locator_t& loc : endpoint_att.unicastLocatorList)
     {
-        m_network_Factory.fill_default_locator_port(loc, unicast_port);
+        m_network_Factory.fill_default_locator_port(domain_id_, loc, m_att, false);
     }
-    uint32_t multicast_port = m_network_Factory.calculate_well_known_port(domain_id_, m_att, true);
     for (Locator_t& loc : endpoint_att.multicastLocatorList)
     {
-        m_network_Factory.fill_default_locator_port(loc, multicast_port);
+        m_network_Factory.fill_default_locator_port(domain_id_, loc, m_att, true);
     }
 
     // Normalize unicast locators
@@ -2323,7 +2088,7 @@ bool RTPSParticipantImpl::newRemoteEndpointDiscovered(
     if (m_att.builtin.discovery_config.discoveryProtocol != DiscoveryProtocol::SIMPLE ||
             m_att.builtin.discovery_config.use_STATIC_EndpointDiscoveryProtocol == false)
     {
-        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT,
+        logWarning(RTPS_PARTICIPANT,
                 "Remote Endpoints can only be activated with static discovery protocol over PDP simple protocol");
         return false;
     }
@@ -2572,13 +2337,13 @@ bool RTPSParticipantImpl::get_persistence_service(
     {
         if (param.persistence_guid == c_Guid_Unknown)
         {
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Cannot create persistence service. Persistence GUID not specified");
+            logError(RTPS_PARTICIPANT, "Cannot create persistence service. Persistence GUID not specified");
             return false;
         }
         service = get_persistence_service(param);
         if (service == nullptr)
         {
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+            logError(RTPS_PARTICIPANT,
                     "Couldn't create writer persistence service for transient/persistent " << debug_label);
             return false;
         }
@@ -2833,104 +2598,30 @@ void RTPSParticipantImpl::environment_file_has_changed()
     }
     else
     {
-        EPROSIMA_LOG_WARNING(RTPS_QOS_CHECK, "Trying to add Discovery Servers to a participant which is not a SERVER, BACKUP " <<
+        logWarning(RTPS_QOS_CHECK, "Trying to add Discovery Servers to a participant which is not a SERVER, BACKUP " <<
                 "or an overriden CLIENT (SIMPLE participant transformed into CLIENT with the environment variable)");
     }
 }
 
 void RTPSParticipantImpl::get_default_metatraffic_locators()
 {
-    get_default_metatraffic_locators(m_att);
-}
+    uint32_t metatraffic_multicast_port = m_att.port.getMulticastPort(domain_id_);
+    uint32_t metatraffic_unicast_port = m_att.port.getUnicastPort(domain_id_,
+                    static_cast<uint32_t>(m_att.participantID));
 
-void RTPSParticipantImpl::get_default_metatraffic_locators(
-        RTPSParticipantAttributes& att)
-{
-    uint32_t metatraffic_multicast_port = att.port.getMulticastPort(domain_id_);
-
-    m_network_Factory.getDefaultMetatrafficMulticastLocators(att.builtin.metatrafficMulticastLocatorList,
+    m_network_Factory.getDefaultMetatrafficMulticastLocators(m_att.builtin.metatrafficMulticastLocatorList,
             metatraffic_multicast_port);
-    m_network_Factory.NormalizeLocators(att.builtin.metatrafficMulticastLocatorList);
+    m_network_Factory.NormalizeLocators(m_att.builtin.metatrafficMulticastLocatorList);
 
-    m_network_Factory.getDefaultMetatrafficUnicastLocators(att.builtin.metatrafficUnicastLocatorList,
-            metatraffic_unicast_port_);
-    m_network_Factory.NormalizeLocators(att.builtin.metatrafficUnicastLocatorList);
+    m_network_Factory.getDefaultMetatrafficUnicastLocators(m_att.builtin.metatrafficUnicastLocatorList,
+            metatraffic_unicast_port);
+    m_network_Factory.NormalizeLocators(m_att.builtin.metatrafficUnicastLocatorList);
 }
 
 void RTPSParticipantImpl::get_default_unicast_locators()
 {
-    get_default_unicast_locators(m_att);
-}
-
-void RTPSParticipantImpl::get_default_unicast_locators(
-        RTPSParticipantAttributes& att)
-{
-    uint32_t unicast_port = metatraffic_unicast_port_ + att.port.offsetd3 - att.port.offsetd1;
-    m_network_Factory.getDefaultUnicastLocators(att.defaultUnicastLocatorList, unicast_port);
-    m_network_Factory.NormalizeLocators(att.defaultUnicastLocatorList);
-}
-
-bool RTPSParticipantImpl::is_participant_ignored(
-        const GuidPrefix_t& participant_guid)
-{
-    shared_lock<shared_mutex> _(ignored_mtx_);
-    return ignored_participants_.find(participant_guid) != ignored_participants_.end();
-}
-
-bool RTPSParticipantImpl::is_writer_ignored(
-        const GUID_t& /*writer_guid*/)
-{
-    return false;
-}
-
-bool RTPSParticipantImpl::is_reader_ignored(
-        const GUID_t& /*reader_guid*/)
-{
-    return false;
-}
-
-bool RTPSParticipantImpl::ignore_participant(
-        const GuidPrefix_t& participant_guid)
-{
-    if (participant_guid == m_guid.guidPrefix)
-    {
-        EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT, "A participant is unable to ignore itself");
-        return false;
-    }
-    {
-        shared_lock<eprosima::shared_mutex> _(mp_builtinProtocols->getDiscoveryMutex());
-
-        for (auto server_it = m_att.builtin.discovery_config.m_DiscoveryServers.begin();
-                server_it != m_att.builtin.discovery_config.m_DiscoveryServers.end(); server_it++)
-        {
-            if (server_it->guidPrefix == participant_guid)
-            {
-                EPROSIMA_LOG_WARNING(RTPS_PARTICIPANT, "Cannot ignore one of this participant Discovery Servers");
-                return false;
-            }
-        }
-    }
-    {
-        std::unique_lock<shared_mutex> _(ignored_mtx_);
-        ignored_participants_.insert(participant_guid);
-    }
-    pdp()->remove_remote_participant(GUID_t(participant_guid, c_EntityId_RTPSParticipant),
-            ParticipantDiscoveryInfo::DISCOVERY_STATUS::IGNORED_PARTICIPANT);
-
-    return true;
-
-}
-
-bool RTPSParticipantImpl::ignore_writer(
-        const GUID_t& /*writer_guid*/)
-{
-    return false;
-}
-
-bool RTPSParticipantImpl::ignore_reader(
-        const GUID_t& /*reader_guid*/)
-{
-    return false;
+    m_network_Factory.getDefaultUnicastLocators(domain_id_, m_att.defaultUnicastLocatorList, m_att);
+    m_network_Factory.NormalizeLocators(m_att.defaultUnicastLocatorList);
 }
 
 #ifdef FASTDDS_STATISTICS
@@ -3023,54 +2714,7 @@ bool RTPSParticipantImpl::unregister_in_reader(
     return res;
 }
 
-void RTPSParticipantImpl::set_enabled_statistics_writers_mask(
-        uint32_t enabled_writers)
-{
-    StatisticsParticipantImpl::set_enabled_statistics_writers_mask(enabled_writers);
-
-    // Propagate mask to all readers and writers
-    shared_lock<shared_mutex> _(endpoints_list_mutex);
-
-    for (auto reader : m_userReaderList)
-    {
-        reader->set_enabled_statistics_writers_mask(enabled_writers);
-    }
-
-    for (auto writer : m_userWriterList)
-    {
-        writer->set_enabled_statistics_writers_mask(enabled_writers);
-    }
-}
-
 #endif // FASTDDS_STATISTICS
-
-bool RTPSParticipantImpl::should_match_local_endpoints(
-        const RTPSParticipantAttributes& att)
-{
-    bool should_match_local_endpoints = true;
-
-    const std::string* ignore_local_endpoints = PropertyPolicyHelper::find_property(att.properties,
-                    "fastdds.ignore_local_endpoints");
-    if (nullptr != ignore_local_endpoints)
-    {
-        if (0 == ignore_local_endpoints->compare("true"))
-        {
-            should_match_local_endpoints = false;
-        }
-        else if (0 == ignore_local_endpoints->compare("false"))
-        {
-            should_match_local_endpoints = true;
-        }
-        else
-        {
-            should_match_local_endpoints = true;
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
-                    "Unkown value '" << *ignore_local_endpoints <<
-                    "' for property 'fastdds.ignore_local_endpoints'. Setting value to 'true'");
-        }
-    }
-    return should_match_local_endpoints;
-}
 
 void RTPSParticipantImpl::update_removed_participant(
         const LocatorList_t& remote_participant_locators)

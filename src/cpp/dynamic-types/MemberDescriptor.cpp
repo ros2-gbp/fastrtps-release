@@ -174,7 +174,7 @@ ReturnCode_t MemberDescriptor::copy_from(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error copying MemberDescriptor, invalid input descriptor");
+        logError(DYN_TYPES, "Error copying MemberDescriptor, invalid input descriptor");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }
@@ -759,7 +759,7 @@ ReturnCode_t MemberDescriptor::apply_annotation(
     }
     else
     {
-        EPROSIMA_LOG_ERROR(DYN_TYPES, "Error applying annotation. The input descriptor isn't consistent.");
+        logError(DYN_TYPES, "Error applying annotation. The input descriptor isn't consistent.");
         return ReturnCode_t::RETCODE_BAD_PARAMETER;
     }
 }

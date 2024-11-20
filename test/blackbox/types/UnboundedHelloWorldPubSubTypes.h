@@ -28,16 +28,14 @@
 
 #include "UnboundedHelloWorld.h"
 
-
 #if !defined(GEN_API_VER) || (GEN_API_VER != 1)
 #error \
     Generated UnboundedHelloWorld is not compatible with current installed Fast DDS. Please, regenerate it with fastddsgen.
 #endif  // GEN_API_VER
 
-
 /*!
  * @brief This class represents the TopicDataType of the type UnboundedHelloWorld defined by the user in the IDL file.
- * @ingroup UnboundedHelloWorld
+ * @ingroup UNBOUNDEDHELLOWORLD
  */
 class UnboundedHelloWorldPubSubType : public eprosima::fastdds::dds::TopicDataType
 {
@@ -47,7 +45,7 @@ public:
 
     eProsima_user_DllExport UnboundedHelloWorldPubSubType();
 
-    eProsima_user_DllExport virtual ~UnboundedHelloWorldPubSubType() override;
+    eProsima_user_DllExport virtual ~UnboundedHelloWorldPubSubType();
 
     eProsima_user_DllExport virtual bool serialize(
             void* data,
@@ -98,8 +96,6 @@ public:
 
     MD5 m_md5;
     unsigned char* m_keyBuffer;
-
 };
 
 #endif // _FAST_DDS_GENERATED_UNBOUNDEDHELLOWORLD_PUBSUBTYPES_H_
-

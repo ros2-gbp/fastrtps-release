@@ -96,7 +96,7 @@ bool BuiltinProtocols::initBuiltinProtocols(
     switch (m_att.discovery_config.discoveryProtocol)
     {
         case DiscoveryProtocol_t::NONE:
-            EPROSIMA_LOG_WARNING(RTPS_PDP, "No participant discovery protocol specified");
+            logWarning(RTPS_PDP, "No participant discovery protocol specified");
             return true;
 
         case DiscoveryProtocol_t::SIMPLE:
@@ -104,7 +104,7 @@ bool BuiltinProtocols::initBuiltinProtocols(
             break;
 
         case DiscoveryProtocol_t::EXTERNAL:
-            EPROSIMA_LOG_ERROR(RTPS_PDP, "Flag only present for debugging purposes");
+            logError(RTPS_PDP, "Flag only present for debugging purposes");
             return false;
 
         case DiscoveryProtocol_t::CLIENT:
@@ -126,13 +126,13 @@ bool BuiltinProtocols::initBuiltinProtocols(
             break;
 
         default:
-            EPROSIMA_LOG_ERROR(RTPS_PDP, "Unknown DiscoveryProtocol_t specified.");
+            logError(RTPS_PDP, "Unknown DiscoveryProtocol_t specified.");
             return false;
     }
 
     if (!mp_PDP->init(mp_participantImpl))
     {
-        EPROSIMA_LOG_ERROR(RTPS_PDP, "Participant discovery configuration failed");
+        logError(RTPS_PDP, "Participant discovery configuration failed");
         delete mp_PDP;
         mp_PDP = nullptr;
         return false;
@@ -203,13 +203,13 @@ bool BuiltinProtocols::addLocalWriter(
 
         if (!ok)
         {
-            EPROSIMA_LOG_WARNING(RTPS_EDP, "Failed register WriterProxyData in EDP");
+            logWarning(RTPS_EDP, "Failed register WriterProxyData in EDP");
             return false;
         }
     }
     else
     {
-        EPROSIMA_LOG_WARNING(RTPS_EDP, "EDP is not used in this Participant, register a Writer is impossible");
+        logWarning(RTPS_EDP, "EDP is not used in this Participant, register a Writer is impossible");
     }
 
     if (nullptr != mp_WLP)
@@ -218,8 +218,7 @@ bool BuiltinProtocols::addLocalWriter(
     }
     else
     {
-        EPROSIMA_LOG_WARNING(RTPS_LIVELINESS,
-                "LIVELINESS is not used in this Participant, register a Writer is impossible");
+        logWarning(RTPS_LIVELINESS, "LIVELINESS is not used in this Participant, register a Writer is impossible");
     }
     return ok;
 }
@@ -238,13 +237,13 @@ bool BuiltinProtocols::addLocalReader(
 
         if (!ok)
         {
-            EPROSIMA_LOG_WARNING(RTPS_EDP, "Failed register ReaderProxyData in EDP");
+            logWarning(RTPS_EDP, "Failed register ReaderProxyData in EDP");
             return false;
         }
     }
     else
     {
-        EPROSIMA_LOG_WARNING(RTPS_EDP, "EDP is not used in this Participant, register a Reader is impossible");
+        logWarning(RTPS_EDP, "EDP is not used in this Participant, register a Reader is impossible");
     }
 
     if (nullptr != mp_WLP)
@@ -322,7 +321,7 @@ void BuiltinProtocols::announceRTPSParticipantState()
     }
     else if (m_att.discovery_config.discoveryProtocol != DiscoveryProtocol_t::NONE)
     {
-        EPROSIMA_LOG_ERROR(RTPS_EDP, "Trying to use BuiltinProtocols interfaces before initBuiltinProtocols call");
+        logError(RTPS_EDP, "Trying to use BuiltinProtocols interfaces before initBuiltinProtocols call");
     }
 }
 
@@ -337,7 +336,7 @@ void BuiltinProtocols::stopRTPSParticipantAnnouncement()
     }
     else if (m_att.discovery_config.discoveryProtocol != DiscoveryProtocol_t::NONE)
     {
-        EPROSIMA_LOG_ERROR(RTPS_EDP, "Trying to use BuiltinProtocols interfaces before initBuiltinProtocols call");
+        logError(RTPS_EDP, "Trying to use BuiltinProtocols interfaces before initBuiltinProtocols call");
     }
 }
 
@@ -351,7 +350,7 @@ void BuiltinProtocols::resetRTPSParticipantAnnouncement()
     }
     else if (m_att.discovery_config.discoveryProtocol != DiscoveryProtocol_t::NONE)
     {
-        EPROSIMA_LOG_ERROR(RTPS_EDP, "Trying to use BuiltinProtocols interfaces before initBuiltinProtocols call");
+        logError(RTPS_EDP, "Trying to use BuiltinProtocols interfaces before initBuiltinProtocols call");
     }
 }
 

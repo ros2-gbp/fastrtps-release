@@ -34,14 +34,11 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define KeyedData1mb_max_cdr_typesize 1024004ULL;
-#define KeyedData1mb_max_key_cdr_typesize 2ULL;
-
 KeyedData1mb::KeyedData1mb()
 {
-    // unsigned short m_key
+    // m_key com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5d20e46
     m_key = 0;
-    // sequence<octet, 1023996> m_data
+    // m_data com.eprosima.idl.parser.typecode.SequenceTypeCode@709ba3fb
 
 
 }
@@ -60,7 +57,7 @@ KeyedData1mb::KeyedData1mb(
 }
 
 KeyedData1mb::KeyedData1mb(
-        KeyedData1mb&& x) noexcept 
+        KeyedData1mb&& x)
 {
     m_key = x.m_key;
     m_data = std::move(x.m_data);
@@ -77,7 +74,7 @@ KeyedData1mb& KeyedData1mb::operator =(
 }
 
 KeyedData1mb& KeyedData1mb::operator =(
-        KeyedData1mb&& x) noexcept
+        KeyedData1mb&& x)
 {
 
     m_key = x.m_key;
@@ -102,8 +99,20 @@ bool KeyedData1mb::operator !=(
 size_t KeyedData1mb::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return KeyedData1mb_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    current_alignment += (1023996 * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t KeyedData1mb::getCdrSerializedSize(
@@ -213,12 +222,18 @@ std::vector<uint8_t>& KeyedData1mb::data()
     return m_data;
 }
 
-
 size_t KeyedData1mb::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return KeyedData1mb_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+     current_align += 2 + eprosima::fastcdr::Cdr::alignment(current_align, 2);
+
+     
+
+
+    return current_align;
 }
 
 bool KeyedData1mb::isKeyDefined()
@@ -230,7 +245,6 @@ void KeyedData1mb::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-   scdr << m_key;
-   
-  
+     scdr << m_key;
+       
 }

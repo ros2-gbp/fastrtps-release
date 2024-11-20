@@ -1,102 +1,33 @@
 Forthcoming
 -----------
 
-Version 2.10.5
---------------
+
+
+Version 2.6.9
+-------------
 
 * Added new `flow_controller_descriptor_list` XML configuration.
 
-Version 2.10.4
---------------
+Version 2.6.8
+-------------
 
-* Added `non_blocking_send` to TCP Transport.
 * Added authentication handshake properties.
-* Added `max_message_size` property to configure maximum output message size.
+* Added `non_blocking_send` to TCP Transport.
 
-Version 2.10.3
---------------
+Version 2.6.7
+-------------
 
 * Added the possibility to define a listening port equal to 0 in TCP Transport
 * Added support for TCP to Fast DDS CLI and environment variable
-* Enable Discovery Server example through TCP
 * Added configuration of builtin transports through DomainParticipantQos, environment
   variable and XML.
+* Enabled secure communications on Discovery Server
 
-Version 2.10.2
---------------
+Version 2.6.6
+-------------
 
-* Shared memory improvements.
-* Data-sharing improvements.
-* Improve performance of intraprocess plus data-sharing.
 * Added participant property to configure SHM transport metatraffic behavior.
   No metatraffic over SHM transport by default.
-* Added Participant ignore local endpoints feature.
-* `DomainParticipantListener::on_participant_discovery` changed behavior (fix ABI break in 2.10.0).
-* Improve content filter expression parameters checks and verbosity.
-* Support new endpoint QoS XML tags.
-* Allow participant profiles with no rtps tag.
-
-
-Version 2.10.1
---------------
-
-* Added `ignore_participant` implementation.
-
-Version 2.10.0
---------------
-
-* Enabled secure communications on Discovery Server (ABI break on RTPS layer)
-* Added non-standard DataWriterListener callback `on_unacknowledged_sample_removed` (API extension on DDS layer).
-* Added `RTPSWriter::has_been_delivered` virtual method (ABI break on RTPS layer).
-* Refactor `StatefulWriter::get_disable_positive_acks` as virtual method of `RTPSWriter` (ABI break on RTPS layer).
-* Network headers made private (ABI break on RTPS layer).
-* Added ignore RTPS entity API in RTPSParticipant (ABI break on RTPS layer).
-* Overload `PDP::removeWriterProxyData` and `PDP::removeReaderProxyData` (ABI break on RTPS layer).
-* Overload RTPS discovery callbacks in RTPSParticipantListener (ABI break on RTPS layer).
-* Overload DDS discovery callbacks in DomainParticipantListener (ABI break on DDS layer).
-* Added on_incompatible_type to RTPS listeners (ABI break on RTPS layer).
-* Added support for QNX 7.1 build.
-
-Version 2.9.0
--------------
-
-* Default memory management policy set to `PREALLOCATED_WITH_REALLOC_MEMORY_MODE` (behaviour change)
-* Statistics metrics are only calculated/accumulated when their corresponding DataWriter is enabled (behaviour change)
-* Added new log macros `EPROSIMA_LOG_INFO`, `EPROSIMA_LOG_WARNING` and `EPROSIMA_LOG_ERROR`, and change all old macros `logInfo`, `logWarning`, and `logError` in the project.
-* Added `ENABLE_OLD_LOG_MACROS` CMake option to support disabling the compilation of old log macros `logInfo`, `logWarning`, and `logError`.
-* FASTDDS_STATISTICS build option set to ON by default
-* Added XML profile validation option as a CLI new verb task: `"fastdds xml validate <xml_file(s)_path>"`. Added tests due to this new feature.
-
-Version 2.8.0
--------------
-
-* Added API get the WAN address of TCPv4 transport descriptors (API extension)
-* Support `propagate` attribute for Properties in PropertyQoSPolicies so they could be
-  set by user and sent in PDP
-* Added possibility to configure Ownership and Ownership Strength QoS Policies from XML profiles file
-* Added Server Name Indication (SNI) support for TLS-TCP communication
-* Changes to allow running tests on Android emulator or device
-* Added configuration settings for announcing locators on external LANs (ABI break)
-
-Version 2.7.1
--------------
-
-* ReadCondition implementation according to DDS version 1.4 standard document
-* Added a new CMake option to allow users to force the use of our third party shared_mutex
-
-Version 2.7.0
--------------
-
-* Implementation of DataWriter methods write_w_timestamp, register_instance_w_timestamp,
-  unregister_instance_w_timestamp, and dispose_w_timestamp (ABI break)
-* Support of `SampleRejectedStatus` in DDS API (API extensions on RTPS layer)
-* Implementation of DomainParticipant method find_topic
-* Include Server Name Indication (SNI) empty API (ABI break on transport layer)
-* CacheChange_t destructor made virtual (ABI break on RTPS layer)
-* Added DDS APIs for ReadCondition (API extension)
-* Added bulk notification interface to RTPS reader listener (API extension)
-* Refactor of auxiliary utils class DBQueue (ABI break)
-* Added configuration data for external locators feature (ABI break)
 
 Version 2.6.1
 -------------

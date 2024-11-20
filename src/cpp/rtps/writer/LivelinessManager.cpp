@@ -45,7 +45,7 @@ bool LivelinessManager::add_writer(
 {
     if (!manage_automatic_ && kind == LivelinessQosPolicyKind::AUTOMATIC_LIVELINESS_QOS)
     {
-        EPROSIMA_LOG_WARNING(RTPS_WRITER, "Liveliness manager not managing automatic writers, writer not added");
+        logWarning(RTPS_WRITER, "Liveliness manager not managing automatic writers, writer not added");
         return false;
     }
 
@@ -202,7 +202,7 @@ bool LivelinessManager::assert_liveliness(
     // Updates the timer owner
     if (!calculate_next())
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Error when restarting liveliness timer");
+        logError(RTPS_WRITER, "Error when restarting liveliness timer");
         return false;
     }
 
@@ -227,7 +227,7 @@ bool LivelinessManager::assert_liveliness(
 
     if (!manage_automatic_ && kind == LivelinessQosPolicyKind::AUTOMATIC_LIVELINESS_QOS)
     {
-        EPROSIMA_LOG_WARNING(RTPS_WRITER, "Liveliness manager not managing automatic writers, writer not added");
+        logWarning(RTPS_WRITER, "Liveliness manager not managing automatic writers, writer not added");
         return false;
     }
 
@@ -256,7 +256,7 @@ bool LivelinessManager::assert_liveliness(
     // Updates the timer owner
     if (!calculate_next())
     {
-        EPROSIMA_LOG_INFO(RTPS_WRITER,
+        logInfo(RTPS_WRITER,
                 "Error when restarting liveliness timer: " << writers_.size() << " writers, liveliness " <<
                 kind);
         return false;
@@ -310,7 +310,7 @@ bool LivelinessManager::timer_expired()
 
     if (timer_owner_ == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_WRITER, "Liveliness timer expired but there is no writer");
+        logError(RTPS_WRITER, "Liveliness timer expired but there is no writer");
         return false;
     }
     else

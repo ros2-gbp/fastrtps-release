@@ -96,8 +96,8 @@ target_link_libraries(DDSCommunicationPubSub fastrtps fastcdr foonathan_memory $
 # Dynamic types test
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/simple_communication_dynamic.py
     ${CMAKE_CURRENT_BINARY_DIR}/simple_communication_dynamic.py COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/example_type_profile.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/example_type_profile.xml COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/example_type.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/example_type.xml COPYONLY)
 
 # Standard tests
 
@@ -116,12 +116,12 @@ list(APPEND TEST_DEFINITIONS
 
 
 list(APPEND XML_CONFIGURATION_FILES
-    simple_reliable_profile.xml
-    simple_besteffort_profile.xml
-    simple_reliable_zerocopy_profile.xml
-    simple_besteffort_zerocopy_profile.xml
-    TCP_server_profile.xml
-    TCP_client_profile.xml
+    simple_reliable.xml
+    simple_besteffort.xml
+    simple_reliable_zerocopy.xml
+    simple_besteffort_zerocopy.xml
+    TCP_server.xml
+    TCP_client.xml
     )
 # Python file
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_build.py
@@ -207,6 +207,9 @@ if(Python3_Interpreter_FOUND)
     endforeach()
 endif()
 
-if(UNIX AND NOT(APPLE) AND NOT(QNXNTO) AND NOT(ANDROID))
-    add_subdirectory(dyn_network)
-endif()
+# Add 'xfail' label to flaky tests
+set(DDS_COMMUNICATION_XFAIL_LIST XFAIL_DDS_COMMUNICATION)
+
+foreach(DDS_COMMUNICATION_XFAIL_TEST ${DDS_COMMUNICATION_XFAIL_LIST})
+    add_xfail_label(${CMAKE_CURRENT_SOURCE_DIR}/${DDS_COMMUNICATION_XFAIL_TEST}.list)
+endforeach()

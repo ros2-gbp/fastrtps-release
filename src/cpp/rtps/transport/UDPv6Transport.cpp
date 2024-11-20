@@ -14,15 +14,15 @@
 
 #include <rtps/transport/UDPv6Transport.h>
 
-#include <algorithm>
-#include <cstring>
 #include <utility>
+#include <cstring>
+#include <algorithm>
 
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/messages/MessageReceiver.h>
-#include <fastdds/rtps/transport/SenderResource.h>
 #include <fastdds/rtps/transport/TransportInterface.h>
+#include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/utils/IPLocator.h>
+#include <fastdds/rtps/network/SenderResource.h>
+#include <fastdds/rtps/messages/MessageReceiver.h>
 
 #include <rtps/transport/asio_helpers.hpp>
 
@@ -122,7 +122,7 @@ UDPv6Transport::UDPv6Transport(
 
         if (interface_whitelist_.empty())
         {
-            EPROSIMA_LOG_ERROR(TRANSPORT, "All whitelist interfaces were filtered out");
+            logError(TRANSPORT, "All whitelist interfaces were filtered out");
             interface_whitelist_.emplace_back(ip::address_v6::from_string("2001:db8::"));
         }
     }
@@ -304,12 +304,12 @@ eProsimaUDPSocket UDPv6Transport::OpenAndBindInputSocket(
         if (!asio_helpers::asio_helpers::try_setting_buffer_size<asio::socket_base::receive_buffer_size>(
                     socket, mReceiveBufferSize, minimum_value, configured_value))
         {
-            EPROSIMA_LOG_ERROR(TRANSPORT_UDPV6,
+            logError(TRANSPORT_UDPV6,
                     "Couldn't set receive buffer size to minimum value: " << minimum_value);
         }
         else if (mReceiveBufferSize != configured_value)
         {
-            EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6,
+            logWarning(TRANSPORT_UDPV6,
                     "Receive buffer size could not be set to the desired value. "
                     << "Using " << configured_value << " instead of " << mReceiveBufferSize);
         }
@@ -396,9 +396,8 @@ bool UDPv6Transport::OpenInputChannel(
                 }
                 catch (asio::system_error const& e)
                 {
-                    EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, "UDPTransport Error binding " << locatorAddressStr << " at port: (" <<
-                            IPLocator::getPhysicalPort(
-                                locator) << ") with msg: " << e.what());
+                    logWarning(RTPS_MSG_OUT, "UDPTransport Error binding " << locatorAddressStr << " at port: (" <<
+                            IPLocator::getPhysicalPort(locator) << ") with msg: " << e.what());
                     (void)e;
                 }
             }
@@ -426,8 +425,7 @@ bool UDPv6Transport::OpenInputChannel(
                         catch (std::system_error& ex)
                         {
                             (void)ex;
-                            EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
-                                    "Error joining multicast group on " << ip << ": " << ex.what());
+                            logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
                         }
                     }
                 }
@@ -441,8 +439,7 @@ bool UDPv6Transport::OpenInputChannel(
                     catch (std::system_error& ex)
                     {
                         (void)ex;
-                        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
-                                "Error joining multicast group on " << ip << ": " << ex.what());
+                        logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
                     }
                 }
             }

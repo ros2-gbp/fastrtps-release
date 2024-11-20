@@ -24,16 +24,15 @@
  * eProsima log mock.
  */
 
-#define MOCK_EPROSIMA_LOG_COMMON(cat, msg)                                                              \
+#define logInfo(cat, msg)                                                                                \
     {                                                                                                   \
         NulStreambuf null_buffer;                                                                       \
         std::ostream null_stream(&null_buffer);                                                         \
         null_stream << msg;                                                                             \
     }
 
-#define EPROSIMA_LOG_INFO(cat, msg) MOCK_EPROSIMA_LOG_COMMON(cat, msg)
-#define EPROSIMA_LOG_WARNING(cat, msg) MOCK_EPROSIMA_LOG_COMMON(cat, msg)
-#define EPROSIMA_LOG_ERROR(cat, msg) MOCK_EPROSIMA_LOG_COMMON(cat, msg)
+#define logWarning(cat, msg) logInfo(cat, msg)
+#define logError(cat, msg) logInfo(cat, msg)
 
 class NulStreambuf : public std::streambuf
 {

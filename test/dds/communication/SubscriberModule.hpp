@@ -19,12 +19,6 @@
 #ifndef TEST_COMMUNICATION_SUBSCRIBER_HPP
 #define TEST_COMMUNICATION_SUBSCRIBER_HPP
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <map>
-#include <mutex>
-
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/dds/subscriber/SubscriberListener.hpp>
@@ -32,6 +26,11 @@
 
 #include "types/FixedSizedPubSubTypes.h"
 #include "types/HelloWorldPubSubTypes.h"
+
+#include <mutex>
+#include <condition_variable>
+#include <map>
+#include <chrono>
 
 namespace eprosima {
 namespace fastdds {
@@ -45,14 +44,14 @@ public:
     SubscriberModule(
             const uint32_t publishers,
             const uint32_t max_number_samples,
-            bool fixed_type,
-            bool zero_copy,
-            bool succeed_on_timeout)
+            bool fixed_type = false,
+            bool zero_copy = false,
+            bool succeed_on_timeout = false)
         : publishers_(publishers)
         , max_number_samples_(max_number_samples)
         , fixed_type_(zero_copy || fixed_type) // If zero copy active, fixed type is required
         , zero_copy_(zero_copy)
-        , succeed_on_timeout_(succeed_on_timeout)
+        , succeeed_on_timeout_(succeed_on_timeout)
     {
     }
 
@@ -85,12 +84,10 @@ public:
 
     bool run(
             bool notexit,
-            const uint32_t rescan_interval,
-            uint32_t timeout);
+            uint32_t timeout = 86400000);
 
     bool run_for(
             bool notexit,
-            const uint32_t rescan_interval,
             const std::chrono::milliseconds& timeout);
 
 private:
@@ -104,8 +101,8 @@ private:
     std::map<eprosima::fastrtps::rtps::GUID_t, uint32_t> number_samples_;
     bool fixed_type_ = false;
     bool zero_copy_ = false;
-    std::atomic_bool run_{true};
-    bool succeed_on_timeout_ = false;
+    bool run_ = true;
+    bool succeeed_on_timeout_ = false;
     DomainParticipant* participant_ = nullptr;
     TypeSupport type_;
     Subscriber* subscriber_ = nullptr;

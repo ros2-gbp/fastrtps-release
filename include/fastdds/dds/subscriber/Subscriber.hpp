@@ -171,23 +171,6 @@ public:
             const StatusMask& mask = StatusMask::all());
 
     /**
-     * This operation creates a DataReader. The returned DataReader will be attached and belong to the Subscriber.
-     *
-     * @param topic Topic the DataReader will be listening.
-     * @param reader_qos QoS of the DataReader.
-     * @param payload_pool IPayloadPool shared pointer that defines reader payload (default: nullptr).
-     * @param listener Pointer to the listener (default: nullptr)
-     * @param mask StatusMask that holds statuses the listener responds to (default: all).
-     * @return Pointer to the created DataReader. nullptr if failed.
-     */
-    RTPS_DllAPI DataReader* create_datareader_with_payload_pool(
-            TopicDescription* topic,
-            const DataReaderQos& reader_qos,
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool,
-            DataReaderListener* listener = nullptr,
-            const StatusMask& mask = StatusMask::all());
-
-    /**
      * This operation creates a DataReader. The returned DataReader will be attached and belongs to the Subscriber.
      *
      * @param topic Topic the DataReader will be listening.
@@ -199,23 +182,6 @@ public:
     RTPS_DllAPI DataReader* create_datareader_with_profile(
             TopicDescription* topic,
             const std::string& profile_name,
-            DataReaderListener* listener = nullptr,
-            const StatusMask& mask = StatusMask::all());
-
-    /**
-     * This operation creates a DataReader. The returned DataReader will be attached and belongs to the Subscriber.
-     *
-     * @param topic Topic the DataReader will be listening.
-     * @param profile_name DataReader profile name.
-     * @param payload_pool IPayloadPool shared pointer that defines reader payload (default: nullptr).
-     * @param listener Pointer to the listener (default: nullptr)
-     * @param mask StatusMask that holds statuses the listener responds to (default: all).
-     * @return Pointer to the created DataReader. nullptr if failed.
-     */
-    RTPS_DllAPI DataReader* create_datareader_with_profile_with_payload_pool(
-            TopicDescription* topic,
-            const std::string& profile_name,
-            std::shared_ptr<fastrtps::rtps::IPayloadPool> payload_pool,
             DataReaderListener* listener = nullptr,
             const StatusMask& mask = StatusMask::all());
 
@@ -264,8 +230,6 @@ public:
      * @param view_states Vector of ViewStateKind
      * @param instance_states Vector of InstanceStateKind
      * @return RETCODE_OK
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_datareaders(
             std::vector<DataReader*>& readers,
@@ -285,8 +249,6 @@ public:
      * attached to the Subscriber.
      *
      * @return RETCODE_OK
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t begin_access();
 
@@ -295,8 +257,6 @@ public:
      * the Subscriber.
      *
      * @return RETCODE_OK
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t end_access();
 
@@ -393,8 +353,6 @@ public:
      * @param[in, out] reader_qos
      * @param[in] topic_qos
      * @return RETCODE_OK if successful, an error code otherwise
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI static ReturnCode_t copy_from_topic_qos(
             DataReaderQos& reader_qos,

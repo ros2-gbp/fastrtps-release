@@ -34,14 +34,11 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-#define UnboundedHelloWorld_max_cdr_typesize 264ULL;
-#define UnboundedHelloWorld_max_key_cdr_typesize 0ULL;
-
 UnboundedHelloWorld::UnboundedHelloWorld()
 {
-    // unsigned short m_index
+    // m_index com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5c5a1b69
     m_index = 0;
-    // string m_message
+    // m_message com.eprosima.idl.parser.typecode.StringTypeCode@627551fb
     m_message ="";
 
 }
@@ -60,7 +57,7 @@ UnboundedHelloWorld::UnboundedHelloWorld(
 }
 
 UnboundedHelloWorld::UnboundedHelloWorld(
-        UnboundedHelloWorld&& x) noexcept 
+        UnboundedHelloWorld&& x)
 {
     m_index = x.m_index;
     m_message = std::move(x.m_message);
@@ -77,7 +74,7 @@ UnboundedHelloWorld& UnboundedHelloWorld::operator =(
 }
 
 UnboundedHelloWorld& UnboundedHelloWorld::operator =(
-        UnboundedHelloWorld&& x) noexcept
+        UnboundedHelloWorld&& x)
 {
 
     m_index = x.m_index;
@@ -102,8 +99,16 @@ bool UnboundedHelloWorld::operator !=(
 size_t UnboundedHelloWorld::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return UnboundedHelloWorld_max_cdr_typesize;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+
+    return current_alignment - initial_alignment;
 }
 
 size_t UnboundedHelloWorld::getCdrSerializedSize(
@@ -206,12 +211,16 @@ std::string& UnboundedHelloWorld::message()
     return m_message;
 }
 
-
 size_t UnboundedHelloWorld::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return UnboundedHelloWorld_max_key_cdr_typesize;
+    size_t current_align = current_alignment;
+
+
+
+
+
+    return current_align;
 }
 
 bool UnboundedHelloWorld::isKeyDefined()
@@ -223,5 +232,5 @@ void UnboundedHelloWorld::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
+      
 }
-

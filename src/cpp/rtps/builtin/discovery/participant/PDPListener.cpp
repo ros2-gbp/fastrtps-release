@@ -33,7 +33,6 @@
 
 #include <fastdds/core/policy/ParameterList.hpp>
 #include <rtps/builtin/discovery/participant/PDPEndpoints.hpp>
-#include <rtps/network/ExternalLocatorsProcessor.hpp>
 #include <rtps/participant/RTPSParticipantImpl.h>
 
 #include <mutex>
@@ -57,14 +56,14 @@ void PDPListener::onNewCacheChangeAdded(
 {
     CacheChange_t* change = const_cast<CacheChange_t*>(change_in);
     GUID_t writer_guid = change->writerGUID;
-    EPROSIMA_LOG_INFO(RTPS_PDP, "SPDP Message received from: " << writer_guid);
+    logInfo(RTPS_PDP, "SPDP Message received from: " << writer_guid);
 
     // Make sure we have an instance handle (i.e GUID)
     if (change->instanceHandle == c_InstanceHandle_Unknown)
     {
         if (!this->get_key(change))
         {
-            EPROSIMA_LOG_WARNING(RTPS_PDP, "Problem getting the key of the change, removing");
+            logWarning(RTPS_PDP, "Problem getting the key of the change, removing");
             parent_pdp_->builtin_endpoints_->remove_from_pdp_reader_history(change);
             return;
         }
@@ -79,7 +78,7 @@ void PDPListener::onNewCacheChangeAdded(
         // Ignore announcement from own RTPSParticipant
         if (guid == parent_pdp_->getRTPSParticipant()->getGuid())
         {
-            EPROSIMA_LOG_INFO(RTPS_PDP, "Message from own RTPSParticipant, removing");
+            logInfo(RTPS_PDP, "Message from own RTPSParticipant, removing");
             parent_pdp_->builtin_endpoints_->remove_from_pdp_reader_history(change);
             return;
         }
@@ -108,17 +107,6 @@ void PDPListener::onNewCacheChangeAdded(
             // After correctly reading it
             change->instanceHandle = temp_participant_data_.m_key;
             guid = temp_participant_data_.m_guid;
-
-            if (parent_pdp_->getRTPSParticipant()->is_participant_ignored(guid.guidPrefix))
-            {
-                return;
-            }
-
-            // Filter locators
-            const auto& pattr = parent_pdp_->getRTPSParticipant()->getAttributes();
-            fastdds::rtps::ExternalLocatorsProcessor::filter_remote_locators(temp_participant_data_,
-                    pattr.builtin.metatraffic_external_unicast_locators, pattr.default_external_unicast_locators,
-                    pattr.ignore_non_matching_locators);
 
             // Check if participant already exists (updated info)
             ParticipantProxyData* pdata = nullptr;
@@ -175,6 +163,7 @@ void PDPListener::process_alive_data(
         std::unique_lock<std::recursive_mutex>& lock)
 {
     GUID_t participant_guid = new_data.m_guid;
+    static_cast<void>(participant_guid);
 
     if (old_data == nullptr)
     {
@@ -214,8 +203,8 @@ void PDPListener::process_alive_data(
 
         reader->getMutex().unlock();
 
-        EPROSIMA_LOG_INFO(RTPS_PDP_DISCOVERY, "Update participant "
-                << old_data->m_guid << " at "
+        logInfo(RTPS_PDP_DISCOVERY, "Update participant "
+                << participant_guid << " at "
                 << "MTTLoc: " << old_data->metatraffic_locators
                 << " DefLoc:" << old_data->default_locators);
 
@@ -232,8 +221,6 @@ void PDPListener::process_alive_data(
         RTPSParticipantListener* listener = parent_pdp_->getRTPSParticipant()->getListener();
         if (listener != nullptr)
         {
-            bool should_be_ignored = false;
-
             {
                 std::lock_guard<std::mutex> cb_lock(parent_pdp_->callback_mtx_);
                 ParticipantDiscoveryInfo info(old_data_copy);
@@ -241,12 +228,7 @@ void PDPListener::process_alive_data(
 
                 listener->onParticipantDiscovery(
                     parent_pdp_->getRTPSParticipant()->getUserRTPSParticipant(),
-                    std::move(info),
-                    should_be_ignored);
-            }
-            if (should_be_ignored)
-            {
-                parent_pdp_->getRTPSParticipant()->ignore_participant(participant_guid.guidPrefix);
+                    std::move(info));
             }
         }
     }

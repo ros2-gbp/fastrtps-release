@@ -28,8 +28,6 @@
 #include <fastdds/rtps/reader/RTPSReader.h>
 
 #include <fastrtps_deprecated/subscriber/SubscriberImpl.h>
-
-#include <rtps/common/ChangeComparison.hpp>
 #include <rtps/reader/WriterProxy.h>
 #include <utils/collections/sorted_vector_insert.hpp>
 
@@ -96,17 +94,17 @@ SubscriberHistory::SubscriberHistory(
         get_key_object_ = type_->createData();
     }
 
-    if (resource_limited_qos_.max_samples <= 0)
+    if (resource_limited_qos_.max_samples == 0)
     {
         resource_limited_qos_.max_samples = std::numeric_limits<int32_t>::max();
     }
 
-    if (resource_limited_qos_.max_instances <= 0)
+    if (resource_limited_qos_.max_instances == 0)
     {
         resource_limited_qos_.max_instances = std::numeric_limits<int32_t>::max();
     }
 
-    if (resource_limited_qos_.max_samples_per_instance <= 0)
+    if (resource_limited_qos_.max_samples_per_instance == 0)
     {
         resource_limited_qos_.max_samples_per_instance = std::numeric_limits<int32_t>::max();
     }
@@ -162,7 +160,7 @@ bool SubscriberHistory::received_change(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -227,7 +225,7 @@ bool SubscriberHistory::received_change_keep_all_with_key(
             }
             else
             {
-                EPROSIMA_LOG_WARNING(SUBSCRIBER, "Change not added due to maximum number of samples per instance");
+                logWarning(SUBSCRIBER, "Change not added due to maximum number of samples per instance");
             }
         }
     }
@@ -245,8 +243,7 @@ bool SubscriberHistory::received_change_keep_all_with_key(
         else
         {
             // Discarting the sample.
-            EPROSIMA_LOG_WARNING(SUBSCRIBER,
-                    "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
+            logWarning(SUBSCRIBER, "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
         }
     }
 
@@ -297,8 +294,7 @@ bool SubscriberHistory::received_change_keep_last_with_key(
         else
         {
             // Discarting the sample.
-            EPROSIMA_LOG_WARNING(SUBSCRIBER,
-                    "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
+            logWarning(SUBSCRIBER, "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
         }
     }
 
@@ -311,8 +307,7 @@ bool SubscriberHistory::add_received_change(
     if (m_isHistoryFull)
     {
         // Discarding the sample.
-        EPROSIMA_LOG_WARNING(SUBSCRIBER,
-                "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
+        logWarning(SUBSCRIBER, "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
         return false;
     }
 
@@ -323,7 +318,7 @@ bool SubscriberHistory::add_received_change(
             m_isHistoryFull = true;
         }
 
-        EPROSIMA_LOG_INFO(SUBSCRIBER, topic_att_.getTopicDataType()
+        logInfo(SUBSCRIBER, topic_att_.getTopicDataType()
                 << ": Change " << a_change->sequenceNumber << " added from: "
                 << a_change->writerGUID; );
 
@@ -340,8 +335,7 @@ bool SubscriberHistory::add_received_change_with_key(
     if (m_isHistoryFull)
     {
         // Discarting the sample.
-        EPROSIMA_LOG_WARNING(SUBSCRIBER,
-                "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
+        logWarning(SUBSCRIBER, "Attempting to add Data to Full ReaderHistory: " << topic_att_.getTopicDataType());
         return false;
     }
 
@@ -354,9 +348,12 @@ bool SubscriberHistory::add_received_change_with_key(
 
         //ADD TO KEY VECTOR
         eprosima::utilities::collections::sorted_vector_insert(instance_changes, a_change,
-                fastdds::rtps::history_order_cmp);
+                [](const CacheChange_t* lhs, const CacheChange_t* rhs)
+                {
+                    return lhs->sourceTimestamp < rhs->sourceTimestamp;
+                });
 
-        EPROSIMA_LOG_INFO(SUBSCRIBER, mp_reader->getGuid().entityId
+        logInfo(SUBSCRIBER, mp_reader->getGuid().entityId
                 << ": Change " << a_change->sequenceNumber << " added from: "
                 << a_change->writerGUID << " with KEY: " << a_change->instanceHandle; );
 
@@ -372,7 +369,7 @@ bool SubscriberHistory::find_key_for_change(
 {
     if (!a_change->instanceHandle.isDefined() && type_ != nullptr)
     {
-        EPROSIMA_LOG_INFO(SUBSCRIBER, "Getting Key of change with no Key transmitted");
+        logInfo(SUBSCRIBER, "Getting Key of change with no Key transmitted");
         type_->deserialize(&a_change->serializedPayload, get_key_object_);
         bool is_key_protected = false;
 #if HAVE_SECURITY
@@ -385,8 +382,8 @@ bool SubscriberHistory::find_key_for_change(
     }
     else if (!a_change->instanceHandle.isDefined())
     {
-        EPROSIMA_LOG_WARNING(SUBSCRIBER, "NO KEY in topic: " << topic_att_.topicName
-                                                             << " and no method to obtain it"; );
+        logWarning(SUBSCRIBER, "NO KEY in topic: " << topic_att_.topicName
+                                                   << " and no method to obtain it"; );
         return false;
     }
 
@@ -403,7 +400,7 @@ bool SubscriberHistory::deserialize_change(
     {
         if (!type_->deserialize(&change->serializedPayload, data))
         {
-            EPROSIMA_LOG_ERROR(SUBSCRIBER, "Deserialization of data failed");
+            logError(SUBSCRIBER, "Deserialization of data failed");
             return false;
         }
     }
@@ -434,7 +431,7 @@ bool SubscriberHistory::readNextData(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -446,7 +443,7 @@ bool SubscriberHistory::readNextData(
         WriterProxy* wp = nullptr;
         if (mp_reader->nextUnreadCache(&change, &wp))
         {
-            EPROSIMA_LOG_INFO(SUBSCRIBER, mp_reader->getGuid().entityId << ": reading " << change->sequenceNumber);
+            logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": reading " << change->sequenceNumber);
             uint32_t ownership = wp && qos_.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
                     wp->ownership_strength() : 0;
             bool deserialized = deserialize_change(change, ownership, data, info);
@@ -464,7 +461,7 @@ bool SubscriberHistory::takeNextData(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -476,8 +473,7 @@ bool SubscriberHistory::takeNextData(
         WriterProxy* wp = nullptr;
         if (mp_reader->nextUntakenCache(&change, &wp))
         {
-            EPROSIMA_LOG_INFO(SUBSCRIBER,
-                    mp_reader->getGuid().entityId << ": taking seqNum" << change->sequenceNumber <<
+            logInfo(SUBSCRIBER, mp_reader->getGuid().entityId << ": taking seqNum" << change->sequenceNumber <<
                     " from writer: " << change->writerGUID);
             uint32_t ownership = wp && qos_.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS ?
                     wp->ownership_strength() : 0;
@@ -535,7 +531,7 @@ bool SubscriberHistory::find_key(
                 return true;
             }
         }
-        EPROSIMA_LOG_WARNING(SUBSCRIBER, "History has reached the maximum number of instances");
+        logWarning(SUBSCRIBER, "History has reached the maximum number of instances");
     }
     return false;
 }
@@ -545,7 +541,7 @@ bool SubscriberHistory::remove_change_sub(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -568,7 +564,7 @@ bool SubscriberHistory::remove_change_sub(
         }
         if (!found)
         {
-            EPROSIMA_LOG_ERROR(SUBSCRIBER, "Change not found on this key, something is wrong");
+            logError(SUBSCRIBER, "Change not found on this key, something is wrong");
         }
     }
 
@@ -587,7 +583,7 @@ bool SubscriberHistory::remove_change_sub(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
 
@@ -611,14 +607,14 @@ bool SubscriberHistory::remove_change_sub(
         }
         if (!found)
         {
-            EPROSIMA_LOG_ERROR(SUBSCRIBER, "Change not found on this key, something is wrong");
+            logError(SUBSCRIBER, "Change not found on this key, something is wrong");
         }
     }
 
     const_iterator chit = find_change_nts(change);
     if (chit == changesEnd())
     {
-        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
+        logInfo(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
         return false;
     }
 
@@ -639,7 +635,7 @@ bool SubscriberHistory::set_next_deadline(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
     std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
@@ -669,7 +665,7 @@ bool SubscriberHistory::get_next_deadline(
 {
     if (mp_reader == nullptr || mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(SUBSCRIBER, "You need to create a Reader with this History before using it");
+        logError(SUBSCRIBER, "You need to create a Reader with this History before using it");
         return false;
     }
     std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
@@ -749,16 +745,19 @@ bool SubscriberHistory::completed_change_keep_all_with_key(
             {
                 //ADD TO KEY VECTOR
                 eprosima::utilities::collections::sorted_vector_insert(instance_changes, a_change,
-                        fastdds::rtps::history_order_cmp);
+                        [](const CacheChange_t* lhs, const CacheChange_t* rhs)
+                        {
+                            return lhs->sourceTimestamp < rhs->sourceTimestamp;
+                        });
                 ret_value = true;
 
-                EPROSIMA_LOG_INFO(SUBSCRIBER, mp_reader->getGuid().entityId
+                logInfo(SUBSCRIBER, mp_reader->getGuid().entityId
                         << ": Change " << a_change->sequenceNumber << " added from: "
                         << a_change->writerGUID << " with KEY: " << a_change->instanceHandle; );
             }
             else
             {
-                EPROSIMA_LOG_WARNING(SUBSCRIBER, "Change not added due to maximum number of samples per instance");
+                logWarning(SUBSCRIBER, "Change not added due to maximum number of samples per instance");
 
                 const_iterator chit = find_change_nts(a_change);
                 if (chit != changesEnd())
@@ -768,7 +767,7 @@ bool SubscriberHistory::completed_change_keep_all_with_key(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY, "Change should exists but didn't find it");
+                    logError(RTPS_WRITER_HISTORY, "Change should exists but didn't find it");
                 }
             }
         }
@@ -805,10 +804,13 @@ bool SubscriberHistory::completed_change_keep_last_with_key(
             {
                 //ADD TO KEY VECTOR
                 eprosima::utilities::collections::sorted_vector_insert(instance_changes, a_change,
-                        fastdds::rtps::history_order_cmp);
+                        [](const CacheChange_t* lhs, const CacheChange_t* rhs)
+                        {
+                            return lhs->sourceTimestamp < rhs->sourceTimestamp;
+                        });
                 ret_value = true;
 
-                EPROSIMA_LOG_INFO(SUBSCRIBER, mp_reader->getGuid().entityId
+                logInfo(SUBSCRIBER, mp_reader->getGuid().entityId
                         << ": Change " << a_change->sequenceNumber << " added from: "
                         << a_change->writerGUID << " with KEY: " << a_change->instanceHandle; );
             }
@@ -822,7 +824,7 @@ bool SubscriberHistory::completed_change_keep_last_with_key(
                 }
                 else
                 {
-                    EPROSIMA_LOG_ERROR(RTPS_WRITER_HISTORY, "Change should exists but didn't find it");
+                    logError(RTPS_WRITER_HISTORY, "Change should exists but didn't find it");
                 }
             }
         }

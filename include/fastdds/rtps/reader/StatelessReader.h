@@ -259,7 +259,6 @@ private:
         bool has_manual_topic_liveliness = false;
         CacheChange_t* fragmented_change = nullptr;
         bool is_datasharing = false;
-        uint32_t ownership_strength;
     };
 
     bool acceptMsgFrom(

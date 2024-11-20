@@ -107,8 +107,6 @@ public:
 
     void run();
 
-    void destroy_user_entities();
-
 private:
 
     bool init_dynamic_types();

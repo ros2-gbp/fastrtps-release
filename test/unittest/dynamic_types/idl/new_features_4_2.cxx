@@ -21,10 +21,8 @@
 
 #ifdef _WIN32
 // Remove linker warning LNK4221 on Visual Studio
-namespace {
-char dummy;
-}  // namespace
-#endif  // _WIN32
+namespace { char dummy; }
+#endif
 
 #include "new_features_4_2.h"
 #include "new_features_4_2TypeObject.h"
@@ -35,47 +33,17 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
-
-
-#define bitmodule_BM2_max_cdr_typesize 24ULL;
-#define NewAliases_max_cdr_typesize 32ULL;
-
-#define StructTest_max_cdr_typesize 80ULL;
-
-
-
-#define bitmodule_BitsetBitmask_max_cdr_typesize 17ULL;
-
-
-#define bitmodule_BM2_max_key_cdr_typesize 0ULL;
-#define NewAliases_max_key_cdr_typesize 0ULL;
-
-#define StructTest_max_key_cdr_typesize 0ULL;
-
-
-
-#define bitmodule_BitsetBitmask_max_key_cdr_typesize 0ULL;
-
 NewAliases::NewAliases()
 {
-    // int8 m_int8_
     m_int8_ = 0;
-    // uint8 m_uint8_
     m_uint8_ = 0;
-    // short m_int16_
     m_int16_ = 0;
-    // unsigned short m_uint16_
     m_uint16_ = 0;
-    // long m_int32_
     m_int32_ = 0;
-    // unsigned long m_uint32_
     m_uint32_ = 0;
-    // long long m_int64_
     m_int64_ = 0;
-    // unsigned long long m_uint64_
     m_uint64_ = 555;
-    // string m_local_string
-    m_local_string ="";
+
 
     // Just to register all known types
     registernew_features_4_2Types();
@@ -94,8 +62,7 @@ NewAliases::~NewAliases()
 
 }
 
-NewAliases::NewAliases(
-        const NewAliases& x)
+NewAliases::NewAliases(const NewAliases &x)
 {
     m_int8_ = x.m_int8_;
     m_uint8_ = x.m_uint8_;
@@ -108,8 +75,7 @@ NewAliases::NewAliases(
     m_local_string = x.m_local_string;
 }
 
-NewAliases::NewAliases(
-        NewAliases&& x) noexcept 
+NewAliases::NewAliases(NewAliases &&x)
 {
     m_int8_ = x.m_int8_;
     m_uint8_ = x.m_uint8_;
@@ -122,8 +88,7 @@ NewAliases::NewAliases(
     m_local_string = std::move(x.m_local_string);
 }
 
-NewAliases& NewAliases::operator =(
-        const NewAliases& x)
+NewAliases& NewAliases::operator=(const NewAliases &x)
 {
 
     m_int8_ = x.m_int8_;
@@ -139,8 +104,7 @@ NewAliases& NewAliases::operator =(
     return *this;
 }
 
-NewAliases& NewAliases::operator =(
-        NewAliases&& x) noexcept
+NewAliases& NewAliases::operator=(NewAliases &&x)
 {
 
     m_int8_ = x.m_int8_;
@@ -156,29 +120,41 @@ NewAliases& NewAliases::operator =(
     return *this;
 }
 
-bool NewAliases::operator ==(
-        const NewAliases& x) const
+size_t NewAliases::getMaxCdrSerializedSize(size_t current_alignment)
 {
+    size_t initial_alignment = current_alignment;
 
-    return (m_int8_ == x.m_int8_ && m_uint8_ == x.m_uint8_ && m_int16_ == x.m_int16_ && m_uint16_ == x.m_uint16_ && m_int32_ == x.m_int32_ && m_uint32_ == x.m_uint32_ && m_int64_ == x.m_int64_ && m_uint64_ == x.m_uint64_ && m_local_string == x.m_local_string);
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
+
+
+    return current_alignment - initial_alignment;
 }
 
-bool NewAliases::operator !=(
-        const NewAliases& x) const
-{
-    return !(*this == x);
-}
-
-size_t NewAliases::getMaxCdrSerializedSize(
-        size_t current_alignment)
-{
-    static_cast<void>(current_alignment);
-    return NewAliases_max_cdr_typesize;
-}
-
-size_t NewAliases::getCdrSerializedSize(
-        const NewAliases& data,
-        size_t current_alignment)
+size_t NewAliases::getCdrSerializedSize(const NewAliases& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -213,8 +189,7 @@ size_t NewAliases::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void NewAliases::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void NewAliases::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
 
     scdr << m_int8_;
@@ -228,8 +203,7 @@ void NewAliases::serialize(
 
 }
 
-void NewAliases::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void NewAliases::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
 
     dcdr >> m_int8_;
@@ -247,10 +221,9 @@ void NewAliases::deserialize(
  * @brief This function sets a value in member int8_
  * @param _int8_ New value for member int8_
  */
-void NewAliases::int8_(
-        int8_t _int8_)
+void NewAliases::int8_(int8_t _int8_)
 {
-    m_int8_ = _int8_;
+m_int8_ = _int8_;
 }
 
 /*!
@@ -270,15 +243,13 @@ int8_t& NewAliases::int8_()
 {
     return m_int8_;
 }
-
 /*!
  * @brief This function sets a value in member uint8_
  * @param _uint8_ New value for member uint8_
  */
-void NewAliases::uint8_(
-        uint8_t _uint8_)
+void NewAliases::uint8_(uint8_t _uint8_)
 {
-    m_uint8_ = _uint8_;
+m_uint8_ = _uint8_;
 }
 
 /*!
@@ -298,15 +269,13 @@ uint8_t& NewAliases::uint8_()
 {
     return m_uint8_;
 }
-
 /*!
  * @brief This function sets a value in member int16_
  * @param _int16_ New value for member int16_
  */
-void NewAliases::int16_(
-        int16_t _int16_)
+void NewAliases::int16_(int16_t _int16_)
 {
-    m_int16_ = _int16_;
+m_int16_ = _int16_;
 }
 
 /*!
@@ -326,15 +295,13 @@ int16_t& NewAliases::int16_()
 {
     return m_int16_;
 }
-
 /*!
  * @brief This function sets a value in member uint16_
  * @param _uint16_ New value for member uint16_
  */
-void NewAliases::uint16_(
-        uint16_t _uint16_)
+void NewAliases::uint16_(uint16_t _uint16_)
 {
-    m_uint16_ = _uint16_;
+m_uint16_ = _uint16_;
 }
 
 /*!
@@ -354,15 +321,13 @@ uint16_t& NewAliases::uint16_()
 {
     return m_uint16_;
 }
-
 /*!
  * @brief This function sets a value in member int32_
  * @param _int32_ New value for member int32_
  */
-void NewAliases::int32_(
-        int32_t _int32_)
+void NewAliases::int32_(int32_t _int32_)
 {
-    m_int32_ = _int32_;
+m_int32_ = _int32_;
 }
 
 /*!
@@ -382,15 +347,13 @@ int32_t& NewAliases::int32_()
 {
     return m_int32_;
 }
-
 /*!
  * @brief This function sets a value in member uint32_
  * @param _uint32_ New value for member uint32_
  */
-void NewAliases::uint32_(
-        uint32_t _uint32_)
+void NewAliases::uint32_(uint32_t _uint32_)
 {
-    m_uint32_ = _uint32_;
+m_uint32_ = _uint32_;
 }
 
 /*!
@@ -410,15 +373,13 @@ uint32_t& NewAliases::uint32_()
 {
     return m_uint32_;
 }
-
 /*!
  * @brief This function sets a value in member int64_
  * @param _int64_ New value for member int64_
  */
-void NewAliases::int64_(
-        int64_t _int64_)
+void NewAliases::int64_(int64_t _int64_)
 {
-    m_int64_ = _int64_;
+m_int64_ = _int64_;
 }
 
 /*!
@@ -438,15 +399,13 @@ int64_t& NewAliases::int64_()
 {
     return m_int64_;
 }
-
 /*!
  * @brief This function sets a value in member uint64_
  * @param _uint64_ New value for member uint64_
  */
-void NewAliases::uint64_(
-        uint64_t _uint64_)
+void NewAliases::uint64_(uint64_t _uint64_)
 {
-    m_uint64_ = _uint64_;
+m_uint64_ = _uint64_;
 }
 
 /*!
@@ -466,25 +425,22 @@ uint64_t& NewAliases::uint64_()
 {
     return m_uint64_;
 }
-
 /*!
  * @brief This function copies the value in member local_string
  * @param _local_string New value to be copied in member local_string
  */
-void NewAliases::local_string(
-        const std::string& _local_string)
+void NewAliases::local_string(const std::string &_local_string)
 {
-    m_local_string = _local_string;
+m_local_string = _local_string;
 }
 
 /*!
  * @brief This function moves the value in member local_string
  * @param _local_string New value to be moved in member local_string
  */
-void NewAliases::local_string(
-        std::string&& _local_string)
+void NewAliases::local_string(std::string &&_local_string)
 {
-    m_local_string = std::move(_local_string);
+m_local_string = std::move(_local_string);
 }
 
 /*!
@@ -505,31 +461,47 @@ std::string& NewAliases::local_string()
     return m_local_string;
 }
 
-
-size_t NewAliases::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t NewAliases::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return NewAliases_max_key_cdr_typesize;
+	size_t current_align = current_alignment;
+
+
+
+
+
+
+
+
+
+
+
+
+    return current_align;
 }
 
 bool NewAliases::isKeyDefined()
 {
-    return false;
+   return false;
 }
 
-void NewAliases::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void NewAliases::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
-    (void) scdr;
+	(void) scdr;
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
 }
 
 WCharUnion::WCharUnion()
 {
     m__d = 'a';
-    // long m_case_zero
     m_case_zero = 0;
-    // long m_case_one
     m_case_one = 0;
 }
 
@@ -537,8 +509,7 @@ WCharUnion::~WCharUnion()
 {
 }
 
-WCharUnion::WCharUnion(
-        const WCharUnion& x)
+WCharUnion::WCharUnion(const WCharUnion &x)
 {
     m__d = x.m__d;
 
@@ -555,8 +526,7 @@ WCharUnion::WCharUnion(
     }
 }
 
-WCharUnion::WCharUnion(
-        WCharUnion&& x) noexcept
+WCharUnion::WCharUnion(WCharUnion &&x)
 {
     m__d = x.m__d;
 
@@ -573,28 +543,7 @@ WCharUnion::WCharUnion(
     }
 }
 
-WCharUnion& WCharUnion::operator =(
-        const WCharUnion& x)
-{
-    m__d = x.m__d;
-
-    switch(m__d)
-    {
-        case 'a':
-        m_case_zero = x.m_case_zero;
-        break;
-        case 'b':
-        m_case_one = x.m_case_one;
-        break;
-        default:
-        break;
-    }
-
-    return *this;
-}
-
-WCharUnion& WCharUnion::operator =(
-        WCharUnion&& x) noexcept
+WCharUnion& WCharUnion::operator=(const WCharUnion &x)
 {
     m__d = x.m__d;
 
@@ -613,36 +562,26 @@ WCharUnion& WCharUnion::operator =(
     return *this;
 }
 
-bool WCharUnion::operator ==(
-        const WCharUnion& x) const
+WCharUnion& WCharUnion::operator=(WCharUnion &&x)
 {
-    if (m__d != x.m__d)
-    {
-        return false;
-    }
+    m__d = x.m__d;
 
     switch(m__d)
     {
         case 'a':
-            return (m_case_zero == x.m_case_zero);
-            break;
+        m_case_zero = x.m_case_zero;
+        break;
         case 'b':
-            return (m_case_one == x.m_case_one);
-            break;
+        m_case_one = x.m_case_one;
+        break;
         default:
         break;
     }
-    return false;
+
+    return *this;
 }
 
-bool WCharUnion::operator !=(
-        const WCharUnion& x) const
-{
-    return !(*this == x);
-}
-
-void WCharUnion::_d(
-        wchar_t __d)
+void WCharUnion::_d(wchar_t __d)
 {
     bool b = false;
 
@@ -688,8 +627,7 @@ wchar_t& WCharUnion::_d()
     return m__d;
 }
 
-void WCharUnion::case_zero(
-        int32_t _case_zero)
+void WCharUnion::case_zero(int32_t _case_zero)
 {
     m_case_zero = _case_zero;
     m__d = 'a';
@@ -734,8 +672,7 @@ int32_t& WCharUnion::case_zero()
 
     return m_case_zero;
 }
-void WCharUnion::case_one(
-        int32_t _case_one)
+void WCharUnion::case_one(int32_t _case_one)
 {
     m_case_one = _case_one;
     m__d = 'b';
@@ -781,10 +718,39 @@ int32_t& WCharUnion::case_one()
     return m_case_one;
 }
 
+size_t WCharUnion::getMaxCdrSerializedSize(size_t current_alignment)
+{
+    size_t initial_alignment = current_alignment;
+    size_t reset_alignment = 0;
+    size_t union_max_size_serialized = 0;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+
+    return union_max_size_serialized - initial_alignment;
+}
+
 // TODO(Ricardo) Review
-size_t WCharUnion::getCdrSerializedSize(
-        const WCharUnion& data,
-        size_t current_alignment)
+size_t WCharUnion::getCdrSerializedSize(const WCharUnion& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -808,8 +774,7 @@ size_t WCharUnion::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void WCharUnion::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void WCharUnion::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
     scdr << m__d;
 
@@ -817,19 +782,16 @@ void WCharUnion::serialize(
     {
         case 'a':
         scdr << m_case_zero;
-
         break;
         case 'b':
         scdr << m_case_one;
-
         break;
         default:
         break;
     }
 }
 
-void WCharUnion::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void WCharUnion::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
     dcdr >> m__d;
 
@@ -850,9 +812,7 @@ void WCharUnion::deserialize(
 OctetUnion::OctetUnion()
 {
     m__d = 5;
-    // long m_case_five
     m_case_five = 0;
-    // long m_case_seven
     m_case_seven = 0;
 }
 
@@ -860,8 +820,7 @@ OctetUnion::~OctetUnion()
 {
 }
 
-OctetUnion::OctetUnion(
-        const OctetUnion& x)
+OctetUnion::OctetUnion(const OctetUnion &x)
 {
     m__d = x.m__d;
 
@@ -878,8 +837,7 @@ OctetUnion::OctetUnion(
     }
 }
 
-OctetUnion::OctetUnion(
-        OctetUnion&& x) noexcept
+OctetUnion::OctetUnion(OctetUnion &&x)
 {
     m__d = x.m__d;
 
@@ -896,28 +854,7 @@ OctetUnion::OctetUnion(
     }
 }
 
-OctetUnion& OctetUnion::operator =(
-        const OctetUnion& x)
-{
-    m__d = x.m__d;
-
-    switch(m__d)
-    {
-        case 5:
-        m_case_five = x.m_case_five;
-        break;
-        case 7:
-        m_case_seven = x.m_case_seven;
-        break;
-        default:
-        break;
-    }
-
-    return *this;
-}
-
-OctetUnion& OctetUnion::operator =(
-        OctetUnion&& x) noexcept
+OctetUnion& OctetUnion::operator=(const OctetUnion &x)
 {
     m__d = x.m__d;
 
@@ -936,36 +873,26 @@ OctetUnion& OctetUnion::operator =(
     return *this;
 }
 
-bool OctetUnion::operator ==(
-        const OctetUnion& x) const
+OctetUnion& OctetUnion::operator=(OctetUnion &&x)
 {
-    if (m__d != x.m__d)
-    {
-        return false;
-    }
+    m__d = x.m__d;
 
     switch(m__d)
     {
         case 5:
-            return (m_case_five == x.m_case_five);
-            break;
+        m_case_five = x.m_case_five;
+        break;
         case 7:
-            return (m_case_seven == x.m_case_seven);
-            break;
+        m_case_seven = x.m_case_seven;
+        break;
         default:
         break;
     }
-    return false;
+
+    return *this;
 }
 
-bool OctetUnion::operator !=(
-        const OctetUnion& x) const
-{
-    return !(*this == x);
-}
-
-void OctetUnion::_d(
-        uint8_t __d)
+void OctetUnion::_d(uint8_t __d)
 {
     bool b = false;
 
@@ -1011,8 +938,7 @@ uint8_t& OctetUnion::_d()
     return m__d;
 }
 
-void OctetUnion::case_five(
-        int32_t _case_five)
+void OctetUnion::case_five(int32_t _case_five)
 {
     m_case_five = _case_five;
     m__d = 5;
@@ -1057,8 +983,7 @@ int32_t& OctetUnion::case_five()
 
     return m_case_five;
 }
-void OctetUnion::case_seven(
-        int32_t _case_seven)
+void OctetUnion::case_seven(int32_t _case_seven)
 {
     m_case_seven = _case_seven;
     m__d = 7;
@@ -1104,10 +1029,39 @@ int32_t& OctetUnion::case_seven()
     return m_case_seven;
 }
 
+size_t OctetUnion::getMaxCdrSerializedSize(size_t current_alignment)
+{
+    size_t initial_alignment = current_alignment;
+    size_t reset_alignment = 0;
+    size_t union_max_size_serialized = 0;
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+
+    return union_max_size_serialized - initial_alignment;
+}
+
 // TODO(Ricardo) Review
-size_t OctetUnion::getCdrSerializedSize(
-        const OctetUnion& data,
-        size_t current_alignment)
+size_t OctetUnion::getCdrSerializedSize(const OctetUnion& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -1131,8 +1085,7 @@ size_t OctetUnion::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void OctetUnion::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void OctetUnion::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
     scdr << m__d;
 
@@ -1140,19 +1093,16 @@ void OctetUnion::serialize(
     {
         case 5:
         scdr << m_case_five;
-
         break;
         case 7:
         scdr << m_case_seven;
-
         break;
         default:
         break;
     }
 }
 
-void OctetUnion::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void OctetUnion::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
     dcdr >> m__d;
 
@@ -1173,9 +1123,7 @@ void OctetUnion::deserialize(
 Int8Union::Int8Union()
 {
     m__d = 3;
-    // long m_case_three
     m_case_three = 0;
-    // long m_case_six
     m_case_six = 0;
 }
 
@@ -1183,8 +1131,7 @@ Int8Union::~Int8Union()
 {
 }
 
-Int8Union::Int8Union(
-        const Int8Union& x)
+Int8Union::Int8Union(const Int8Union &x)
 {
     m__d = x.m__d;
 
@@ -1201,8 +1148,7 @@ Int8Union::Int8Union(
     }
 }
 
-Int8Union::Int8Union(
-        Int8Union&& x) noexcept
+Int8Union::Int8Union(Int8Union &&x)
 {
     m__d = x.m__d;
 
@@ -1219,28 +1165,7 @@ Int8Union::Int8Union(
     }
 }
 
-Int8Union& Int8Union::operator =(
-        const Int8Union& x)
-{
-    m__d = x.m__d;
-
-    switch(m__d)
-    {
-        case 3:
-        m_case_three = x.m_case_three;
-        break;
-        case 6:
-        m_case_six = x.m_case_six;
-        break;
-        default:
-        break;
-    }
-
-    return *this;
-}
-
-Int8Union& Int8Union::operator =(
-        Int8Union&& x) noexcept
+Int8Union& Int8Union::operator=(const Int8Union &x)
 {
     m__d = x.m__d;
 
@@ -1259,36 +1184,26 @@ Int8Union& Int8Union::operator =(
     return *this;
 }
 
-bool Int8Union::operator ==(
-        const Int8Union& x) const
+Int8Union& Int8Union::operator=(Int8Union &&x)
 {
-    if (m__d != x.m__d)
-    {
-        return false;
-    }
+    m__d = x.m__d;
 
     switch(m__d)
     {
         case 3:
-            return (m_case_three == x.m_case_three);
-            break;
+        m_case_three = x.m_case_three;
+        break;
         case 6:
-            return (m_case_six == x.m_case_six);
-            break;
+        m_case_six = x.m_case_six;
+        break;
         default:
         break;
     }
-    return false;
+
+    return *this;
 }
 
-bool Int8Union::operator !=(
-        const Int8Union& x) const
-{
-    return !(*this == x);
-}
-
-void Int8Union::_d(
-        int8_t __d)
+void Int8Union::_d(int8_t __d)
 {
     bool b = false;
 
@@ -1334,8 +1249,7 @@ int8_t& Int8Union::_d()
     return m__d;
 }
 
-void Int8Union::case_three(
-        int32_t _case_three)
+void Int8Union::case_three(int32_t _case_three)
 {
     m_case_three = _case_three;
     m__d = 3;
@@ -1380,8 +1294,7 @@ int32_t& Int8Union::case_three()
 
     return m_case_three;
 }
-void Int8Union::case_six(
-        int32_t _case_six)
+void Int8Union::case_six(int32_t _case_six)
 {
     m_case_six = _case_six;
     m__d = 6;
@@ -1427,10 +1340,39 @@ int32_t& Int8Union::case_six()
     return m_case_six;
 }
 
+size_t Int8Union::getMaxCdrSerializedSize(size_t current_alignment)
+{
+    size_t initial_alignment = current_alignment;
+    size_t reset_alignment = 0;
+    size_t union_max_size_serialized = 0;
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+
+    return union_max_size_serialized - initial_alignment;
+}
+
 // TODO(Ricardo) Review
-size_t Int8Union::getCdrSerializedSize(
-        const Int8Union& data,
-        size_t current_alignment)
+size_t Int8Union::getCdrSerializedSize(const Int8Union& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -1454,8 +1396,7 @@ size_t Int8Union::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void Int8Union::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void Int8Union::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
     scdr << m__d;
 
@@ -1463,19 +1404,16 @@ void Int8Union::serialize(
     {
         case 3:
         scdr << m_case_three;
-
         break;
         case 6:
         scdr << m_case_six;
-
         break;
         default:
         break;
     }
 }
 
-void Int8Union::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void Int8Union::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
     dcdr >> m__d;
 
@@ -1503,20 +1441,17 @@ bitmodule::ParentBitset::~ParentBitset()
 {
 }
 
-bitmodule::ParentBitset::ParentBitset(
-        const ParentBitset& x)
+bitmodule::ParentBitset::ParentBitset(const ParentBitset &x)
 {
     m_bitset = x.m_bitset;
 }
 
-bitmodule::ParentBitset::ParentBitset(
-        ParentBitset&& x) noexcept 
+bitmodule::ParentBitset::ParentBitset(ParentBitset &&x)
 {
     m_bitset = x.m_bitset;
 }
 
-bitmodule::ParentBitset& bitmodule::ParentBitset::operator =(
-        const ParentBitset& x)
+bitmodule::ParentBitset& bitmodule::ParentBitset::operator=(const ParentBitset &x)
 {
 
     m_bitset = x.m_bitset;
@@ -1524,8 +1459,7 @@ bitmodule::ParentBitset& bitmodule::ParentBitset::operator =(
     return *this;
 }
 
-bitmodule::ParentBitset& bitmodule::ParentBitset::operator =(
-        ParentBitset&& x) noexcept
+bitmodule::ParentBitset& bitmodule::ParentBitset::operator=(ParentBitset &&x)
 {
 
     m_bitset = x.m_bitset;
@@ -1533,22 +1467,18 @@ bitmodule::ParentBitset& bitmodule::ParentBitset::operator =(
     return *this;
 }
 
-bool bitmodule::ParentBitset::operator ==(
-        const ParentBitset& x) const
+size_t bitmodule::ParentBitset::getMaxCdrSerializedSize(size_t current_alignment)
 {
+    size_t initial_alignment = current_alignment;
 
-    return m_bitset == x.m_bitset;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    return current_alignment - initial_alignment;
 }
 
-bool bitmodule::ParentBitset::operator !=(
-        const ParentBitset& x) const
-{
-    return !(*this == x);
-}
-
-size_t bitmodule::ParentBitset::getCdrSerializedSize(
-        const bitmodule::ParentBitset& ,
-        size_t current_alignment)
+size_t bitmodule::ParentBitset::getCdrSerializedSize(const bitmodule::ParentBitset& , size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
 
@@ -1558,15 +1488,13 @@ size_t bitmodule::ParentBitset::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void bitmodule::ParentBitset::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void bitmodule::ParentBitset::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
 
     scdr << static_cast<uint32_t>(parent_bitfield());
 }
 
-void bitmodule::ParentBitset::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void bitmodule::ParentBitset::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
 
     uint32_t aux_parent_bitfield;
@@ -1575,14 +1503,13 @@ void bitmodule::ParentBitset::deserialize(
 }
 
 
-void bitmodule::ParentBitset::parent_bitfield(
-        uint32_t _parent_bitfield)
+void bitmodule::ParentBitset::parent_bitfield(uint32_t _parent_bitfield)
 {
     int base = 0;
     int size = 17;
     for (int i = base; i < base + size; ++i)
     {
-        m_bitset.set(i, !!(_parent_bitfield & 0x01));
+        m_bitset.set(i, _parent_bitfield & 0x01);
         _parent_bitfield = _parent_bitfield >> 1;
     }
 }
@@ -1599,7 +1526,7 @@ uint32_t bitmodule::ParentBitset::parent_bitfield() const
     return static_cast<uint32_t>(aux.to_ullong());
 }
 
-bitmodule::MyBitset::MyBitset()    : bitmodule::ParentBitset() 
+bitmodule::MyBitset::MyBitset() : bitmodule::ParentBitset() 
 {
     // Just to register all known types
     registernew_features_4_2Types();
@@ -1609,55 +1536,64 @@ bitmodule::MyBitset::~MyBitset()
 {
 }
 
-bitmodule::MyBitset::MyBitset(
-        const MyBitset& x)    : bitmodule::ParentBitset(x) 
+bitmodule::MyBitset::MyBitset(const MyBitset &x) : bitmodule::ParentBitset(x) 
 {
     m_bitset = x.m_bitset;
 }
 
-bitmodule::MyBitset::MyBitset(
-        MyBitset&& x) noexcept     : bitmodule::ParentBitset(std::move(x)) 
+bitmodule::MyBitset::MyBitset(MyBitset &&x) : bitmodule::ParentBitset(std::move(x)) 
 {
     m_bitset = x.m_bitset;
 }
 
-bitmodule::MyBitset& bitmodule::MyBitset::operator =(
-        const MyBitset& x)
+bitmodule::MyBitset& bitmodule::MyBitset::operator=(const MyBitset &x)
 {
-    bitmodule::ParentBitset::operator =(x); 
+    bitmodule::ParentBitset::operator=(x); 
 
     m_bitset = x.m_bitset;
 
     return *this;
 }
 
-bitmodule::MyBitset& bitmodule::MyBitset::operator =(
-        MyBitset&& x) noexcept
+bitmodule::MyBitset& bitmodule::MyBitset::operator=(MyBitset &&x)
 {
-    bitmodule::ParentBitset::operator =(std::move(x)); 
+    bitmodule::ParentBitset::operator=(std::move(x)); 
 
     m_bitset = x.m_bitset;
 
     return *this;
 }
 
-bool bitmodule::MyBitset::operator ==(
-        const MyBitset& x) const
+size_t bitmodule::MyBitset::getMaxCdrSerializedSize(size_t current_alignment)
 {
-     if (bitmodule::ParentBitset::operator !=(x)) return false; 
+    size_t initial_alignment = current_alignment;
 
-    return m_bitset == x.m_bitset;
+    current_alignment += bitmodule::ParentBitset::getMaxCdrSerializedSize(current_alignment); 
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+    current_alignment += 2 + eprosima::fastcdr::Cdr::alignment(current_alignment, 2);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
-bool bitmodule::MyBitset::operator !=(
-        const MyBitset& x) const
-{
-    return !(*this == x);
-}
-
-size_t bitmodule::MyBitset::getCdrSerializedSize(
-        const bitmodule::MyBitset& data,
-        size_t current_alignment)
+size_t bitmodule::MyBitset::getCdrSerializedSize(const bitmodule::MyBitset& data, size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
 
@@ -1680,8 +1616,7 @@ size_t bitmodule::MyBitset::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void bitmodule::MyBitset::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void bitmodule::MyBitset::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
     bitmodule::ParentBitset::serialize(scdr); 
 
@@ -1694,8 +1629,7 @@ void bitmodule::MyBitset::serialize(
     scdr << static_cast<int16_t>(f());
 }
 
-void bitmodule::MyBitset::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void bitmodule::MyBitset::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
     bitmodule::ParentBitset::deserialize(dcdr); 
 
@@ -1721,14 +1655,13 @@ void bitmodule::MyBitset::deserialize(
 }
 
 
-void bitmodule::MyBitset::a(
-        char _a)
+void bitmodule::MyBitset::a(char _a)
 {
     int base = 0;
     int size = 3;
     for (int i = base; i < base + size; ++i)
     {
-        m_bitset.set(i, !!(_a & 0x01));
+        m_bitset.set(i, _a & 0x01);
         _a = _a >> 1;
     }
 }
@@ -1744,8 +1677,7 @@ char bitmodule::MyBitset::a() const
     }
     return static_cast<char>(aux.to_ullong());
 }
-void bitmodule::MyBitset::b(
-        bool _b)
+void bitmodule::MyBitset::b(bool _b)
 {
     int base = 3;
     m_bitset.set(base, _b);
@@ -1757,14 +1689,13 @@ bool bitmodule::MyBitset::b() const
     return m_bitset.test(base);
 }
 
-void bitmodule::MyBitset::c(
-        uint16_t _c)
+void bitmodule::MyBitset::c(uint16_t _c)
 {
     int base = 8;
     int size = 10;
     for (int i = base; i < base + size; ++i)
     {
-        m_bitset.set(i, !!(_c & 0x01));
+        m_bitset.set(i, _c & 0x01);
         _c = _c >> 1;
     }
 }
@@ -1780,14 +1711,13 @@ uint16_t bitmodule::MyBitset::c() const
     }
     return static_cast<uint16_t>(aux.to_ullong());
 }
-void bitmodule::MyBitset::d(
-        int16_t _d)
+void bitmodule::MyBitset::d(int16_t _d)
 {
     int base = 18;
     int size = 12;
     for (int i = base; i < base + size; ++i)
     {
-        m_bitset.set(i, !!(_d & 0x01));
+        m_bitset.set(i, _d & 0x01);
         _d = _d >> 1;
     }
 }
@@ -1803,14 +1733,13 @@ int16_t bitmodule::MyBitset::d() const
     }
     return static_cast<int16_t>(aux.to_ullong());
 }
-void bitmodule::MyBitset::e(
-        int16_t _e)
+void bitmodule::MyBitset::e(int16_t _e)
 {
     int base = 30;
     int size = 12;
     for (int i = base; i < base + size; ++i)
     {
-        m_bitset.set(i, !!(_e & 0x01));
+        m_bitset.set(i, _e & 0x01);
         _e = _e >> 1;
     }
 }
@@ -1826,14 +1755,13 @@ int16_t bitmodule::MyBitset::e() const
     }
     return static_cast<int16_t>(aux.to_ullong());
 }
-void bitmodule::MyBitset::f(
-        int16_t _f)
+void bitmodule::MyBitset::f(int16_t _f)
 {
     int base = 42;
     int size = 12;
     for (int i = base; i < base + size; ++i)
     {
-        m_bitset.set(i, !!(_f & 0x01));
+        m_bitset.set(i, _f & 0x01);
         _f = _f >> 1;
     }
 }
@@ -1853,9 +1781,7 @@ int16_t bitmodule::MyBitset::f() const
 
 bitmodule::BitsetBitmask::BitsetBitmask()
 {
-    // bitmodule::MyBitset m_mybitset
 
-    // bitmodule::MyBitMask m_mybitmask
     m_mybitmask = static_cast<bitmodule::MyBitMask>(0);
 
     // Just to register all known types
@@ -1868,22 +1794,19 @@ bitmodule::BitsetBitmask::~BitsetBitmask()
 
 }
 
-bitmodule::BitsetBitmask::BitsetBitmask(
-        const BitsetBitmask& x)
+bitmodule::BitsetBitmask::BitsetBitmask(const BitsetBitmask &x)
 {
     m_mybitset = x.m_mybitset;
     m_mybitmask = x.m_mybitmask;
 }
 
-bitmodule::BitsetBitmask::BitsetBitmask(
-        BitsetBitmask&& x) noexcept 
+bitmodule::BitsetBitmask::BitsetBitmask(BitsetBitmask &&x)
 {
     m_mybitset = std::move(x.m_mybitset);
     m_mybitmask = x.m_mybitmask;
 }
 
-bitmodule::BitsetBitmask& bitmodule::BitsetBitmask::operator =(
-        const BitsetBitmask& x)
+bitmodule::BitsetBitmask& bitmodule::BitsetBitmask::operator=(const BitsetBitmask &x)
 {
 
     m_mybitset = x.m_mybitset;
@@ -1892,8 +1815,7 @@ bitmodule::BitsetBitmask& bitmodule::BitsetBitmask::operator =(
     return *this;
 }
 
-bitmodule::BitsetBitmask& bitmodule::BitsetBitmask::operator =(
-        BitsetBitmask&& x) noexcept
+bitmodule::BitsetBitmask& bitmodule::BitsetBitmask::operator=(BitsetBitmask &&x)
 {
 
     m_mybitset = std::move(x.m_mybitset);
@@ -1902,29 +1824,20 @@ bitmodule::BitsetBitmask& bitmodule::BitsetBitmask::operator =(
     return *this;
 }
 
-bool bitmodule::BitsetBitmask::operator ==(
-        const BitsetBitmask& x) const
+size_t bitmodule::BitsetBitmask::getMaxCdrSerializedSize(size_t current_alignment)
 {
+    size_t initial_alignment = current_alignment;
 
-    return (m_mybitset == x.m_mybitset && m_mybitmask == x.m_mybitmask);
+
+    current_alignment += bitmodule::MyBitset::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
-bool bitmodule::BitsetBitmask::operator !=(
-        const BitsetBitmask& x) const
-{
-    return !(*this == x);
-}
-
-size_t bitmodule::BitsetBitmask::getMaxCdrSerializedSize(
-        size_t current_alignment)
-{
-    static_cast<void>(current_alignment);
-    return bitmodule_BitsetBitmask_max_cdr_typesize;
-}
-
-size_t bitmodule::BitsetBitmask::getCdrSerializedSize(
-        const bitmodule::BitsetBitmask& data,
-        size_t current_alignment)
+size_t bitmodule::BitsetBitmask::getCdrSerializedSize(const bitmodule::BitsetBitmask& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -1938,47 +1851,40 @@ size_t bitmodule::BitsetBitmask::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void bitmodule::BitsetBitmask::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void bitmodule::BitsetBitmask::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
 
     scdr << m_mybitset;
     scdr << (uint8_t)m_mybitmask;
-
 }
 
-void bitmodule::BitsetBitmask::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void bitmodule::BitsetBitmask::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
 
     dcdr >> m_mybitset;
     {
-        uint8_t bitmask_value = 0;
-        dcdr >> bitmask_value;
-        m_mybitmask = (bitmodule::MyBitMask)bitmask_value;
+        uint8_t enum_value = 0;
+        dcdr >> enum_value;
+        m_mybitmask = (bitmodule::MyBitMask)enum_value;
     }
-
-
 }
 
 /*!
  * @brief This function copies the value in member mybitset
  * @param _mybitset New value to be copied in member mybitset
  */
-void bitmodule::BitsetBitmask::mybitset(
-        const bitmodule::MyBitset& _mybitset)
+void bitmodule::BitsetBitmask::mybitset(const bitmodule::MyBitset &_mybitset)
 {
-    m_mybitset = _mybitset;
+m_mybitset = _mybitset;
 }
 
 /*!
  * @brief This function moves the value in member mybitset
  * @param _mybitset New value to be moved in member mybitset
  */
-void bitmodule::BitsetBitmask::mybitset(
-        bitmodule::MyBitset&& _mybitset)
+void bitmodule::BitsetBitmask::mybitset(bitmodule::MyBitset &&_mybitset)
 {
-    m_mybitset = std::move(_mybitset);
+m_mybitset = std::move(_mybitset);
 }
 
 /*!
@@ -2002,10 +1908,9 @@ bitmodule::MyBitset& bitmodule::BitsetBitmask::mybitset()
  * @brief This function sets a value in member mybitmask
  * @param _mybitmask New value for member mybitmask
  */
-void bitmodule::BitsetBitmask::mybitmask(
-        bitmodule::MyBitMask _mybitmask)
+void bitmodule::BitsetBitmask::mybitmask(bitmodule::MyBitMask _mybitmask)
 {
-    m_mybitmask = _mybitmask;
+m_mybitmask = _mybitmask;
 }
 
 /*!
@@ -2026,31 +1931,32 @@ bitmodule::MyBitMask& bitmodule::BitsetBitmask::mybitmask()
     return m_mybitmask;
 }
 
-
-
-size_t bitmodule::BitsetBitmask::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t bitmodule::BitsetBitmask::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return bitmodule_BitsetBitmask_max_key_cdr_typesize;
+	size_t current_align = current_alignment;
+
+
+
+
+
+    return current_align;
 }
 
 bool bitmodule::BitsetBitmask::isKeyDefined()
 {
-    return false;
+   return false;
 }
 
-void bitmodule::BitsetBitmask::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void bitmodule::BitsetBitmask::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
-    (void) scdr;
+	(void) scdr;
+	 
+	 
 }
 
-bitmodule::BM2::BM2()    : bitmodule::BitsetBitmask() 
+bitmodule::BM2::BM2() : bitmodule::BitsetBitmask() 
 {
-    // bitmodule::MyBitMask m_two
     m_two = static_cast<bitmodule::MyBitMask>(0);
-    // long m_mylong
     m_mylong = 0;
 
     // Just to register all known types
@@ -2063,24 +1969,21 @@ bitmodule::BM2::~BM2()
 
 }
 
-bitmodule::BM2::BM2(
-        const BM2& x)    : bitmodule::BitsetBitmask(x) 
+bitmodule::BM2::BM2(const BM2 &x) : bitmodule::BitsetBitmask(x) 
 {
     m_two = x.m_two;
     m_mylong = x.m_mylong;
 }
 
-bitmodule::BM2::BM2(
-        BM2&& x) noexcept     : bitmodule::BitsetBitmask(std::move(x)) 
+bitmodule::BM2::BM2(BM2 &&x) : bitmodule::BitsetBitmask(std::move(x)) 
 {
     m_two = x.m_two;
     m_mylong = x.m_mylong;
 }
 
-bitmodule::BM2& bitmodule::BM2::operator =(
-        const BM2& x)
+bitmodule::BM2& bitmodule::BM2::operator=(const BM2 &x)
 {
-    bitmodule::BitsetBitmask::operator =(x); 
+    bitmodule::BitsetBitmask::operator=(x); 
 
     m_two = x.m_two;
     m_mylong = x.m_mylong;
@@ -2088,10 +1991,9 @@ bitmodule::BM2& bitmodule::BM2::operator =(
     return *this;
 }
 
-bitmodule::BM2& bitmodule::BM2::operator =(
-        BM2&& x) noexcept
+bitmodule::BM2& bitmodule::BM2::operator=(BM2 &&x)
 {
-    bitmodule::BitsetBitmask::operator =(std::move(x)); 
+    bitmodule::BitsetBitmask::operator=(std::move(x)); 
 
     m_two = x.m_two;
     m_mylong = x.m_mylong;
@@ -2099,30 +2001,23 @@ bitmodule::BM2& bitmodule::BM2::operator =(
     return *this;
 }
 
-bool bitmodule::BM2::operator ==(
-        const BM2& x) const
+size_t bitmodule::BM2::getMaxCdrSerializedSize(size_t current_alignment)
 {
-     if (bitmodule::BitsetBitmask::operator !=(x)) return false; 
+    size_t initial_alignment = current_alignment;
 
-    return (m_two == x.m_two && m_mylong == x.m_mylong);
+    current_alignment += bitmodule::BitsetBitmask::getMaxCdrSerializedSize(current_alignment); 
+
+    current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+
+    return current_alignment - initial_alignment;
 }
 
-bool bitmodule::BM2::operator !=(
-        const BM2& x) const
-{
-    return !(*this == x);
-}
-
-size_t bitmodule::BM2::getMaxCdrSerializedSize(
-        size_t current_alignment)
-{
-    static_cast<void>(current_alignment);
-    return bitmodule_BM2_max_cdr_typesize;
-}
-
-size_t bitmodule::BM2::getCdrSerializedSize(
-        const bitmodule::BM2& data,
-        size_t current_alignment)
+size_t bitmodule::BM2::getCdrSerializedSize(const bitmodule::BM2& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -2139,28 +2034,23 @@ size_t bitmodule::BM2::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void bitmodule::BM2::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void bitmodule::BM2::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
     bitmodule::BitsetBitmask::serialize(scdr); 
 
     scdr << (uint8_t)m_two;
     scdr << m_mylong;
-
 }
 
-void bitmodule::BM2::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void bitmodule::BM2::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
     bitmodule::BitsetBitmask::deserialize(dcdr); 
 
     {
-        uint8_t bitmask_value = 0;
-        dcdr >> bitmask_value;
-        m_two = (bitmodule::MyBitMask)bitmask_value;
+        uint8_t enum_value = 0;
+        dcdr >> enum_value;
+        m_two = (bitmodule::MyBitMask)enum_value;
     }
-
-
     dcdr >> m_mylong;
 }
 
@@ -2168,10 +2058,9 @@ void bitmodule::BM2::deserialize(
  * @brief This function sets a value in member two
  * @param _two New value for member two
  */
-void bitmodule::BM2::two(
-        bitmodule::MyBitMask _two)
+void bitmodule::BM2::two(bitmodule::MyBitMask _two)
 {
-    m_two = _two;
+m_two = _two;
 }
 
 /*!
@@ -2191,15 +2080,13 @@ bitmodule::MyBitMask& bitmodule::BM2::two()
 {
     return m_two;
 }
-
 /*!
  * @brief This function sets a value in member mylong
  * @param _mylong New value for member mylong
  */
-void bitmodule::BM2::mylong(
-        int32_t _mylong)
+void bitmodule::BM2::mylong(int32_t _mylong)
 {
-    m_mylong = _mylong;
+m_mylong = _mylong;
 }
 
 /*!
@@ -2220,39 +2107,39 @@ int32_t& bitmodule::BM2::mylong()
     return m_mylong;
 }
 
-
-
-size_t bitmodule::BM2::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t bitmodule::BM2::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return bitmodule_BM2_max_key_cdr_typesize;
+	size_t current_align = current_alignment;
+
+    current_alignment += bitmodule::BitsetBitmask::getKeyMaxCdrSerializedSize(current_alignment); 
+
+
+
+
+    return current_align;
 }
 
 bool bitmodule::BM2::isKeyDefined()
 {
     if (bitmodule::BitsetBitmask::isKeyDefined())
         return true;
-     return false;
+    return false;
 }
 
-void bitmodule::BM2::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void bitmodule::BM2::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
-    (void) scdr;
- bitmodule::BitsetBitmask::serializeKey(scdr);  
+	(void) scdr;
+    bitmodule::BitsetBitmask::serializeKey(scdr); 
+	 
+	 
 }
 
 
-StructTest::StructTest()    : NewAliases() 
+StructTest::StructTest() : NewAliases() 
 {
-    // WCharUnion m_charUnion
 
-    // OctetUnion m_octetUnion
 
-    // Int8Union m_int8Union
 
-    // bitmodule::BM2 m_myStructBits
 
 
     // Just to register all known types
@@ -2267,8 +2154,7 @@ StructTest::~StructTest()
 
 }
 
-StructTest::StructTest(
-        const StructTest& x)    : NewAliases(x) 
+StructTest::StructTest(const StructTest &x) : NewAliases(x) 
 {
     m_charUnion = x.m_charUnion;
     m_octetUnion = x.m_octetUnion;
@@ -2276,8 +2162,7 @@ StructTest::StructTest(
     m_myStructBits = x.m_myStructBits;
 }
 
-StructTest::StructTest(
-        StructTest&& x) noexcept     : NewAliases(std::move(x)) 
+StructTest::StructTest(StructTest &&x) : NewAliases(std::move(x)) 
 {
     m_charUnion = std::move(x.m_charUnion);
     m_octetUnion = std::move(x.m_octetUnion);
@@ -2285,10 +2170,9 @@ StructTest::StructTest(
     m_myStructBits = std::move(x.m_myStructBits);
 }
 
-StructTest& StructTest::operator =(
-        const StructTest& x)
+StructTest& StructTest::operator=(const StructTest &x)
 {
-    NewAliases::operator =(x); 
+    NewAliases::operator=(x); 
 
     m_charUnion = x.m_charUnion;
     m_octetUnion = x.m_octetUnion;
@@ -2298,10 +2182,9 @@ StructTest& StructTest::operator =(
     return *this;
 }
 
-StructTest& StructTest::operator =(
-        StructTest&& x) noexcept
+StructTest& StructTest::operator=(StructTest &&x)
 {
-    NewAliases::operator =(std::move(x)); 
+    NewAliases::operator=(std::move(x)); 
 
     m_charUnion = std::move(x.m_charUnion);
     m_octetUnion = std::move(x.m_octetUnion);
@@ -2311,30 +2194,21 @@ StructTest& StructTest::operator =(
     return *this;
 }
 
-bool StructTest::operator ==(
-        const StructTest& x) const
+size_t StructTest::getMaxCdrSerializedSize(size_t current_alignment)
 {
-     if (NewAliases::operator !=(x)) return false; 
+    size_t initial_alignment = current_alignment;
 
-    return (m_charUnion == x.m_charUnion && m_octetUnion == x.m_octetUnion && m_int8Union == x.m_int8Union && m_myStructBits == x.m_myStructBits);
+    current_alignment += NewAliases::getMaxCdrSerializedSize(current_alignment); 
+
+    current_alignment += WCharUnion::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += OctetUnion::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += Int8Union::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += bitmodule::BM2::getMaxCdrSerializedSize(current_alignment);
+
+    return current_alignment - initial_alignment;
 }
 
-bool StructTest::operator !=(
-        const StructTest& x) const
-{
-    return !(*this == x);
-}
-
-size_t StructTest::getMaxCdrSerializedSize(
-        size_t current_alignment)
-{
-    static_cast<void>(current_alignment);
-    return StructTest_max_cdr_typesize;
-}
-
-size_t StructTest::getCdrSerializedSize(
-        const StructTest& data,
-        size_t current_alignment)
+size_t StructTest::getCdrSerializedSize(const StructTest& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -2349,8 +2223,7 @@ size_t StructTest::getCdrSerializedSize(
     return current_alignment - initial_alignment;
 }
 
-void StructTest::serialize(
-        eprosima::fastcdr::Cdr& scdr) const
+void StructTest::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
     NewAliases::serialize(scdr); 
 
@@ -2358,11 +2231,9 @@ void StructTest::serialize(
     scdr << m_octetUnion;
     scdr << m_int8Union;
     scdr << m_myStructBits;
-
 }
 
-void StructTest::deserialize(
-        eprosima::fastcdr::Cdr& dcdr)
+void StructTest::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
     NewAliases::deserialize(dcdr); 
 
@@ -2376,20 +2247,18 @@ void StructTest::deserialize(
  * @brief This function copies the value in member charUnion
  * @param _charUnion New value to be copied in member charUnion
  */
-void StructTest::charUnion(
-        const WCharUnion& _charUnion)
+void StructTest::charUnion(const WCharUnion &_charUnion)
 {
-    m_charUnion = _charUnion;
+m_charUnion = _charUnion;
 }
 
 /*!
  * @brief This function moves the value in member charUnion
  * @param _charUnion New value to be moved in member charUnion
  */
-void StructTest::charUnion(
-        WCharUnion&& _charUnion)
+void StructTest::charUnion(WCharUnion &&_charUnion)
 {
-    m_charUnion = std::move(_charUnion);
+m_charUnion = std::move(_charUnion);
 }
 
 /*!
@@ -2413,20 +2282,18 @@ WCharUnion& StructTest::charUnion()
  * @brief This function copies the value in member octetUnion
  * @param _octetUnion New value to be copied in member octetUnion
  */
-void StructTest::octetUnion(
-        const OctetUnion& _octetUnion)
+void StructTest::octetUnion(const OctetUnion &_octetUnion)
 {
-    m_octetUnion = _octetUnion;
+m_octetUnion = _octetUnion;
 }
 
 /*!
  * @brief This function moves the value in member octetUnion
  * @param _octetUnion New value to be moved in member octetUnion
  */
-void StructTest::octetUnion(
-        OctetUnion&& _octetUnion)
+void StructTest::octetUnion(OctetUnion &&_octetUnion)
 {
-    m_octetUnion = std::move(_octetUnion);
+m_octetUnion = std::move(_octetUnion);
 }
 
 /*!
@@ -2450,20 +2317,18 @@ OctetUnion& StructTest::octetUnion()
  * @brief This function copies the value in member int8Union
  * @param _int8Union New value to be copied in member int8Union
  */
-void StructTest::int8Union(
-        const Int8Union& _int8Union)
+void StructTest::int8Union(const Int8Union &_int8Union)
 {
-    m_int8Union = _int8Union;
+m_int8Union = _int8Union;
 }
 
 /*!
  * @brief This function moves the value in member int8Union
  * @param _int8Union New value to be moved in member int8Union
  */
-void StructTest::int8Union(
-        Int8Union&& _int8Union)
+void StructTest::int8Union(Int8Union &&_int8Union)
 {
-    m_int8Union = std::move(_int8Union);
+m_int8Union = std::move(_int8Union);
 }
 
 /*!
@@ -2487,20 +2352,18 @@ Int8Union& StructTest::int8Union()
  * @brief This function copies the value in member myStructBits
  * @param _myStructBits New value to be copied in member myStructBits
  */
-void StructTest::myStructBits(
-        const bitmodule::BM2& _myStructBits)
+void StructTest::myStructBits(const bitmodule::BM2 &_myStructBits)
 {
-    m_myStructBits = _myStructBits;
+m_myStructBits = _myStructBits;
 }
 
 /*!
  * @brief This function moves the value in member myStructBits
  * @param _myStructBits New value to be moved in member myStructBits
  */
-void StructTest::myStructBits(
-        bitmodule::BM2&& _myStructBits)
+void StructTest::myStructBits(bitmodule::BM2 &&_myStructBits)
 {
-    m_myStructBits = std::move(_myStructBits);
+m_myStructBits = std::move(_myStructBits);
 }
 
 /*!
@@ -2521,24 +2384,33 @@ bitmodule::BM2& StructTest::myStructBits()
     return m_myStructBits;
 }
 
-
-size_t StructTest::getKeyMaxCdrSerializedSize(
-        size_t current_alignment)
+size_t StructTest::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
-    static_cast<void>(current_alignment);
-    return StructTest_max_key_cdr_typesize;
+	size_t current_align = current_alignment;
+
+    current_alignment += NewAliases::getKeyMaxCdrSerializedSize(current_alignment); 
+
+
+
+
+
+
+    return current_align;
 }
 
 bool StructTest::isKeyDefined()
 {
     if (NewAliases::isKeyDefined())
         return true;
-     return false;
+    return false;
 }
 
-void StructTest::serializeKey(
-        eprosima::fastcdr::Cdr& scdr) const
+void StructTest::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
-    (void) scdr;
- NewAliases::serializeKey(scdr);  
+	(void) scdr;
+    NewAliases::serializeKey(scdr); 
+	 
+	 
+	 
+	 
 }

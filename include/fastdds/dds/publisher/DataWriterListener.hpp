@@ -54,73 +54,59 @@ public:
     }
 
     /**
-     * This method is called when the DataWriter is matched (or unmatched) against an endpoint.
+     * This method is called when the Publisher is matched (or unmatched) against an endpoint.
      *
-     * @param writer Pointer to the associated DataWriter
-     * @param info Information regarding the matched DataReader
+     * @param writer Pointer to the associated Publisher
+     * @param info Information regarding the matched subscriber
      */
     virtual void on_publication_matched(
             DataWriter* writer,
             const PublicationMatchedStatus& info)
     {
-        static_cast<void>(writer);
-        static_cast<void>(info);
+        (void)writer;
+        (void)info;
     }
 
     /**
      * A method called when a deadline is missed
      *
-     * @param writer Pointer to the associated DataWriter
+     * @param writer Pointer to the associated Publisher
      * @param status The deadline missed status
      */
     virtual void on_offered_deadline_missed(
             DataWriter* writer,
             const OfferedDeadlineMissedStatus& status)
     {
-        static_cast<void>(writer);
-        static_cast<void>(status);
+        (void)writer;
+        (void)status;
     }
 
     /**
      * A method called when an incompatible QoS is offered
      *
-     * @param writer Pointer to the associated DataWriter
+     * @param writer Pointer to the associated Publisher
      * @param status The deadline missed status
      */
     virtual void on_offered_incompatible_qos(
             DataWriter* writer,
             const OfferedIncompatibleQosStatus& status)
     {
-        static_cast<void>(writer);
-        static_cast<void>(status);
+        (void)writer;
+        (void)status;
     }
 
     /**
-     * @brief Method called when the liveliness of a DataWriter is lost
+     * @brief Method called when the liveliness of a publisher is lost
      *
-     * @param writer Pointer to the associated DataWriter
+     * @param writer The publisher
      * @param status The liveliness lost status
      */
     virtual void on_liveliness_lost(
             DataWriter* writer,
             const LivelinessLostStatus& status)
     {
-        static_cast<void>(writer);
-        static_cast<void>(status);
-    }
-
-    /**
-     * @brief Method called when a sample has been removed unacknowledged
-     *
-     * @param writer Pointer to the associated DataWriter
-     * @param instance Handle to the instance the sample was removed from
-     */
-    virtual void on_unacknowledged_sample_removed(
-            DataWriter* writer,
-            const InstanceHandle_t& instance)
-    {
-        static_cast<void>(writer);
-        static_cast<void>(instance);
+        (void)writer;
+        (void)status;
     }
 
 };

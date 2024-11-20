@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_DATA1MB_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -93,7 +91,7 @@ public:
      * @param x Reference to the object Data1mb that will be copied.
      */
     eProsima_user_DllExport Data1mb(
-            Data1mb&& x) noexcept;
+            Data1mb&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +105,7 @@ public:
      * @param x Reference to the object Data1mb that will be copied.
      */
     eProsima_user_DllExport Data1mb& operator =(
-            Data1mb&& x) noexcept;
+            Data1mb&& x);
 
     /*!
      * @brief Comparison operator.
@@ -150,11 +148,11 @@ public:
     eProsima_user_DllExport std::vector<uint8_t>& data();
 
     /*!
-    * @brief This function returns the maximum serialized size of an object
-    * depending on the buffer alignment.
-    * @param current_alignment Buffer alignment.
-    * @return Maximum serialized size.
-    */
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -209,7 +207,6 @@ public:
 private:
 
     std::vector<uint8_t> m_data;
-
 };
 
 #endif // _FAST_DDS_GENERATED_DATA1MB_H_

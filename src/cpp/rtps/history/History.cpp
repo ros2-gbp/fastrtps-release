@@ -42,7 +42,7 @@ History::History(
 
 History::~History()
 {
-    EPROSIMA_LOG_INFO(RTPS_HISTORY, "");
+    logInfo(RTPS_HISTORY, "");
 }
 
 History::const_iterator History::find_change_nts(
@@ -50,7 +50,7 @@ History::const_iterator History::find_change_nts(
 {
     if ( nullptr == mp_mutex )
     {
-        EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
+        logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
         return const_iterator();
     }
 
@@ -79,7 +79,7 @@ History::iterator History::remove_change_nts(
 
     if (removal == changesEnd())
     {
-        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Trying to remove without a proper CacheChange_t referenced");
+        logInfo(RTPS_WRITER_HISTORY, "Trying to remove without a proper CacheChange_t referenced");
         return changesEnd();
     }
 
@@ -103,7 +103,7 @@ bool History::remove_change(
 
     if (it == changesEnd())
     {
-        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
+        logInfo(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
         return false;
     }
 
@@ -117,7 +117,7 @@ bool History::remove_all_changes()
 {
     if (mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
+        logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
         return false;
     }
 
@@ -166,7 +166,7 @@ bool History::get_change(
 
     if (mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
+        logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
         return false;
     }
 
@@ -208,7 +208,7 @@ bool History::get_earliest_change(
 {
     if (mp_mutex == nullptr)
     {
-        EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
+        logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
         return false;
     }
 

@@ -54,14 +54,6 @@ if(Python3_Interpreter_FOUND)
     ###############################################################################
     # MemoryTest
     ###############################################################################
-    find_program(VALGRIND_PROGRAM NAMES valgrind)
-
-    # If valgrind is not found, set it to "valgrind" so that the test can be run with
-    # the appropriate environment set at runtime.
-    if (${VALGRIND_PROGRAM} STREQUAL "valgrind-NOTFOUND")
-        set(VALGRIND_PROGRAM "valgrind")
-    endif()
-
     add_test(NAME MemoryTest
         COMMAND ${Python3_EXECUTABLE} memory_tests.py)
 
@@ -75,7 +67,7 @@ if(Python3_Interpreter_FOUND)
     set_property(TEST MemoryTest APPEND PROPERTY ENVIRONMENT
         "PROFILING_BINS=$<TARGET_FILE:MemoryTest>")
     set_property(TEST MemoryTest APPEND PROPERTY ENVIRONMENT
-        "VALGRIND_BIN=${VALGRIND_PROGRAM}")
+        "VALGRIND_BIN=${CTEST_MEMORYCHECK_COMMAND}")
     if(SECURITY)
         set_property(TEST MemoryTest APPEND PROPERTY ENVIRONMENT
             "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs")
@@ -97,7 +89,7 @@ if(Python3_Interpreter_FOUND)
     set_property(TEST CyclesTest APPEND PROPERTY ENVIRONMENT
         "PROFILING_BINS=$<TARGET_FILE:MemoryTest>")
     set_property(TEST CyclesTest APPEND PROPERTY ENVIRONMENT
-        "VALGRIND_BIN=${VALGRIND_PROGRAM}")
+        "VALGRIND_BIN=valgrind")
     if(SECURITY)
         set_property(TEST CyclesTest APPEND PROPERTY ENVIRONMENT
             "CERTS_PATH=${PROJECT_SOURCE_DIR}/test/certs")

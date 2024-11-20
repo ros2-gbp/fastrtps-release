@@ -162,7 +162,7 @@ static void setup_transports_shm(
         RTPSParticipantAttributes& att)
 {
 #ifdef FASTDDS_SHM_TRANSPORT_DISABLED
-    EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Trying to configure SHM transport only, " <<
+    logError(RTPS_PARTICIPANT, "Trying to configure SHM transport only, " <<
             "but Fast DDS was built without SHM transport support.");
 #else
     auto descriptor = create_shm_transport(att);
@@ -186,34 +186,20 @@ static void setup_transports_udpv6(
     att.userTransports.push_back(descriptor);
 }
 
-static void setup_large_data_shm_transport(
-        RTPSParticipantAttributes& att)
-{
-#ifdef FASTDDS_SHM_TRANSPORT_DISABLED
-    static_cast<void>(att);
-    EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT, "Trying to configure Large Data transport, " <<
-            "but Fast DDS was built without SHM transport support. Will use " <<
-            "TCP for communications on the same host.");
-#else
-    auto descriptor = create_shm_transport(att);
-    att.userTransports.push_back(descriptor);
-
-    auto shm_loc = fastdds::rtps::SHMLocator::create_locator(0, fastdds::rtps::SHMLocator::Type::UNICAST);
-    att.defaultUnicastLocatorList.push_back(shm_loc);
-#endif  // FASTDDS_SHM_TRANSPORT_DISABLED
-}
-
 static void setup_transports_large_data(
         RTPSParticipantAttributes& att,
         bool intraprocess_only)
 {
     if (!intraprocess_only)
     {
-        setup_large_data_shm_transport(att);
+        auto shm_transport = create_shm_transport(att);
+        att.userTransports.push_back(shm_transport);
+
+        auto shm_loc = fastdds::rtps::SHMLocator::create_locator(0, fastdds::rtps::SHMLocator::Type::UNICAST);
+        att.defaultUnicastLocatorList.push_back(shm_loc);
 
         auto tcp_transport = create_tcpv4_transport(att);
         att.userTransports.push_back(tcp_transport);
-        att.properties.properties().emplace_back("fastdds.tcp_transport.non_blocking_send", "true");
 
         Locator_t tcp_loc;
         tcp_loc.kind = LOCATOR_KIND_TCPv4;
@@ -242,11 +228,14 @@ static void setup_transports_large_datav6(
 {
     if (!intraprocess_only)
     {
-        setup_large_data_shm_transport(att);
+        auto shm_transport = create_shm_transport(att);
+        att.userTransports.push_back(shm_transport);
+
+        auto shm_loc = fastdds::rtps::SHMLocator::create_locator(0, fastdds::rtps::SHMLocator::Type::UNICAST);
+        att.defaultUnicastLocatorList.push_back(shm_loc);
 
         auto tcp_transport = create_tcpv6_transport(att);
         att.userTransports.push_back(tcp_transport);
-        att.properties.properties().emplace_back("fastdds.tcp_transport.non_blocking_send", "true");
 
         Locator_t tcp_loc;
         tcp_loc.kind = LOCATOR_KIND_TCPv6;
@@ -308,7 +297,7 @@ void RTPSParticipantAttributes::setup_transports(
             break;
 
         default:
-            EPROSIMA_LOG_ERROR(RTPS_PARTICIPANT,
+            logError(RTPS_PARTICIPANT,
                     "Setup for '" << transports << "' transport configuration not yet supported.");
             return;
     }

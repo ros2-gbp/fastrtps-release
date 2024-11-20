@@ -34,7 +34,6 @@
 #include <fastdds/dds/topic/IContentFilterFactory.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
-#include <fastdds/dds/topic/TopicListener.hpp>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/common/Guid.h>
 #include <fastdds/rtps/common/SampleIdentity.h>
@@ -134,50 +133,22 @@ public:
     /**
      * Modifies the DomainParticipantListener, sets the mask to StatusMask::all()
      *
-     * @param listener New value for the DomainParticipantListener
-     * @return RETCODE_OK if successful, RETCODE_ERROR otherwise.
-     * @warning Do not call this method from a \c DomainParticipantListener callback.
+     * @param listener new value for the DomainParticipantListener
+     * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t set_listener(
             DomainParticipantListener* listener);
 
     /**
-     * Modifies the DomainParticipantListener, sets the mask to StatusMask::all()
-     *
-     * @param listener New value for the DomainParticipantListener
-     * @param timeout Maximum time to wait for executing callbacks to finish.
-     * @return RETCODE_OK if successful, RETCODE_ERROR if failed (timeout expired).
-     * @warning Do not call this method from a \c DomainParticipantListener callback.
-     */
-    RTPS_DllAPI ReturnCode_t set_listener(
-            DomainParticipantListener* listener,
-            const std::chrono::seconds timeout);
-
-    /**
      * Modifies the DomainParticipantListener.
      *
-     * @param listener New value for the DomainParticipantListener
+     * @param listener new value for the DomainParticipantListener
      * @param mask StatusMask that holds statuses the listener responds to
-     * @return RETCODE_OK if successful, RETCODE_ERROR otherwise.
-     * @warning Do not call this method from a \c DomainParticipantListener callback.
+     * @return RETCODE_OK
      */
     RTPS_DllAPI ReturnCode_t set_listener(
             DomainParticipantListener* listener,
             const StatusMask& mask);
-
-    /**
-     * Modifies the DomainParticipantListener.
-     *
-     * @param listener New value for the DomainParticipantListener
-     * @param mask StatusMask that holds statuses the listener responds to
-     * @param timeout Maximum time to wait for executing callbacks to finish.
-     * @return RETCODE_OK if successful, RETCODE_ERROR if failed (timeout expired)
-     * @warning Do not call this method from a \c DomainParticipantListener callback.
-     */
-    RTPS_DllAPI ReturnCode_t set_listener(
-            DomainParticipantListener* listener,
-            const StatusMask& mask,
-            const std::chrono::seconds timeout);
 
     /**
      * @brief This operation enables the DomainParticipant
@@ -377,25 +348,17 @@ public:
      * @param a_multitopic MultiTopic to be deleted
      * @return RETCODE_BAD_PARAMETER if the topic passed is a nullptr, RETCODE_PRECONDITION_NOT_MET if the topic does not belong to
      * this participant or if it is referenced by any entity and RETCODE_OK if the Topic was deleted.
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
-     *
      */
     RTPS_DllAPI ReturnCode_t delete_multitopic(
             const MultiTopic* a_multitopic);
 
     /**
      * Gives access to an existing (or ready to exist) enabled Topic.
-     * It should be noted that the returned Topic is a local object that acts as a proxy to designate the global
-     * concept of topic.
-     * Topics obtained by means of find_topic, must also be deleted by means of delete_topic so that the local
-     * resources can be released.
-     * If a Topic is obtained multiple times by means of find_topic or create_topic, it must also be deleted that same
-     * number of times using delete_topic.
+     * Topics obtained by this method must be destroyed by delete_topic.
      *
      * @param topic_name Topic name
      * @param timeout Maximum time to wait for the Topic
-     * @return Pointer to the existing Topic, nullptr in case of error or timeout
+     * @return Pointer to the existing Topic, nullptr in error case
      */
     RTPS_DllAPI Topic* find_topic(
             const std::string& topic_name,
@@ -423,11 +386,10 @@ public:
     /**
      * Locally ignore a remote domain participant.
      *
-     * @note This action is not reversible.
+     * @note This action is not required to be reversible.
      *
      * @param handle Identifier of the remote participant to ignore
-     * @return RETURN_OK code if everything correct, RETCODE_BAD_PARAMENTER otherwise
-     *
+     * @return RETURN_OK code if everything correct, error code otherwise
      */
     RTPS_DllAPI ReturnCode_t ignore_participant(
             const InstanceHandle_t& handle);
@@ -435,41 +397,32 @@ public:
     /**
      * Locally ignore a topic.
      *
-     * @note This action is not reversible.
+     * @note This action is not required to be reversible.
      *
      * @param handle Identifier of the topic to ignore
      * @return RETURN_OK code if everything correct, error code otherwise
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
-     *
      */
     RTPS_DllAPI ReturnCode_t ignore_topic(
             const InstanceHandle_t& handle);
 
     /**
-     * Locally ignore a remote datawriter.
+     * Locally ignore a datawriter.
      *
-     * @note This action is not reversible.
+     * @note This action is not required to be reversible.
      *
      * @param handle Identifier of the datawriter to ignore
      * @return RETURN_OK code if everything correct, error code otherwise
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
-     *
      */
     RTPS_DllAPI ReturnCode_t ignore_publication(
             const InstanceHandle_t& handle);
 
     /**
-     * Locally ignore a remote datareader.
+     * Locally ignore a datareader.
      *
-     * @note This action is not reversible.
+     * @note This action is not required to be reversible.
      *
      * @param handle Identifier of the datareader to ignore
      * @return RETURN_OK code if everything correct, error code otherwise
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
-     *
      */
     RTPS_DllAPI ReturnCode_t ignore_subscription(
             const InstanceHandle_t& handle);
@@ -671,10 +624,8 @@ public:
     /**
      * Retrieves the list of DomainParticipants that have been discovered in the domain and are not "ignored".
      *
-     * @param[out] participant_handles Reference to the vector where discovered participants will be returned
+     * @param[out]  participant_handles Reference to the vector where discovered participants will be returned
      * @return RETCODE_OK if everything correct, error code otherwise
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_discovered_participants(
             std::vector<InstanceHandle_t>& participant_handles) const;
@@ -682,11 +633,9 @@ public:
     /**
      * Retrieves the DomainParticipant data of a discovered not ignored participant.
      *
-     * @param[out] participant_data Reference to the ParticipantBuiltinTopicData object to return the data
+     * @param[out]  participant_data Reference to the ParticipantBuiltinTopicData object to return the data
      * @param participant_handle InstanceHandle of DomainParticipant to retrieve the data from
      * @return RETCODE_OK if everything correct, PRECONDITION_NOT_MET if participant does not exist
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_discovered_participant_data(
             builtin::ParticipantBuiltinTopicData& participant_data,
@@ -695,10 +644,8 @@ public:
     /**
      * Retrieves the list of topics that have been discovered in the domain and are not "ignored".
      *
-     * @param[out] topic_handles Reference to the vector where discovered topics will be returned
+     * @param[out]  topic_handles Reference to the vector where discovered topics will be returned
      * @return RETCODE_OK if everything correct, error code otherwise
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_discovered_topics(
             std::vector<InstanceHandle_t>& topic_handles) const;
@@ -706,11 +653,9 @@ public:
     /**
      * Retrieves the Topic data of a discovered not ignored topic.
      *
-     * @param[out] topic_data Reference to the TopicBuiltinTopicData object to return the data
+     * @param[out]  topic_data Reference to the TopicBuiltinTopicData object to return the data
      * @param topic_handle InstanceHandle of Topic to retrieve the data from
      * @return RETCODE_OK if everything correct, PRECONDITION_NOT_MET if topic does not exist
-     *
-     * @warning Not supported yet. Currently returns RETCODE_UNSUPPORTED
      */
     RTPS_DllAPI ReturnCode_t get_discovered_topic_data(
             builtin::TopicBuiltinTopicData& topic_data,
@@ -824,8 +769,6 @@ public:
 
     /**
      * @brief Getter for the resource event
-     *
-     * @pre The DomainParticipant is enabled.
      *
      * @return A reference to the resource event
      */

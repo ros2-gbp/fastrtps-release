@@ -45,20 +45,10 @@
 #include <statistics/types/typesPubSubTypes.h>
 #include <utils/SystemInfo.hpp>
 
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
-#include <fastrtps/xmlparser/XMLParserCommon.h>
-#include <fastdds/utils/QosConverters.hpp>
-
 namespace eprosima {
 namespace fastdds {
 namespace statistics {
 namespace dds {
-
-using fastrtps::xmlparser::XMLProfileManager;
-using fastrtps::xmlparser::XMLP_ret;
-using fastrtps::xmlparser::DEFAULT_STATISTICS_DATAWRITER_PROFILE;
-using fastrtps::PublisherAttributes;
 
 constexpr const char* HISTORY_LATENCY_TOPIC_ALIAS = "HISTORY_LATENCY_TOPIC";
 constexpr const char* NETWORK_LATENCY_TOPIC_ALIAS = "NETWORK_LATENCY_TOPIC";
@@ -141,11 +131,9 @@ ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter(
             auto data_writer = builtin_publisher_impl_->create_datawriter(topic, writer_impl, efd::StatusMask::all());
             if (nullptr == data_writer)
             {
-                // Remove already created Impl
-                delete writer_impl;
                 // Remove topic and type
                 delete_topic_and_type(use_topic_name);
-                EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT, topic_name << " DataWriter creation has failed");
+                logError(STATISTICS_DOMAIN_PARTICIPANT, topic_name << " DataWriter creation has failed");
                 return ReturnCode_t::RETCODE_ERROR;
             }
 
@@ -169,44 +157,10 @@ ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter(
             else
             {
                 statistics_listener_->set_datawriter(event_kind, data_writer);
-                rtps_participant_->set_enabled_statistics_writers_mask(statistics_listener_->enabled_writers_mask());
             }
         }
         return ReturnCode_t::RETCODE_OK;
     }
-    return ReturnCode_t::RETCODE_ERROR;
-}
-
-ReturnCode_t DomainParticipantImpl::enable_statistics_datawriter_with_profile(
-        const std::string& profile_name,
-        const std::string& topic_name)
-{
-    DataWriterQos datawriter_qos;
-    PublisherAttributes attr;
-    if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(profile_name, attr, false))
-    {
-        efd::utils::set_qos_from_attributes(datawriter_qos, attr);
-
-        ReturnCode_t ret = enable_statistics_datawriter(topic_name, datawriter_qos);
-        // case RETCODE_ERROR is checked and logged in enable_statistics_datawriter.
-        // case RETCODE_INCONSISTENT_POLICY could happen if profile defined in XML is inconsistent.
-        // case RETCODE_UNSUPPORTED cannot happen because this method is only called if FASTDDS_STATISTICS
-        // CMake option is enabled
-        if (ret == ReturnCode_t::RETCODE_INCONSISTENT_POLICY)
-        {
-            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
-                    "Statistics DataWriter QoS from profile name " << profile_name << " are not consistent/compatible");
-        }
-        assert(ret != ReturnCode_t::RETCODE_UNSUPPORTED);
-        if (ret == ReturnCode_t::RETCODE_BAD_PARAMETER)
-        {
-            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
-                    "Profile name " << profile_name << " is not a valid statistics topic name/alias");
-        }
-        return ret;
-    }
-    EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
-            "Profile name " << profile_name << " has not been found");
     return ReturnCode_t::RETCODE_ERROR;
 }
 
@@ -228,14 +182,12 @@ ReturnCode_t DomainParticipantImpl::disable_statistics_datawriter(
     {
         // Avoid calling DataWriter from listener callback
         statistics_listener_->set_datawriter(event_kind, nullptr);
-        rtps_participant_->set_enabled_statistics_writers_mask(statistics_listener_->enabled_writers_mask());
 
         // Delete the DataWriter
         if (ReturnCode_t::RETCODE_OK != builtin_publisher_->delete_datawriter(writer))
         {
             // Restore writer on listener before returning the error
             statistics_listener_->set_datawriter(event_kind, writer);
-            rtps_participant_->set_enabled_statistics_writers_mask(statistics_listener_->enabled_writers_mask());
             ret = ReturnCode_t::RETCODE_ERROR;
         }
 
@@ -328,33 +280,16 @@ void DomainParticipantImpl::enable_statistics_builtin_datawriters(
     std::string topic;
     while (std::getline(topics, topic, ';'))
     {
-        DataWriterQos datawriter_qos;
-        PublisherAttributes attr;
-        if (XMLP_ret::XML_OK == XMLProfileManager::fillPublisherAttributes(topic, attr, false))
-        {
-            efd::utils::set_qos_from_attributes(datawriter_qos, attr);
-        }
-        else if (XMLP_ret::XML_OK ==
-                XMLProfileManager::fillPublisherAttributes(DEFAULT_STATISTICS_DATAWRITER_PROFILE, attr, false))
-        {
-            efd::utils::set_qos_from_attributes(datawriter_qos, attr);
-        }
-
-        ReturnCode_t ret = enable_statistics_datawriter(topic, datawriter_qos);
+        ReturnCode_t ret = enable_statistics_datawriter(topic, STATISTICS_DATAWRITER_QOS);
         // case RETCODE_ERROR is checked and logged in enable_statistics_datawriter.
-        // case RETCODE_INCONSISTENT_POLICY could happen if profile defined in XML is inconsistent.
+        // case RETCODE_INCONSISTENT_POLICY cannot happen. STATISTICS_DATAWRITER_QOS is consistent.
         // case RETCODE_UNSUPPORTED cannot happen because this method is only called if FASTDDS_STATISTICS
         // CMake option is enabled
-        if (ret == ReturnCode_t::RETCODE_INCONSISTENT_POLICY)
-        {
-            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
-                    "Statistics DataWriter QoS from topic " << topic << " are not consistent/compatible");
-        }
+        assert(ret != ReturnCode_t::RETCODE_INCONSISTENT_POLICY);
         assert(ret != ReturnCode_t::RETCODE_UNSUPPORTED);
         if (ret == ReturnCode_t::RETCODE_BAD_PARAMETER)
         {
-            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
-                    "Topic " << topic << " is not a valid statistics topic name/alias");
+            logError(STATISTICS_DOMAIN_PARTICIPANT, "Topic " << topic << " is not a valid statistics topic name/alias");
         }
     }
 }
@@ -471,8 +406,7 @@ bool DomainParticipantImpl::find_or_create_topic_and_type(
     {
         if (topic_desc->get_type_name() != type->getName())
         {
-            EPROSIMA_LOG_ERROR(STATISTICS_DOMAIN_PARTICIPANT,
-                    topic_name << " is not using expected type " << type->getName() <<
+            logError(STATISTICS_DOMAIN_PARTICIPANT, topic_name << " is not using expected type " << type->getName() <<
                     " and is using instead type " << topic_desc->get_type_name());
             return false;
         }

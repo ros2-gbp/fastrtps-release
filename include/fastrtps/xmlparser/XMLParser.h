@@ -28,7 +28,6 @@
 
 #include <map>
 #include <mutex>
-#include <set>
 #include <string>
 
 namespace tinyxml2 {
@@ -348,11 +347,6 @@ protected:
             rtps::MemoryManagementPolicy_t& historyMemoryPolicy,
             uint8_t ident);
 
-    static XMLP_ret getXMLExternalLocatorList(
-            tinyxml2::XMLElement* elem,
-            fastdds::rtps::ExternalLocators& external_locators,
-            uint8_t ident);
-
     RTPS_DllAPI static XMLP_ret getXMLLocatorList(
             tinyxml2::XMLElement* elem,
             rtps::LocatorList_t& locatorList,
@@ -571,11 +565,6 @@ protected:
     RTPS_DllAPI static XMLP_ret getXMLUint(
             tinyxml2::XMLElement* elem,
             uint16_t* ui16,
-            uint8_t ident);
-
-    RTPS_DllAPI static XMLP_ret getXMLUint(
-            tinyxml2::XMLElement* elem,
-            uint64_t* ui64,
             uint8_t ident);
 
     RTPS_DllAPI static XMLP_ret getXMLBool(

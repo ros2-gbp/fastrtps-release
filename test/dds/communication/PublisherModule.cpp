@@ -65,7 +65,7 @@ bool PublisherModule::init(
 
     if (participant_ == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER_MODULE, "Error creating publisher participant");
+        logError(PUBLISHER_MODULE, "Error creating publisher participant");
         return false;
     }
 
@@ -89,14 +89,14 @@ bool PublisherModule::init(
     publisher_ = participant_->create_publisher(PUBLISHER_QOS_DEFAULT, this);
     if (publisher_ == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER_MODULE, "Error creating publisher");
+        logError(PUBLISHER_MODULE, "Error creating publisher");
         return false;
     }
 
     topic_ = participant_->create_topic(topic_name.str(), type_.get_type_name(), TOPIC_QOS_DEFAULT);
     if (topic_ == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER_MODULE, "Error creating publisher topic");
+        logError(PUBLISHER_MODULE, "Error creating publisher topic");
         return false;
     }
 
@@ -108,7 +108,7 @@ bool PublisherModule::init(
     writer_ = publisher_->create_datawriter(topic_, wqos, this);
     if (writer_ == nullptr)
     {
-        EPROSIMA_LOG_ERROR(PUBLISHER_MODULE, "Error creating publisher datawriter");
+        logError(PUBLISHER_MODULE, "Error creating publisher datawriter");
         return false;
     }
     std::cout << "Writer created correctly in topic " << topic_->get_name()
@@ -131,29 +131,12 @@ void PublisherModule::wait_discovery(
 
 void PublisherModule::run(
         uint32_t samples,
-        const uint32_t rescan_interval,
         const uint32_t loops,
         uint32_t interval)
 {
     uint32_t current_loop = 0;
     uint16_t index = 1;
     void* sample = nullptr;
-
-    std::thread net_rescan_thread([this, rescan_interval]()
-            {
-                if (rescan_interval > 0)
-                {
-                    auto interval = std::chrono::seconds(rescan_interval);
-                    while (run_)
-                    {
-                        std::this_thread::sleep_for(interval);
-                        if (run_)
-                        {
-                            participant_->set_qos(participant_->get_qos());
-                        }
-                    }
-                }
-            });
 
     while (run_ && (loops == 0 || loops > current_loop))
     {
@@ -181,7 +164,7 @@ void PublisherModule::run(
                 data->message("HelloWorld");
             }
         }
-        EPROSIMA_LOG_INFO(PUBLISHER_MODULE, "Publisher writting index " << index);
+        logInfo(PUBLISHER_MODULE, "Publisher writting index " << index);
         writer_->write(sample);
 
         if (index == samples)
@@ -201,9 +184,6 @@ void PublisherModule::run(
 
         std::this_thread::sleep_for(std::chrono::milliseconds(interval));
     }
-
-    run_ = false;
-    net_rescan_thread.join();
 }
 
 void PublisherModule::on_publication_matched(

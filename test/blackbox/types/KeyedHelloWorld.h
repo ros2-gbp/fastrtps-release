@@ -23,8 +23,6 @@
 #define _FAST_DDS_GENERATED_KEYEDHELLOWORLD_H_
 
 
-#include <fastrtps/utils/fixed_size_string.hpp>
-
 #include <stdint.h>
 #include <array>
 #include <string>
@@ -93,7 +91,7 @@ public:
      * @param x Reference to the object KeyedHelloWorld that will be copied.
      */
     eProsima_user_DllExport KeyedHelloWorld(
-            KeyedHelloWorld&& x) noexcept;
+            KeyedHelloWorld&& x);
 
     /*!
      * @brief Copy assignment.
@@ -107,7 +105,7 @@ public:
      * @param x Reference to the object KeyedHelloWorld that will be copied.
      */
     eProsima_user_DllExport KeyedHelloWorld& operator =(
-            KeyedHelloWorld&& x) noexcept;
+            KeyedHelloWorld&& x);
 
     /*!
      * @brief Comparison operator.
@@ -166,33 +164,33 @@ public:
      * @param _message New value to be copied in member message
      */
     eProsima_user_DllExport void message(
-            const eprosima::fastrtps::fixed_string<128>& _message);
+            const std::string& _message);
 
     /*!
      * @brief This function moves the value in member message
      * @param _message New value to be moved in member message
      */
     eProsima_user_DllExport void message(
-            eprosima::fastrtps::fixed_string<128>&& _message);
+            std::string&& _message);
 
     /*!
      * @brief This function returns a constant reference to member message
      * @return Constant reference to member message
      */
-    eProsima_user_DllExport const eprosima::fastrtps::fixed_string<128>& message() const;
+    eProsima_user_DllExport const std::string& message() const;
 
     /*!
      * @brief This function returns a reference to member message
      * @return Reference to member message
      */
-    eProsima_user_DllExport eprosima::fastrtps::fixed_string<128>& message();
+    eProsima_user_DllExport std::string& message();
 
     /*!
-    * @brief This function returns the maximum serialized size of an object
-    * depending on the buffer alignment.
-    * @param current_alignment Buffer alignment.
-    * @return Maximum serialized size.
-    */
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
     eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
             size_t current_alignment = 0);
 
@@ -248,8 +246,7 @@ private:
 
     uint16_t m_key;
     uint16_t m_index;
-    eprosima::fastrtps::fixed_string<128> m_message;
-
+    std::string m_message;
 };
 
 #endif // _FAST_DDS_GENERATED_KEYEDHELLOWORLD_H_

@@ -478,6 +478,13 @@ public:
     }
 
     /**
+     * Method to add the logical ports associated to a channel that was not available
+     * when the logical ports were obtained.
+     * @param channel Channel that might add the logical ports if available.
+     */
+    void send_channel_pending_logical_ports(
+            std::shared_ptr<TCPChannelResource>& channel);
+    /**
      * Close the output channel associated to the given remote participant but if its locators belong to the
      * given list of initial peers.
      *
@@ -489,14 +496,6 @@ public:
             SendResourceList& send_resource_list,
             const LocatorList& remote_participant_locators,
             const LocatorList& participant_initial_peers) const;
-
-    /**
-     * Method to add the logical ports associated to a channel that was not available
-     * when the logical ports were obtained.
-     * @param channel Channel that might add the logical ports if available.
-     */
-    void send_channel_pending_logical_ports(
-            std::shared_ptr<TCPChannelResource>& channel);
 };
 
 } // namespace rtps

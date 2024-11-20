@@ -54,19 +54,20 @@ concurrency:
 jobs:
   ubuntu-ci:
 
-    if: ${{ !(github.event_name == 'pull_request') || !contains(github.event.pull_request.labels.*.name, 'conflicts') }}
+    if: ${{ (
+              !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
+              !contains(github.event.pull_request.labels.*.name, 'conflicts')
+            ) }}
     uses: ./.github/workflows/reusable-ubuntu-ci.yml
     with:
       # It would be desirable to have a matrix of ubuntu OS for this job, but due to the issue opened in this ticket:
       # https://github.com/orgs/community/discussions/128118 , it has been set as a single OS job.
-      os-image: 'ubuntu-22.04'
+      os-image: 'ubuntu-20.04'
       label: ${{ inputs.label || 'ubuntu-ci' }}
       colcon-args: ${{ inputs.colcon-args }}
       cmake-args: ${{ inputs.cmake-args }}
       ctest-args: ${{ inputs.ctest-args || '-LE xfail' }}
-      fastdds-branch: ${{ inputs.fastdds_branch || github.ref || '2.10.x' }}
+      fastdds-branch: ${{ inputs.fastdds_branch || github.ref || '2.6.x' }}
       security: ${{ ((inputs.security == true) && true) || github.event_name == 'pull_request' }}
-      run-build: ${{ !(github.event_name == 'pull_request') || !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
       run-tests: ${{ ((inputs.run-tests == true) && true) || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-test')) }}
       use-ccache: ${{ ((inputs.use-ccache == true) && true) || false }}
-      add-label: ${{ (github.event_name == 'pull_request') && (github.event.pull_request.head.repo.full_name == github.repository) && true || false }}

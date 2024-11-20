@@ -18,17 +18,15 @@
 
 #include <asio.hpp>
 #include <gtest/gtest.h>
-
+#include <MockReceiverResource.h>
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastdds/rtps/common/LocatorList.hpp>
 #include <fastrtps/transport/TCPv6TransportDescriptor.h>
-#include <fastrtps/utils/IPLocator.h>
+#include <fastrtps/rtps/network/NetworkFactory.h>
 #include <fastrtps/utils/Semaphore.h>
-
-#include <MockReceiverResource.h>
+#include <fastrtps/utils/IPLocator.h>
 #include "mock/MockTCPv6Transport.h"
-#include <rtps/network/NetworkFactory.h>
 #include <rtps/transport/TCPv6Transport.h>
 
 using namespace eprosima::fastrtps::rtps;
@@ -522,61 +520,6 @@ TEST_F(TCPv6Tests, opening_output_channel_with_same_locator_as_local_listening_p
     ASSERT_EQ(send_resource_list.size(), 2);
 }
 
-// This test verifies that the send resource list is correctly cleaned and the channel resource is removed
-// from the channel_resources_map.
-TEST_F(TCPv6Tests, remove_from_send_resource_list)
-{
-    TCPv6TransportDescriptor send_descriptor;
-    MockTCPv6Transport send_transport_under_test(send_descriptor);
-    send_transport_under_test.init();
-
-    Locator_t output_locator_1;
-    IPLocator::createLocator(LOCATOR_KIND_TCPv6, "::1", g_default_port, output_locator_1);
-    IPLocator::setLogicalPort(output_locator_1, 7410);
-
-    Locator_t output_locator_2;
-    IPLocator::createLocator(LOCATOR_KIND_TCPv6, "::1", g_default_port + 1, output_locator_2);
-    IPLocator::setLogicalPort(output_locator_2, 7410);
-
-    LocatorList_t initial_peer_list;
-    initial_peer_list.push_back(output_locator_2);
-
-    SendResourceList send_resource_list;
-    ASSERT_TRUE(send_transport_under_test.OpenOutputChannel(send_resource_list, output_locator_1));
-    ASSERT_TRUE(send_transport_under_test.OpenOutputChannel(send_resource_list, output_locator_2));
-    ASSERT_EQ(send_resource_list.size(), 2u);
-
-    // Using a wrong locator should not remove the channel resource
-    LocatorList_t wrong_remote_participant_physical_locators;
-    Locator_t wrong_output_locator;
-    IPLocator::createLocator(LOCATOR_KIND_TCPv6, "::1", g_default_port + 2, wrong_output_locator);
-    IPLocator::setLogicalPort(wrong_output_locator, 7410);
-    wrong_remote_participant_physical_locators.push_back(wrong_output_locator);
-    send_transport_under_test.CloseOutputChannel(
-        send_resource_list,
-        wrong_remote_participant_physical_locators,
-        initial_peer_list);
-    ASSERT_EQ(send_resource_list.size(), 2u);
-
-    // Using the correct locator should remove the channel resource
-    LocatorList_t remote_participant_physical_locators;
-    remote_participant_physical_locators.push_back(output_locator_1);
-    send_transport_under_test.CloseOutputChannel(
-        send_resource_list,
-        remote_participant_physical_locators,
-        initial_peer_list);
-    ASSERT_EQ(send_resource_list.size(), 1u);
-
-    // Using the initial peer locator should not remove the channel resource
-    remote_participant_physical_locators.clear();
-    remote_participant_physical_locators.push_back(output_locator_2);
-    send_transport_under_test.CloseOutputChannel(
-        send_resource_list,
-        remote_participant_physical_locators,
-        initial_peer_list);
-    ASSERT_EQ(send_resource_list.size(), 1u);
-}
-
 // This test verifies the logical port passed to OpenOutputChannel is correctly added to the channel pending list or the
 // trasnport's pending channel logical ports map.
 TEST_F(TCPv6Tests, add_logical_port_on_send_resource_creation)
@@ -674,6 +617,61 @@ TEST_F(TCPv6Tests, add_logical_port_on_send_resource_creation)
 
         client_resource_list.clear();
     }
+}
+
+// This test verifies that the send resource list is correctly cleaned and the channel resource is removed
+// from the channel_resources_map.
+TEST_F(TCPv6Tests, remove_from_send_resource_list)
+{
+    TCPv6TransportDescriptor send_descriptor;
+    MockTCPv6Transport send_transport_under_test(send_descriptor);
+    send_transport_under_test.init();
+
+    Locator_t output_locator_1;
+    IPLocator::createLocator(LOCATOR_KIND_TCPv6, "::1", g_default_port, output_locator_1);
+    IPLocator::setLogicalPort(output_locator_1, 7410);
+
+    Locator_t output_locator_2;
+    IPLocator::createLocator(LOCATOR_KIND_TCPv6, "::1", g_default_port + 1, output_locator_2);
+    IPLocator::setLogicalPort(output_locator_2, 7410);
+
+    LocatorList_t initial_peer_list;
+    initial_peer_list.push_back(output_locator_2);
+
+    SendResourceList send_resource_list;
+    ASSERT_TRUE(send_transport_under_test.OpenOutputChannel(send_resource_list, output_locator_1));
+    ASSERT_TRUE(send_transport_under_test.OpenOutputChannel(send_resource_list, output_locator_2));
+    ASSERT_EQ(send_resource_list.size(), 2u);
+
+    // Using a wrong locator should not remove the channel resource
+    LocatorList_t wrong_remote_participant_physical_locators;
+    Locator_t wrong_output_locator;
+    IPLocator::createLocator(LOCATOR_KIND_TCPv6, "::1", g_default_port + 2, wrong_output_locator);
+    IPLocator::setLogicalPort(wrong_output_locator, 7410);
+    wrong_remote_participant_physical_locators.push_back(wrong_output_locator);
+    send_transport_under_test.CloseOutputChannel(
+        send_resource_list,
+        wrong_remote_participant_physical_locators,
+        initial_peer_list);
+    ASSERT_EQ(send_resource_list.size(), 2u);
+
+    // Using the correct locator should remove the channel resource
+    LocatorList_t remote_participant_physical_locators;
+    remote_participant_physical_locators.push_back(output_locator_1);
+    send_transport_under_test.CloseOutputChannel(
+        send_resource_list,
+        remote_participant_physical_locators,
+        initial_peer_list);
+    ASSERT_EQ(send_resource_list.size(), 1u);
+
+    // Using the initial peer locator should not remove the channel resource
+    remote_participant_physical_locators.clear();
+    remote_participant_physical_locators.push_back(output_locator_2);
+    send_transport_under_test.CloseOutputChannel(
+        send_resource_list,
+        remote_participant_physical_locators,
+        initial_peer_list);
+    ASSERT_EQ(send_resource_list.size(), 1u);
 }
 
 // TODO: TEST_F(TCPv6Tests, send_and_receive_between_both_secure_ports)

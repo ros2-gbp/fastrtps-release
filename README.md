@@ -29,9 +29,10 @@
     <a href="https://eprosima-fast-rtps.readthedocs.io"><img alt="Documentation badge" src="https://img.shields.io/readthedocs/eprosima-fast-rtps.svg"/></a>
     <br>
     <a href=""><img alt="Status" src="https://nexus.lab.fiware.org/static/badges/statuses/incubating.svg"/></a>
-    <a href="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-ubuntu-2.10.x.yml"><img alt="Fast DDS Ubuntu CI (nightly)" src="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-ubuntu-2.10.x.yml/badge.svg"/></a>
-    <a href="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-windows-2.10.x.yml"><img alt="Fast DDS Windows CI (nightly)" src="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-windows-2.10.x.yml/badge.svg"/></a>
-    <a href="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-mac-2.10.x.yml"><img alt="Fast DDS MacOS CI (nightly)" src="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-mac-2.10.x.yml/badge.svg"/></a>
+    <a href="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-ubuntu-ci.yml"><img alt="Fast DDS Ubuntu CI (nightly)" src="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-ubuntu-ci.yml/badge.svg"/></a>
+    <a href="http://jenkins.eprosima.com:8080/view/Nightly/job/nightly_fastdds_sec_master_linux_aarch64/"><img alt="Linux arm64 ci" src="http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux_aarch64/lastCompletedBuild/badge/icon?subject=%20%20%20Linux-aarch64%20CI%20"/></a>
+    <a href="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-windows-ci.yml"><img alt="Windows ci" src="https://github.com/eProsima/Fast-DDS/actions/workflows/nightly-windows-ci.yml/badge.svg"/></a>
+    <a href="http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac"><img alt="Mac ci" src="http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac/lastCompletedBuild/badge/icon?subject=%20%20%20%20%20%20%20Mac%20CI%20"/></a>
     <a href="http://jenkins.eprosima.com:8080/job/nightly_fastdds_coverage_linux"><img alt="Coverage" src="https://img.shields.io/jenkins/coverage/cobertura.svg?jobUrl=http%3A%2F%2Fjenkins.eprosima.com%3A8080%2Fjob%2Fnightly_fastdds_coverage_linux"/></a>
 </div>
 
@@ -62,12 +63,6 @@ system input/output channel combination for each deployment.
 This project is part of [FIWARE](https://www.fiware.org/). For more information check the FIWARE Catalogue entry for
 [Robotics](https://github.com/Fiware/catalogue/tree/master/robotics).
 
-## Commercial support
-
-Looking for commercial support? Write us to info@eprosima.com
-
-Find more about us at [eProsima’s webpage](https://eprosima.com/).
-
 ## Want us to share your project with the community?
 
 Write to evaluation.support@eprosima.com or mention @EProsima on Twitter.
@@ -76,6 +71,11 @@ We are curious to get to know your use case!
 ## Supported platforms
 
 More information about the official support can be found [here](https://github.com/eProsima/Fast-DDS/blob/master/PLATFORM_SUPPORT.md#platform-support)
+
+* Linux [![Linux ci](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux/badge/icon?subject=%20%20%20Linux%20CI%20)](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux)
+* Linux-aarch64 [![Linux arm64 ci](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_linux_aarch64/badge/icon?subject=%20%20%20Linux-aarch64%20CI%20)](http://jenkins.eprosima.com:8080/view/Nightly/job/nightly_fastdds_sec_master_linux_aarch64/)
+* Windows [![Windows ci](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_windows/label=windows-secure,platform=x64,toolset=v142/badge/icon?subject=%20%20%20%20Windows%20CI%20)](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_windows/label=windows-secure,platform=x64,toolset=v142)
+* Mac [![Mac ci](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac/badge/icon?subject=%20%20%20%20%20%20%20Mac%20CI%20)](http://jenkins.eprosima.com:8080/job/nightly_fastdds_sec_master_mac)
 
 ## Installation Guide
 You can get either a binary distribution of *eprosima Fast DDS* or compile the library yourself from source.
@@ -110,12 +110,12 @@ This Docker image was built for Ubuntu 20.04 (Focal Fossa).
 
 To run this container you need **Docker installed**. From a terminal run the following command
 
-    $ sudo apt-get install docker.io
+	$ sudo apt-get install docker.io
 
 Load the docker image:
 
-    $ docker load -i ubuntu-fastdds-suite:<FastDDS-Version>.tar
-    $ docker tag ubuntu-fastdds-suite:<FastDDS-Version> ubuntu-fastdds-suite:latest
+	$ docker load -i ubuntu-fastdds-suite:<FastDDS-Version>.tar
+	$ docker tag ubuntu-fastdds-suite:<FastDDS-Version> ubuntu-fastdds-suite:latest
 
 Run the eProsima Fast DDS Suite Docker container:
 
@@ -177,7 +177,7 @@ To launch the Hello World example (a minimal example that will perform a Publish
 sending samples) you could run:
 
     $ goToExamples
-    $ cd dds/HelloWorldExample/bin
+    $ cd HelloWorldExample/bin
     $ tmux new-session "./HelloWorldExample publisher 0 1000" \; \
     split-window "./HelloWorldExample subscriber" \; \
     select-layout even-vertical
@@ -186,13 +186,13 @@ This example is not constrained to the current instance. It's possible to run se
 container to check the communication between them by running the following from each container.
 
     $ goToExamples
-    $ cd dds/HelloWorldExample/bin
+    $ cd HelloWorldExample/bin
     $ ./HelloWorldExample publisher
 
 or
 
     $ goToExamples
-    $ cd dds/HelloWorldExample/bin
+    $ cd HelloWorldExample/bin
     $ ./HelloWorldExample subscriber
 
 Another example you could launch is the Benchmark example. This example creates either a Publisher or a Subscriber and
@@ -202,14 +202,22 @@ a report with the number of samples transmitted.
 On the subscriber side, run:
 
     $ goToExamples
-    $ cd dds/Benchmark/bin
+    $ cd Benchmark/bin
     $ ./Benchmark subscriber udp
 
 On the publisher side, run:
 
     $ goToExamples
-    $ cd dds/Benchmark/bin
+    $ cd Benchmark/bin
     $ ./Benchmark publisher udp
+
+
+## Getting Help
+
+If you need support you can reach us by mail at `support@eProsima.com` or by phone at `+34 91 804 34 48`.
+
+
+
 
 ---
 

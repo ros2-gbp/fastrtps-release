@@ -123,16 +123,8 @@ public:
 
     RTPSWithRegistrationReader(
             const std::string& topic_name)
-        : RTPSWithRegistrationReader(topic_name, nullptr)
-    {
-    }
-
-    RTPSWithRegistrationReader(
-            const std::string& topic_name,
-            eprosima::fastrtps::rtps::RTPSParticipant* participant)
         : listener_(*this)
-        , participant_(participant)
-        , destroy_participant_(nullptr == participant)
+        , participant_(nullptr)
         , reader_(nullptr)
         , history_(nullptr)
         , initialized_(false)
@@ -149,27 +141,29 @@ public:
         reader_attr_.times.heartbeatResponseDelay.seconds = 0;
         //reader_attr_.times.heartbeatResponseDelay.nanosec = 100000000;
         reader_attr_.times.heartbeatResponseDelay.nanosec = 100000000;
-
-        participant_attr_.builtin.discovery_config.discoveryProtocol =
-                eprosima::fastrtps::rtps::DiscoveryProtocol::SIMPLE;
-        participant_attr_.builtin.use_WriterLivelinessProtocol = true;
     }
 
     virtual ~RTPSWithRegistrationReader()
     {
-        destroy();
+        if (participant_ != nullptr)
+        {
+            eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(participant_);
+        }
+        if (history_ != nullptr)
+        {
+            delete(history_);
+        }
     }
 
     void init()
     {
         matched_ = 0;
 
-        if (nullptr == participant_)
-        {
-            participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant(
-                static_cast<uint32_t>(GET_PID()) % 230, participant_attr_);
-            ASSERT_NE(participant_, nullptr);
-        }
+        eprosima::fastrtps::rtps::RTPSParticipantAttributes pattr;
+        pattr.builtin.discovery_config.discoveryProtocol = eprosima::fastrtps::rtps::DiscoveryProtocol::SIMPLE;
+        pattr.builtin.use_WriterLivelinessProtocol = true;
+        participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant((uint32_t)GET_PID() % 230, pattr);
+        ASSERT_NE(participant_, nullptr);
 
         //Create readerhistory
         hattr_.payloadMaxSize = type_.m_typeSize;
@@ -213,11 +207,11 @@ public:
 
     void destroy()
     {
-        if (destroy_participant_ && participant_ != nullptr)
+        if (participant_ != nullptr)
         {
             eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(participant_);
+            participant_ = nullptr;
         }
-        participant_ = nullptr;
 
         if (history_ != nullptr)
         {
@@ -334,39 +328,27 @@ public:
 
     eprosima::fastrtps::rtps::SequenceNumber_t get_last_received_sequence_number() const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
         return last_seq_;
     }
 
     void wait_discovery(
             std::chrono::seconds timeout = std::chrono::seconds::zero())
     {
-        bool post_assertion = (matched_ == 0 && timeout == std::chrono::seconds::zero()) ? true : false;
-        wait_discovery(1, timeout);
-        if (post_assertion)
-        {
-            ASSERT_NE(matched_, 0u);
-        }
-    }
+        std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
-    void wait_discovery(
-            size_t matches,
-            std::chrono::seconds timeout = std::chrono::seconds::zero())
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-
-        if (timeout == std::chrono::seconds::zero())
+        if (matched_ == 0 && timeout == std::chrono::seconds::zero())
         {
-            cvDiscovery_.wait(lock, [&]() -> bool
+            cvDiscovery_.wait(lock, [this]() -> bool
                     {
-                        return matched_ >= matches;
+                        return matched_ != 0;
                     });
+            EXPECT_NE(matched_, 0u);
         }
         else
         {
-            cvDiscovery_.wait_for(lock, timeout, [&]()
+            cv_.wait_for(lock, timeout, [&]()
                     {
-                        return matched_ >= matches;
+                        return matched_ != 0;
                     });
         }
     }
@@ -621,25 +603,23 @@ private:
             const RTPSWithRegistrationReader&) = delete;
 
     eprosima::fastrtps::rtps::RTPSParticipant* participant_;
-    eprosima::fastrtps::rtps::RTPSParticipantAttributes participant_attr_;
-    bool destroy_participant_{false};
     eprosima::fastrtps::rtps::RTPSReader* reader_;
     eprosima::fastrtps::rtps::ReaderAttributes reader_attr_;
     eprosima::fastrtps::TopicAttributes topic_attr_;
     eprosima::fastrtps::ReaderQos reader_qos_;
     eprosima::fastrtps::rtps::ReaderHistory* history_;
     eprosima::fastrtps::rtps::HistoryAttributes hattr_;
-    std::atomic<bool> initialized_;
+    bool initialized_;
     std::list<type> total_msgs_;
-    mutable std::mutex mutex_;
+    std::mutex mutex_;
     std::condition_variable cv_;
     std::mutex mutexDiscovery_;
     std::condition_variable cvDiscovery_;
-    std::atomic<bool> receiving_;
-    std::atomic<uint32_t> matched_;
+    bool receiving_;
+    uint32_t matched_;
     eprosima::fastrtps::rtps::SequenceNumber_t last_seq_;
-    std::atomic<size_t> current_received_count_;
-    std::atomic<size_t> number_samples_expected_;
+    size_t current_received_count_;
+    size_t number_samples_expected_;
     type_support type_;
     std::shared_ptr<eprosima::fastrtps::rtps::IPayloadPool> payload_pool_;
     bool has_payload_pool_ = false;

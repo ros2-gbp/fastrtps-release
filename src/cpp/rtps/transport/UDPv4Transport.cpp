@@ -14,18 +14,18 @@
 
 #include <rtps/transport/UDPv4Transport.h>
 
-#include <algorithm>
-#include <cstring>
 #include <utility>
+#include <cstring>
+#include <algorithm>
 
-#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/transport/TransportInterface.h>
+#include <fastdds/rtps/network/ReceiverResource.h>
+#include <fastdds/rtps/network/SenderResource.h>
 #include <fastdds/rtps/messages/CDRMessage.h>
 #include <fastdds/rtps/messages/MessageReceiver.h>
-#include <fastdds/rtps/transport/SenderResource.h>
-#include <fastdds/rtps/transport/TransportInterface.h>
+#include <fastdds/dds/log/Log.hpp>
 #include <fastrtps/utils/IPLocator.h>
 
-#include <rtps/network/ReceiverResource.h>
 #include <rtps/transport/asio_helpers.hpp>
 
 using namespace std;
@@ -118,7 +118,7 @@ UDPv4Transport::UDPv4Transport(
 
         if (interface_whitelist_.empty())
         {
-            EPROSIMA_LOG_ERROR(TRANSPORT, "All whitelist interfaces were filtered out");
+            logError(TRANSPORT, "All whitelist interfaces were filtered out");
             interface_whitelist_.emplace_back(ip::address_v4::from_string("192.0.2.0"));
         }
     }
@@ -300,12 +300,12 @@ eProsimaUDPSocket UDPv4Transport::OpenAndBindInputSocket(
         if (!asio_helpers::try_setting_buffer_size<socket_base::receive_buffer_size>(
                     socket, mReceiveBufferSize, minimum_value, configured_value))
         {
-            EPROSIMA_LOG_ERROR(TRANSPORT_UDPV4,
+            logError(TRANSPORT_UDPV4,
                     "Couldn't set receive buffer size to minimum value: " << minimum_value);
         }
         else if (mReceiveBufferSize != configured_value)
         {
-            EPROSIMA_LOG_WARNING(TRANSPORT_UDPV4,
+            logWarning(TRANSPORT_UDPV4,
                     "Receive buffer size could not be set to the desired value. "
                     << "Using " << configured_value << " instead of " << mReceiveBufferSize);
         }
@@ -391,9 +391,9 @@ bool UDPv4Transport::OpenInputChannel(
                 catch (asio::system_error const& e)
                 {
                     (void)e;
-                    EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, "UDPTransport Error binding " << locatorAddressStr << " at port: (" << IPLocator::getPhysicalPort(
+                    logWarning(RTPS_MSG_OUT, "UDPTransport Error binding " << locatorAddressStr << " at port: (" << IPLocator::getPhysicalPort(
                                 locator) << ")"
-                                                                                     << " with msg: " << e.what());
+                                                                           << " with msg: " << e.what());
                 }
             }
         }
@@ -419,8 +419,7 @@ bool UDPv4Transport::OpenInputChannel(
                         catch (std::system_error& ex)
                         {
                             (void)ex;
-                            EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
-                                    "Error joining multicast group on " << ip << ": " << ex.what());
+                            logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
                         }
                     }
                 }
@@ -434,8 +433,7 @@ bool UDPv4Transport::OpenInputChannel(
                     catch (std::system_error& ex)
                     {
                         (void)ex;
-                        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
-                                "Error joining multicast group on " << ip << ": " << ex.what());
+                        logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
                     }
                 }
             }
@@ -600,8 +598,7 @@ void UDPv4Transport::update_network_interfaces()
                     catch (std::system_error& ex)
                     {
                         (void)ex;
-                        EPROSIMA_LOG_WARNING(RTPS_MSG_OUT,
-                                "Error joining multicast group on " << ip << ": " << ex.what());
+                        logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
                     }
                 }
             }
@@ -616,7 +613,7 @@ void UDPv4Transport::update_network_interfaces()
                 catch (std::system_error& ex)
                 {
                     (void)ex;
-                    EPROSIMA_LOG_WARNING(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
+                    logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
                 }
             }
         }

@@ -108,7 +108,6 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
-
     RTPS_DllAPI static size_t getCdrSerializedSize(
             const ExtendedAnnotationParameterValue& data,
             size_t current_alignment = 0);

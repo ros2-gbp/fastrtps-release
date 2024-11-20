@@ -65,8 +65,7 @@ struct ReadTakeCommand
             int32_t max_samples,
             const StateFilter& states,
             const history_type::instance_info& instance,
-            bool single_instance,
-            bool loop_for_data)
+            bool single_instance = false)
         : type_(reader.type_)
         , loan_manager_(reader.loan_manager_)
         , history_(reader.history_)
@@ -80,7 +79,6 @@ struct ReadTakeCommand
         , instance_(instance)
         , handle_(instance->first)
         , single_instance_(single_instance)
-        , loop_for_data_(loop_for_data)
     {
         assert(0 <= remaining_samples_);
 
@@ -147,7 +145,6 @@ struct ReadTakeCommand
                     // Add sample and info to collections
                     ReturnCode_t previous_return_value = return_value_;
                     bool added = add_sample(*it, remove_change);
-                    history_.change_was_processed_nts(change, added);
                     reader_->end_sample_access_nts(change, wp, added);
 
                     // Check if the payload is dirty
@@ -183,7 +180,7 @@ struct ReadTakeCommand
 
         if (current_slot_ > first_slot)
         {
-            history_.instance_viewed_nts(instance_->second);
+            instance_->second->view_state = ViewStateKind::NOT_NEW_VIEW_STATE;
             ret_val = true;
 
             // complete sample infos
@@ -197,17 +194,7 @@ struct ReadTakeCommand
             }
         }
 
-        // Check if further iteration is required
-        if (single_instance_ && (!loop_for_data_ || (loop_for_data_ && ret_val)))
-        {
-            finished_ = true;
-            history_.check_and_remove_instance(instance_);
-        }
-        else
-        {
-            next_instance();
-        }
-
+        next_instance();
         return ret_val;
     }
 
@@ -271,7 +258,6 @@ private:
     history_type::instance_info instance_;
     InstanceHandle_t handle_;
     bool single_instance_;
-    bool loop_for_data_;
 
     bool finished_ = false;
     ReturnCode_t return_value_ = ReturnCode_t::RETCODE_NO_DATA;
@@ -282,13 +268,11 @@ private:
     {
         while (!is_current_instance_valid())
         {
-            if ((single_instance_ && !loop_for_data_) || !next_instance())
+            if (!next_instance())
             {
-                finished_ = true;
                 return false;
             }
         }
-
         return true;
     }
 
@@ -303,6 +287,11 @@ private:
     bool next_instance()
     {
         history_.check_and_remove_instance(instance_);
+        if (single_instance_)
+        {
+            finished_ = true;
+            return false;
+        }
 
         auto result = history_.next_available_instance_nts(handle_, instance_);
         if (!result.first)
@@ -407,7 +396,7 @@ private:
 
         if (!is_valid)
         {
-            EPROSIMA_LOG_WARNING(RTPS_READER,
+            logWarning(RTPS_READER,
                     "Change " << change->sequenceNumber << " from " << change->writerGUID << " is overidden");
             return false;
         }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/network/NetworkFactory.h>
+#include <fastdds/rtps/network/NetworkFactory.h>
 
 #include <limits>
 #include <utility>
@@ -61,7 +61,7 @@ NetworkFactory::NetworkFactory(
         }
         else
         {
-            EPROSIMA_LOG_WARNING(RTPS_NETWORK, "Unrecognized value '" << *enforce_metatraffic << "'" <<
+            logWarning(RTPS_NETWORK, "Unrecognized value '" << *enforce_metatraffic << "'" <<
                     " for 'fastdds.shm.enforce_metatraffic'. Using default value: 'none'");
         }
     }
@@ -371,27 +371,30 @@ bool NetworkFactory::configureInitialPeerLocator(
 }
 
 bool NetworkFactory::getDefaultUnicastLocators(
+        uint32_t domain_id,
         LocatorList_t& locators,
-        uint32_t port) const
+        const RTPSParticipantAttributes& m_att) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
     {
-        result |= transport->getDefaultUnicastLocators(locators, port);
+        result |= transport->getDefaultUnicastLocators(locators, calculate_well_known_port(domain_id, m_att, false));
     }
     return result;
 }
 
 bool NetworkFactory::fill_default_locator_port(
+        uint32_t domain_id,
         Locator_t& locator,
-        uint32_t port) const
+        const RTPSParticipantAttributes& m_att,
+        bool is_multicast) const
 {
     bool result = false;
     for (auto& transport : mRegisteredTransports)
     {
         if (transport->IsLocatorSupported(locator))
         {
-            result |= transport->fillUnicastLocator(locator, port);
+            result |= transport->fillUnicastLocator(locator, calculate_well_known_port(domain_id, m_att, is_multicast));
         }
     }
     return result;
@@ -419,7 +422,7 @@ uint16_t NetworkFactory::calculate_well_known_port(
 
     if (port > 65535)
     {
-        EPROSIMA_LOG_ERROR(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
+        logError(RTPS, "Calculated port number is too high. Probably the domainId is over 232, there are "
                 << "too much participants created or portBase is too high.");
         std::cout << "Calculated port number is too high. Probably the domainId is over 232, there are "
                   << "too much participants created or portBase is too high." << std::endl;

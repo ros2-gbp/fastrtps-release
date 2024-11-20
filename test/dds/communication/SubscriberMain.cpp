@@ -26,14 +26,13 @@ using namespace eprosima::fastdds::dds;
  * --notexit
  * --fixed_type
  * --zero_copy
- * --succeed_on_timeout
  * --seed <int>
  * --samples <int>
  * --magic <str>
- * --timeout <int>
  * --xmlfile <path>
  * --publishers <int>
- * --rescan <int>
+ * --succeed_on_timeout
+ * --timeout <int>
  */
 
 int main(
@@ -49,7 +48,6 @@ int main(
     uint32_t samples = 4;
     uint32_t publishers = 1;
     uint32_t timeout = 86400000; // 24 h in ms
-    uint32_t rescan_interval_seconds = 0;
     char* xml_file = nullptr;
     std::string magic;
 
@@ -131,16 +129,6 @@ int main(
 
             publishers = strtol(argv[arg_count], nullptr, 10);
         }
-        else if (strcmp(argv[arg_count], "--rescan") == 0)
-        {
-            if (++arg_count >= argc)
-            {
-                std::cout << "--rescan expects a parameter" << std::endl;
-                return -1;
-            }
-
-            rescan_interval_seconds = strtol(argv[arg_count], nullptr, 10);
-        }
         else
         {
             std::cout << "Wrong argument " << argv[arg_count] << std::endl;
@@ -159,7 +147,7 @@ int main(
 
     if (subscriber.init(seed, magic))
     {
-        return subscriber.run(notexit, rescan_interval_seconds, timeout) ? 0 : -1;
+        return subscriber.run(notexit, timeout) ? 0 : -1;
     }
 
     return -1;

@@ -421,61 +421,6 @@ TEST_P(TransportTCP, TCP_TLS)
     ASSERT_TRUE(replier.is_matched());
 }
 
-// Test successful removal of client after previously matched server is removed
-TEST_P(TransportTCP, TCP_TLS_client_disconnect_after_server)
-{
-    TCPReqRepHelloWorldRequester* requester = new TCPReqRepHelloWorldRequester();
-    TCPReqRepHelloWorldReplier* replier = new TCPReqRepHelloWorldReplier();
-
-    requester->init(0, 0, global_port, 5, certs_path);
-
-    ASSERT_TRUE(requester->isInitialized());
-
-    replier->init(4, 0, global_port, 5, certs_path);
-
-    ASSERT_TRUE(replier->isInitialized());
-
-    // Wait for discovery.
-    requester->wait_discovery();
-    replier->wait_discovery();
-
-    ASSERT_TRUE(requester->is_matched());
-    ASSERT_TRUE(replier->is_matched());
-
-    // Completely remove server prior to deleting client
-    delete replier;
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    delete requester;
-}
-
-// Test successful removal of server after previously matched client is removed
-// Issue -> https://eprosima.easyredmine.com/issues/16288
-TEST_P(TransportTCP, TCP_TLS_server_disconnect_after_client)
-{
-    TCPReqRepHelloWorldReplier* replier = new TCPReqRepHelloWorldReplier();
-    TCPReqRepHelloWorldRequester* requester = new TCPReqRepHelloWorldRequester();
-
-    requester->init(0, 0, global_port, 5, certs_path);
-
-    ASSERT_TRUE(requester->isInitialized());
-
-    replier->init(4, 0, global_port, 5, certs_path);
-
-    ASSERT_TRUE(replier->isInitialized());
-
-    // Wait for discovery.
-    requester->wait_discovery();
-    replier->wait_discovery();
-
-    ASSERT_TRUE(requester->is_matched());
-    ASSERT_TRUE(replier->is_matched());
-
-    // Completely remove client prior to deleting server
-    delete requester;
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    delete replier;
-}
-
 void tls_init()
 {
     certs_path = std::getenv("CERTS_PATH");
@@ -555,15 +500,6 @@ TEST_P(TransportTCP, TCPv4_copy)
     // Copy assignment
     TCPv4TransportDescriptor tcpv4_transport_copy = tcpv4_transport;
     EXPECT_EQ(tcpv4_transport_copy, tcpv4_transport);
-}
-
-// Test get_WAN_address member function
-TEST_P(TransportTCP, TCPv4_get_WAN_address)
-{
-    // TCPv4TransportDescriptor
-    TCPv4TransportDescriptor tcpv4_transport;
-    tcpv4_transport.set_WAN_address("80.80.99.45");
-    ASSERT_EQ(tcpv4_transport.get_WAN_address(), "80.80.99.45");
 }
 
 // Test == operator for TCPv6
@@ -671,7 +607,7 @@ TEST(TransportTCP, Client_reconnection)
     delete requester;
 }
 
-// Test copy constructor and copy assignment for TCPv4
+// Test zero listening port for TCPv4
 TEST_P(TransportTCP, TCPv4_autofill_port)
 {
     PubSubReader<HelloWorldPubSubType> p1(TEST_TOPIC_NAME);
@@ -701,7 +637,7 @@ TEST_P(TransportTCP, TCPv4_autofill_port)
     EXPECT_TRUE(IPLocator::getPhysicalPort(p2_locators.begin()[0]) == port);
 }
 
-// Test copy constructor and copy assignment for TCPv6
+// Test zero listening port for TCPv6
 TEST_P(TransportTCP, TCPv6_autofill_port)
 {
     PubSubReader<HelloWorldPubSubType> p1(TEST_TOPIC_NAME);
@@ -838,6 +774,111 @@ TEST_P(TransportTCP, large_data_topology)
     // Destroy participants
     readers.clear();
     writers.clear();
+}
+
+// Test TCP transport on large message with best effort reliability
+TEST_P(TransportTCP, large_message_send_receive)
+{
+    // Prepare data to be sent before participants discovery so it is ready to be sent as soon as possible.
+    std::list<Data1mb> data;
+    data = default_data300kb_data_generator(1);
+
+    uint16_t writer_port = global_port;
+
+    /* Test configuration */
+    PubSubReader<Data1mbPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<Data1mbPubSubType> writer(TEST_TOPIC_NAME);
+
+    std::shared_ptr<TCPTransportDescriptor> writer_transport;
+    std::shared_ptr<TCPTransportDescriptor> reader_transport;
+    Locator_t initialPeerLocator;
+    if (use_ipv6)
+    {
+        reader_transport = std::make_shared<eprosima::fastdds::rtps::TCPv6TransportDescriptor>();
+        writer_transport = std::make_shared<eprosima::fastdds::rtps::TCPv6TransportDescriptor>();
+        initialPeerLocator.kind = LOCATOR_KIND_TCPv6;
+        IPLocator::setIPv6(initialPeerLocator, "::1");
+    }
+    else
+    {
+        reader_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+        writer_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+        initialPeerLocator.kind = LOCATOR_KIND_TCPv4;
+        IPLocator::setIPv4(initialPeerLocator, 127, 0, 0, 1);
+    }
+    writer_transport->tcp_negotiation_timeout = 100;
+    reader_transport->tcp_negotiation_timeout = 100;
+
+    // Add listener port to server
+    writer_transport->add_listener_port(writer_port);
+
+    // Add initial peer to client
+    initialPeerLocator.port = writer_port;
+    LocatorList_t initial_peer_list;
+    initial_peer_list.push_back(initialPeerLocator);
+
+    // Setup participants
+    writer.disable_builtin_transport()
+            .add_user_transport_to_pparams(writer_transport);
+
+    reader.disable_builtin_transport()
+            .initial_peers(initial_peer_list)
+            .add_user_transport_to_pparams(reader_transport);
+
+    // Init participants
+    writer.init();
+    reader.init();
+    ASSERT_TRUE(writer.isInitialized());
+    ASSERT_TRUE(reader.isInitialized());
+
+    // Wait for discovery
+    writer.wait_discovery(1, std::chrono::seconds(0));
+    reader.wait_discovery(std::chrono::seconds(0), 1);
+
+    // Send and receive data
+    reader.startReception(data);
+
+    writer.send(data);
+    EXPECT_TRUE(data.empty());
+
+    reader.block_for_all();
+}
+
+// Test TCP transport on large message with best effort reliability and LARGE_DATA mode
+TEST_P(TransportTCP, large_message_large_data_send_receive)
+{
+    // Prepare data to be sent. before participants discovery so it is ready to be sent as soon as possible.
+    // The writer might try to send the data before the reader has negotiated the connection.
+    // If the negotiation timeout is too short, the writer will fail to send the data and the reader will not receive it.
+    // LARGE_DATA participant discovery is tipically faster than tcp negotiation.
+    std::list<Data1mb> data;
+    data = default_data300kb_data_generator(1);
+
+    /* Test configuration */
+    PubSubReader<Data1mbPubSubType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<Data1mbPubSubType> writer(TEST_TOPIC_NAME);
+
+    uint32_t tcp_negotiation_timeout = 100;
+    writer.setup_large_data_tcp(use_ipv6, 0, tcp_negotiation_timeout);
+    reader.setup_large_data_tcp(use_ipv6, 0, tcp_negotiation_timeout);
+
+    // Init participants
+    writer.init();
+    reader.init();
+    ASSERT_TRUE(writer.isInitialized());
+    ASSERT_TRUE(reader.isInitialized());
+
+    // Wait for discovery
+    writer.wait_discovery(1, std::chrono::seconds(0));
+    reader.wait_discovery(std::chrono::seconds(0), 1);
+
+    // Send and receive data
+    reader.startReception(data);
+
+    writer.send(data);
+    EXPECT_TRUE(data.empty());
+
+    reader.block_for_all();
 }
 
 // Test TCP send resource cleaning. This test matches a server with a client and then releases the
@@ -992,7 +1033,6 @@ TEST_P(TransportTCP, send_resource_cleanup)
 // the send resource should not be removed.
 TEST_P(TransportTCP, send_resource_cleanup_initial_peer)
 {
-
 #if defined(__APPLE__)
     if (use_ipv6)
     {
@@ -1148,109 +1188,64 @@ TEST_P(TransportTCP, send_resource_cleanup_initial_peer)
     client->wait_discovery(2, std::chrono::seconds(0));
 }
 
-// Test TCP transport on large message with best effort reliability
-TEST_P(TransportTCP, large_message_send_receive)
+// Test CreateInitialConnection for TCP
+TEST_P(TransportTCP, TCP_initial_peers_connection)
 {
-    // Prepare data to be sent before participants discovery so it is ready to be sent as soon as possible.
-    std::list<Data1mb> data;
-    data = default_data300kb_data_generator(1);
+    PubSubWriter<HelloWorldPubSubType> p1(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> p2(TEST_TOPIC_NAME);
+    PubSubReader<HelloWorldPubSubType> p3(TEST_TOPIC_NAME);
 
-    uint16_t writer_port = global_port;
-
-    /* Test configuration */
-    PubSubReader<Data1mbPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<Data1mbPubSubType> writer(TEST_TOPIC_NAME);
-
-    std::shared_ptr<TCPTransportDescriptor> writer_transport;
-    std::shared_ptr<TCPTransportDescriptor> reader_transport;
-    Locator_t initialPeerLocator;
-    if (use_ipv6)
-    {
-        reader_transport = std::make_shared<eprosima::fastdds::rtps::TCPv6TransportDescriptor>();
-        writer_transport = std::make_shared<eprosima::fastdds::rtps::TCPv6TransportDescriptor>();
-        initialPeerLocator.kind = LOCATOR_KIND_TCPv6;
-        IPLocator::setIPv6(initialPeerLocator, "::1");
-    }
-    else
-    {
-        reader_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
-        writer_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
-        initialPeerLocator.kind = LOCATOR_KIND_TCPv4;
-        IPLocator::setIPv4(initialPeerLocator, 127, 0, 0, 1);
-    }
-    writer_transport->tcp_negotiation_timeout = 100;
-    reader_transport->tcp_negotiation_timeout = 100;
-
-    // Add listener port to server
-    writer_transport->add_listener_port(writer_port);
+    // Add TCP Transport with listening port
+    auto p1_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    p1_transport->add_listener_port(global_port);
+    auto p2_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    p2_transport->add_listener_port(global_port + 1);
+    auto p3_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+    p3_transport->add_listener_port(global_port - 1);
 
     // Add initial peer to client
-    initialPeerLocator.port = writer_port;
+    Locator_t initialPeerLocator;
+    initialPeerLocator.kind = LOCATOR_KIND_TCPv4;
+    IPLocator::setIPv4(initialPeerLocator, 127, 0, 0, 1);
+    initialPeerLocator.port = global_port;
     LocatorList_t initial_peer_list;
     initial_peer_list.push_back(initialPeerLocator);
 
     // Setup participants
-    writer.disable_builtin_transport()
-            .add_user_transport_to_pparams(writer_transport);
+    p1.disable_builtin_transport()
+            .add_user_transport_to_pparams(p1_transport);
 
-    reader.disable_builtin_transport()
+    p2.disable_builtin_transport()
             .initial_peers(initial_peer_list)
-            .add_user_transport_to_pparams(reader_transport);
+            .add_user_transport_to_pparams(p2_transport);
+
+    p3.disable_builtin_transport()
+            .initial_peers(initial_peer_list)
+            .add_user_transport_to_pparams(p3_transport);
 
     // Init participants
-    writer.init();
-    reader.init();
-    ASSERT_TRUE(writer.isInitialized());
-    ASSERT_TRUE(reader.isInitialized());
+    p1.init();
+    p2.init();
+    p3.init();
+    ASSERT_TRUE(p1.isInitialized());
+    ASSERT_TRUE(p2.isInitialized());
+    ASSERT_TRUE(p3.isInitialized());
 
     // Wait for discovery
-    writer.wait_discovery(1, std::chrono::seconds(0));
-    reader.wait_discovery(std::chrono::seconds(0), 1);
+    p1.wait_discovery(2, std::chrono::seconds(0));
+    p2.wait_discovery(std::chrono::seconds(0), 1);
+    p3.wait_discovery(std::chrono::seconds(0), 1);
 
     // Send and receive data
-    reader.startReception(data);
+    auto data = default_helloworld_data_generator();
+    p2.startReception(data);
+    p3.startReception(data);
 
-    writer.send(data);
+    p1.send(data);
     EXPECT_TRUE(data.empty());
 
-    reader.block_for_all();
-}
-
-// Test TCP transport on large message with best effort reliability and LARGE_DATA mode
-TEST_P(TransportTCP, large_message_large_data_send_receive)
-{
-    // Prepare data to be sent. before participants discovery so it is ready to be sent as soon as possible.
-    // The writer might try to send the data before the reader has negotiated the connection.
-    // If the negotiation timeout is too short, the writer will fail to send the data and the reader will not receive it.
-    // LARGE_DATA participant discovery is tipically faster than tcp negotiation.
-    std::list<Data1mb> data;
-    data = default_data300kb_data_generator(1);
-
-    /* Test configuration */
-    PubSubReader<Data1mbPubSubType> reader(TEST_TOPIC_NAME);
-    PubSubWriter<Data1mbPubSubType> writer(TEST_TOPIC_NAME);
-
-    uint32_t tcp_negotiation_timeout = 100;
-    writer.setup_large_data_tcp(use_ipv6, 0, tcp_negotiation_timeout);
-    reader.setup_large_data_tcp(use_ipv6, 0, tcp_negotiation_timeout);
-
-    // Init participants
-    writer.init();
-    reader.init();
-    ASSERT_TRUE(writer.isInitialized());
-    ASSERT_TRUE(reader.isInitialized());
-
-    // Wait for discovery
-    writer.wait_discovery(1, std::chrono::seconds(0));
-    reader.wait_discovery(std::chrono::seconds(0), 1);
-
-    // Send and receive data
-    reader.startReception(data);
-
-    writer.send(data);
-    EXPECT_TRUE(data.empty());
-
-    reader.block_for_all();
+    p2.block_for_all();
+    p3.block_for_all();
 }
 
 #ifdef INSTANTIATE_TEST_SUITE_P

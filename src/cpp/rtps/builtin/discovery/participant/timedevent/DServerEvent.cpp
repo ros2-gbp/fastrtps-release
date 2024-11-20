@@ -86,8 +86,7 @@ bool DServerPingEvent::server_ping_event()
     {
         // Not all servers have yet received our DATA(p) thus resend
         pdp_->ping_remote_servers();
-        EPROSIMA_LOG_INFO(SERVER_PING_THREAD,
-                "Server " << pdp_->getRTPSParticipant()->getGuid() << " PDP announcement");
+        logInfo(SERVER_PING_THREAD, "Server " << pdp_->getRTPSParticipant()->getGuid() << " PDP announcement");
 
         // restart
         return true;
