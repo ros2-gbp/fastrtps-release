@@ -50,6 +50,8 @@
 #include <fastdds/rtps/writer/StatelessPersistentWriter.h>
 #include <fastdds/rtps/writer/StatefulPersistentWriter.h>
 
+#include <fastdds/rtps/common/LocatorList.hpp>
+
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/Semaphore.h>
 #include <fastrtps/xmlparser/XMLProfileManager.h>
@@ -200,18 +202,83 @@ RTPSParticipantImpl::RTPSParticipantImpl(
     switch (m_att.builtin.discovery_config.discoveryProtocol)
     {
         case DiscoveryProtocol::BACKUP:
-        case DiscoveryProtocol::CLIENT:
         case DiscoveryProtocol::SERVER:
+            // Verify if listening ports are provided
+            for (auto& transportDescriptor : m_att.userTransports)
+            {
+                TCPTransportDescriptor* pT = dynamic_cast<TCPTransportDescriptor*>(transportDescriptor.get());
+                if (pT)
+                {
+                    if (pT->listening_ports.empty())
+                    {
+                        logError(RTPS_PARTICIPANT,
+                                "Participant " << m_att.getName() << " with GUID " << m_guid <<
+                                " tries to create a TCP server for discovery server without providing a proper listening port.");
+                        break;
+                    }
+                    if (!m_att.builtin.metatrafficUnicastLocatorList.empty())
+                    {
+                        std::for_each(m_att.builtin.metatrafficUnicastLocatorList.begin(),
+                                m_att.builtin.metatrafficUnicastLocatorList.end(), [&](Locator_t& locator)
+                                {
+                                    // TCP DS default logical port is the same as the physical one
+                                    if (locator.kind == LOCATOR_KIND_TCPv4 || locator.kind == LOCATOR_KIND_TCPv6)
+                                    {
+                                        if (IPLocator::getLogicalPort(locator) == 0)
+                                        {
+                                            IPLocator::setLogicalPort(locator, IPLocator::getPhysicalPort(locator));
+                                        }
+                                    }
+                                });
+                    }
+                    for (fastdds::rtps::RemoteServerAttributes& it : m_att.builtin.discovery_config.m_DiscoveryServers)
+                    {
+                        std::for_each(it.metatrafficUnicastLocatorList.begin(),
+                                it.metatrafficUnicastLocatorList.end(), [&](Locator_t& locator)
+                                {
+                                    // TCP DS default logical port is the same as the physical one
+                                    if (locator.kind == LOCATOR_KIND_TCPv4 || locator.kind == LOCATOR_KIND_TCPv6)
+                                    {
+                                        if (IPLocator::getLogicalPort(locator) == 0)
+                                        {
+                                            IPLocator::setLogicalPort(locator, IPLocator::getPhysicalPort(locator));
+                                        }
+                                    }
+                                });
+                    }
+                }
+            }
+            break;
+        case DiscoveryProtocol::CLIENT:
         case DiscoveryProtocol::SUPER_CLIENT:
             // Verify if listening ports are provided
             for (auto& transportDescriptor : m_att.userTransports)
             {
                 TCPTransportDescriptor* pT = dynamic_cast<TCPTransportDescriptor*>(transportDescriptor.get());
-                if (pT && pT->listening_ports.empty())
+                if (pT)
                 {
-                    logInfo(RTPS_PARTICIPANT,
-                            "Participant " << m_att.getName() << " with GUID " << m_guid <<
-                            " tries to use discovery server over TCP without providing a proper listening port.");
+                    if (pT->listening_ports.empty())
+                    {
+                        logInfo(RTPS_PARTICIPANT,
+                                "Participant " << m_att.getName() << " with GUID " << m_guid <<
+                                " tries to create a TCP client for discovery server without providing a proper listening port." <<
+                                " No TCP participants will be able to connect to this participant, but it will be able make connections.");
+                    }
+                    for (fastdds::rtps::RemoteServerAttributes& it : m_att.builtin.discovery_config.m_DiscoveryServers)
+                    {
+                        std::for_each(it.metatrafficUnicastLocatorList.begin(),
+                                it.metatrafficUnicastLocatorList.end(), [&](Locator_t& locator)
+                                {
+                                    // TCP DS default logical port is the same as the physical one
+                                    if (locator.kind == LOCATOR_KIND_TCPv4 || locator.kind == LOCATOR_KIND_TCPv6)
+                                    {
+                                        if (IPLocator::getLogicalPort(locator) == 0)
+                                        {
+                                            IPLocator::setLogicalPort(locator, IPLocator::getPhysicalPort(locator));
+                                        }
+                                    }
+                                });
+                    }
                 }
             }
         default:
@@ -371,6 +438,22 @@ RTPSParticipantImpl::RTPSParticipantImpl(
         logWarning(RTPS_PARTICIPANT,
                 "Metatraffic multicast port " << meta_multicast_port_for_check << " cannot be opened."
                 " It may is opened by another application. Discovery may fail.");
+    }
+
+    {
+        const std::string* max_size_property =
+                PropertyPolicyHelper::find_property(m_att.properties, "fastdds.max_message_size");
+        if (max_size_property != nullptr)
+        {
+            try
+            {
+                max_output_message_size_ = std::stoul(*max_size_property);
+            }
+            catch (const std::exception& e)
+            {
+                logError(RTPS_WRITER, "Error parsing max_message_size property: " << e.what());
+            }
+        }
     }
 
     bool allow_growing_buffers = m_att.allocation.send_buffers.dynamic;
@@ -627,7 +710,7 @@ bool RTPSParticipantImpl::create_writer(
 
     GUID_t guid(m_guid.guidPrefix, entId);
     fastdds::rtps::FlowController* flow_controller = nullptr;
-    const char* flow_controller_name = param.flow_controller_name;
+    std::string flow_controller_name = param.flow_controller_name;
 
     // Support of old flow controller style.
     if (param.throughputController.bytesPerPeriod != UINT32_MAX && param.throughputController.periodMillisecs != 0)
@@ -1268,8 +1351,37 @@ void RTPSParticipantImpl::update_attributes(
 
     auto pdp = mp_builtinProtocols->mp_PDP;
 
+    // Check if discovery servers need to be updated
+    eprosima::fastdds::rtps::RemoteServerList_t converted_discovery_servers =
+            patt.builtin.discovery_config.m_DiscoveryServers;
+    if (patt.builtin.discovery_config.m_DiscoveryServers != m_att.builtin.discovery_config.m_DiscoveryServers)
+    {
+        for (auto& transportDescriptor : m_att.userTransports)
+        {
+            TCPTransportDescriptor* pT = dynamic_cast<TCPTransportDescriptor*>(transportDescriptor.get());
+            if (pT)
+            {
+                for (fastdds::rtps::RemoteServerAttributes& it : converted_discovery_servers)
+                {
+                    std::for_each(it.metatrafficUnicastLocatorList.begin(),
+                            it.metatrafficUnicastLocatorList.end(), [&](Locator_t& locator)
+                            {
+                                // TCP DS default logical port is the same as the physical one
+                                if (locator.kind == LOCATOR_KIND_TCPv4 || locator.kind == LOCATOR_KIND_TCPv6)
+                                {
+                                    if (IPLocator::getLogicalPort(locator) == 0)
+                                    {
+                                        IPLocator::setLogicalPort(locator, IPLocator::getPhysicalPort(locator));
+                                    }
+                                }
+                            });
+                }
+            }
+        }
+    }
+
     // Check if there are changes
-    if (patt.builtin.discovery_config.m_DiscoveryServers != m_att.builtin.discovery_config.m_DiscoveryServers
+    if (converted_discovery_servers != m_att.builtin.discovery_config.m_DiscoveryServers
             || patt.userData != m_att.userData
             || update_pdp)
     {
@@ -1291,7 +1403,7 @@ void RTPSParticipantImpl::update_attributes(
         for (auto existing_server : m_att.builtin.discovery_config.m_DiscoveryServers)
         {
             bool contained = false;
-            for (auto incoming_server : patt.builtin.discovery_config.m_DiscoveryServers)
+            for (auto incoming_server : converted_discovery_servers)
             {
                 if (existing_server.guidPrefix == incoming_server.guidPrefix)
                 {
@@ -1364,8 +1476,8 @@ void RTPSParticipantImpl::update_attributes(
                     m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::SERVER ||
                     m_att.builtin.discovery_config.discoveryProtocol == DiscoveryProtocol::BACKUP)
             {
-                // Add incoming servers iff we don't know about them already or the listening locator has been modified
-                for (auto incoming_server : patt.builtin.discovery_config.m_DiscoveryServers)
+                // Add incoming servers if we don't know about them already or the listening locator has been modified
+                for (auto incoming_server : converted_discovery_servers)
                 {
                     eprosima::fastdds::rtps::RemoteServerList_t::iterator server_it;
                     for (server_it = m_att.builtin.discovery_config.m_DiscoveryServers.begin();
@@ -2028,8 +2140,11 @@ uint32_t RTPSParticipantImpl::getMaxMessageSize() const
 #endif // if HAVE_SECURITY
 
     return (std::min)(
-        m_network_Factory.get_max_message_size_between_transports(),
-        max_receiver_buffer_size);
+                {
+                    max_output_message_size_,
+                    m_network_Factory.get_max_message_size_between_transports(),
+                    max_receiver_buffer_size
+                });
 }
 
 uint32_t RTPSParticipantImpl::getMaxDataSize()
@@ -2162,6 +2277,38 @@ WLP* RTPSParticipantImpl::wlp()
 fastdds::dds::builtin::TypeLookupManager* RTPSParticipantImpl::typelookup_manager() const
 {
     return mp_builtinProtocols->tlm_;
+}
+
+bool RTPSParticipantImpl::has_tcp_transports()
+{
+    const RTPSParticipantAttributes& pattr = getRTPSParticipantAttributes();
+    bool has_tcp_transports = false;
+    for (auto& transportDescriptor : pattr.userTransports)
+    {
+        TCPTransportDescriptor* pT = dynamic_cast<TCPTransportDescriptor*>(transportDescriptor.get());
+        if (pT)
+        {
+            has_tcp_transports = true;
+            break;
+        }
+    }
+
+    return has_tcp_transports;
+}
+
+void RTPSParticipantImpl::create_tcp_connections(
+        const LocatorList_t& locators)
+{
+    for (const Locator_t& loc : locators)
+    {
+        if (loc.kind == LOCATOR_KIND_TCPv4 || loc.kind == LOCATOR_KIND_TCPv6)
+        {
+            // Set logical port to 0 and call createSenderResources to allow opening a TCP CONNECT channel in the transport
+            Locator_t loc_with_logical_zero = loc;
+            IPLocator::setLogicalPort(loc_with_logical_zero, 0);
+            createSenderResources(loc_with_logical_zero);
+        }
+    }
 }
 
 IPersistenceService* RTPSParticipantImpl::get_persistence_service(
@@ -2365,9 +2512,17 @@ bool RTPSParticipantImpl::did_mutation_took_place_on_meta(
                 case LOCATOR_KIND_TCPv4:
                     set_wan_address(ret);
                     IPLocator::setPhysicalPort(ret, Tcp4ListeningPort());
+                    if (IPLocator::getLogicalPort(ret) == 0)
+                    {
+                        IPLocator::setLogicalPort(ret, IPLocator::getPhysicalPort(ret));
+                    }
                     break;
                 case LOCATOR_KIND_TCPv6:
                     IPLocator::setPhysicalPort(ret, Tcp6ListeningPort());
+                    if (IPLocator::getLogicalPort(ret) == 0)
+                    {
+                        IPLocator::setLogicalPort(ret, IPLocator::getPhysicalPort(ret));
+                    }
                     break;
             }
             return ret;
@@ -2560,6 +2715,19 @@ bool RTPSParticipantImpl::unregister_in_reader(
 }
 
 #endif // FASTDDS_STATISTICS
+
+void RTPSParticipantImpl::update_removed_participant(
+        const LocatorList_t& remote_participant_locators)
+{
+    if (!remote_participant_locators.empty())
+    {
+        std::lock_guard<std::timed_mutex> guard(m_send_resources_mutex_);
+        m_network_Factory.remove_participant_associated_send_resources(
+            send_resource_list_,
+            remote_participant_locators,
+            m_att.builtin.initialPeersList);
+    }
+}
 
 } /* namespace rtps */
 } /* namespace fastrtps */

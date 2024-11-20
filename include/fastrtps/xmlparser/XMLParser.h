@@ -27,6 +27,7 @@
 #include <fastrtps/attributes/LibrarySettingsAttributes.h>
 
 #include <map>
+#include <mutex>
 #include <string>
 
 namespace tinyxml2 {
@@ -91,6 +92,8 @@ class XMLParser
 
 public:
 
+    using FlowControllerDescriptorList = std::vector<std::shared_ptr<fastdds::rtps::FlowControllerDescriptor>>;
+
     /**
      * Load the default XML file.
      * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case.
@@ -107,6 +110,18 @@ public:
     RTPS_DllAPI static XMLP_ret loadXML(
             const std::string& filename,
             up_base_node_t& root);
+
+    /**
+     * Load a XML file.
+     * @param filename Name for the file to be loaded.
+     * @param root Root node.
+     * @param is_default Is the default XML file.
+     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case.
+     */
+    static XMLP_ret loadXML(
+            const std::string& filename,
+            up_base_node_t& root,
+            bool is_default);
 
     /**
      * Load a XML data from buffer.
@@ -147,6 +162,14 @@ public:
      */
     RTPS_DllAPI static XMLP_ret loadXMLDynamicTypes(
             tinyxml2::XMLElement& types);
+
+
+    /**
+     * Clears the private static collections.
+     *
+     * @return XMLP_ret::XML_OK on success, XMLP_ret::XML_ERROR in other case.
+     */
+    RTPS_DllAPI static XMLP_ret clear();
 
 protected:
 
@@ -484,6 +507,11 @@ protected:
             rtps::ThroughputControllerDescriptor& throughputController,
             uint8_t ident);
 
+    RTPS_DllAPI static XMLP_ret getXMLFlowControllerDescriptorList(
+            tinyxml2::XMLElement* elem,
+            FlowControllerDescriptorList& flow_controller_descriptor_list,
+            uint8_t ident);
+
     RTPS_DllAPI static XMLP_ret getXMLPortParameters(
             tinyxml2::XMLElement* elem,
             rtps::PortParameters& port,
@@ -603,6 +631,11 @@ protected:
             tinyxml2::XMLElement* elem,
             eprosima::fastdds::rtps::BuiltinTransports* bt,
             uint8_t ident);
+
+private:
+
+    static std::mutex collections_mtx_;
+    static std::set<std::string> flow_controller_descriptor_names_;
 };
 
 } // namespace xmlparser
