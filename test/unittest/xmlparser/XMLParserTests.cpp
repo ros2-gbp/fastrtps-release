@@ -66,6 +66,7 @@ TEST_F(XMLParserTests, regressions)
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/19851_profile_bin.xml", root));
     EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/simple_participant_profiles_nok.xml", root));
     EXPECT_EQ(XMLP_ret::XML_OK, XMLParser::loadXML("regressions/simple_participant_profiles_ok.xml", root));
+    EXPECT_EQ(XMLP_ret::XML_ERROR, XMLParser::loadXML("regressions/20732_profile_bin.xml", root));
 }
 
 TEST_F(XMLParserTests, NoFile)
@@ -422,6 +423,8 @@ TEST_F(XMLParserTests, Data)
     EXPECT_EQ(rtps_atts.participantID, 9898);
     EXPECT_EQ(rtps_atts.throughputController.bytesPerPeriod, 2048u);
     EXPECT_EQ(rtps_atts.throughputController.periodMillisecs, 45u);
+    EXPECT_EQ(rtps_atts.flow_controllers.at(0)->max_bytes_per_period, 2048);
+    EXPECT_EQ(rtps_atts.flow_controllers.at(0)->period_ms, 45u);
     EXPECT_EQ(rtps_atts.useBuiltinTransports, true);
     EXPECT_EQ(std::string(rtps_atts.getName()), "test_name");
     EXPECT_EQ(rtps_atts.userData, std::vector<octet>({0x56, 0x30, 0x0, 0xce}));
@@ -516,6 +519,8 @@ TEST_F(XMLParserTests, DataBuffer)
     EXPECT_EQ(rtps_atts.participantID, 9898);
     EXPECT_EQ(rtps_atts.throughputController.bytesPerPeriod, 2048u);
     EXPECT_EQ(rtps_atts.throughputController.periodMillisecs, 45u);
+    EXPECT_EQ(rtps_atts.flow_controllers.at(0)->max_bytes_per_period, 2048);
+    EXPECT_EQ(rtps_atts.flow_controllers.at(0)->period_ms, 45u);
     EXPECT_EQ(rtps_atts.useBuiltinTransports, true);
     EXPECT_EQ(std::string(rtps_atts.getName()), "test_name");
     EXPECT_EQ(rtps_atts.userData, std::vector<octet>({0x56, 0x30, 0x0, 0xce}));
@@ -1385,6 +1390,7 @@ TEST_F(XMLParserTests, fillDataNodeParticipantNegativeClauses)
             "<port><bad_element></bad_element></port>",
             "<participantID><bad_element></bad_element></participantID>",
             "<throughputController><bad_element></bad_element></throughputController>",
+            "<flow_controller_descriptor_list><bad_element></bad_element></flow_controller_descriptor_list>",
             "<userTransports><bad_element></bad_element></userTransports>",
             "<useBuiltinTransports><bad_element></bad_element></useBuiltinTransports>",
             "<propertiesPolicy><bad_element></bad_element></propertiesPolicy>",
