@@ -94,7 +94,6 @@ SecurityManager::SecurityManager(
     participant->getRTPSParticipantAttributes().allocation.data_limits})
 {
     assert(participant != nullptr);
-    static OpenSSLInit openssl_init;
 }
 
 SecurityManager::~SecurityManager()
@@ -935,6 +934,10 @@ bool SecurityManager::on_process_handshake(
                 }
                 else
                 {
+                    // Return the handshake handle
+                    authentication_plugin_->return_handshake_handle(remote_participant_info->handshake_handle_,
+                            exception);
+                    remote_participant_info->handshake_handle_ = nullptr;
                     EPROSIMA_LOG_ERROR(SECURITY, "WriterHistory cannot add the CacheChange_t");
                 }
             }
@@ -946,6 +949,9 @@ bool SecurityManager::on_process_handshake(
         }
         else
         {
+            // Return the handshake handle
+            authentication_plugin_->return_handshake_handle(remote_participant_info->handshake_handle_, exception);
+            remote_participant_info->handshake_handle_ = nullptr;
             EPROSIMA_LOG_ERROR(SECURITY, "WriterHistory cannot retrieve a CacheChange_t");
         }
     }
@@ -1063,11 +1069,13 @@ void SecurityManager::delete_participant_stateless_message_entities()
 void SecurityManager::create_participant_stateless_message_pool()
 {
     participant_stateless_message_writer_hattr_ =
-    { PREALLOCATED_WITH_REALLOC_MEMORY_MODE, participant_->getMaxMessageSize(), 20, 100 };
+    { PREALLOCATED_WITH_REALLOC_MEMORY_MODE, static_cast<uint32_t>(PARTICIPANT_STATELESS_MESSAGE_PAYLOAD_DEFAULT_SIZE),
+      20, 100};
     participant_stateless_message_reader_hattr_ =
-    { PREALLOCATED_WITH_REALLOC_MEMORY_MODE, participant_->getMaxMessageSize(), 10, 5000 };
+    { PREALLOCATED_WITH_REALLOC_MEMORY_MODE, static_cast<uint32_t>(PARTICIPANT_STATELESS_MESSAGE_PAYLOAD_DEFAULT_SIZE),
+      10, 5000};
 
-    BasicPoolConfig cfg{ PREALLOCATED_WITH_REALLOC_MEMORY_MODE, participant_->getMaxMessageSize() };
+    BasicPoolConfig cfg{ PREALLOCATED_WITH_REALLOC_MEMORY_MODE, PARTICIPANT_STATELESS_MESSAGE_PAYLOAD_DEFAULT_SIZE};
     participant_stateless_message_pool_ = TopicPayloadPoolRegistry::get("DCPSParticipantStatelessMessage", cfg);
 
     PoolConfig writer_cfg = PoolConfig::from_history_attributes(participant_stateless_message_writer_hattr_);
@@ -1219,7 +1227,8 @@ void SecurityManager::delete_participant_volatile_message_secure_entities()
 void SecurityManager::create_participant_volatile_message_secure_pool()
 {
     participant_volatile_message_secure_hattr_ =
-    { PREALLOCATED_WITH_REALLOC_MEMORY_MODE, participant_->getMaxMessageSize(), 10, 0 };
+    { PREALLOCATED_WITH_REALLOC_MEMORY_MODE, static_cast<uint32_t>(PARTICIPANT_VOLATILE_MESSAGE_PAYLOAD_DEFAULT_SIZE),
+      10, 0 };
 
     PoolConfig pool_cfg = PoolConfig::from_history_attributes(participant_volatile_message_secure_hattr_);
     participant_volatile_message_secure_pool_ =
@@ -1718,6 +1727,7 @@ void SecurityManager::process_participant_volatile_message_secure(
         const GUID_t remote_participant_key(message.message_identity().source_guid().guidPrefix,
                 c_EntityId_RTPSParticipant);
         std::shared_ptr<ParticipantCryptoHandle> remote_participant_crypto;
+        DiscoveredParticipantInfo::AuthUniquePtr remote_participant_info;
 
         // Search remote participant crypto handle.
         {
@@ -1733,6 +1743,7 @@ void SecurityManager::process_participant_volatile_message_secure(
                 }
 
                 remote_participant_crypto = dp_it->second->get_participant_crypto();
+                remote_participant_info = dp_it->second->get_auth();
             }
             else
             {
@@ -1754,11 +1765,29 @@ void SecurityManager::process_participant_volatile_message_secure(
                 EPROSIMA_LOG_ERROR(SECURITY, "Cannot set remote participant crypto tokens ("
                         << remote_participant_key << ") - (" << exception.what() << ")");
             }
+            else
+            {
+                // Release the change from the participant_stateless_message_writer_pool_
+                // As both participants have already authorized each other
+
+                if (remote_participant_info &&
+                        remote_participant_info->change_sequence_number_ != SequenceNumber_t::unknown())
+                {
+                    participant_stateless_message_writer_history_->remove_change(
+                        remote_participant_info->change_sequence_number_);
+                    remote_participant_info->change_sequence_number_ = SequenceNumber_t::unknown();
+                }
+            }
         }
         else
         {
             std::lock_guard<shared_mutex> _(mutex_);
             remote_participant_pending_messages_.emplace(remote_participant_key, std::move(message.message_data()));
+        }
+
+        if (remote_participant_info)
+        {
+            restore_discovered_participant_info(remote_participant_key, remote_participant_info);
         }
     }
     else if (message.message_class_id().compare(GMCLASSID_SECURITY_READER_CRYPTO_TOKENS) == 0)
@@ -1915,7 +1944,7 @@ void SecurityManager::process_participant_volatile_message_secure(
     }
     else
     {
-        EPROSIMA_LOG_INFO(SECURITY, "Discarted ParticipantGenericMessage with class id " << message.message_class_id());
+        EPROSIMA_LOG_INFO(SECURITY, "Discarded ParticipantGenericMessage with class id " << message.message_class_id());
     }
 }
 
