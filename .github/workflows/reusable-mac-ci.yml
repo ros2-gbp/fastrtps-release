@@ -48,14 +48,6 @@ jobs:
         cmake-build-type:
           - 'RelWithDebInfo'
     steps:
-      - name: Add ci-pending label if PR
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: eProsima/eProsima-CI/external/add_labels@v0
-        with:
-          labels: ci-pending
-          number: ${{ github.event.number }}
-          repo: eProsima/Fast-DDS
-
       - name: Sync eProsima/Fast-DDS repository
         uses: eProsima/eProsima-CI/external/checkout@v0
         with:
@@ -69,12 +61,12 @@ jobs:
       - name: Get minimum supported version of CMake
         uses: eProsima/eProsima-CI/external/get-cmake@v0
         with:
-          cmakeVersion: '3.16.3'
+          cmakeVersion: '3.22.6'
 
       - name: Install brew dependencies
         uses: eProsima/eProsima-CI/macos/install_brew_packages@v0
         with:
-          packages: llvm asio tinyxml2 openssl@1.1
+          packages: llvm asio tinyxml2 openssl@3.0
           update: false
           upgrade: false
 

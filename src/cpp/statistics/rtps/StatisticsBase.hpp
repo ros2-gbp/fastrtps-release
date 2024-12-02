@@ -19,6 +19,8 @@
 #ifndef _STATISTICS_RTPS_STATISTICSBASE_HPP_
 #define _STATISTICS_RTPS_STATISTICSBASE_HPP_
 
+#include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <set>
 
@@ -53,6 +55,7 @@ namespace statistics {
 struct StatisticsAncillary
 {
     std::set<std::shared_ptr<IListener>> listeners;
+    std::atomic<uint32_t> enabled_writers_mask{0};
     virtual ~StatisticsAncillary() = default;
 };
 
@@ -78,11 +81,11 @@ Function StatisticsListenersImpl::for_each_listener(
 {
     // Use a collection copy to prevent locking on traversal
     std::unique_lock<fastrtps::RecursiveTimedMutex> lock(get_statistics_mutex());
-    auto listeners = members_->listeners;
-    lock.unlock();
-
     if (members_)
     {
+        auto listeners = members_->listeners;
+        lock.unlock();
+
         for (auto& listener : listeners)
         {
             f(listener);
@@ -129,6 +132,9 @@ private:
     unsigned long long pdp_counter_ = {};
     // EDP_PACKETS ancillary
     unsigned long long edp_counter_ = {};
+
+    // Mask of enabled statistics writers
+    std::atomic<uint32_t> enabled_writers_mask_{0};
 
     /*
      * Retrieve the GUID_t from derived class
@@ -192,6 +198,15 @@ protected:
 
     // retrieve the participant mutex
     std::recursive_mutex& get_statistics_mutex();
+
+    /**
+     * @brief Check whether the statistics writers in the input mask are enabled
+     *
+     * @param checked_enabled_writers The mask of writers to check
+     * @return True if all enabled, false otherwise
+     */
+    bool are_statistics_writers_enabled(
+            uint32_t checked_enabled_writers);
 
     /** Register a listener in participant RTPSWriter entities.
      * @param listener smart pointer to the listener interface to register
@@ -409,7 +424,7 @@ protected:
 
 public:
 
-    /*
+    /**
      * Registers a listener in participant's statistics callback queue
      * @param listener smart pointer to the listener being registered
      * @param kind combination of fastdds::statistics::EventKind flags used as a mask
@@ -419,7 +434,7 @@ public:
             std::shared_ptr<fastdds::statistics::IListener> listener,
             uint32_t kind);
 
-    /*
+    /**
      * Unregisters a listener in participant's statistics callback queue
      * @param listener smart pointer to the listener being unregistered
      * @param kind combination of fastdds::statistics::EventKind flags used as a mask
@@ -428,12 +443,31 @@ public:
     bool remove_statistics_listener(
             std::shared_ptr<fastdds::statistics::IListener> listener,
             uint32_t kind);
+
+    /**
+     * @brief Set the enabled statistics writers mask
+     *
+     * @param enabled_writers The new mask to set
+     */
+    virtual void set_enabled_statistics_writers_mask(
+            uint32_t enabled_writers);
+
+    /**
+     * @brief Get the enabled statistics writers mask
+     *
+     * @return The mask of enabled writers
+     */
+    virtual uint32_t get_enabled_statistics_writers_mask();
 };
 
 // auxiliary conversion functions
-detail::Locator_s to_statistics_type(fastrtps::rtps::Locator_t);
-detail::GUID_s to_statistics_type(fastrtps::rtps::GUID_t);
-detail::SampleIdentity_s to_statistics_type(fastrtps::rtps::SampleIdentity);
+RTPS_DllAPI detail::Locator_s to_statistics_type(fastrtps::rtps::Locator_t);
+RTPS_DllAPI fastrtps::rtps::Locator_t to_fastdds_type(
+        detail::Locator_s);
+RTPS_DllAPI detail::GUID_s to_statistics_type(fastrtps::rtps::GUID_t);
+RTPS_DllAPI fastrtps::rtps::GUID_t to_fastdds_type(
+        detail::GUID_s);
+RTPS_DllAPI detail::SampleIdentity_s to_statistics_type(fastrtps::rtps::SampleIdentity);
 
 #else // dummy implementation
 

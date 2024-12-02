@@ -47,14 +47,14 @@ target_link_libraries(
 ###########################################################################
 set(
     THROUGHPUT_TEST_LIST
-    intraprocess_best_effort
-    intraprocess_reliable
-    interprocess_best_effort_udp
-    interprocess_reliable_udp
-#    interprocess_best_effort_tcp
-#    interprocess_reliable_tcp
-    interprocess_best_effort_shm
-    interprocess_reliable_shm
+    throughput_intraprocess_best_effort_profile
+    throughput_intraprocess_reliable_profile
+    throughput_interprocess_best_effort_udp_profile
+    throughput_interprocess_reliable_udp_profile
+#   throughput_interprocess_best_effort_tcp_profile
+#   throughput_interprocess_reliable_tcp_profile
+    throughput_interprocess_best_effort_shm_profile
+    throughput_interprocess_reliable_shm_profile
 )
 
 ###########################################################################
@@ -303,10 +303,3 @@ if(Python3_Interpreter_FOUND)
 
     endforeach(throughput_test_name)
 endif()
-
-# Add 'xfail' label to flaky tests
-set(THROUGHPUT_XFAIL_LIST XFAIL_THROUGHPUT)
-
-foreach(THROUGHPUT_XFAIL_TEST ${THROUGHPUT_XFAIL_LIST})
-    add_xfail_label(${CMAKE_CURRENT_SOURCE_DIR}/${THROUGHPUT_XFAIL_TEST}.list)
-endforeach()

@@ -19,6 +19,8 @@
 #include "LatencyTestSubscriber.hpp"
 
 #include <cassert>
+#include <chrono>
+#include <thread>
 
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
@@ -26,10 +28,10 @@
 #include <fastdds/dds/log/Log.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/subscriber/DataReader.hpp>
-#include <fastrtps/xmlparser/XMLProfileManager.h>
 #include <fastdds/rtps/common/Time_t.h>
-#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
+#include <fastrtps/xmlparser/XMLProfileManager.h>
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::types;
@@ -46,35 +48,12 @@ LatencyTestSubscriber::LatencyTestSubscriber()
 
 LatencyTestSubscriber::~LatencyTestSubscriber()
 {
-    // Static type endpoints should have been remove for each payload iteration
-    if (dynamic_types_)
-    {
-        destroy_data_endpoints();
-    }
-    else if (nullptr != data_writer_
-            || nullptr != data_reader_
-            || nullptr != latency_data_pub_topic_
-            || nullptr != latency_data_sub_topic_
-            || !latency_data_type_)
-    {
-        logError(LATENCYSUBSCRIBER, "ERROR unregistering the DATA type and/or removing the endpoints");
-    }
-
-    subscriber_->delete_datareader(command_reader_);
-    participant_->delete_subscriber(subscriber_);
-
-    publisher_->delete_datawriter(command_writer_);
-    participant_->delete_publisher(publisher_);
-
-    participant_->delete_topic(latency_command_sub_topic_);
-    participant_->delete_topic(latency_command_pub_topic_);
-
     std::string TestCommandType("TestCommandType");
     participant_->unregister_type(TestCommandType);
 
     DomainParticipantFactory::get_instance()->delete_participant(participant_);
 
-    logInfo(LatencyTest, "Sub: Participant removed");
+    EPROSIMA_LOG_INFO(LatencyTest, "Sub: Participant removed");
 }
 
 bool LatencyTestSubscriber::init(
@@ -172,7 +151,7 @@ bool LatencyTestSubscriber::init(
     // Register the command type
     if (ReturnCode_t::RETCODE_OK != latency_command_type_.register_type(participant_))
     {
-        logError(LATENCYSUBSCRIBER, "ERROR registering the COMMAND type");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR registering the COMMAND type");
         return false;
     }
 
@@ -180,7 +159,7 @@ bool LatencyTestSubscriber::init(
     publisher_ = participant_->create_publisher(PUBLISHER_QOS_DEFAULT, nullptr);
     if (publisher_ == nullptr)
     {
-        logError(LATENCYSUBSCRIBER, "ERROR creating PUBLISHER");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR creating PUBLISHER");
         return false;
     }
 
@@ -188,7 +167,7 @@ bool LatencyTestSubscriber::init(
     subscriber_ = participant_->create_subscriber(SUBSCRIBER_QOS_DEFAULT, nullptr);
     if (subscriber_ == nullptr)
     {
-        logError(LATENCYSUBSCRIBER, "ERROR creating SUBSCRIBER");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR creating SUBSCRIBER");
         return false;
     }
 
@@ -201,13 +180,14 @@ bool LatencyTestSubscriber::init(
 
             if ( ReturnCode_t::RETCODE_OK != publisher_->get_datawriter_qos_from_profile(pub_profile_name, dw_qos_))
             {
-                logError(LATENCYSUBSCRIBER, "ERROR unable to retrieve the " << pub_profile_name << "from XML file");
+                EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER,
+                        "ERROR unable to retrieve the " << pub_profile_name << "from XML file");
                 return false;
             }
 
             if ( ReturnCode_t::RETCODE_OK != subscriber_->get_datareader_qos_from_profile(sub_profile_name, dr_qos_))
             {
-                logError(LATENCYSUBSCRIBER, "ERROR unable to retrieve the " << sub_profile_name);
+                EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR unable to retrieve the " << sub_profile_name);
                 return false;
             }
         }
@@ -368,7 +348,7 @@ void LatencyTestSubscriber::LatencyDataWriterListener::on_publication_matched(
 
     if (info.current_count_change > 0)
     {
-        logInfo(LatencyTest, C_MAGENTA << "Data Pub Matched" << C_DEF);
+        EPROSIMA_LOG_INFO(LatencyTest, C_MAGENTA << "Data Pub Matched" << C_DEF);
     }
 
     lock.unlock();
@@ -387,7 +367,7 @@ void LatencyTestSubscriber::LatencyDataReaderListener::on_subscription_matched(
 
     if (info.current_count_change > 0)
     {
-        logInfo(LatencyTest, C_MAGENTA << "Data Sub Matched" << C_DEF);
+        EPROSIMA_LOG_INFO(LatencyTest, C_MAGENTA << "Data Sub Matched" << C_DEF);
     }
 
     lock.unlock();
@@ -406,7 +386,7 @@ void LatencyTestSubscriber::ComandWriterListener::on_publication_matched(
 
     if (info.current_count_change > 0)
     {
-        logInfo(LatencyTest, C_MAGENTA << "Command Pub Matched" << C_DEF);
+        EPROSIMA_LOG_INFO(LatencyTest, C_MAGENTA << "Command Pub Matched" << C_DEF);
     }
 
     lock.unlock();
@@ -425,7 +405,7 @@ void LatencyTestSubscriber::CommandReaderListener::on_subscription_matched(
 
     if (info.current_count_change > 0)
     {
-        logInfo(LatencyTest, C_MAGENTA << "Command Sub Matched" << C_DEF);
+        EPROSIMA_LOG_INFO(LatencyTest, C_MAGENTA << "Command Sub Matched" << C_DEF);
     }
 
     lock.unlock();
@@ -481,7 +461,7 @@ void LatencyTestSubscriber::CommandReaderListener::on_data_available(
         log << "Problem reading command message";
     }
 
-    logInfo(LatencyTest, log.str());
+    EPROSIMA_LOG_INFO(LatencyTest, log.str());
 }
 
 void LatencyTestSubscriber::LatencyDataReaderListener::on_data_available(
@@ -503,7 +483,7 @@ void LatencyTestSubscriber::LatencyDataReaderListener::on_data_available(
 
         if (ReturnCode_t::RETCODE_OK != reader->take(data_seq, infos, 1))
         {
-            logInfo(LatencyTest, "Problem reading Subscriber echoed loaned test data");
+            EPROSIMA_LOG_INFO(LatencyTest, "Problem reading Subscriber echoed loaned test data");
             return;
         }
 
@@ -527,7 +507,7 @@ void LatencyTestSubscriber::LatencyDataReaderListener::on_data_available(
             // release the reader loan
             if (ReturnCode_t::RETCODE_OK != reader->return_loan(data_seq, infos))
             {
-                logInfo(LatencyTest, "Problem returning loaned test data");
+                EPROSIMA_LOG_INFO(LatencyTest, "Problem returning loaned test data");
                 return;
             }
 
@@ -545,13 +525,13 @@ void LatencyTestSubscriber::LatencyDataReaderListener::on_data_available(
 
                 if (!loaned)
                 {
-                    logError(LatencyTest, "Subscriber trying to loan: " << trials);
+                    EPROSIMA_LOG_ERROR(LatencyTest, "Subscriber trying to loan: " << trials);
                 }
             }
 
             if (!loaned)
             {
-                logInfo(LatencyTest, "Problem echoing Publisher test data with loan");
+                EPROSIMA_LOG_INFO(LatencyTest, "Problem echoing Publisher test data with loan");
                 // release the reader loan
                 reader->return_loan(data_seq, infos);
                 return;
@@ -567,7 +547,7 @@ void LatencyTestSubscriber::LatencyDataReaderListener::on_data_available(
 
             if (!sub->data_writer_->write(echoed_loan))
             {
-                logError(LatencyTest, "Problem echoing Publisher test data with loan");
+                EPROSIMA_LOG_ERROR(LatencyTest, "Problem echoing Publisher test data with loan");
                 sub->data_writer_->discard_loan(echoed_loan);
             }
         }
@@ -576,7 +556,7 @@ void LatencyTestSubscriber::LatencyDataReaderListener::on_data_available(
             // release the loan
             if (ReturnCode_t::RETCODE_OK != reader->return_loan(data_seq, infos))
             {
-                logError(LatencyTest, "Problem returning loaned test data");
+                EPROSIMA_LOG_ERROR(LatencyTest, "Problem returning loaned test data");
             }
         }
     }
@@ -598,13 +578,13 @@ void LatencyTestSubscriber::LatencyDataReaderListener::on_data_available(
 
                 if (!sub->data_writer_->write(data))
                 {
-                    logInfo(LatencyTest, "Problem echoing Publisher test data");
+                    EPROSIMA_LOG_INFO(LatencyTest, "Problem echoing Publisher test data");
                 }
             }
         }
         else
         {
-            logInfo(LatencyTest, "Problem reading Publisher test data");
+            EPROSIMA_LOG_INFO(LatencyTest, "Problem reading Publisher test data");
         }
     }
 }
@@ -621,7 +601,7 @@ void LatencyTestSubscriber::run()
             return total_matches() == (dynamic_types_ ? 4 : 2);
         });
 
-    logInfo(LatencyTest, C_B_MAGENTA << "Sub: DISCOVERY COMPLETE " << C_DEF);
+    EPROSIMA_LOG_INFO(LatencyTest, C_B_MAGENTA << "Sub: DISCOVERY COMPLETE " << C_DEF);
 
     for (std::vector<uint32_t>::iterator payload = data_size_sub_.begin(); payload != data_size_sub_.end(); ++payload)
     {
@@ -632,10 +612,36 @@ void LatencyTestSubscriber::run()
     }
 }
 
+void LatencyTestSubscriber::destroy_user_entities()
+{
+    // Static type endpoints should have been remove for each payload iteration
+    if (dynamic_types_)
+    {
+        destroy_data_endpoints();
+    }
+    else if (nullptr != data_writer_
+            || nullptr != data_reader_
+            || nullptr != latency_data_pub_topic_
+            || nullptr != latency_data_sub_topic_
+            || !latency_data_type_)
+    {
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR unregistering the DATA type and/or removing the endpoints");
+    }
+
+    subscriber_->delete_datareader(command_reader_);
+    participant_->delete_subscriber(subscriber_);
+
+    publisher_->delete_datawriter(command_writer_);
+    participant_->delete_publisher(publisher_);
+
+    participant_->delete_topic(latency_command_sub_topic_);
+    participant_->delete_topic(latency_command_pub_topic_);
+}
+
 bool LatencyTestSubscriber::test(
         uint32_t datasize)
 {
-    logInfo(LatencyTest, "Preparing test with data size: " << datasize );
+    EPROSIMA_LOG_INFO(LatencyTest, "Preparing test with data size: " << datasize );
 
     // Wait for the Publisher READY command
     // Assures that LatencyTestSubscriber|Publisher data endpoints creation and
@@ -654,7 +660,7 @@ bool LatencyTestSubscriber::test(
 
         if (nullptr == dynamic_data_)
         {
-            logError(LatencyTest, "Iteration failed: Failed to create Dynamic Data");
+            EPROSIMA_LOG_ERROR(LatencyTest, "Iteration failed: Failed to create Dynamic Data");
             return false;
         }
 
@@ -687,7 +693,7 @@ bool LatencyTestSubscriber::test(
     }
     else
     {
-        logError(LatencyTest, "Error preparing static types and endpoints for testing");
+        EPROSIMA_LOG_ERROR(LatencyTest, "Error preparing static types and endpoints for testing");
         return false;
     }
 
@@ -698,11 +704,11 @@ bool LatencyTestSubscriber::test(
     command.m_command = BEGIN;
     if (!command_writer_->write(&command))
     {
-        logError(LatencyTest, "Subscriber fail to publish the BEGIN command")
+        EPROSIMA_LOG_ERROR(LatencyTest, "Subscriber fail to publish the BEGIN command");
         return false;
     }
 
-    logInfo(LatencyTest, "Testing with data size: " << datasize);
+    EPROSIMA_LOG_INFO(LatencyTest, "Testing with data size: " << datasize);
 
     // Wait for the STOP or STOP_ERROR commands
     wait_for_command(
@@ -711,7 +717,7 @@ bool LatencyTestSubscriber::test(
             return command_msg_count_ != 0;
         });
 
-    logInfo(LatencyTest, "TEST OF SIZE: " << datasize << " ENDS");
+    EPROSIMA_LOG_INFO(LatencyTest, "TEST OF SIZE: " << datasize << " ENDS");
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     if (dynamic_types_)
@@ -731,7 +737,8 @@ bool LatencyTestSubscriber::test(
         // Remove endpoints associated to the given payload size
         if (!destroy_data_endpoints())
         {
-            logError(LatencyTest, "Static endpoints for payload size " << datasize << " could not been removed");
+            EPROSIMA_LOG_ERROR(LatencyTest,
+                    "Static endpoints for payload size " << datasize << " could not been removed");
         }
     }
 
@@ -743,14 +750,14 @@ bool LatencyTestSubscriber::test(
     command.m_command = END;
     if (!command_writer_->write(&command))
     {
-        logError(LatencyTest, "Subscriber fail to publish the END command")
+        EPROSIMA_LOG_ERROR(LatencyTest, "Subscriber fail to publish the END command");
         return false;
     }
 
     // prevent the LatencyTestSubscriber from been destroyed while LatencyTestPublisher is waitin for the END command.
     if ( ReturnCode_t::RETCODE_OK != command_writer_->wait_for_acknowledgments(eprosima::fastrtps::c_TimeInfinite))
     {
-        logError(LatencyTest, "Subscriber fail to acknowledge the END command")
+        EPROSIMA_LOG_ERROR(LatencyTest, "Subscriber fail to acknowledge the END command");
         return false;
     }
 
@@ -780,12 +787,12 @@ bool LatencyTestSubscriber::init_dynamic_types()
     // Check if it has been initialized before
     if (dynamic_pub_sub_type_)
     {
-        logError(LATENCYSUBSCRIBER, "ERROR DYNAMIC DATA type already initialized");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR DYNAMIC DATA type already initialized");
         return false;
     }
     else if (participant_->find_type(LatencyDataType::type_name_))
     {
-        logError(LATENCYSUBSCRIBER, "ERROR DYNAMIC DATA type already registered");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR DYNAMIC DATA type already registered");
         return false;
     }
 
@@ -803,7 +810,7 @@ bool LatencyTestSubscriber::init_dynamic_types()
     // Register the data type
     if (ReturnCode_t::RETCODE_OK != dynamic_pub_sub_type_.register_type(participant_))
     {
-        logError(LATENCYSUBSCRIBER, "ERROR registering the DYNAMIC DATA type");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR registering the DYNAMIC DATA type");
         return false;
     }
 
@@ -818,12 +825,12 @@ bool LatencyTestSubscriber::init_static_types(
     // Check if it has been initialized before
     if (latency_data_type_)
     {
-        logError(LATENCYSUBSCRIBER, "ERROR STATIC DATA type already initialized");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR STATIC DATA type already initialized");
         return false;
     }
     else if (participant_->find_type(LatencyDataType::type_name_))
     {
-        logError(LATENCYSUBSCRIBER, "ERROR STATIC DATA type already registered");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR STATIC DATA type already registered");
         return false;
     }
 
@@ -835,7 +842,7 @@ bool LatencyTestSubscriber::init_static_types(
     // Register the static type
     if (ReturnCode_t::RETCODE_OK != latency_data_type_.register_type(participant_))
     {
-        logError(LATENCYSUBSCRIBER, "ERROR registering the STATIC DATA type");
+        EPROSIMA_LOG_ERROR(LATENCYSUBSCRIBER, "ERROR registering the STATIC DATA type");
         return false;
     }
 
@@ -847,19 +854,19 @@ bool LatencyTestSubscriber::create_data_endpoints()
     if (nullptr != latency_data_sub_topic_
             || nullptr != latency_data_pub_topic_)
     {
-        logError(LatencyTest, "ERROR topics already initialized");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR topics already initialized");
         return false;
     }
 
     if (nullptr != data_writer_)
     {
-        logError(LatencyTest, "ERROR data_writer_ already initialized");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR data_writer_ already initialized");
         return false;
     }
 
     if (nullptr != data_reader_)
     {
-        logError(LatencyTest, "ERROR data_reader_ already initialized");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR data_reader_ already initialized");
         return false;
     }
 
@@ -879,7 +886,7 @@ bool LatencyTestSubscriber::create_data_endpoints()
 
     if (nullptr == latency_data_sub_topic_)
     {
-        logError(LatencyTest, "ERROR creating the DATA TYPE for the subscriber data reader topic");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR creating the DATA TYPE for the subscriber data reader topic");
         return false;
     }
 
@@ -901,7 +908,7 @@ bool LatencyTestSubscriber::create_data_endpoints()
 
     if (latency_data_pub_topic_ == nullptr)
     {
-        logError(LatencyTest, "ERROR creating the DATA TYPE for the subscriber data writer topic");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR creating the DATA TYPE for the subscriber data writer topic");
         return false;
     }
 
@@ -912,7 +919,7 @@ bool LatencyTestSubscriber::create_data_endpoints()
                 dw_qos_,
                 &data_writer_listener_)))
     {
-        logError(LatencyTest, "ERROR creating the subscriber data writer");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR creating the subscriber data writer");
         return false;
     }
 
@@ -922,7 +929,7 @@ bool LatencyTestSubscriber::create_data_endpoints()
                 dr_qos_,
                 &data_reader_listener_)))
     {
-        logError(LatencyTest, "ERROR creating the subscriber data reader");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR creating the subscriber data reader");
         return false;
     }
 
@@ -939,7 +946,7 @@ bool LatencyTestSubscriber::destroy_data_endpoints()
     if (nullptr == data_writer_
             || ReturnCode_t::RETCODE_OK != publisher_->delete_datawriter(data_writer_))
     {
-        logError(LatencyTest, "ERROR destroying the DataWriter");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR destroying the DataWriter");
         return false;
     }
     data_writer_ = nullptr;
@@ -948,7 +955,7 @@ bool LatencyTestSubscriber::destroy_data_endpoints()
     if (nullptr == data_reader_
             || ReturnCode_t::RETCODE_OK != subscriber_->delete_datareader(data_reader_))
     {
-        logError(LatencyTest, "ERROR destroying the DataReader");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR destroying the DataReader");
         return false;
     }
     data_reader_ = nullptr;
@@ -958,14 +965,14 @@ bool LatencyTestSubscriber::destroy_data_endpoints()
     if (nullptr == latency_data_pub_topic_
             || ReturnCode_t::RETCODE_OK != participant_->delete_topic(latency_data_pub_topic_))
     {
-        logError(LatencyTest, "ERROR destroying the DATA pub topic");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR destroying the DATA pub topic");
         return false;
     }
     latency_data_pub_topic_ = nullptr;
     if (nullptr == latency_data_sub_topic_
             || ReturnCode_t::RETCODE_OK != participant_->delete_topic(latency_data_sub_topic_))
     {
-        logError(LatencyTest, "ERROR destroying the DATA sub topic");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR destroying the DATA sub topic");
         return false;
     }
     latency_data_sub_topic_ = nullptr;
@@ -974,7 +981,7 @@ bool LatencyTestSubscriber::destroy_data_endpoints()
     if (ReturnCode_t::RETCODE_OK
             != participant_->unregister_type(LatencyDataType::type_name_))
     {
-        logError(LatencyTest, "ERROR unregistering the DATA type");
+        EPROSIMA_LOG_ERROR(LatencyTest, "ERROR unregistering the DATA type");
         return false;
     }
 

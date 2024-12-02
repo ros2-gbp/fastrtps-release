@@ -14,17 +14,19 @@
 
 #include <rtps/transport/UDPv6Transport.h>
 
-#include <utility>
-#include <cstring>
 #include <algorithm>
+#include <cstring>
+#include <utility>
 
-#include <fastdds/rtps/transport/TransportInterface.h>
 #include <fastdds/dds/log/Log.hpp>
-#include <fastrtps/utils/IPLocator.h>
-#include <fastdds/rtps/network/SenderResource.h>
 #include <fastdds/rtps/messages/MessageReceiver.h>
+#include <fastdds/rtps/transport/SenderResource.h>
+#include <fastdds/rtps/transport/TransportInterface.h>
+#include <fastrtps/utils/IPLocator.h>
 
+#include <rtps/network/utils/netmask_filter.hpp>
 #include <rtps/transport/asio_helpers.hpp>
+#include <utils/SystemInfo.hpp>
 
 using namespace std;
 using namespace asio;
@@ -38,11 +40,15 @@ using octet = fastrtps::rtps::octet;
 using IPLocator = fastrtps::rtps::IPLocator;
 using Log = fastdds::dds::Log;
 
-static void get_ipv6s(
+static bool get_ipv6s(
         vector<IPFinder::info_IP>& locNames,
-        bool return_loopback = false)
+        bool return_loopback,
+        bool force_lookup)
 {
-    IPFinder::getIPs(&locNames, return_loopback);
+    if (!SystemInfo::get_ips(locNames, return_loopback, force_lookup))
+    {
+        return false;
+    }
     // Controller out IP4
     auto new_end = remove_if(locNames.begin(),
                     locNames.end(),
@@ -54,14 +60,20 @@ static void get_ipv6s(
     std::for_each(locNames.begin(), locNames.end(), [](IPFinder::info_IP& loc)
             {
                 loc.locator.kind = LOCATOR_KIND_UDPv6;
+                loc.masked_locator.kind = LOCATOR_KIND_UDPv6;
             });
+    return true;
 }
 
-static void get_ipv6s_unique_interfaces(
+static bool get_ipv6s_unique_interfaces(
         std::vector<IPFinder::info_IP>& locNames,
-        bool return_loopback = false)
+        bool return_loopback,
+        bool force_lookup)
 {
-    get_ipv6s(locNames, return_loopback);
+    if (!get_ipv6s(locNames, return_loopback, force_lookup))
+    {
+        return false;
+    }
     std::sort(locNames.begin(), locNames.end(),
             [](const IPFinder::info_IP&  a, const IPFinder::info_IP& b) -> bool
             {
@@ -73,6 +85,7 @@ static void get_ipv6s_unique_interfaces(
                         return a.type != IPFinder::IP6_LOCAL && b.type != IPFinder::IP6_LOCAL && a.dev == b.dev;
                     });
     locNames.erase(new_end, locNames.end());
+    return true;
 }
 
 static asio::ip::address_v6::bytes_type locator_to_native(
@@ -105,24 +118,109 @@ UDPv6Transport::UDPv6Transport(
     mSendBufferSize = descriptor.sendBufferSize;
     mReceiveBufferSize = descriptor.receiveBufferSize;
 
-    if (!descriptor.interfaceWhiteList.empty())
+    // Copy descriptor's netmask filter configuration
+    // NOTE: participant's netmask_filter already taken into account before calling tranport registration
+    netmask_filter_ = descriptor.netmask_filter;
+
+    if (!descriptor.interfaceWhiteList.empty() || !descriptor.interface_allowlist.empty() ||
+            !descriptor.interface_blocklist.empty())
     {
-        std::vector<IPFinder::info_IP> local_interfaces;
-        get_ipv6s(local_interfaces, true);
-        for (IPFinder::info_IP& infoIP : local_interfaces)
+        const auto white_begin = descriptor.interfaceWhiteList.begin();
+        const auto white_end = descriptor.interfaceWhiteList.end();
+
+        const auto allow_begin = descriptor.interface_allowlist.begin();
+        const auto allow_end = descriptor.interface_allowlist.end();
+
+        const auto block_begin = descriptor.interface_blocklist.begin();
+        const auto block_end = descriptor.interface_blocklist.end();
+
+        if (!descriptor.interfaceWhiteList.empty())
         {
-            for (auto& whitelist_interface : descriptor.interfaceWhiteList)
+            EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6,
+                    "Support for interfaceWhiteList will be removed in a future release."
+                    << " Please use interface allowlist/blocklist instead.");
+        }
+
+        std::vector<IPFinder::info_IP> local_interfaces;
+        get_ipv6s(local_interfaces, true, false);
+        for (const IPFinder::info_IP& infoIP : local_interfaces)
+        {
+            if (std::find_if(block_begin, block_end, [infoIP](const BlockedNetworkInterface& blocklist_element)
+                    {
+                        return blocklist_element.name == infoIP.dev || compare_ips(blocklist_element.name, infoIP.name);
+                    }) != block_end )
             {
-                if (compare_ips(infoIP.name, whitelist_interface))
+                // Before skipping this interface, check if present in whitelist/allowlist and warn the user if found
+                if ((std::find_if(white_begin, white_end, [infoIP](const std::string& whitelist_element)
+                        {
+                            return whitelist_element == infoIP.dev || compare_ips(whitelist_element, infoIP.name);
+                        }) != white_end ) ||
+                        (std::find_if(allow_begin, allow_end,
+                        [infoIP](const AllowedNetworkInterface& allowlist_element)
+                        {
+                            return allowlist_element.name == infoIP.dev ||
+                            compare_ips(allowlist_element.name, infoIP.name);
+                        }) != allow_end ))
+                {
+                    EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6,
+                            "Blocked interface " << infoIP.dev << ": " << infoIP.name
+                                                 << " is also present in whitelist/allowlist."
+                                                 << " Blocklist takes precedence over whitelist/allowlist.");
+                }
+            }
+            else if (descriptor.interfaceWhiteList.empty() && descriptor.interface_allowlist.empty())
+            {
+                interface_whitelist_.emplace_back(ip::address_v6::from_string(infoIP.name));
+                allowed_interfaces_.emplace_back(infoIP.dev, infoIP.name, infoIP.masked_locator,
+                        descriptor.netmask_filter);
+            }
+            else if (!descriptor.interface_allowlist.empty())
+            {
+                auto allow_it = std::find_if(
+                    allow_begin,
+                    allow_end,
+                    [&infoIP](const AllowedNetworkInterface& allowlist_element)
+                    {
+                        return allowlist_element.name == infoIP.dev || compare_ips(allowlist_element.name,
+                        infoIP.name);
+                    });
+                if (allow_it != allow_end)
+                {
+                    NetmaskFilterKind netmask_filter = allow_it->netmask_filter;
+                    if (network::netmask_filter::validate_and_transform(netmask_filter,
+                            descriptor.netmask_filter))
+                    {
+                        interface_whitelist_.emplace_back(ip::address_v6::from_string(infoIP.name));
+                        allowed_interfaces_.emplace_back(infoIP.dev, infoIP.name, infoIP.masked_locator,
+                                netmask_filter);
+                    }
+                    else
+                    {
+                        EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6,
+                                "Ignoring allowed interface " << infoIP.dev << ": " << infoIP.name
+                                                              << " as its netmask filter configuration (" << netmask_filter << ") is incompatible"
+                                                              << " with descriptor's (" << descriptor.netmask_filter <<
+                                ").");
+                    }
+                }
+            }
+            else if (!descriptor.interfaceWhiteList.empty())
+            {
+                if (std::find_if(white_begin, white_end, [infoIP](const std::string& whitelist_element)
+                        {
+                            return whitelist_element == infoIP.dev || compare_ips(whitelist_element, infoIP.name);
+                        }) != white_end )
                 {
                     interface_whitelist_.emplace_back(ip::address_v6::from_string(infoIP.name));
+                    allowed_interfaces_.emplace_back(infoIP.dev, infoIP.name, infoIP.masked_locator,
+                            descriptor.netmask_filter);
                 }
             }
         }
 
         if (interface_whitelist_.empty())
         {
-            logError(TRANSPORT, "All whitelist interfaces were filtered out");
+            EPROSIMA_LOG_ERROR(TRANSPORT_UDPV6, "All whitelist interfaces were filtered out");
             interface_whitelist_.emplace_back(ip::address_v6::from_string("2001:db8::"));
         }
     }
@@ -277,11 +375,12 @@ asio::ip::udp UDPv6Transport::generate_protocol() const
     return ip::udp::v6();
 }
 
-void UDPv6Transport::get_ips(
+bool UDPv6Transport::get_ips(
         std::vector<IPFinder::info_IP>& locNames,
-        bool return_loopback)
+        bool return_loopback,
+        bool force_lookup) const
 {
-    get_ipv6s(locNames, return_loopback);
+    return get_ipv6s(locNames, return_loopback, force_lookup);
 }
 
 const std::string& UDPv6Transport::localhost_name()
@@ -304,12 +403,12 @@ eProsimaUDPSocket UDPv6Transport::OpenAndBindInputSocket(
         if (!asio_helpers::asio_helpers::try_setting_buffer_size<asio::socket_base::receive_buffer_size>(
                     socket, mReceiveBufferSize, minimum_value, configured_value))
         {
-            logError(TRANSPORT_UDPV6,
+            EPROSIMA_LOG_ERROR(TRANSPORT_UDPV6,
                     "Couldn't set receive buffer size to minimum value: " << minimum_value);
         }
         else if (mReceiveBufferSize != configured_value)
         {
-            logWarning(TRANSPORT_UDPV6,
+            EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6,
                     "Receive buffer size could not be set to the desired value. "
                     << "Using " << configured_value << " instead of " << mReceiveBufferSize);
         }
@@ -369,7 +468,7 @@ bool UDPv6Transport::OpenInputChannel(
             auto& channelResources = mInputSockets.at(IPLocator::getPhysicalPort(locator));
             for (UDPChannelResource* channelResource : channelResources)
             {
-                if (locatorAddressStr == channelResource->interface())
+                if (locatorAddressStr == channelResource->iface())
                 {
                     found = true;
                     break;
@@ -396,8 +495,9 @@ bool UDPv6Transport::OpenInputChannel(
                 }
                 catch (asio::system_error const& e)
                 {
-                    logWarning(RTPS_MSG_OUT, "UDPTransport Error binding " << locatorAddressStr << " at port: (" <<
-                            IPLocator::getPhysicalPort(locator) << ") with msg: " << e.what());
+                    EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6, "UDPTransport Error binding " << locatorAddressStr << " at port: (" <<
+                            IPLocator::getPhysicalPort(
+                                locator) << ") with msg: " << e.what());
                     (void)e;
                 }
             }
@@ -410,10 +510,10 @@ bool UDPv6Transport::OpenInputChannel(
             auto pChannelResources = mInputSockets.at(IPLocator::getPhysicalPort(locator));
             for (auto& channelResource : pChannelResources)
             {
-                if (channelResource->interface() == s_IPv6AddressAny)
+                if (channelResource->iface() == s_IPv6AddressAny)
                 {
                     std::vector<IPFinder::info_IP> locNames;
-                    get_ipv6s_unique_interfaces(locNames, true);
+                    get_ipv6s_unique_interfaces(locNames, true, false);
                     for (const auto& infoIP : locNames)
                     {
                         auto ip = asio::ip::address_v6::from_string(infoIP.name);
@@ -425,13 +525,14 @@ bool UDPv6Transport::OpenInputChannel(
                         catch (std::system_error& ex)
                         {
                             (void)ex;
-                            logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
+                            EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6,
+                                    "Error joining multicast group on " << ip << ": " << ex.what());
                         }
                     }
                 }
                 else
                 {
-                    auto ip = asio::ip::address_v6::from_string(channelResource->interface());
+                    auto ip = asio::ip::address_v6::from_string(channelResource->iface());
                     try
                     {
                         channelResource->socket()->set_option(ip::multicast::join_group(locatorAddress, ip.scope_id()));
@@ -439,7 +540,8 @@ bool UDPv6Transport::OpenInputChannel(
                     catch (std::system_error& ex)
                     {
                         (void)ex;
-                        logWarning(RTPS_MSG_OUT, "Error joining multicast group on " << ip << ": " << ex.what());
+                        EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6,
+                                "Error joining multicast group on " << ip << ": " << ex.what());
                     }
                 }
             }
@@ -467,21 +569,21 @@ std::vector<std::string> UDPv6Transport::get_binding_interfaces_list()
 }
 
 bool UDPv6Transport::is_interface_allowed(
-        const std::string& interface) const
+        const std::string& iface) const
 {
     if (interface_whitelist_.empty())
     {
         return true;
     }
 
-    if (asio::ip::address_v6::from_string(interface) == ip::address_v6::any())
+    if (asio::ip::address_v6::from_string(iface) == ip::address_v6::any())
     {
         return true;
     }
 
     for (auto& whitelist : interface_whitelist_)
     {
-        if (compare_ips(whitelist.to_string(), interface))
+        if (compare_ips(whitelist.to_string(), iface))
         {
             return true;
         }
@@ -516,7 +618,7 @@ LocatorList UDPv6Transport::NormalizeLocator(
     if (IPLocator::isAny(locator))
     {
         std::vector<IPFinder::info_IP> locNames;
-        get_ipv6s(locNames);
+        get_ipv6s(locNames, false, false);
         for (const auto& infoIP : locNames)
         {
             if (is_interface_allowed(infoIP.name))
@@ -552,6 +654,13 @@ bool UDPv6Transport::is_local_locator(
         return true;
     }
 
+    std::vector<IPFinder::info_IP> currentInterfaces;
+    if (!get_ips(currentInterfaces, false, false))
+    {
+        EPROSIMA_LOG_WARNING(TRANSPORT_UDPV6,
+                "Could not retrieve IPs information to check if locator " << locator << " is local.");
+        return false;
+    }
     for (const IPFinder::info_IP& localInterface : currentInterfaces)
     {
         if (IPLocator::compareAddress(localInterface.locator, locator))
@@ -593,7 +702,7 @@ void UDPv6Transport::SetSocketOutboundInterface(
 
 bool UDPv6Transport::compare_ips(
         const std::string& ip1,
-        const std::string& ip2) const
+        const std::string& ip2)
 {
     // string::find returns string::npos if the character is not found
     // If the second parameter is string::npos value, it indicates to take all characters until the end of the string

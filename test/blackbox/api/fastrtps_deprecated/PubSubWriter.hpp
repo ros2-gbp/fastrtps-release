@@ -260,8 +260,8 @@ public:
         publisher_attr_.topic.topicKind =
                 type_.m_isGetKeyDefined ? ::eprosima::fastrtps::rtps::WITH_KEY : ::eprosima::fastrtps::rtps::NO_KEY;
 
-        // By default, memory mode is preallocated (the most restritive)
-        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        // By default, memory mode is PREALLOCATED_WITH_REALLOC_MEMORY_MODE
+        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
         publisher_attr_.times.heartbeatPeriod.seconds = 0;
@@ -561,16 +561,28 @@ public:
     }
 
 #if HAVE_SECURITY
-    void waitAuthorized()
+    void waitAuthorized(
+            std::chrono::seconds timeout = std::chrono::seconds::zero(),
+            unsigned int expected = 1)
     {
         std::unique_lock<std::mutex> lock(mutexAuthentication_);
 
         std::cout << "Writer is waiting authorization..." << std::endl;
 
-        cvAuthentication_.wait(lock, [&]() -> bool
-                {
-                    return authorized_ > 0;
-                });
+        if (timeout == std::chrono::seconds::zero())
+        {
+            cvAuthentication_.wait(lock, [&]()
+                    {
+                        return authorized_ >= expected;
+                    });
+        }
+        else
+        {
+            cvAuthentication_.wait_for(lock, timeout, [&]()
+                    {
+                        return authorized_ >= expected;
+                    });
+        }
 
         std::cout << "Writer authorization finished..." << std::endl;
     }
@@ -751,6 +763,14 @@ public:
             eprosima::fastdds::rtps::BuiltinTransports transports)
     {
         participant_attr_.rtps.setup_transports(transports);
+        return *this;
+    }
+
+    PubSubWriter& setup_transports(
+            eprosima::fastdds::rtps::BuiltinTransports transports,
+            const eprosima::fastdds::rtps::BuiltinTransportsOptions& options)
+    {
+        participant_attr_.rtps.setup_transports(transports, options);
         return *this;
     }
 
@@ -1105,14 +1125,14 @@ public:
     }
 
     PubSubWriter& property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
+            const eprosima::fastrtps::rtps::PropertyPolicy& property_policy)
     {
         participant_attr_.rtps.properties = property_policy;
         return *this;
     }
 
     PubSubWriter& entity_property_policy(
-            const eprosima::fastrtps::rtps::PropertyPolicy property_policy)
+            const eprosima::fastrtps::rtps::PropertyPolicy& property_policy)
     {
         publisher_attr_.properties = property_policy;
         return *this;
@@ -1198,6 +1218,14 @@ public:
         return *this;
     }
 
+    PubSubWriter& ownership_strength(
+            uint32_t strength)
+    {
+        publisher_attr_.qos.m_ownership.kind = eprosima::fastdds::dds::EXCLUSIVE_OWNERSHIP_QOS;
+        publisher_attr_.qos.m_ownershipStrength.value = strength;
+        return *this;
+    }
+
     PubSubWriter& load_publisher_attr(
             const std::string& xml)
     {
@@ -1241,6 +1269,7 @@ public:
             uint32_t sockerBufferSize)
     {
         participant_attr_.rtps.listenSocketBufferSize = sockerBufferSize;
+        participant_attr_.rtps.sendSocketBufferSize = sockerBufferSize;
         return *this;
     }
 
@@ -1255,6 +1284,13 @@ public:
             int32_t participantId)
     {
         participant_attr_.rtps.participantID = participantId;
+        return *this;
+    }
+
+    PubSubWriter& set_events_thread_settings(
+            const eprosima::fastdds::rtps::ThreadSettings& settings)
+    {
+        participant_attr_.rtps.timed_events_thread = settings;
         return *this;
     }
 
@@ -1278,6 +1314,11 @@ public:
     {
         publisher_attr_.qos.m_partition.clear();
         publisher_attr_.qos.m_partition.push_back(partition.c_str());
+        return publisher_->updateAttributes(publisher_attr_);
+    }
+
+    bool set_qos()
+    {
         return publisher_->updateAttributes(publisher_attr_);
     }
 

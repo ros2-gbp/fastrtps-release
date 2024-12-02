@@ -42,7 +42,7 @@ History::History(
 
 History::~History()
 {
-    logInfo(RTPS_HISTORY, "");
+    EPROSIMA_LOG_INFO(RTPS_HISTORY, "");
 }
 
 History::const_iterator History::find_change_nts(
@@ -50,7 +50,7 @@ History::const_iterator History::find_change_nts(
 {
     if ( nullptr == mp_mutex )
     {
-        logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
+        EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
         return const_iterator();
     }
 
@@ -74,12 +74,12 @@ History::iterator History::remove_change_nts(
 {
     if (nullptr == mp_mutex)
     {
-        return changesEnd();
+        return remove_iterator_constness(removal);
     }
 
     if (removal == changesEnd())
     {
-        logInfo(RTPS_WRITER_HISTORY, "Trying to remove without a proper CacheChange_t referenced");
+        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Trying to remove without a proper CacheChange_t referenced");
         return changesEnd();
     }
 
@@ -94,21 +94,58 @@ History::iterator History::remove_change_nts(
     return m_changes.erase(removal);
 }
 
+History::iterator History::remove_change_nts(
+        const_iterator removal,
+        const std::chrono::time_point<std::chrono::steady_clock>&,
+        bool release)
+{
+    return History::remove_change_nts(removal, release);
+}
+
 bool History::remove_change(
         CacheChange_t* ch)
 {
+    return History::remove_change(ch, std::chrono::steady_clock::now() + std::chrono::hours(24));
+}
+
+bool History::remove_change(
+        CacheChange_t* ch,
+        const std::chrono::time_point<std::chrono::steady_clock>& max_blocking_time)
+{
+#if HAVE_STRICT_REALTIME
+    std::unique_lock<RecursiveTimedMutex> lock(*mp_mutex, std::defer_lock);
+    if (!lock.try_lock_until(max_blocking_time))
+    {
+        EPROSIMA_LOG_ERROR(PUBLISHER, "Cannot lock the DataWriterHistory mutex");
+        return false;
+    }
+#else
     std::lock_guard<RecursiveTimedMutex> guard(*mp_mutex);
+#endif // if HAVE_STRICT_REALTIME
 
     const_iterator it = find_change_nts(ch);
 
     if (it == changesEnd())
     {
-        logInfo(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
+        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Trying to remove a change not in history");
         return false;
     }
 
-    // remove using the virtual method
-    remove_change_nts(it);
+    // Dummy change just used to compare original change with change returned from remove_change_nts function
+    CacheChange_t dummy_change;
+    dummy_change.writerGUID = (*it)->writerGUID;
+    dummy_change.sequenceNumber = (*it)->sequenceNumber;
+
+    // Remove using the virtual method
+    History::iterator history_it = remove_change_nts(it, max_blocking_time);
+
+    // If remove_change_nts returns a valid iterator (not end()) and this is the same iterator means that it
+    // could not remove it so this function should fail
+    if (history_it != changesEnd() && matches_change(&dummy_change, *history_it))
+    {
+        EPROSIMA_LOG_INFO(RTPS_WRITER_HISTORY, "Failed to remove a change from history");
+        return false;
+    }
 
     return true;
 }
@@ -117,7 +154,7 @@ bool History::remove_all_changes()
 {
     if (mp_mutex == nullptr)
     {
-        logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
+        EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
         return false;
     }
 
@@ -166,7 +203,7 @@ bool History::get_change(
 
     if (mp_mutex == nullptr)
     {
-        logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
+        EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
         return false;
     }
 
@@ -208,7 +245,7 @@ bool History::get_earliest_change(
 {
     if (mp_mutex == nullptr)
     {
-        logError(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
+        EPROSIMA_LOG_ERROR(RTPS_HISTORY, "You need to create a RTPS Entity with this History before using it");
         return false;
     }
 
@@ -221,6 +258,14 @@ bool History::get_earliest_change(
 
     *change = m_changes.front();
     return true;
+}
+
+History::iterator History::remove_iterator_constness(
+        const_iterator c_it)
+{
+    History::iterator it = changesBegin();
+    std::advance(it, std::distance<const_iterator>(m_changes.cbegin(), c_it));
+    return it;
 }
 
 } // namespace rtps

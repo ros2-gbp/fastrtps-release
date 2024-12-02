@@ -651,9 +651,8 @@ TEST_P(PubSubFragmentsLimited, AsyncPubSubAsReliableKeyedData300kbKeepLast1InLos
 
 // Regression test for 20257
 // When a non existing change is removed, the change is also removed from the data instance changes sequence
-// For uncrustify sake *INDENT-OFF*
-TEST(PubSubFragmentsLimited, AsyncPubSubAsReliableKeyedData300kbKeepLast1LoosyConditionsSmallFragmentsCorrectlyBehavesWhenInlineQoSAreForced)
-// *INDENT-ON*
+TEST(PubSubFragmentsLimited,
+        AsyncPubSubAsReliableKeyedData300kbKeepLast1LoosyConditionsSmallFragmentsCorrectlyBehavesWhenInlineQoSAreForced)
 {
     PubSubReader<KeyedData1mbPubSubType> reader(TEST_TOPIC_NAME);
     PubSubWriter<KeyedData1mbPubSubType> writer(TEST_TOPIC_NAME);

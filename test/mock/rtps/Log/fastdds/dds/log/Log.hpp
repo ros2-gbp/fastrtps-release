@@ -18,21 +18,25 @@
 
 #include <functional>
 #include <memory>
+
 #include <gmock/gmock.h>
+
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
 
 /**
  * eProsima log mock.
  */
 
-#define logInfo(cat, msg)                                                                                \
+#define MOCK_EPROSIMA_LOG_COMMON(cat, msg)                                                              \
     {                                                                                                   \
         NulStreambuf null_buffer;                                                                       \
         std::ostream null_stream(&null_buffer);                                                         \
         null_stream << msg;                                                                             \
     }
 
-#define logWarning(cat, msg) logInfo(cat, msg)
-#define logError(cat, msg) logInfo(cat, msg)
+#define EPROSIMA_LOG_INFO(cat, msg) MOCK_EPROSIMA_LOG_COMMON(cat, msg)
+#define EPROSIMA_LOG_WARNING(cat, msg) MOCK_EPROSIMA_LOG_COMMON(cat, msg)
+#define EPROSIMA_LOG_ERROR(cat, msg) MOCK_EPROSIMA_LOG_COMMON(cat, msg)
 
 class NulStreambuf : public std::streambuf
 {
@@ -81,6 +85,13 @@ public:
         ClearConsumersFunc();
     }
 
+    static std::function<void()> SetThreadConfigFunc;
+    static void SetThreadConfig(
+            rtps::ThreadSettings&)
+    {
+        SetThreadConfigFunc();
+    }
+
 };
 
 using ::testing::_;
@@ -99,6 +110,8 @@ public:
     MOCK_METHOD1(RegisterConsumer, void(std::unique_ptr<LogConsumer>&));
 
     MOCK_METHOD0(ClearConsumers, void());
+
+    MOCK_METHOD(void, SetThreadConfig, ());
 };
 
 } // namespace dds

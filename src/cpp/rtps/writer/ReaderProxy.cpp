@@ -89,7 +89,7 @@ bool ReaderProxy::rtps_is_relevant(
     if (nullptr != filter)
     {
         bool ret = filter->is_relevant(*change, guid());
-        logInfo(RTPS_READER_PROXY,
+        EPROSIMA_LOG_INFO(RTPS_READER_PROXY,
                 "Change " << change->instanceHandle << " is relevant for reader " << guid() << "? " << ret);
         return ret;
     }
@@ -144,7 +144,7 @@ void ReaderProxy::start(
         initial_heartbeat_event_->restart_timer();
     }
 
-    logInfo(RTPS_READER_PROXY, "Reader Proxy started");
+    EPROSIMA_LOG_INFO(RTPS_READER_PROXY, "Reader Proxy started");
 }
 
 bool ReaderProxy::update(
@@ -245,8 +245,8 @@ void ReaderProxy::add_change(
     if (changes_for_reader_.push_back(change) == nullptr)
     {
         // This should never happen
-        logError(RTPS_READER_PROXY, "Error adding change " << change.getSequenceNumber()
-                                                           << " to reader proxy " << guid());
+        EPROSIMA_LOG_ERROR(RTPS_READER_PROXY, "Error adding change " << change.getSequenceNumber()
+                                                                     << " to reader proxy " << guid());
         eprosima::fastdds::dds::Log::Flush();
         assert(false);
     }
@@ -442,7 +442,7 @@ bool ReaderProxy::requested_changes_set(
 
     if (isSomeoneWasSetRequested)
     {
-        logInfo(RTPS_READER_PROXY, "Requested Changes: " << seq_num_set);
+        EPROSIMA_LOG_INFO(RTPS_READER_PROXY, "Requested Changes: " << seq_num_set);
     }
 
     return isSomeoneWasSetRequested;
@@ -689,6 +689,26 @@ ReaderProxy::ChangeConstIterator ReaderProxy::find_change(
     return it == end
            ? it
            : it->getSequenceNumber() == seq_num ? it : end;
+}
+
+bool ReaderProxy::has_been_delivered(
+        const SequenceNumber_t& seq_number,
+        bool& found) const
+{
+    if (seq_number <= changes_low_mark_)
+    {
+        // Change has already been acknowledged, so it has been delivered
+        return true;
+    }
+
+    ChangeConstIterator it = find_change(seq_number);
+    if (it != changes_for_reader_.end())
+    {
+        found = true;
+        return it->has_been_delivered();
+    }
+
+    return false;
 }
 
 }   // namespace rtps

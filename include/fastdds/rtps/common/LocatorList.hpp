@@ -96,6 +96,8 @@ class LocatorList
 {
 public:
 
+    using value_type = typename std::vector<Locator>::value_type;
+
     /// Constructor
     RTPS_DllAPI LocatorList()
     {
@@ -471,7 +473,7 @@ inline std::istream& operator >>(
         catch (std::ios_base::failure& )
         {
             locList.clear();
-            logWarning(LOCATOR_LIST, "Error deserializing LocatorList");
+            EPROSIMA_LOG_WARNING(LOCATOR_LIST, "Error deserializing LocatorList");
         }
 
         input.exceptions(excp_mask);

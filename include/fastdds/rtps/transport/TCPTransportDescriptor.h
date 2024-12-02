@@ -15,9 +15,14 @@
 #ifndef _FASTDDS_TCP_TRANSPORT_DESCRIPTOR_H_
 #define _FASTDDS_TCP_TRANSPORT_DESCRIPTOR_H_
 
+#include <cstdint>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#include <fastdds/rtps/attributes/ThreadSettings.hpp>
 #include <fastdds/rtps/transport/SocketTransportDescriptor.h>
 #include <fastrtps/fastrtps_dll.h>
-#include <iostream>
 
 namespace eprosima {
 namespace fastdds {
@@ -47,6 +52,10 @@ namespace rtps {
  * - \c apply_security: true to use TLS (Transport Layer Security).
  *
  * - \c tls_config: Configuration for TLS.
+ *
+ * - \c non_blocking_send: do not block on send operations. When it is set to true, send operations will return
+ *      immediately if the buffer might get full, but no error will be returned to the upper layer. This means
+ *      that the application will behave as if the datagram is sent and lost.
  *
  * - \c tcp_negotiation_timeout: time to wait for logical port negotiation (in ms).
  *
@@ -78,6 +87,8 @@ struct TCPTransportDescriptor : public SocketTransportDescriptor
      * - \c default_verify_path: look for verification files on the default paths.
      *
      * - \c handshake_role: role that the transport will take on handshaking.
+     *
+     * - \c server_name: server name or host name required in case Server Name Indication (SNI) is used.
      *
      */
     struct TLSConfig
@@ -182,6 +193,8 @@ struct TCPTransportDescriptor : public SocketTransportDescriptor
         std::string rsa_private_key_file;
         //! Role that the transport will take on handshaking
         TLSHandShakeRole handshake_role = TLSHandShakeRole::DEFAULT;
+        //! Server name or host name required in case Server Name Indication (SNI) is used
+        std::string server_name;
 
         //! Add verification modes to the verification mode mask
         void add_verify_mode(
@@ -254,7 +267,7 @@ struct TCPTransportDescriptor : public SocketTransportDescriptor
     //! Enables the TCP_NODELAY socket option
     bool enable_tcp_nodelay;
 
-    FASTDDS_TODO_BEFORE(3, 0, "Eliminate wait_for_tcp_negotiation, variable not in use.")
+    FASTDDS_TODO_BEFORE(3, 0, "Eliminate wait_for_tcp_negotiation, variable not in use.");
     bool wait_for_tcp_negotiation;
 
     //! Enables the calculation and sending of CRC on message headers
@@ -266,6 +279,26 @@ struct TCPTransportDescriptor : public SocketTransportDescriptor
 
     //! Configuration of the TLS (Transport Layer Security)
     TLSConfig tls_config;
+
+    //! Thread settings for keep alive thread
+    ThreadSettings keep_alive_thread;
+
+    //! Thread settings for the accept connections thread
+    ThreadSettings accept_thread;
+
+    /**
+     * Whether to use non-blocking calls to send().
+     *
+     * When set to true, calls to send() will return immediately if the send buffer might get full.
+     * This may happen when receive buffer on reader's side is full. No error will be returned
+     * to the upper layer. This means that the application will behave
+     * as if the datagram is sent but lost (i.e. throughput may be reduced). This value is
+     * specially useful on high-frequency writers.
+     *
+     * When set to false, which is the default, calls to send() will block until the send buffer has space for the
+     * datagram. This may cause application lock.
+     */
+    bool non_blocking_send;
 
     //! Add listener port to the listening_ports list
     void add_listener_port(

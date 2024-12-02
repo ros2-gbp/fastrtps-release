@@ -55,7 +55,7 @@ DSClientEvent::~DSClientEvent()
 
 bool DSClientEvent::event()
 {
-    // logInfo(CLIENT_PDP_THREAD, "Client " << mp_PDP->getRTPSParticipant()->getGuid() << " DSClientEvent Period");
+    // EPROSIMA_LOG_INFO(CLIENT_PDP_THREAD, "Client " << mp_PDP->getRTPSParticipant()->getGuid() << " DSClientEvent Period");
     bool restart = false;
 
     // Iterate over remote servers to check for new unmatched servers
@@ -90,9 +90,10 @@ bool DSClientEvent::event()
         // This marks to announceParticipantState that the announcement is only meant for missing servers,
         // so it is not a periodic announcement
         mp_PDP->_serverPing = true;
-        WriteParams __wp = WriteParams();
+        WriteParams __wp = WriteParams::write_params_default();
         mp_PDP->announceParticipantState(false, false, __wp);
-        logInfo(CLIENT_PDP_THREAD, "Client " << mp_PDP->getRTPSParticipant()->getGuid() << " PDP announcement");
+        EPROSIMA_LOG_INFO(CLIENT_PDP_THREAD,
+                "Client " << mp_PDP->getRTPSParticipant()->getGuid() << " PDP announcement");
     }
 
     return restart;

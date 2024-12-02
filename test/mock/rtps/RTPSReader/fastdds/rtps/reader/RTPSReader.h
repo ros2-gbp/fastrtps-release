@@ -156,6 +156,10 @@ public:
         return true;
     }
 
+    virtual void local_actions_on_reader_removed()
+    {
+    }
+
     virtual bool change_removed_by_history(
             CacheChange_t*,
             WriterProxy*)
@@ -180,6 +184,14 @@ public:
     virtual bool isInCleanState()
     {
         return true;
+    }
+
+    void setHistory(
+            ReaderHistory* history)
+    {
+        history->mp_reader = this;
+        history->mp_mutex = &mp_mutex;
+        history_ = history;
     }
 
     ReaderHistory* getHistory()

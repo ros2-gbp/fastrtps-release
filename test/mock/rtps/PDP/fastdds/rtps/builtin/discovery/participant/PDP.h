@@ -28,6 +28,17 @@
 #include <gmock/gmock.h>
 
 namespace eprosima {
+
+namespace fastdds {
+namespace statistics {
+namespace rtps {
+
+struct IProxyObserver;
+
+} // namespace rtps
+} // namespace statistics
+} // namespace fastdds
+
 namespace fastrtps {
 namespace rtps {
 
@@ -51,6 +62,10 @@ public:
     MOCK_METHOD0(createPDPEndpoints, bool());
 
     MOCK_METHOD0(getEDP, EDP*());
+
+#ifdef FASTDDS_STATISTICS
+    MOCK_METHOD0(get_proxy_observer, const fastdds::statistics::rtps::IProxyObserver*());
+#endif // FASTDDS_STATISTICS
 
     MOCK_METHOD1(assignRemoteEndpoints, void(
             ParticipantProxyData* pdata));
@@ -87,6 +102,8 @@ public:
 
     MOCK_METHOD0(ParticipantProxiesEnd, ResourceLimitedVector<ParticipantProxyData*>::const_iterator());
 
+    MOCK_METHOD(RTPSParticipantImpl*, getRTPSParticipant, (), (const));
+
     ProxyPool<ReaderProxyData>& get_temporary_reader_proxies_pool()
     {
         return temp_proxy_readers;
@@ -105,7 +122,6 @@ public:
     ProxyPool<ReaderProxyData> temp_proxy_readers = {{4, 1}};
     ProxyPool<WriterProxyData> temp_proxy_writers = {{4, 1}};
 };
-
 
 } //namespace rtps
 } //namespace fastrtps

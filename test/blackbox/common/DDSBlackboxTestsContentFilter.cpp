@@ -389,7 +389,7 @@ protected:
             }
             else
             {
-                EXPECT_EQ(filter_counter.content_filter_info_count, 0);
+                EXPECT_EQ(filter_counter.content_filter_info_count, 0u);
                 EXPECT_EQ(filter_counter.max_filter_signature_number, 0u);
             }
         }
@@ -610,6 +610,12 @@ TEST(DDSContentFilter, CorrectlyHandleAliasOtherHeader)
         throw std::runtime_error("Failed to register type");
     }
 
+    auto sub = participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT, nullptr);
+    if (sub == nullptr)
+    {
+        throw std::runtime_error("Failed to create subscriber");
+    }
+
     auto topic = participant->create_topic("TestTopic", type->getName(), TOPIC_QOS_DEFAULT);
     if (topic == nullptr)
     {
@@ -623,10 +629,6 @@ TEST(DDSContentFilter, CorrectlyHandleAliasOtherHeader)
         "FilteredTestTopic", topic, expression, parameters);
 
     EXPECT_NE(nullptr, filtered_topic);
-
-    participant->delete_contentfilteredtopic(filtered_topic);
-    participant->delete_topic(topic);
-    dpf->delete_participant(participant);
 }
 
 /**

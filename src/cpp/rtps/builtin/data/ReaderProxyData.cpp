@@ -17,14 +17,14 @@
  *
  */
 
-#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
-
-#include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/common/CDRMessage_t.h>
-#include <fastdds/rtps/network/NetworkFactory.h>
-
 #include <fastdds/core/policy/ParameterList.hpp>
 #include <fastdds/core/policy/QosPoliciesSerializer.hpp>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/builtin/data/ReaderProxyData.h>
+#include <fastdds/rtps/common/CDRMessage_t.h>
+#include <fastdds/rtps/common/VendorId_t.hpp>
+
+#include <rtps/network/NetworkFactory.h>
 
 #include "ProxyDataFilters.hpp"
 
@@ -35,6 +35,7 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+using ::operator <<;
 
 ReaderProxyData::ReaderProxyData (
         const size_t max_unicast_locators,
@@ -45,6 +46,7 @@ ReaderProxyData::ReaderProxyData (
     , security_attributes_(0UL)
     , plugin_security_attributes_(0UL)
 #endif // if HAVE_SECURITY
+    , m_networkConfiguration(0)
     , remote_locators_(max_unicast_locators, max_multicast_locators)
     , m_userDefinedId(0)
     , m_isAlive(true)
@@ -78,7 +80,7 @@ ReaderProxyData::~ReaderProxyData()
     delete m_type_id;
     delete m_type_information;
 
-    logInfo(RTPS_PROXY_DATA, "ReaderProxyData destructor: " << m_guid; );
+    EPROSIMA_LOG_INFO(RTPS_PROXY_DATA, "ReaderProxyData destructor: " << m_guid; );
 }
 
 ReaderProxyData::ReaderProxyData(
@@ -89,6 +91,7 @@ ReaderProxyData::ReaderProxyData(
     , plugin_security_attributes_(readerInfo.plugin_security_attributes_)
 #endif // if HAVE_SECURITY
     , m_guid(readerInfo.m_guid)
+    , m_networkConfiguration(readerInfo.m_networkConfiguration)
     , remote_locators_(readerInfo.remote_locators_)
     , m_key(readerInfo.m_key)
     , m_RTPSParticipantKey(readerInfo.m_RTPSParticipantKey)
@@ -130,6 +133,7 @@ ReaderProxyData& ReaderProxyData::operator =(
     plugin_security_attributes_ = readerInfo.plugin_security_attributes_;
 #endif // if HAVE_SECURITY
     m_guid = readerInfo.m_guid;
+    m_networkConfiguration = readerInfo.m_networkConfiguration;
     remote_locators_ = readerInfo.remote_locators_;
     m_key = readerInfo.m_key;
     m_RTPSParticipantKey = readerInfo.m_RTPSParticipantKey;
@@ -181,6 +185,12 @@ uint32_t ReaderProxyData::get_serialized_size(
 {
     uint32_t ret_val = include_encapsulation ? 4 : 0;
 
+    // PID_ENDPOINT_GUID
+    ret_val += 4 + PARAMETER_GUID_LENGTH;
+
+    // PID_NETWORK_CONFIGURATION_SET
+    ret_val += 4 + PARAMETER_NETWORKCONFIGSET_LENGTH;
+
     // PID_UNICAST_LOCATOR
     ret_val += static_cast<uint32_t>((4 + PARAMETER_LOCATOR_LENGTH) * remote_locators_.unicast.size());
 
@@ -201,9 +211,6 @@ uint32_t ReaderProxyData::get_serialized_size(
 
     // PID_KEY_HASH
     ret_val += 4 + 16;
-
-    // PID_ENDPOINT_GUID
-    ret_val += 4 + PARAMETER_GUID_LENGTH;
 
     // PID_PROTOCOL_VERSION
     ret_val += 4 + 4;
@@ -281,6 +288,14 @@ uint32_t ReaderProxyData::get_serialized_size(
         ret_val += fastdds::dds::QosPoliciesSerializer<DisablePositiveACKsQosPolicy>::cdr_serialized_size(
             m_qos.m_disablePositiveACKs);
     }
+
+    if ((m_qos.data_sharing.send_always() || m_qos.data_sharing.hasChanged) &&
+            m_qos.data_sharing.kind() != fastdds::dds::OFF)
+    {
+        ret_val += fastdds::dds::QosPoliciesSerializer<DataSharingQosPolicy>::cdr_serialized_size(
+            m_qos.data_sharing);
+    }
+
     if (m_type_id && m_type_id->m_type_identifier._d() != 0)
     {
         ret_val += fastdds::dds::QosPoliciesSerializer<TypeIdV1>::cdr_serialized_size(*m_type_id);
@@ -288,22 +303,6 @@ uint32_t ReaderProxyData::get_serialized_size(
     if (m_type && m_type->m_type_object._d() != 0)
     {
         ret_val += fastdds::dds::QosPoliciesSerializer<TypeObjectV1>::cdr_serialized_size(*m_type);
-    }
-    if (m_type_information && m_type_information->assigned())
-    {
-        ret_val +=
-                fastdds::dds::QosPoliciesSerializer<xtypes::TypeInformation>::cdr_serialized_size(*m_type_information);
-    }
-    if (m_qos.type_consistency.send_always() || m_qos.type_consistency.hasChanged)
-    {
-        ret_val += fastdds::dds::QosPoliciesSerializer<TypeConsistencyEnforcementQosPolicy>::cdr_serialized_size(
-            m_qos.type_consistency);
-    }
-    if ((m_qos.data_sharing.send_always() || m_qos.data_sharing.hasChanged) &&
-            m_qos.data_sharing.kind() != fastdds::dds::OFF)
-    {
-        ret_val += fastdds::dds::QosPoliciesSerializer<DataSharingQosPolicy>::cdr_serialized_size(
-            m_qos.data_sharing);
     }
 
     if (m_properties.size() > 0)
@@ -326,6 +325,23 @@ uint32_t ReaderProxyData::get_serialized_size(
     }
 #endif // if HAVE_SECURITY
 
+    if (m_qos.representation.send_always() || m_qos.representation.hasChanged)
+    {
+        ret_val += fastdds::dds::QosPoliciesSerializer<DataRepresentationQosPolicy>::cdr_serialized_size(
+            m_qos.representation);
+    }
+
+    if (m_qos.type_consistency.send_always() || m_qos.type_consistency.hasChanged)
+    {
+        ret_val += fastdds::dds::QosPoliciesSerializer<TypeConsistencyEnforcementQosPolicy>::cdr_serialized_size(
+            m_qos.type_consistency);
+    }
+    if (m_type_information && m_type_information->assigned())
+    {
+        ret_val +=
+                fastdds::dds::QosPoliciesSerializer<xtypes::TypeInformation>::cdr_serialized_size(*m_type_information);
+    }
+
     // PID_SENTINEL
     return ret_val + 4;
 }
@@ -337,6 +353,23 @@ bool ReaderProxyData::writeToCDRMessage(
     if (write_encapsulation)
     {
         if (!ParameterList::writeEncapsulationToCDRMsg(msg))
+        {
+            return false;
+        }
+    }
+
+    {
+        ParameterGuid_t p(fastdds::dds::PID_ENDPOINT_GUID, PARAMETER_GUID_LENGTH, m_guid);
+        if (!fastdds::dds::ParameterSerializer<ParameterGuid_t>::add_to_cdr_message(p, msg))
+        {
+            return false;
+        }
+    }
+
+    {
+        ParameterNetworkConfigSet_t p(fastdds::dds::PID_NETWORK_CONFIGURATION_SET, PARAMETER_NETWORKCONFIGSET_LENGTH);
+        p.netconfigSet = m_networkConfiguration;
+        if (!fastdds::dds::ParameterSerializer<ParameterNetworkConfigSet_t>::add_to_cdr_message(p, msg))
         {
             return false;
         }
@@ -389,13 +422,6 @@ bool ReaderProxyData::writeToCDRMessage(
     {
         ParameterKey_t p(fastdds::dds::PID_KEY_HASH, 16, m_key);
         if (!fastdds::dds::ParameterSerializer<ParameterKey_t>::add_to_cdr_message(p, msg))
-        {
-            return false;
-        }
-    }
-    {
-        ParameterGuid_t p(fastdds::dds::PID_ENDPOINT_GUID, PARAMETER_GUID_LENGTH, m_guid);
-        if (!fastdds::dds::ParameterSerializer<ParameterGuid_t>::add_to_cdr_message(p, msg))
         {
             return false;
         }
@@ -533,6 +559,15 @@ bool ReaderProxyData::writeToCDRMessage(
         }
     }
 
+    if ((m_qos.data_sharing.send_always() || m_qos.data_sharing.hasChanged) &&
+            m_qos.data_sharing.kind() != fastdds::dds::OFF)
+    {
+        if (!fastdds::dds::QosPoliciesSerializer<DataSharingQosPolicy>::add_to_cdr_message(m_qos.data_sharing, msg))
+        {
+            return false;
+        }
+    }
+
     if (m_type_id && m_type_id->m_type_identifier._d() != 0)
     {
         if (!fastdds::dds::QosPoliciesSerializer<TypeIdV1>::add_to_cdr_message(*m_type_id, msg))
@@ -579,12 +614,14 @@ bool ReaderProxyData::writeToCDRMessage(
     }
 #endif // if HAVE_SECURITY
 
-    /* TODO - Enable when implement XCDR, XCDR2 and/or XML
-       if (m_qos.representation.send_always() || m_qos.representation.hasChanged)
-       {
-        if (!m_qos.representation.addToCDRMessage(msg)) return false;
-       }
-     */
+    if (m_qos.representation.send_always() || m_qos.representation.hasChanged)
+    {
+        if (!fastdds::dds::QosPoliciesSerializer<DataRepresentationQosPolicy>::add_to_cdr_message(m_qos.representation,
+                msg))
+        {
+            return false;
+        }
+    }
 
     if (m_qos.type_consistency.send_always() || m_qos.type_consistency.hasChanged)
     {
@@ -603,31 +640,21 @@ bool ReaderProxyData::writeToCDRMessage(
         }
     }
 
-    if ((m_qos.data_sharing.send_always() || m_qos.data_sharing.hasChanged) &&
-            m_qos.data_sharing.kind() != fastdds::dds::OFF)
-    {
-        if (!fastdds::dds::QosPoliciesSerializer<DataSharingQosPolicy>::add_to_cdr_message(m_qos.data_sharing, msg))
-        {
-            return false;
-        }
-    }
-
     return fastdds::dds::ParameterSerializer<Parameter_t>::add_parameter_sentinel(msg);
 }
 
 bool ReaderProxyData::readFromCDRMessage(
         CDRMessage_t* msg,
         const NetworkFactory& network,
-        bool is_shm_transport_available)
+        bool is_shm_transport_available,
+        bool should_filter_locators,
+        fastdds::rtps::VendorId_t source_vendor_id)
 {
-    bool are_shm_default_locators_present = false;
-    bool is_shm_transport_possible = false;
-
-    auto param_process = [this, &network,
-                    &is_shm_transport_available,
-                    &is_shm_transport_possible,
-                    &are_shm_default_locators_present](CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
+    auto param_process = [this, &network, &is_shm_transport_available, &should_filter_locators, source_vendor_id](
+        CDRMessage_t* msg, const ParameterId_t& pid, uint16_t plength)
             {
+                VendorId_t vendor_id = c_VendorId_Unknown;
+
                 switch (pid)
                 {
                     case fastdds::dds::PID_VENDORID:
@@ -640,6 +667,7 @@ bool ReaderProxyData::readFromCDRMessage(
                         }
 
                         is_shm_transport_available &= (p.vendorId == c_VendorId_eProsima);
+                        vendor_id = p.vendorId;
                         break;
                     }
                     case fastdds::dds::PID_DURABILITY:
@@ -826,6 +854,32 @@ bool ReaderProxyData::readFromCDRMessage(
                         m_key = p.guid;
                         break;
                     }
+                    case fastdds::dds::PID_NETWORK_CONFIGURATION_SET:
+                    {
+                        VendorId_t local_vendor_id = source_vendor_id;
+                        if (c_VendorId_Unknown == local_vendor_id)
+                        {
+                            local_vendor_id = ((c_VendorId_Unknown == vendor_id) ? c_VendorId_eProsima : vendor_id);
+                        }
+
+                        // Ignore custom PID when coming from other vendors
+                        if (c_VendorId_eProsima != local_vendor_id)
+                        {
+                            EPROSIMA_LOG_INFO(RTPS_PROXY_DATA,
+                                    "Ignoring custom PID" << pid << " from vendor " << local_vendor_id);
+                            return true;
+                        }
+
+                        ParameterNetworkConfigSet_t p(pid, plength);
+                        if (!fastdds::dds::ParameterSerializer<ParameterNetworkConfigSet_t>::read_from_cdr_message(p,
+                                msg, plength))
+                        {
+                            return false;
+                        }
+
+                        m_networkConfiguration = p.netconfigSet;
+                        break;
+                    }
                     case fastdds::dds::PID_UNICAST_LOCATOR:
                     {
                         ParameterLocator_t p(pid, plength);
@@ -835,16 +889,22 @@ bool ReaderProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator))
+                        if (!should_filter_locators)
                         {
-                            ProxyDataFilters::filter_locators(
-                                is_shm_transport_available,
-                                &is_shm_transport_possible,
-                                &are_shm_default_locators_present,
-                                &remote_locators_,
-                                temp_locator,
-                                true);
+                            remote_locators_.add_unicast_locator(p.locator);
+                        }
+                        else
+                        {
+                            Locator_t temp_locator;
+                            if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration,
+                                    m_guid.is_from_this_host()))
+                            {
+                                ProxyDataFilters::filter_locators(
+                                    is_shm_transport_available,
+                                    remote_locators_,
+                                    temp_locator,
+                                    true);
+                            }
                         }
                         break;
                     }
@@ -857,16 +917,22 @@ bool ReaderProxyData::readFromCDRMessage(
                             return false;
                         }
 
-                        Locator_t temp_locator;
-                        if (network.transform_remote_locator(p.locator, temp_locator))
+                        if (!should_filter_locators)
                         {
-                            ProxyDataFilters::filter_locators(
-                                is_shm_transport_available,
-                                &is_shm_transport_possible,
-                                &are_shm_default_locators_present,
-                                &remote_locators_,
-                                temp_locator,
-                                false);
+                            remote_locators_.add_multicast_locator(p.locator);
+                        }
+                        else
+                        {
+                            Locator_t temp_locator;
+                            if (network.transform_remote_locator(p.locator, temp_locator, m_networkConfiguration,
+                                    m_guid.is_from_this_host()))
+                            {
+                                ProxyDataFilters::filter_locators(
+                                    is_shm_transport_available,
+                                    remote_locators_,
+                                    temp_locator,
+                                    false);
+                            }
                         }
                         break;
                     }
@@ -943,6 +1009,21 @@ bool ReaderProxyData::readFromCDRMessage(
 
                     case fastdds::dds::PID_DISABLE_POSITIVE_ACKS:
                     {
+                        VendorId_t local_vendor_id = source_vendor_id;
+                        if (c_VendorId_Unknown == local_vendor_id)
+                        {
+                            local_vendor_id = ((c_VendorId_Unknown == vendor_id) ? c_VendorId_eProsima : vendor_id);
+                        }
+
+                        // Ignore custom PID when coming from other vendors except RTI Connext
+                        if ((c_VendorId_eProsima != local_vendor_id) &&
+                                (fastdds::rtps::c_VendorId_rti_connext != local_vendor_id))
+                        {
+                            EPROSIMA_LOG_INFO(RTPS_PROXY_DATA,
+                                    "Ignoring custom PID" << pid << " from vendor " << local_vendor_id);
+                            return true;
+                        }
+
                         if (!fastdds::dds::QosPoliciesSerializer<DisablePositiveACKsQosPolicy>::read_from_cdr_message(
                                     m_qos.m_disablePositiveACKs, msg, plength))
                         {
@@ -987,10 +1068,24 @@ bool ReaderProxyData::readFromCDRMessage(
 
                     case fastdds::dds::PID_DATASHARING:
                     {
+                        VendorId_t local_vendor_id = source_vendor_id;
+                        if (c_VendorId_Unknown == local_vendor_id)
+                        {
+                            local_vendor_id = ((c_VendorId_Unknown == vendor_id) ? c_VendorId_eProsima : vendor_id);
+                        }
+
+                        // Ignore custom PID when coming from other vendors
+                        if (c_VendorId_eProsima != local_vendor_id)
+                        {
+                            EPROSIMA_LOG_INFO(RTPS_PROXY_DATA,
+                                    "Ignoring custom PID" << pid << " from vendor " << local_vendor_id);
+                            return true;
+                        }
+
                         if (!fastdds::dds::QosPoliciesSerializer<DataSharingQosPolicy>::read_from_cdr_message(
                                     m_qos.data_sharing, msg, plength))
                         {
-                            logError(RTPS_READER_PROXY_DATA,
+                            EPROSIMA_LOG_ERROR(RTPS_READER_PROXY_DATA,
                                     "Received with error.");
                             return false;
                         }
@@ -1053,6 +1148,7 @@ void ReaderProxyData::clear()
     plugin_security_attributes_ = 0UL;
 #endif // if HAVE_SECURITY
     m_guid = c_Guid_Unknown;
+    m_networkConfiguration = 0;
     remote_locators_.unicast.clear();
     remote_locators_.multicast.clear();
     m_key = InstanceHandle_t();
@@ -1116,6 +1212,7 @@ void ReaderProxyData::copy(
         ReaderProxyData* rdata)
 {
     m_guid = rdata->m_guid;
+    m_networkConfiguration = rdata->m_networkConfiguration;
     remote_locators_ = rdata->remote_locators_;
     m_key = rdata->m_key;
     m_RTPSParticipantKey = rdata->m_RTPSParticipantKey;
@@ -1180,13 +1277,12 @@ void ReaderProxyData::set_remote_unicast_locators(
         const LocatorList_t& locators,
         const NetworkFactory& network)
 {
-    Locator_t local_locator;
     remote_locators_.unicast.clear();
     for (const Locator_t& locator : locators)
     {
-        if (network.transform_remote_locator(locator, local_locator))
+        if (network.is_locator_remote_or_allowed(locator, m_guid.is_from_this_host()))
         {
-            remote_locators_.add_unicast_locator(local_locator);
+            remote_locators_.add_unicast_locator(locator);
         }
     }
 }
@@ -1201,11 +1297,10 @@ void ReaderProxyData::set_multicast_locators(
         const LocatorList_t& locators,
         const NetworkFactory& network)
 {
-    Locator_t local_locator;
     remote_locators_.multicast.clear();
     for (const Locator_t& locator : locators)
     {
-        if (network.transform_remote_locator(locator, local_locator))
+        if (network.is_locator_remote_or_allowed(locator, m_guid.is_from_this_host()))
         {
             remote_locators_.add_multicast_locator(locator);
         }
@@ -1223,15 +1318,14 @@ void ReaderProxyData::set_remote_locators(
         const NetworkFactory& network,
         bool use_multicast_locators)
 {
-    Locator_t local_locator;
     remote_locators_.unicast.clear();
     remote_locators_.multicast.clear();
 
     for (const Locator_t& locator : locators.unicast)
     {
-        if (network.transform_remote_locator(locator, local_locator))
+        if (network.is_locator_remote_or_allowed(locator, m_guid.is_from_this_host()))
         {
-            remote_locators_.add_unicast_locator(local_locator);
+            remote_locators_.add_unicast_locator(locator);
         }
     }
 
@@ -1239,7 +1333,7 @@ void ReaderProxyData::set_remote_locators(
     {
         for (const Locator_t& locator : locators.multicast)
         {
-            if (network.transform_remote_locator(locator, local_locator))
+            if (network.is_locator_remote_or_allowed(locator, m_guid.is_from_this_host()))
             {
                 remote_locators_.add_multicast_locator(locator);
             }

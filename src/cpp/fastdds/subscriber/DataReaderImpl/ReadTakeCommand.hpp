@@ -65,7 +65,8 @@ struct ReadTakeCommand
             int32_t max_samples,
             const StateFilter& states,
             const history_type::instance_info& instance,
-            bool single_instance = false)
+            bool single_instance,
+            bool loop_for_data)
         : type_(reader.type_)
         , loan_manager_(reader.loan_manager_)
         , history_(reader.history_)
@@ -79,6 +80,7 @@ struct ReadTakeCommand
         , instance_(instance)
         , handle_(instance->first)
         , single_instance_(single_instance)
+        , loop_for_data_(loop_for_data)
     {
         assert(0 <= remaining_samples_);
 
@@ -145,6 +147,7 @@ struct ReadTakeCommand
                     // Add sample and info to collections
                     ReturnCode_t previous_return_value = return_value_;
                     bool added = add_sample(*it, remove_change);
+                    history_.change_was_processed_nts(change, added);
                     reader_->end_sample_access_nts(change, wp, added);
 
                     // Check if the payload is dirty
@@ -180,7 +183,7 @@ struct ReadTakeCommand
 
         if (current_slot_ > first_slot)
         {
-            instance_->second->view_state = ViewStateKind::NOT_NEW_VIEW_STATE;
+            history_.instance_viewed_nts(instance_->second);
             ret_val = true;
 
             // complete sample infos
@@ -194,7 +197,17 @@ struct ReadTakeCommand
             }
         }
 
-        next_instance();
+        // Check if further iteration is required
+        if (single_instance_ && (!loop_for_data_ || (loop_for_data_ && ret_val)))
+        {
+            finished_ = true;
+            history_.check_and_remove_instance(instance_);
+        }
+        else
+        {
+            next_instance();
+        }
+
         return ret_val;
     }
 
@@ -225,9 +238,17 @@ struct ReadTakeCommand
         info.reception_timestamp = item->reader_info.receptionTimestamp;
         info.instance_handle = item->instanceHandle;
         info.publication_handle = InstanceHandle_t(item->writerGUID);
+
+        /*
+         * TODO(eduponz): The sample identity should be taken from the sample identity parameter.
+         * More importantly, the related sample identity should be taken from the related sample identity
+         * in write_params.
+         */
+        FASTDDS_TODO_BEFORE(3, 0, "Fill both sample_identity and related_sample_identity with write_params");
         info.sample_identity.writer_guid(item->writerGUID);
         info.sample_identity.sequence_number(item->sequenceNumber);
         info.related_sample_identity = item->write_params.sample_identity();
+
         info.valid_data = true;
 
         switch (item->kind)
@@ -258,6 +279,7 @@ private:
     history_type::instance_info instance_;
     InstanceHandle_t handle_;
     bool single_instance_;
+    bool loop_for_data_;
 
     bool finished_ = false;
     ReturnCode_t return_value_ = ReturnCode_t::RETCODE_NO_DATA;
@@ -268,11 +290,13 @@ private:
     {
         while (!is_current_instance_valid())
         {
-            if (!next_instance())
+            if ((single_instance_ && !loop_for_data_) || !next_instance())
             {
+                finished_ = true;
                 return false;
             }
         }
+
         return true;
     }
 
@@ -287,11 +311,6 @@ private:
     bool next_instance()
     {
         history_.check_and_remove_instance(instance_);
-        if (single_instance_)
-        {
-            finished_ = true;
-            return false;
-        }
 
         auto result = history_.next_available_instance_nts(handle_, instance_);
         if (!result.first)
@@ -396,7 +415,7 @@ private:
 
         if (!is_valid)
         {
-            logWarning(RTPS_READER,
+            EPROSIMA_LOG_WARNING(RTPS_READER,
                     "Change " << change->sequenceNumber << " from " << change->writerGUID << " is overidden");
             return false;
         }

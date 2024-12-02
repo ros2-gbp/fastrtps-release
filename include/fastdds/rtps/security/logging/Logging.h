@@ -250,15 +250,15 @@ bool Logging::compose_header(
                 case LoggingLevel::ALERT_LEVEL:                       \
                 case LoggingLevel::CRITICAL_LEVEL:                    \
                 case LoggingLevel::ERROR_LEVEL:                       \
-                    logError(SECURITY, MESSAGE);                      \
+                    EPROSIMA_LOG_ERROR(SECURITY, MESSAGE);                      \
                     break;                                            \
                 case LoggingLevel::WARNING_LEVEL:                     \
-                    logWarning(SECURITY, MESSAGE);                    \
+                    EPROSIMA_LOG_WARNING(SECURITY, MESSAGE);                    \
                     break;                                            \
                 case LoggingLevel::NOTICE_LEVEL:                      \
                 case LoggingLevel::INFORMATIONAL_LEVEL:               \
                 case LoggingLevel::DEBUG_LEVEL:                       \
-                    logInfo(SECURITY, MESSAGE);                       \
+                    EPROSIMA_LOG_INFO(SECURITY, MESSAGE);                       \
                     break;                                            \
             }                                                         \
         }                                                             \

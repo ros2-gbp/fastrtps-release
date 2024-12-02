@@ -12,18 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../profiles/test_xml_profiles.xml
-    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_profiles.xml
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../profiles/test_xml_profile.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_xml_profile.xml
     COPYONLY)
 
 set(PARTICIPANTTESTS_SOURCE
-    ParticipantTests.cpp
-    ${PROJECT_SOURCE_DIR}/src/cpp/rtps/builtin/discovery/participant/ServerAttributes.cpp
+        ParticipantTests.cpp
     )
 
 if(WIN32)
     add_definitions(-D_WIN32_WINNT=0x0601)
 endif()
+
+if(ANDROID)
+    if (ANDROID_NATIVE_API_LEVEL LESS 24)
+        list(APPEND PARTICIPANTTESTS_SOURCE
+            ${ANDROID_IFADDRS_SOURCE_DIR}/ifaddrs.c
+            )
+    endif()
+endif()
+
 
 add_executable(ParticipantTests ${PARTICIPANTTESTS_SOURCE})
 target_compile_definitions(ParticipantTests PRIVATE
@@ -37,4 +45,12 @@ target_include_directories(ParticipantTests PRIVATE
 target_link_libraries(ParticipantTests fastrtps fastcdr foonathan_memory
     GTest::gmock
     ${CMAKE_DL_LIBS})
-add_gtest(ParticipantTests SOURCES ${PARTICIPANTTESTS_SOURCE})
+
+if(EPROSIMA_TEST_DNS_NOT_SET_UP)
+    message(STATUS "Ignoring 'ParticipantTests.SimpleParticipantRemoteServerListConfigurationDNS'")
+    set(dns_filter "-ParticipantTests.SimpleParticipantRemoteServerListConfigurationDNS")
+endif()
+
+gtest_discover_tests(ParticipantTests TEST_FILTER ${dns_filter})
+
+unset(dns_filter)

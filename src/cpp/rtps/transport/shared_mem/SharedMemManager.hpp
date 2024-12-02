@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <list>
+#include <thread>
 #include <unordered_map>
 
 #include <foonathan/memory/container.hpp>
@@ -113,7 +114,7 @@ private:
                     std::memory_order_relaxed))
             {
             }
-            logWarning(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
+            EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "Buffer is being invalidated, segment_size may be insufficient");
             return (s.processing_count == 0);
         }
 
@@ -263,8 +264,8 @@ public:
         }
         catch (const std::exception& e)
         {
-            logError(RTPS_TRANSPORT_SHM, "Failed to create Shared Memory Manager for domain " << domain_name
-                                                                                              << ": " <<
+            EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to create Shared Memory Manager for domain " << domain_name
+                                                                                                        << ": " <<
                     e.what());
             return std::shared_ptr<SharedMemManager>();
         }
@@ -388,8 +389,8 @@ public:
             }
             catch (const std::exception& e)
             {
-                logError(RTPS_TRANSPORT_SHM, "Failed to create segment " << segment_name_
-                                                                         << ": " << e.what());
+                EPROSIMA_LOG_ERROR(RTPS_TRANSPORT_SHM, "Failed to create segment " << segment_name_
+                                                                                   << ": " << e.what());
 
                 throw;
             }
@@ -422,7 +423,7 @@ public:
 
             if (overflows_count_)
             {
-                logWarning(RTPS_TRANSPORT_SHM,
+                EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM,
                         "Segment " << segment_id_.to_string().c_str()
                                    << " closed. It had " << "overflows_count "
                                    << overflows_count_);
@@ -675,7 +676,7 @@ public:
                 }
                 catch (const std::exception& e)
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, e.what());
                 }
             }
         }
@@ -736,6 +737,11 @@ public:
                     global_port_->pop(*global_listener_, was_cell_freed);
 
                     auto segment = shared_mem_manager_->find_segment(buffer_descriptor.source_segment_id);
+                    if (!segment)
+                    {
+                        // Descriptor points to non-existing segment: discard
+                        continue;
+                    }
                     auto buffer_node =
                             static_cast<BufferNode*>(segment->get_address_from_offset(buffer_descriptor.
                                     buffer_node_offset));
@@ -778,8 +784,9 @@ public:
                 }
                 else
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, "SHM Listener on port " << global_port_->port_id() << " failure: "
-                                                                           << e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM,
+                            "SHM Listener on port " << global_port_->port_id() << " failure: "
+                                                    << e.what());
 
                     regenerate_port();
                 }
@@ -901,8 +908,8 @@ public:
 
                 if (!global_port_->is_port_ok())
                 {
-                    logWarning(RTPS_TRANSPORT_SHM, "SHM Port " << global_port_->port_id() << " failure: "
-                                                               << e.what());
+                    EPROSIMA_LOG_WARNING(RTPS_TRANSPORT_SHM, "SHM Port " << global_port_->port_id() << " failure: "
+                                                                         << e.what());
 
                     regenerate_port();
                     is_port_ok = false;
@@ -1304,7 +1311,14 @@ private:
         else // Is a new segment
         {
             auto segment_name = global_segment_.domain_name() + "_" + id.to_string();
-            segment = std::make_shared<SharedMemSegment>(boost::interprocess::open_only, segment_name);
+            try
+            {
+                segment = std::make_shared<SharedMemSegment>(boost::interprocess::open_only, segment_name);
+            }
+            catch (std::exception&)
+            {
+                return segment;
+            }
             auto segment_wrapper = std::make_shared<SegmentWrapper>(shared_from_this(), segment, id, segment_name);
 
             ids_segments_[id.get()] = segment_wrapper;

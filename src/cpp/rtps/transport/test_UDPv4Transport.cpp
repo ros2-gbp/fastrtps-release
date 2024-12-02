@@ -33,10 +33,10 @@ using SequenceNumber_t = fastrtps::rtps::SequenceNumber_t;
 using EntityId_t = fastrtps::rtps::EntityId_t;
 
 std::vector<std::vector<octet>> test_UDPv4Transport::test_UDPv4Transport_DropLog;
-uint32_t test_UDPv4Transport::test_UDPv4Transport_DropLogLength = 0;
-bool test_UDPv4Transport::test_UDPv4Transport_ShutdownAllNetwork = false;
-bool test_UDPv4Transport::always_drop_participant_builtin_topic_data = false;
-bool test_UDPv4Transport::simulate_no_interfaces = false;
+std::atomic<uint32_t> test_UDPv4Transport::test_UDPv4Transport_DropLogLength(0);
+std::atomic<bool> test_UDPv4Transport::test_UDPv4Transport_ShutdownAllNetwork(false);
+std::atomic<bool> test_UDPv4Transport::always_drop_participant_builtin_topic_data(false);
+std::atomic<bool> test_UDPv4Transport::simulate_no_interfaces(false);
 test_UDPv4TransportDescriptor::DestinationLocatorFilter test_UDPv4Transport::locator_filter([](const Locator&)
         {
             return false;
@@ -145,15 +145,14 @@ bool test_UDPv4TransportDescriptor::operator ==(
            SocketTransportDescriptor::operator ==(t));
 }
 
-void test_UDPv4Transport::get_ips(
+bool test_UDPv4Transport::get_ips(
         std::vector<fastrtps::rtps::IPFinder::info_IP>& locNames,
-        bool return_loopback)
+        bool return_loopback,
+        bool force_lookup) const
 {
-
     if (!simulate_no_interfaces)
     {
-        UDPv4Transport::get_ips(locNames, return_loopback);
-        return;
+        return UDPv4Transport::get_ips(locNames, return_loopback, force_lookup);
     }
 
     if (return_loopback)
@@ -164,8 +163,11 @@ void test_UDPv4Transport::get_ips(
         local.name = "127.0.0.1";
         local.locator.kind = LOCATOR_KIND_UDPv4;
         fill_local_ip(local.locator);
+        local.masked_locator = local.locator;
+        local.masked_locator.mask(32);
         locNames.emplace_back(local);
     }
+    return true;
 }
 
 LocatorList test_UDPv4Transport::NormalizeLocator(
@@ -206,6 +208,12 @@ bool test_UDPv4Transport::send(
 
     while (it != *destination_locators_end)
     {
+        if (!IsLocatorSupported(*it))
+        {
+            ++it;
+            continue;
+        }
+
         auto now = std::chrono::steady_clock::now();
 
         if (now < max_blocking_time_point)
@@ -312,8 +320,8 @@ bool test_UDPv4Transport::packet_should_drop(
         return true;
     }
 
-    CDRMessage_t cdrMessage(send_buffer_size);
-    memcpy(cdrMessage.buffer, send_buffer, send_buffer_size);
+    CDRMessage_t cdrMessage(0);
+    cdrMessage.init(const_cast<octet*>(send_buffer), send_buffer_size);
     cdrMessage.length = send_buffer_size;
 
     if (cdrMessage.length < RTPSMESSAGE_HEADER_SIZE)
@@ -364,26 +372,35 @@ bool test_UDPv4Transport::packet_should_drop(
                     {
                         return true;
                     }
-                    else if (!drop_participant_builtin_topic_data_)
+                    else if (drop_participant_builtin_topic_data_)
                     {
-                        return false;
+                        return true;
                     }
                 }
-                else if ((!drop_publication_builtin_topic_data_ &&
-                        writer_id == fastrtps::rtps::c_EntityId_SEDPPubWriter) ||
-                        (!drop_subscription_builtin_topic_data_ &&
-                        writer_id == fastrtps::rtps::c_EntityId_SEDPSubWriter))
+                else if (writer_id == fastrtps::rtps::c_EntityId_SEDPPubWriter)
                 {
-                    return false;
+                    if (drop_publication_builtin_topic_data_)
+                    {
+                        return true;
+                    }
                 }
-
-                if (should_be_dropped(&drop_data_messages_percentage_))
+                else if (writer_id == fastrtps::rtps::c_EntityId_SEDPSubWriter)
                 {
-                    return true;
+                    if (drop_subscription_builtin_topic_data_)
+                    {
+                        return true;
+                    }
                 }
-                if (drop_data_messages_filter_(cdrMessage))
+                else
                 {
-                    return true;
+                    if (should_be_dropped(&drop_data_messages_percentage_))
+                    {
+                        return true;
+                    }
+                    if (drop_data_messages_filter_(cdrMessage))
+                    {
+                        return true;
+                    }
                 }
 
                 break;
