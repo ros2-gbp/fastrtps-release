@@ -29,9 +29,10 @@ using namespace eprosima::fastdds::dds;
  * --seed <int>
  * --wait <int>
  * --samples <int>
+ * --interval <int>
  * --magic <str>
  * --xmlfile <path>
- * --interval <int>
+ * --rescan <int>
  */
 
 int main(
@@ -40,6 +41,7 @@ int main(
 {
     int arg_count = 1;
     bool exit_on_lost_liveliness = false;
+    bool exit_on_disposal_received = false;
     bool fixed_type = false;
     bool zero_copy = false;
     uint32_t seed = 7800;
@@ -47,6 +49,7 @@ int main(
     char* xml_file = nullptr;
     uint32_t samples = 4;
     uint32_t interval = 250;
+    uint32_t rescan_interval_seconds = 0;
     std::string magic;
 
     while (arg_count < argc)
@@ -54,6 +57,10 @@ int main(
         if (strcmp(argv[arg_count], "--exit_on_lost_liveliness") == 0)
         {
             exit_on_lost_liveliness = true;
+        }
+        else if (strcmp(argv[arg_count], "--exit_on_disposal_received") == 0)
+        {
+            exit_on_disposal_received = true;
         }
         else if (strcmp(argv[arg_count], "--fixed_type") == 0)
         {
@@ -123,6 +130,16 @@ int main(
 
             xml_file = argv[arg_count];
         }
+        else if (strcmp(argv[arg_count], "--rescan") == 0)
+        {
+            if (++arg_count >= argc)
+            {
+                std::cout << "--rescan expects a parameter" << std::endl;
+                return -1;
+            }
+
+            rescan_interval_seconds = strtol(argv[arg_count], nullptr, 10);
+        }
         else
         {
             std::cout << "Wrong argument " << argv[arg_count] << std::endl;
@@ -137,7 +154,7 @@ int main(
         DomainParticipantFactory::get_instance()->load_XML_profiles_file(xml_file);
     }
 
-    PublisherModule publisher(exit_on_lost_liveliness, fixed_type, zero_copy);
+    PublisherModule publisher(exit_on_lost_liveliness, exit_on_disposal_received, fixed_type, zero_copy);
 
     if (publisher.init(seed, magic))
     {
@@ -146,7 +163,7 @@ int main(
             publisher.wait_discovery(wait);
         }
 
-        publisher.run(samples, 0, interval);
+        publisher.run(samples, rescan_interval_seconds, 0, interval);
         return 0;
     }
 
