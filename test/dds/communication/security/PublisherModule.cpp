@@ -134,12 +134,29 @@ void PublisherModule::wait_discovery(
 
 void PublisherModule::run(
         uint32_t samples,
+        const uint32_t rescan_interval,
         const uint32_t loops,
         uint32_t interval)
 {
     uint32_t current_loop = 0;
     uint16_t index = 1;
     void* sample = nullptr;
+
+    std::thread net_rescan_thread([this, rescan_interval]()
+            {
+                if (rescan_interval > 0)
+                {
+                    auto interval = std::chrono::seconds(rescan_interval);
+                    while (run_)
+                    {
+                        std::this_thread::sleep_for(interval);
+                        if (run_)
+                        {
+                            participant_->set_qos(participant_->get_qos());
+                        }
+                    }
+                }
+            });
 
     while (run_ && (loops == 0 || loops > current_loop))
     {
@@ -187,6 +204,9 @@ void PublisherModule::run(
 
         std::this_thread::sleep_for(std::chrono::milliseconds(interval));
     }
+
+    run_ = false;
+    net_rescan_thread.join();
 }
 
 void PublisherModule::on_publication_matched(
@@ -230,6 +250,10 @@ void PublisherModule::on_participant_discovery(
     {
         std::cout << "Publisher participant " << // participant->getGuid() <<
             " removed participant " << info.info.m_guid << std::endl;
+        if (exit_on_disposal_received_)
+        {
+            run_ = false;
+        }
     }
     else if (info.status == ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
     {
