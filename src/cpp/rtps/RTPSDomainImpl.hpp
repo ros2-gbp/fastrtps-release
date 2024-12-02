@@ -25,13 +25,17 @@
 #endif // defined(_WIN32) || defined(__unix__)
 
 #include <fastdds/rtps/attributes/ThreadSettings.hpp>
+#include <fastdds/rtps/reader/LocalReaderPointer.hpp>
 #include <fastrtps/rtps/reader/RTPSReader.h>
 #include <fastrtps/rtps/RTPSDomain.h>
 #include <fastrtps/rtps/writer/RTPSWriter.h>
 
+#include <utils/shared_memory/BoostAtExitRegistry.hpp>
 #include <utils/SystemInfo.hpp>
 
-#include <utils/shared_memory/BoostAtExitRegistry.hpp>
+#if HAVE_SECURITY
+#include <security/OpenSSLInit.hpp>
+#endif // HAVE_SECURITY
 
 namespace eprosima {
 namespace fastrtps {
@@ -173,7 +177,7 @@ public:
      *
      * @returns A pointer to a local reader given its endpoint guid, or nullptr if not found.
      */
-    static RTPSReader* find_local_reader(
+    static std::shared_ptr<LocalReaderPointer> find_local_reader(
             const GUID_t& reader_guid);
 
     /**
@@ -249,6 +253,9 @@ private:
     std::shared_ptr<eprosima::detail::BoostAtExitRegistry> boost_singleton_handler_ { eprosima::detail::
                                                                                               BoostAtExitRegistry::
                                                                                               get_instance() };
+#if HAVE_SECURITY
+    std::shared_ptr<security::OpenSSLInit> openssl_singleton_handler_{ security::OpenSSLInit::get_instance() };
+#endif // HAVE_SECURITY
 
     std::mutex m_mutex;
 
